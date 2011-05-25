@@ -1,0 +1,21 @@
+AC_INIT([gemelo], 0.1)
+
+AM_CONFIG_HEADER([config.h])
+
+AM_INIT_AUTOMAKE([1.9])
+
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+AC_PROG_CC
+
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.16 gobject-2.0 >= 2.16 gio-2.0 >= 2.22])
+
+AC_PATH_PROG([GLIB_MKENUMS], [glib-mkenums])
+AC_PATH_PROG([GLIB_GENMARSHAL], [glib-genmarshal])
+
+AC_CONFIG_FILES([
+        Makefile
+        src/Makefile
+])
+
+AC_OUTPUT
