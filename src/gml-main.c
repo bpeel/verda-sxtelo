@@ -21,9 +21,59 @@
 #endif
 
 #include <glib.h>
+#include <unistd.h>
+
+#include "gml-main-context.h"
+
+static int carry_on = TRUE;
+
+static void
+timer_cb (GmlMainContextSource *source,
+          void *user_data)
+{
+  g_print ("timer %p\n", user_data);
+}
+
+static void
+poll_in_cb (GmlMainContextSource *source,
+            int fd,
+            GmlMainContextPollFlags flags,
+            void *user_data)
+{
+  g_print ("%i %p 0x%x\n", fd, user_data, flags);
+  carry_on = FALSE;
+}
 
 int
 main (int argc, char **argv)
 {
+  GError *error = NULL;
+  GmlMainContext *mc = gml_main_context_new (&error);
+  GmlMainContextSource *poll_source, *timer_source;
+
+  if (mc == NULL)
+    {
+      g_print ("%s\n", error->message);
+      return 1;
+    }
+
+  poll_source = gml_main_context_add_poll (mc,
+                                           STDIN_FILENO,
+                                           GML_MAIN_CONTEXT_POLL_IN,
+                                           poll_in_cb,
+                                           (void *) 0xdeadbeef);
+  timer_source = gml_main_context_add_timer (mc,
+                                             timer_cb,
+                                             (void *) 0xdeadbeef);
+  gml_main_context_set_timer (mc, timer_source, 1750);
+
+  while (carry_on)
+    gml_main_context_poll (mc, -1);
+
+  gml_main_context_remove_source (mc, poll_source);
+  gml_main_context_remove_source (mc, timer_source);
+
+  gml_main_context_free (mc);
+
   return 0;
 }

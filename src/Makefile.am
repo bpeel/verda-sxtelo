@@ -4,11 +4,13 @@ INCLUDES = \
 	$(GLIB_CFLAGS) \
 	-DGML_LIBDIR=\""$(libdir)"\"
 
-source_h =
+source_h = \
+	$(srcdir)/gml-main-context.h
 
 gemelo_SOURCES = \
 	$(source_h) \
-	$(srcdir)/gml-main.c
+	$(srcdir)/gml-main.c \
+	$(srcdir)/gml-main-context.c
 
 gemelo_LDFLAGS = \
 	$(GLIB_LIBS)
