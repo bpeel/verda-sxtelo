@@ -26,6 +26,14 @@ AS_IF([test "x$have_timerfd" = "xno"],
       AC_MSG_ERROR([timerfd support is required to build gemelo.
 This should be provided by glibc since version 2.8]))
 
+have_signalfd=yes
+AC_CHECK_HEADER(sys/signalfd.h, , have_signalfd=no)
+AC_CHECK_FUNC(signalfd, , have_signalfd=no)
+
+AS_IF([test "x$have_signalfd" = "xno"],
+      AC_MSG_ERROR([signalfd support is required to build gemelo.
+This should be provided by glibc since version 2.8]))
+
 AC_PATH_PROG([GLIB_MKENUMS], [glib-mkenums])
 AC_PATH_PROG([GLIB_GENMARSHAL], [glib-genmarshal])
 
