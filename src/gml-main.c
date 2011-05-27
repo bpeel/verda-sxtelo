@@ -21,59 +21,109 @@
 #endif
 
 #include <glib.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "gml-main-context.h"
+#include "gml-server.h"
 
-static int carry_on = TRUE;
+static char *option_listen_address = "0.0.0.0";
+static int option_listen_port = 5142;
 
-static void
-timer_cb (GmlMainContextSource *source,
-          void *user_data)
+static GOptionEntry
+options[] =
+  {
+    {
+      "address", 'a', 0, G_OPTION_ARG_STRING, &option_listen_address,
+      "Address to listen on", "address"
+    },
+    {
+      "port", 'p', 0, G_OPTION_ARG_INT, &option_listen_port,
+      "Port to listen on", "port"
+    },
+    { NULL, 0, 0, 0, NULL, NULL, NULL }
+  };
+
+static gboolean
+process_arguments (int *argc, char ***argv,
+                   GError **error)
 {
-  g_print ("timer %p\n", user_data);
+  GOptionContext *context;
+  gboolean ret;
+  GOptionGroup *group;
+
+  group = g_option_group_new (NULL, /* name */
+                              NULL, /* description */
+                              NULL, /* help_description */
+                              NULL, /* user_data */
+                              NULL /* destroy notify */);
+  g_option_group_add_entries (group, options);
+  context = g_option_context_new ("- A server for practicing a "
+                                  "foreign language");
+  g_option_context_set_main_group (context, group);
+  ret = g_option_context_parse (context, argc, argv, error);
+  g_option_context_free (context);
+
+  if (ret && *argc > 1)
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
+                   "Unknown option '%s'", (* argv)[1]);
+      ret = FALSE;
+    }
+
+  return ret;
 }
 
-static void
-poll_in_cb (GmlMainContextSource *source,
-            int fd,
-            GmlMainContextPollFlags flags,
-            void *user_data)
+static GmlServer *
+create_server (GError **error)
 {
-  g_print ("%i %p 0x%x\n", fd, user_data, flags);
-  carry_on = FALSE;
+  GInetAddress *inet_address;
+  GmlServer *server = NULL;
+
+  inet_address = g_inet_address_new_from_string (option_listen_address);
+
+  if (inet_address == NULL)
+    g_set_error (error, G_IO_ERROR, G_IO_ERROR_UNKNOWN,
+                 "Failed to parse address '%s'",
+                 option_listen_address);
+  else
+    {
+      GSocketAddress *address = g_inet_socket_address_new (inet_address,
+                                                           option_listen_port);
+
+      server = gml_server_new (address, error);
+
+      g_object_unref (address);
+      g_object_unref (inet_address);
+    }
+
+  return server;
 }
 
 int
 main (int argc, char **argv)
 {
   GError *error = NULL;
-  GmlMainContext *mc = gml_main_context_new (&error);
-  GmlMainContextSource *poll_source, *timer_source;
+  GmlServer *server;
 
-  if (mc == NULL)
+  g_type_init ();
+
+  if (!process_arguments (&argc, &argv, &error))
     {
-      g_print ("%s\n", error->message);
-      return 1;
+      fprintf (stderr, "%s\n", error->message);
+      return EXIT_FAILURE;
     }
 
-  poll_source = gml_main_context_add_poll (mc,
-                                           STDIN_FILENO,
-                                           GML_MAIN_CONTEXT_POLL_IN,
-                                           poll_in_cb,
-                                           (void *) 0xdeadbeef);
-  timer_source = gml_main_context_add_timer (mc,
-                                             timer_cb,
-                                             (void *) 0xdeadbeef);
-  gml_main_context_set_timer (mc, timer_source, 1750);
+  server = create_server (&error);
 
-  while (carry_on)
-    gml_main_context_poll (mc, -1);
+  if (server == NULL)
+    fprintf (stderr, "%s\n", error->message);
+  else
+    {
+      if (!gml_server_run (server, &error))
+        fprintf (stderr, "%s\n", error->message);
 
-  gml_main_context_remove_source (mc, poll_source);
-  gml_main_context_remove_source (mc, timer_source);
-
-  gml_main_context_free (mc);
+      gml_server_free (server);
+    }
 
   return 0;
 }
