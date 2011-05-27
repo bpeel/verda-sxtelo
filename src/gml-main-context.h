@@ -48,6 +48,9 @@ typedef void (* GmlMainContextPollCallback) (GmlMainContextSource *source,
 typedef void (* GmlMainContextTimerCallback) (GmlMainContextSource *source,
                                               void *user_data);
 
+typedef void (* GmlMainContextQuitCallback) (GmlMainContextSource *source,
+                                             void *user_data);
+
 GmlMainContext *
 gml_main_context_new (GError **error);
 
@@ -67,6 +70,11 @@ GmlMainContextSource *
 gml_main_context_add_timer (GmlMainContext *mc,
                             GmlMainContextTimerCallback callback,
                             void *user_data);
+
+GmlMainContextSource *
+gml_main_context_add_quit (GmlMainContext *mc,
+                           GmlMainContextQuitCallback callback,
+                           void *user_data);
 
 void
 gml_main_context_set_timer (GmlMainContext *mc,

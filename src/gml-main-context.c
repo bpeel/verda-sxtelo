@@ -25,7 +25,9 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
+#include <sys/signalfd.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "gml-main-context.h"
 
@@ -51,7 +53,8 @@ struct _GmlMainContextSource
   enum
   {
     GML_MAIN_CONTEXT_POLL_SOURCE,
-    GML_MAIN_CONTEXT_TIMER_SOURCE
+    GML_MAIN_CONTEXT_TIMER_SOURCE,
+    GML_MAIN_CONTEXT_QUIT_SOURCE
   } type;
   int fd;
   gpointer user_data;
@@ -202,6 +205,43 @@ gml_main_context_set_timer (GmlMainContext *mc,
     g_warning ("timerfd_settime failed: %s", strerror (errno));
 }
 
+GmlMainContextSource *
+gml_main_context_add_quit (GmlMainContext *mc,
+                           GmlMainContextQuitCallback callback,
+                           void *user_data)
+{
+  GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
+  sigset_t sigset;
+
+  sigemptyset (&sigset);
+  sigaddset (&sigset, SIGINT);
+
+  if (sigprocmask (SIG_BLOCK, &sigset, NULL) == -1)
+    g_warning ("sigprocmask failed: %s", strerror (errno));
+
+  source->fd = signalfd (-1, &sigset, SFD_NONBLOCK | SFD_CLOEXEC);
+  source->callback = callback;
+  source->type = GML_MAIN_CONTEXT_QUIT_SOURCE;
+  source->user_data = user_data;
+
+  if (source->fd == -1)
+    g_warning ("Failed to create timerfd: %s", strerror (errno));
+  else
+    {
+      struct epoll_event event;
+
+      event.events = EPOLLIN;
+      event.data.ptr = source;
+
+      if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_ADD, source->fd, &event) == -1)
+        g_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
+
+      mc->n_sources++;
+    }
+
+  return source;
+}
+
 void
 gml_main_context_remove_source (GmlMainContext *mc,
                                 GmlMainContextSource *source)
@@ -211,7 +251,8 @@ gml_main_context_remove_source (GmlMainContext *mc,
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
     g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
 
-  if (source->type == GML_MAIN_CONTEXT_TIMER_SOURCE)
+  if (source->type == GML_MAIN_CONTEXT_TIMER_SOURCE
+      || source->type == GML_MAIN_CONTEXT_QUIT_SOURCE)
     close (source->fd);
 
   g_slice_free (GmlMainContextSource, source);
@@ -282,6 +323,28 @@ gml_main_context_poll (GmlMainContext *mc,
                   }
                 else if (got != sizeof (count))
                   g_warning ("Read on timerfd returned %i", got);
+                else
+                  callback (source, source->user_data);
+              }
+              break;
+
+            case GML_MAIN_CONTEXT_QUIT_SOURCE:
+              {
+                GmlMainContextQuitCallback callback = source->callback;
+                struct signalfd_siginfo info;
+                int got;
+
+                got = read (source->fd, &info, sizeof (info));
+
+                if (got == -1)
+                  {
+                    if (errno != EAGAIN)
+                      g_warning ("Read on signalfd failed: %s",
+                                 strerror (errno));
+                  }
+                else if (got != sizeof (info))
+                  g_warning ("Read on signalfd returned %i "
+                             "(expected %i)", got, (int) sizeof (info));
                 else
                   callback (source, source->user_data);
               }
