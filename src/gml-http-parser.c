@@ -652,9 +652,12 @@ gml_http_parser_parser_eof (GmlHttpParser *parser,
     {
     case GML_HTTP_PARSER_READING_REQUEST_LINE:
       /* This is an acceptable place for the client to shutdown the
-         connection */
-      return TRUE;
+         connection if there we haven't received any of the line
+         yet */
+      if (parser->buf_len == 0)
+        return TRUE;
 
+      /* flow through */
     case GML_HTTP_PARSER_TERMINATING_REQUEST_LINE:
     case GML_HTTP_PARSER_READING_HEADER:
     case GML_HTTP_PARSER_TERMINATING_HEADER:
