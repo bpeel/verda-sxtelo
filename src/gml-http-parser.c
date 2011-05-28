@@ -644,6 +644,42 @@ gml_http_parser_parse_data (GmlHttpParser *parser,
   return TRUE;
 }
 
+gboolean
+gml_http_parser_parser_eof (GmlHttpParser *parser,
+                            GError **error)
+{
+  switch (parser->state)
+    {
+    case GML_HTTP_PARSER_READING_REQUEST_LINE:
+      /* This is an acceptable place for the client to shutdown the
+         connection */
+      return TRUE;
+
+    case GML_HTTP_PARSER_TERMINATING_REQUEST_LINE:
+    case GML_HTTP_PARSER_READING_HEADER:
+    case GML_HTTP_PARSER_TERMINATING_HEADER:
+    case GML_HTTP_PARSER_CHECKING_HEADER_CONTINUATION:
+    case GML_HTTP_PARSER_READING_DATA_WITH_LENGTH:
+    case GML_HTTP_PARSER_READING_CHUNK_LENGTH:
+    case GML_HTTP_PARSER_TERMINATING_CHUNK_LENGTH:
+    case GML_HTTP_PARSER_IGNORING_CHUNK_EXTENSION:
+    case GML_HTTP_PARSER_TERMINATING_CHUNK_EXTENSION:
+    case GML_HTTP_PARSER_IGNORING_CHUNK_TRAILER:
+    case GML_HTTP_PARSER_TERMINATING_CHUNK_TRAILER:
+    case GML_HTTP_PARSER_READING_CHUNK:
+    case GML_HTTP_PARSER_READING_CHUNK_TERMINATOR1:
+    case GML_HTTP_PARSER_READING_CHUNK_TERMINATOR2:
+      /* Closing the connection here is invalid */
+      g_set_error (error,
+                   GML_HTTP_PARSER_ERROR,
+                   GML_HTTP_PARSER_ERROR_INVALID,
+                   "Client closed the connection unexpectedly");
+      return FALSE;
+    }
+
+  g_assert_not_reached ();
+}
+
 GQuark
 gml_http_parser_error_quark (void)
 {

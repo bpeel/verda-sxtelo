@@ -96,6 +96,10 @@ gml_http_parser_parse_data (GmlHttpParser *parser,
                             unsigned int length,
                             GError **error);
 
+gboolean
+gml_http_parser_parser_eof (GmlHttpParser *parser,
+                            GError **error);
+
 GQuark
 gml_http_parser_error_quark (void);
 
