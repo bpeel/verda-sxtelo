@@ -24,6 +24,7 @@
 
 #include "gml-server.h"
 #include "gml-main-context.h"
+#include "gml-http-parser.h"
 
 struct _GmlServer
 {
@@ -37,7 +38,76 @@ struct _GmlServer
   GError *fatal_error;
 
   gboolean quit_received;
+
+  /* List of open connections */
+  GList *connections;
 };
+
+typedef struct
+{
+  GmlServer *server;
+
+  GSocket *client_socket;
+  GmlMainContextSource *source;
+
+  /* Pointer to the GList node in the connections list so it can be
+     removed quickly */
+  GList *list_node;
+
+  GmlHttpParser http_parser;
+} GmlServerConnection;
+
+static gboolean
+gml_server_request_line_received_cb (const char *method,
+                                     const char *uri,
+                                     void *user_data)
+{
+  g_print ("request line received \"%s\" \"%s\"\n",
+           method,
+           uri);
+
+  return TRUE;
+}
+
+static gboolean
+gml_server_header_received_cb (const char *field_name,
+                               const char *value,
+                               void *user_data)
+{
+  g_print ("header received \"%s\" \"%s\"\n",
+           field_name,
+           value);
+
+  return TRUE;
+}
+
+static gboolean
+gml_server_data_received_cb (const guint8 *data,
+                             unsigned int length,
+                             void *user_data)
+{
+  g_print ("data received \"%.*s\"\n",
+           length, data);
+
+  return TRUE;
+}
+
+static gboolean
+gml_server_request_finished_cb (void *user_data)
+{
+  g_print ("request finished\n");
+
+  return TRUE;
+}
+
+static GmlHttpParserVtable
+gml_server_http_parser_vtable =
+  {
+    .request_line_received = gml_server_request_line_received_cb,
+    .header_received = gml_server_header_received_cb,
+    .data_received = gml_server_data_received_cb,
+    .request_finished = gml_server_request_finished_cb
+  };
 
 static void
 gml_server_quit_cb (GmlMainContextSource *source,
@@ -46,6 +116,68 @@ gml_server_quit_cb (GmlMainContextSource *source,
   GmlServer *server = user_data;
 
   server->quit_received = TRUE;
+}
+
+static void
+gml_server_remove_connection (GmlServer *server,
+                              GmlServerConnection *connection)
+{
+  gml_main_context_remove_source (server->main_context, connection->source);
+  g_object_unref (connection->client_socket);
+  server->connections = g_list_delete_link (server->connections,
+                                            connection->list_node);
+  g_slice_free (GmlServerConnection, connection);
+}
+
+static void
+gml_server_connection_poll_cb (GmlMainContextSource *source,
+                               int fd,
+                               GmlMainContextPollFlags flags,
+                               void *user_data)
+{
+  GmlServerConnection *connection = user_data;
+  GmlServer *server = connection->server;
+  char buf[1024];
+
+  if (flags & GML_MAIN_CONTEXT_POLL_IN)
+    {
+      GError *error = NULL;
+
+      gssize got =
+        g_socket_receive (connection->client_socket,
+                          buf,
+                          sizeof (buf),
+                          NULL, /* cancellable */
+                          &error);
+
+      /* FIXME, the g_prints should be in some kind of logging mechanism */
+
+      if (got == 0)
+        {
+          g_print ("EOF from socket\n");
+          gml_server_remove_connection (server, connection);
+        }
+      else if (got == -1)
+        {
+          if (error->domain != G_IO_ERROR
+              || error->code != G_IO_ERROR_WOULD_BLOCK)
+            {
+              g_print ("Error reading from socket: %s\n", error->message);
+              gml_server_remove_connection (server, connection);
+            }
+
+          g_clear_error (&error);
+        }
+      else if (!gml_http_parser_parse_data (&connection->http_parser,
+                                            (guint8 *) buf,
+                                            got,
+                                            &error))
+        {
+          g_print ("%s\n", error->message);
+          g_clear_error (&error);
+          gml_server_remove_connection (server, connection);
+        }
+    }
 }
 
 static void
@@ -74,37 +206,30 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
     }
   else
     {
-      GSocketAddress *address =
-        g_socket_get_remote_address (client_socket,
-                                     &error);
+      GmlServerConnection *connection;
 
-      if (address == NULL)
-        g_print ("Error getting remote address: %s\n", error->message);
-      else
-        {
-          GInetAddress *inet_address;
-          char *name;
-          guint16 port;
+      g_socket_set_blocking (client_socket, FALSE);
 
-          g_assert (G_IS_INET_SOCKET_ADDRESS (address));
+      connection = g_slice_new (GmlServerConnection);
 
-          inet_address =
-            g_inet_socket_address_get_address (G_INET_SOCKET_ADDRESS (address));
+      connection->server = server;
+      connection->client_socket = client_socket;
+      connection->source =
+        gml_main_context_add_poll (server->main_context,
+                                   g_socket_get_fd (client_socket),
+                                   GML_MAIN_CONTEXT_POLL_IN,
+                                   gml_server_connection_poll_cb,
+                                   connection);
+      server->connections = g_list_prepend (server->connections,
+                                            connection);
 
-          name = g_inet_address_to_string (inet_address);
+      gml_http_parser_init (&connection->http_parser,
+                            &gml_server_http_parser_vtable,
+                            connection);
 
-          port =
-            g_inet_socket_address_get_port (G_INET_SOCKET_ADDRESS (address));
-
-          g_print ("Got connection from: %s:%i\n",
-                   name, (int) port);
-
-          g_object_unref (address);
-
-          g_free (name);
-        }
-
-      g_object_unref (client_socket);
+      /* Store the list node so we can quickly remove the connection
+         from the list */
+      connection->list_node = server->connections;
     }
 }
 
@@ -195,6 +320,9 @@ gml_server_run (GmlServer *server,
 void
 gml_server_free (GmlServer *server)
 {
+  while (server->connections)
+    gml_server_remove_connection (server, server->connections->data);
+
   gml_main_context_remove_source (server->main_context,
                                   server->quit_source);
 
