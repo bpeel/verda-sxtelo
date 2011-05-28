@@ -59,6 +59,7 @@ struct _GmlMainContextSource
   int fd;
   gpointer user_data;
   void *callback;
+  GmlMainContextPollFlags current_flags;
 };
 
 GmlMainContext *
@@ -132,6 +133,8 @@ gml_main_context_add_poll (GmlMainContext *mc,
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
     g_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
 
+  source->current_flags = flags;
+
   mc->n_sources++;
 
   return source;
@@ -146,11 +149,16 @@ gml_main_context_modify_poll (GmlMainContext *mc,
 
   g_return_if_fail (source->type == GML_MAIN_CONTEXT_POLL_SOURCE);
 
+  if (source->current_flags == flags)
+    return;
+
   event.events = get_epoll_events (flags);
   event.data.ptr = source;
 
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_MOD, source->fd, &event) == -1)
     g_warning ("EPOLL_CTL_MOD failed: %s", strerror (errno));
+
+  source->current_flags = flags;
 }
 
 GmlMainContextSource *
