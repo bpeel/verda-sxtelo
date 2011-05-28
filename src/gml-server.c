@@ -21,10 +21,14 @@
 #endif
 
 #include <glib.h>
+#include <string.h>
 
 #include "gml-server.h"
 #include "gml-main-context.h"
 #include "gml-http-parser.h"
+#include "gml-person-set.h"
+#include "gml-new-person-response.h"
+#include "gml-error-response.h"
 
 struct _GmlServer
 {
@@ -41,7 +45,11 @@ struct _GmlServer
 
   /* List of open connections */
   GList *connections;
+
+  GmlPersonSet *person_set;
 };
+
+#define GML_SERVER_OUTPUT_BUFFER_SIZE 1024
 
 typedef struct
 {
@@ -55,6 +63,27 @@ typedef struct
   GList *list_node;
 
   GmlHttpParser http_parser;
+
+  /* This becomes TRUE when we've received something from the client
+     that we don't understand and we're ignoring any further input */
+  gboolean had_bad_input;
+  /* This becomes TRUE when the client has closed its end of the
+     connection */
+  gboolean read_finished;
+  /* This becomes TRUE when we've stopped writing data. This will only
+     happen after the client closes its connection or we've had bad
+     input and we're ignoring further data */
+  gboolean write_finished;
+
+  /* The next response that will be added to the response queue when a
+     complete request is received */
+  GmlResponse *next_response;
+
+  /* Queue of GmlResponses to send to this client */
+  GQueue response_queue;
+
+  unsigned int output_length;
+  guint8 output_buffer[GML_SERVER_OUTPUT_BUFFER_SIZE];
 } GmlServerConnection;
 
 static gboolean
@@ -62,9 +91,26 @@ gml_server_request_line_received_cb (const char *method,
                                      const char *uri,
                                      void *user_data)
 {
-  g_print ("request line received \"%s\" \"%s\"\n",
-           method,
-           uri);
+  GmlServerConnection *connection = user_data;
+  GmlServer *server = connection->server;
+
+  if (!strcmp (method, "GET") && !strcmp (uri, "/new_person"))
+    {
+      GSocketAddress *remote_address =
+        g_socket_get_remote_address (connection->client_socket, NULL);
+      GmlPerson *person = gml_person_set_generate_person (server->person_set,
+                                                          remote_address);
+      connection->next_response = gml_new_person_response_new (person);
+      g_object_unref (person);
+      if (remote_address)
+        g_object_unref (remote_address);
+    }
+  else if (!strcmp (method, "GET") || !strcmp (method, "POST"))
+    connection->next_response =
+      gml_error_response_new (GML_ERROR_RESPONSE_NOT_FOUND);
+  else
+    connection->next_response =
+      gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
 
   return TRUE;
 }
@@ -74,10 +120,6 @@ gml_server_header_received_cb (const char *field_name,
                                const char *value,
                                void *user_data)
 {
-  g_print ("header received \"%s\" \"%s\"\n",
-           field_name,
-           value);
-
   return TRUE;
 }
 
@@ -86,16 +128,18 @@ gml_server_data_received_cb (const guint8 *data,
                              unsigned int length,
                              void *user_data)
 {
-  g_print ("data received \"%.*s\"\n",
-           length, data);
-
   return TRUE;
 }
 
 static gboolean
 gml_server_request_finished_cb (void *user_data)
 {
-  g_print ("request finished\n");
+  GmlServerConnection *connection = user_data;
+
+  /* We've successfully got a complete request so we'll queue the
+     response */
+  g_queue_push_tail (&connection->response_queue, connection->next_response);
+  connection->next_response = NULL;
 
   return TRUE;
 }
@@ -119,14 +163,95 @@ gml_server_quit_cb (GmlMainContextSource *source,
 }
 
 static void
+gml_server_connection_clear_responses (GmlServerConnection *connection)
+{
+  g_queue_foreach (&connection->response_queue,
+                   (GFunc) g_object_unref,
+                   NULL);
+  g_queue_clear (&connection->response_queue);
+
+  if (connection->next_response)
+    {
+      g_object_unref (connection->next_response);
+      connection->next_response = NULL;
+    }
+}
+
+static void
+set_bad_input (GmlServerConnection *connection, GError *error)
+{
+  GmlResponse *response;
+
+  /* Replace all of the queued responses with an error response */
+  gml_server_connection_clear_responses (connection);
+
+  if (error->domain == GML_HTTP_PARSER_ERROR
+      && error->code == GML_HTTP_PARSER_ERROR_UNSUPPORTED)
+    response = gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+  else
+    response = gml_error_response_new (GML_ERROR_RESPONSE_BAD_REQUEST);
+
+  g_queue_push_tail (&connection->response_queue, response);
+
+  connection->had_bad_input = TRUE;
+}
+
+static void
 gml_server_remove_connection (GmlServer *server,
                               GmlServerConnection *connection)
 {
+  gml_server_connection_clear_responses (connection);
+
   gml_main_context_remove_source (server->main_context, connection->source);
   g_object_unref (connection->client_socket);
   server->connections = g_list_delete_link (server->connections,
                                             connection->list_node);
   g_slice_free (GmlServerConnection, connection);
+}
+
+static void
+update_poll (GmlServerConnection *connection)
+{
+  GmlMainContextPollFlags flags = 0;
+
+  if (!connection->read_finished)
+    flags |= GML_MAIN_CONTEXT_POLL_IN;
+
+  /* Shutdown the socket if we've finished writing */
+  if (!connection->write_finished
+      && (connection->read_finished || connection->had_bad_input)
+      && g_queue_is_empty (&connection->response_queue)
+      && connection->output_length == 0)
+    {
+      GError *error = NULL;
+
+      if (!g_socket_shutdown (connection->client_socket,
+                              FALSE, /* shutdown_read */
+                              TRUE, /* shutdown_write */
+                              &error))
+        {
+          g_print ("shutdown socket failed: %s\n", error->message);
+          g_clear_error (&error);
+          gml_server_remove_connection (connection->server, connection);
+          return;
+        }
+
+      connection->write_finished = TRUE;
+    }
+
+  if (!connection->write_finished
+      && (!g_queue_is_empty (&connection->response_queue)
+          || connection->output_length > 0))
+    flags |= GML_MAIN_CONTEXT_POLL_OUT;
+
+  /* If both ends of the connection are closed then we can abandon
+     this connectin */
+  if (connection->read_finished && connection->write_finished)
+    gml_server_remove_connection (connection->server, connection);
+  else
+    gml_main_context_modify_poll (connection->server->main_context,
+                                  connection->source,
+                                  flags);
 }
 
 static void
@@ -154,8 +279,17 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
 
       if (got == 0)
         {
-          g_print ("EOF from socket\n");
-          gml_server_remove_connection (server, connection);
+          if (!connection->had_bad_input
+              && !gml_http_parser_parser_eof (&connection->http_parser,
+                                              &error))
+            {
+              set_bad_input (connection, error);
+              g_clear_error (&error);
+            }
+
+          connection->read_finished = TRUE;
+
+          update_poll (connection);
         }
       else if (got == -1)
         {
@@ -168,14 +302,76 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
 
           g_clear_error (&error);
         }
-      else if (!gml_http_parser_parse_data (&connection->http_parser,
-                                            (guint8 *) buf,
-                                            got,
-                                            &error))
+      else
         {
-          g_print ("%s\n", error->message);
+          if (!connection->had_bad_input
+              && !gml_http_parser_parse_data (&connection->http_parser,
+                                              (guint8 *) buf,
+                                              got,
+                                              &error))
+            {
+              set_bad_input (connection, error);
+              g_clear_error (&error);
+            }
+
+          update_poll (connection);
+        }
+    }
+  else if (flags & GML_MAIN_CONTEXT_POLL_OUT)
+    {
+      GError *error = NULL;
+      gssize wrote;
+
+      /* Try to fill the output buffer as much as possible before
+         initiating a write */
+      while (connection->output_length < GML_SERVER_OUTPUT_BUFFER_SIZE
+             && !g_queue_is_empty (&connection->response_queue))
+        {
+          GmlResponse *response =
+            g_queue_peek_head (&connection->response_queue);
+          unsigned int added;
+
+          added =
+            gml_response_add_data (response,
+                                   connection->output_buffer
+                                   + connection->output_length,
+                                   GML_SERVER_OUTPUT_BUFFER_SIZE
+                                   - connection->output_length);
+
+          connection->output_length += added;
+
+          /* If the response is now finished then remove it from the queue */
+          if (gml_response_is_finished (response))
+            {
+              g_object_unref (response);
+              g_queue_pop_head (&connection->response_queue);
+            }
+        }
+
+      if ((wrote = g_socket_send (connection->client_socket,
+                                  (const gchar *) connection->output_buffer,
+                                  connection->output_length,
+                                  NULL,
+                                  &error)) == -1)
+        {
+          if (error->domain != G_IO_ERROR
+              || error->code != G_IO_ERROR_WOULD_BLOCK)
+            {
+              g_print ("Error writing to socket: %s\n", error->message);
+              gml_server_remove_connection (server, connection);
+            }
+
           g_clear_error (&error);
-          gml_server_remove_connection (server, connection);
+        }
+      else
+        {
+          /* Move any remaining data in the output buffer to the front */
+          memmove (connection->output_buffer,
+                   connection->output_buffer + wrote,
+                   connection->output_length - wrote);
+          connection->output_length -= wrote;
+
+          update_poll (connection);
         }
     }
 }
@@ -227,6 +423,15 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
                             &gml_server_http_parser_vtable,
                             connection);
 
+      connection->next_response = NULL;
+      g_queue_init (&connection->response_queue);
+
+      connection->had_bad_input = FALSE;
+      connection->read_finished = FALSE;
+      connection->write_finished = FALSE;
+
+      connection->output_length = 0;
+
       /* Store the list node so we can quickly remove the connection
          from the list */
       connection->list_node = server->connections;
@@ -268,6 +473,8 @@ gml_server_new (GSocketAddress *address,
   if (!g_socket_listen (server->server_socket,
                         error))
     goto error;
+
+  server->person_set = gml_person_set_new ();
 
   server->server_socket_source =
     gml_main_context_add_poll (server->main_context,
@@ -322,6 +529,8 @@ gml_server_free (GmlServer *server)
 {
   while (server->connections)
     gml_server_remove_connection (server, server->connections->data);
+
+  gml_person_set_free (server->person_set);
 
   gml_main_context_remove_source (server->main_context,
                                   server->quit_source);
