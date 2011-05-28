@@ -7,6 +7,7 @@ INCLUDES = \
 source_h = \
 	$(srcdir)/gml-http-parser.h \
 	$(srcdir)/gml-main-context.h \
+	$(srcdir)/gml-person.h \
 	$(srcdir)/gml-server.h
 
 gemelo_SOURCES = \
@@ -14,6 +15,7 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-http-parser.c \
 	$(srcdir)/gml-main.c \
 	$(srcdir)/gml-main-context.c \
+	$(srcdir)/gml-person.c \
 	$(srcdir)/gml-server.c
 
 gemelo_LDFLAGS = \
