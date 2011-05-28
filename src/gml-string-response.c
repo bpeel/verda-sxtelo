@@ -21,10 +21,10 @@
 #endif
 
 #include <string.h>
-#include "gml-error-response.h"
+#include "gml-string-response.h"
 
-G_DEFINE_TYPE (GmlErrorResponse,
-               gml_error_response,
+G_DEFINE_TYPE (GmlStringResponse,
+               gml_string_response,
                GML_TYPE_RESPONSE);
 
 static const char
@@ -55,23 +55,23 @@ not_found_response[] =
   "This location is not supported by this server\r\n";
 
 static void
-get_message (GmlErrorResponseType type,
+get_message (GmlStringResponseType type,
              const char **message_buffer,
              unsigned int *message_length)
 {
   switch (type)
     {
-    case GML_ERROR_RESPONSE_BAD_REQUEST:
+    case GML_STRING_RESPONSE_BAD_REQUEST:
       *message_buffer = bad_request_response;
       *message_length = sizeof (bad_request_response) - 1;
       return;
 
-    case GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST:
+    case GML_STRING_RESPONSE_UNSUPPORTED_REQUEST:
       *message_buffer = unsupported_request_response;
       *message_length = sizeof (unsupported_request_response) - 1;
       return;
 
-    case GML_ERROR_RESPONSE_NOT_FOUND:
+    case GML_STRING_RESPONSE_NOT_FOUND:
       *message_buffer = not_found_response;
       *message_length = sizeof (not_found_response) - 1;
       return;
@@ -81,11 +81,11 @@ get_message (GmlErrorResponseType type,
 }
 
 static unsigned int
-gml_error_response_add_data (GmlResponse *response,
+gml_string_response_add_data (GmlResponse *response,
                              guint8 *data,
                              unsigned int length)
 {
-  GmlErrorResponse *self = GML_ERROR_RESPONSE (response);
+  GmlStringResponse *self = GML_STRING_RESPONSE (response);
   const char *message_buffer;
   unsigned int message_length;
   unsigned int to_write;
@@ -101,9 +101,9 @@ gml_error_response_add_data (GmlResponse *response,
 }
 
 static gboolean
-gml_error_response_is_finished (GmlResponse *response)
+gml_string_response_is_finished (GmlResponse *response)
 {
-  GmlErrorResponse *self = GML_ERROR_RESPONSE (response);
+  GmlStringResponse *self = GML_STRING_RESPONSE (response);
   const char *message_buffer;
   unsigned int message_length;
 
@@ -113,24 +113,24 @@ gml_error_response_is_finished (GmlResponse *response)
 }
 
 static void
-gml_error_response_class_init (GmlErrorResponseClass *klass)
+gml_string_response_class_init (GmlStringResponseClass *klass)
 {
   GmlResponseClass *response_class = (GmlResponseClass *) klass;
 
-  response_class->add_data = gml_error_response_add_data;
-  response_class->is_finished = gml_error_response_is_finished;
+  response_class->add_data = gml_string_response_add_data;
+  response_class->is_finished = gml_string_response_is_finished;
 }
 
 static void
-gml_error_response_init (GmlErrorResponse *self)
+gml_string_response_init (GmlStringResponse *self)
 {
 }
 
 GmlResponse *
-gml_error_response_new (GmlErrorResponseType type)
+gml_string_response_new (GmlStringResponseType type)
 {
-  GmlErrorResponse *self =
-    g_object_new (GML_TYPE_ERROR_RESPONSE, NULL);
+  GmlStringResponse *self =
+    g_object_new (GML_TYPE_STRING_RESPONSE, NULL);
 
   self->type = type;
 

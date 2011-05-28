@@ -28,7 +28,7 @@
 #include "gml-http-parser.h"
 #include "gml-person-set.h"
 #include "gml-new-person-response.h"
-#include "gml-error-response.h"
+#include "gml-string-response.h"
 #include "gml-conversation.h"
 
 struct _GmlServer
@@ -202,7 +202,7 @@ parse_new_person_request (GmlServerConnection *connection,
   return response;
 
  bad_room_name:
-  return gml_error_response_new (GML_ERROR_RESPONSE_BAD_REQUEST);
+  return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
 }
 
 static const struct
@@ -246,7 +246,7 @@ gml_server_request_line_received_cb (const char *method,
       {
         if (strcmp (method, requests[i].method))
           connection->next_response =
-            gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+            gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
         else
           connection->next_response =
             requests[i].parse_func (connection, query_string);
@@ -256,10 +256,10 @@ gml_server_request_line_received_cb (const char *method,
 
   if (!strcmp (method, "GET") || !strcmp (method, "POST"))
     connection->next_response =
-      gml_error_response_new (GML_ERROR_RESPONSE_NOT_FOUND);
+      gml_string_response_new (GML_STRING_RESPONSE_NOT_FOUND);
   else
     connection->next_response =
-      gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+      gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
 
  done:
   g_free (url_copy);
@@ -339,9 +339,10 @@ set_bad_input (GmlServerConnection *connection, GError *error)
 
   if (error->domain == GML_HTTP_PARSER_ERROR
       && error->code == GML_HTTP_PARSER_ERROR_UNSUPPORTED)
-    response = gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+    response =
+      gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
   else
-    response = gml_error_response_new (GML_ERROR_RESPONSE_BAD_REQUEST);
+    response = gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
 
   g_queue_push_tail (&connection->response_queue, response);
 

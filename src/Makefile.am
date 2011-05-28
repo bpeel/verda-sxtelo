@@ -6,19 +6,18 @@ INCLUDES = \
 
 source_h = \
 	$(srcdir)/gml-conversation.h \
-	$(srcdir)/gml-error-response.h \
 	$(srcdir)/gml-http-parser.h \
 	$(srcdir)/gml-main-context.h \
 	$(srcdir)/gml-new-person-response.h \
 	$(srcdir)/gml-person.h \
 	$(srcdir)/gml-person-set.h \
 	$(srcdir)/gml-response.h \
-	$(srcdir)/gml-server.h
+	$(srcdir)/gml-server.h \
+	$(srcdir)/gml-string-response.h
 
 gemelo_SOURCES = \
 	$(source_h) \
 	$(srcdir)/gml-conversation.c \
-	$(srcdir)/gml-error-response.c \
 	$(srcdir)/gml-http-parser.c \
 	$(srcdir)/gml-main.c \
 	$(srcdir)/gml-main-context.c \
@@ -26,7 +25,8 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-person.c \
 	$(srcdir)/gml-person-set.c \
 	$(srcdir)/gml-response.c \
-	$(srcdir)/gml-server.c
+	$(srcdir)/gml-server.c \
+	$(srcdir)/gml-string-response.c
 
 gemelo_LDFLAGS = \
 	$(GLIB_LIBS)
