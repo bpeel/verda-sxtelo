@@ -5,11 +5,13 @@ INCLUDES = \
 	-DGML_LIBDIR=\""$(libdir)"\"
 
 source_h = \
+	$(srcdir)/gml-http-parser.h \
 	$(srcdir)/gml-main-context.h \
 	$(srcdir)/gml-server.h
 
 gemelo_SOURCES = \
 	$(source_h) \
+	$(srcdir)/gml-http-parser.c \
 	$(srcdir)/gml-main.c \
 	$(srcdir)/gml-main-context.c \
 	$(srcdir)/gml-server.c
