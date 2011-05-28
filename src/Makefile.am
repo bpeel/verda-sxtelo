@@ -5,6 +5,7 @@ INCLUDES = \
 	-DGML_LIBDIR=\""$(libdir)"\"
 
 source_h = \
+	$(srcdir)/gml-conversation.h \
 	$(srcdir)/gml-error-response.h \
 	$(srcdir)/gml-http-parser.h \
 	$(srcdir)/gml-main-context.h \
@@ -16,6 +17,7 @@ source_h = \
 
 gemelo_SOURCES = \
 	$(source_h) \
+	$(srcdir)/gml-conversation.c \
 	$(srcdir)/gml-error-response.c \
 	$(srcdir)/gml-http-parser.c \
 	$(srcdir)/gml-main.c \
