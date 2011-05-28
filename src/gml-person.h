@@ -63,6 +63,9 @@ struct _GmlPerson
   GmlPersonId id;
 
   GmlConversation *conversation;
+
+  GTimer *use_age;
+  unsigned int use_count;
 };
 
 GType
@@ -88,6 +91,15 @@ gml_person_new (GmlPersonId id,
 
 void
 gml_person_leave_conversation (GmlPerson *person);
+
+void
+gml_person_add_use (GmlPerson *person);
+
+void
+gml_person_remove_use (GmlPerson *person);
+
+gboolean
+gml_person_has_use (GmlPerson *person);
 
 G_END_DECLS
 
