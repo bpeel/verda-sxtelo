@@ -60,7 +60,7 @@ gml_person_set_generate_person (GmlPersonSet *set,
 
   person = gml_person_new (id, conversation);
 
-  g_hash_table_insert (set, &id, g_object_ref (person));
+  g_hash_table_insert (set, &person->id, g_object_ref (person));
 
   return person;
 }
