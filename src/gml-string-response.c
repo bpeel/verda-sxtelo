@@ -54,6 +54,16 @@ not_found_response[] =
   "\r\n"
   "This location is not supported by this server\r\n";
 
+static const char
+ok_response[] =
+  "HTTP/1.1 200 OK\r\n"
+  GML_RESPONSE_COMMON_HEADERS
+  GML_RESPONSE_DISABLE_CACHE_HEADERS
+  "Content-Type: text/plain; charset=ISO-8859-1\r\n"
+  "Content-Length: 4\r\n"
+  "\r\n"
+  "OK\r\n";
+
 static void
 get_message (GmlStringResponseType type,
              const char **message_buffer,
@@ -74,6 +84,11 @@ get_message (GmlStringResponseType type,
     case GML_STRING_RESPONSE_NOT_FOUND:
       *message_buffer = not_found_response;
       *message_length = sizeof (not_found_response) - 1;
+      return;
+
+    case GML_STRING_RESPONSE_OK:
+      *message_buffer = ok_response;
+      *message_length = sizeof (ok_response) - 1;
       return;
     }
 
