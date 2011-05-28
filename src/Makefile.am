@@ -9,6 +9,7 @@ source_h = \
 	$(srcdir)/gml-main-context.h \
 	$(srcdir)/gml-person.h \
 	$(srcdir)/gml-person-set.h \
+	$(srcdir)/gml-response.h \
 	$(srcdir)/gml-server.h
 
 gemelo_SOURCES = \
@@ -18,6 +19,7 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-main-context.c \
 	$(srcdir)/gml-person.c \
 	$(srcdir)/gml-person-set.c \
+	$(srcdir)/gml-response.c \
 	$(srcdir)/gml-server.c
 
 gemelo_LDFLAGS = \
