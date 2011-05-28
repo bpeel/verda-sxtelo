@@ -36,7 +36,8 @@ gml_person_set_get_person (GmlPersonSet *set,
 
 GmlPerson *
 gml_person_set_generate_person (GmlPersonSet *set,
-                                GSocketAddress *address);
+                                GSocketAddress *address,
+                                GmlConversation *conversation);
 
 void
 gml_person_set_remove_person (GmlPersonSet *set,

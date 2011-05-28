@@ -28,8 +28,25 @@
 G_DEFINE_TYPE (GmlPerson, gml_person, G_TYPE_OBJECT);
 
 static void
+gml_person_dispose (GObject *object)
+{
+  GmlPerson *person = GML_PERSON (object);
+
+  if (person->conversation)
+    {
+      g_object_unref (person->conversation);
+      person->conversation = NULL;
+    }
+
+  G_OBJECT_CLASS (gml_person_parent_class)->dispose (object);
+}
+
+static void
 gml_person_class_init (GmlPersonClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gml_person_dispose;
 }
 
 static void
@@ -94,11 +111,13 @@ gml_person_generate_id (GSocketAddress *address)
 }
 
 GmlPerson *
-gml_person_new (GmlPersonId id)
+gml_person_new (GmlPersonId id,
+                GmlConversation *conversation)
 {
   GmlPerson *person = g_object_new (GML_TYPE_PERSON, NULL);
 
   person->id = id;
+  person->conversation = g_object_ref (conversation);
 
   return person;
 }

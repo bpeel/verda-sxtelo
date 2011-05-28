@@ -46,7 +46,8 @@ gml_person_set_get_person (GmlPersonSet *set,
 
 GmlPerson *
 gml_person_set_generate_person (GmlPersonSet *set,
-                                GSocketAddress *address)
+                                GSocketAddress *address,
+                                GmlConversation *conversation)
 {
   GmlPerson *person;
   GmlPersonId id;
@@ -57,7 +58,7 @@ gml_person_set_generate_person (GmlPersonSet *set,
     id = gml_person_generate_id (address);
   while (gml_person_set_get_person (set, id));
 
-  person = gml_person_new (id);
+  person = gml_person_new (id, conversation);
 
   g_hash_table_insert (set, &id, g_object_ref (person));
 

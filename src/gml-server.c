@@ -29,6 +29,7 @@
 #include "gml-person-set.h"
 #include "gml-new-person-response.h"
 #include "gml-error-response.h"
+#include "gml-conversation.h"
 
 struct _GmlServer
 {
@@ -45,6 +46,16 @@ struct _GmlServer
 
   /* List of open connections */
   GList *connections;
+
+  /* Hash table of pending conversations. This only contains
+     conversations that only have one person. The key is the name of
+     the room and the value is the a GmlServerConversationHashData
+     struct (which contains a pointer to the conversation). The hash
+     table only takes a weak reference on the conversation so we can
+     detect if the person leaves before a second person joins and just
+     destroy the conversation. The data for the weak reference is the
+     same pointer to the hash data */
+  GHashTable *pending_conversations;
 
   GmlPersonSet *person_set;
 };
@@ -86,31 +97,172 @@ typedef struct
   guint8 output_buffer[GML_SERVER_OUTPUT_BUFFER_SIZE];
 } GmlServerConnection;
 
+typedef struct
+{
+  char *room_name;
+  GmlServer *server;
+  GmlConversation *conversation;
+} GmlServerConversationHashData;
+
+static void
+free_conversation_hash_data (GmlServerConversationHashData *data)
+{
+  g_free (data->room_name);
+  g_slice_free (GmlServerConversationHashData, data);
+}
+
+static void
+conversation_weak_ref_cb (gpointer user_data,
+                          GObject *where_the_object_was)
+{
+  GmlServerConversationHashData *data = user_data;
+
+  /* This will also destroy the hash data */
+  g_hash_table_remove (data->server->pending_conversations,
+                       data->room_name);
+}
+
+static GmlConversation *
+get_conversation (GmlServer *server,
+                  const char *room_name)
+{
+  GmlServerConversationHashData *data;
+  GmlConversation *conversation;
+
+  if ((data = g_hash_table_lookup (server->pending_conversations,
+                                   room_name)) == NULL)
+    {
+      /* If there's no conversation with that name then we'll create it */
+      conversation = gml_conversation_new ();
+
+      data = g_slice_new (GmlServerConversationHashData);
+
+      data->room_name = g_strdup (room_name);
+      data->server = server;
+      data->conversation = conversation;
+
+      /* Take a weak reference on the conversation so we can remove it
+         from the pending conversation list if the first person
+         disappears before another person joins */
+      g_object_weak_ref (G_OBJECT (conversation),
+                         conversation_weak_ref_cb,
+                         data);
+
+      g_hash_table_insert (server->pending_conversations,
+                           data->room_name,
+                           data);
+    }
+  else
+    {
+      conversation = g_object_ref (data->conversation);
+
+      g_object_weak_unref (G_OBJECT (conversation),
+                           conversation_weak_ref_cb,
+                           data);
+
+      /* This should also free the data */
+      g_hash_table_remove (server->pending_conversations, room_name);
+    }
+
+  return conversation;
+}
+
+static GmlResponse *
+parse_new_person_request (GmlServerConnection *connection,
+                          const char *query_string)
+{
+  GmlConversation *conversation;
+  GSocketAddress *address;
+  GmlPerson *person;
+  GmlResponse *response;
+  const char *p;
+
+  /* The query string will be used as the room name. It should only
+     contain letters */
+  if (query_string == NULL || *query_string == 0)
+    goto bad_room_name;
+
+  for (p = query_string; *p; p++)
+    if (!g_ascii_isalpha (*p))
+      goto bad_room_name;
+
+  address = g_socket_get_remote_address (connection->client_socket, NULL);
+  conversation = get_conversation (connection->server, query_string);
+  person = gml_person_set_generate_person (connection->server->person_set,
+                                           address,
+                                           conversation);
+  g_object_unref (conversation);
+  if (address)
+    g_object_unref (address);
+
+  response = gml_new_person_response_new (person);
+
+  g_object_unref (person);
+
+  return response;
+
+ bad_room_name:
+  return gml_error_response_new (GML_ERROR_RESPONSE_BAD_REQUEST);
+}
+
+static const struct
+{
+  const char *method;
+  const char *url;
+  GmlResponse * (* parse_func) (GmlServerConnection *connection,
+                                const char *query_string);
+}
+requests[] =
+  {
+    { "GET", "/new_person", parse_new_person_request }
+  };
+
 static gboolean
 gml_server_request_line_received_cb (const char *method,
                                      const char *uri,
                                      void *user_data)
 {
   GmlServerConnection *connection = user_data;
-  GmlServer *server = connection->server;
+  const char *query_string;
+  const char *question_mark;
+  const char *url;
+  char *url_copy = NULL;
+  int i;
 
-  if (!strcmp (method, "GET") && !strcmp (uri, "/new_person"))
+  if ((question_mark = strchr (uri, '?')))
     {
-      GSocketAddress *remote_address =
-        g_socket_get_remote_address (connection->client_socket, NULL);
-      GmlPerson *person = gml_person_set_generate_person (server->person_set,
-                                                          remote_address);
-      connection->next_response = gml_new_person_response_new (person);
-      g_object_unref (person);
-      if (remote_address)
-        g_object_unref (remote_address);
+      url_copy = strndup (uri, question_mark - uri);
+      url = url_copy;
+      query_string = question_mark + 1;
     }
-  else if (!strcmp (method, "GET") || !strcmp (method, "POST"))
+  else
+    {
+      url = uri;
+      query_string = NULL;
+    }
+
+  for (i = 0; i < G_N_ELEMENTS (requests); i++)
+    if (!strcmp (url, requests[i].url))
+      {
+        if (strcmp (method, requests[i].method))
+          connection->next_response =
+            gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+        else
+          connection->next_response =
+            requests[i].parse_func (connection, query_string);
+
+        goto done;
+      }
+
+  if (!strcmp (method, "GET") || !strcmp (method, "POST"))
     connection->next_response =
       gml_error_response_new (GML_ERROR_RESPONSE_NOT_FOUND);
   else
     connection->next_response =
       gml_error_response_new (GML_ERROR_RESPONSE_UNSUPPORTED_REQUEST);
+
+ done:
+  g_free (url_copy);
 
   return TRUE;
 }
@@ -476,6 +628,15 @@ gml_server_new (GSocketAddress *address,
 
   server->person_set = gml_person_set_new ();
 
+  /* The hash table doesn't a destroy function for the key because its
+     owned by the hash data */
+  server->pending_conversations =
+    g_hash_table_new_full (g_str_hash,
+                           g_str_equal,
+                           NULL, /* key_destroy */
+                           /* value_destroy */
+                           (GDestroyNotify) free_conversation_hash_data);
+
   server->server_socket_source =
     gml_main_context_add_poll (server->main_context,
                                g_socket_get_fd (server->server_socket),
@@ -531,6 +692,12 @@ gml_server_free (GmlServer *server)
     gml_server_remove_connection (server, server->connections->data);
 
   gml_person_set_free (server->person_set);
+
+  /* Destroying all of the people should make all of the conversations
+     disappear so we don't need to bother removing all of the weak
+     references */
+  g_warn_if_fail (g_hash_table_size (server->pending_conversations) == 0);
+  g_hash_table_destroy (server->pending_conversations);
 
   gml_main_context_remove_source (server->main_context,
                                   server->quit_source);

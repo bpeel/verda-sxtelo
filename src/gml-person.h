@@ -21,6 +21,7 @@
 
 #include <glib-object.h>
 #include <gio/gio.h>
+#include "gml-conversation.h"
 
 G_BEGIN_DECLS
 
@@ -60,6 +61,8 @@ struct _GmlPerson
   GObject parent;
 
   GmlPersonId id;
+
+  GmlConversation *conversation;
 };
 
 GType
@@ -76,7 +79,8 @@ GmlPersonId
 gml_person_generate_id (GSocketAddress *address);
 
 GmlPerson *
-gml_person_new (GmlPersonId id);
+gml_person_new (GmlPersonId id,
+                GmlConversation *conversation);
 
 G_END_DECLS
 
