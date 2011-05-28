@@ -205,6 +205,27 @@ parse_new_person_request (GmlServerConnection *connection,
   return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
 }
 
+static GmlResponse *
+parse_leave_request (GmlServerConnection *connection,
+                     const char *query_string)
+{
+  GmlServer *server = connection->server;
+  GmlPersonId id;
+  GmlPerson *person;
+
+  if (!gml_person_parse_id (query_string, &id))
+    return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
+
+  if ((person = gml_person_set_get_person (server->person_set, id)) == NULL)
+    return gml_string_response_new (GML_STRING_RESPONSE_NOT_FOUND);
+
+  gml_person_leave_conversation (person);
+
+  gml_person_set_remove_person (server->person_set, person);
+
+  return gml_string_response_new (GML_STRING_RESPONSE_OK);
+}
+
 static const struct
 {
   const char *method;
@@ -214,7 +235,8 @@ static const struct
 }
 requests[] =
   {
-    { "GET", "/new_person", parse_new_person_request }
+    { "GET", "/new_person", parse_new_person_request },
+    { "GET", "/leave", parse_leave_request }
   };
 
 static gboolean

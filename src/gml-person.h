@@ -86,6 +86,9 @@ GmlPerson *
 gml_person_new (GmlPersonId id,
                 GmlConversation *conversation);
 
+void
+gml_person_leave_conversation (GmlPerson *person);
+
 G_END_DECLS
 
 #endif /* __GML_PERSON_H__ */

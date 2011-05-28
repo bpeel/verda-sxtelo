@@ -138,3 +138,14 @@ gml_person_new (GmlPersonId id,
 
   return person;
 }
+
+void
+gml_person_leave_conversation (GmlPerson *person)
+{
+  if (person->conversation)
+    {
+      g_object_unref (person->conversation);
+      person->conversation = NULL;
+    }
+}
+
