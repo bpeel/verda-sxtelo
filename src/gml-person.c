@@ -110,6 +110,23 @@ gml_person_generate_id (GSocketAddress *address)
   return id;
 }
 
+gboolean
+gml_person_parse_id (const char *string,
+                     GmlPersonId *id)
+{
+  const char *p;
+
+  *id = 0;
+
+  for (p = string; *p; p++)
+    if (!g_ascii_isxdigit (*p))
+      return FALSE;
+    else
+      *id = (*id << 4) | g_ascii_xdigit_value (*p);
+
+  return p - string == sizeof (GmlPersonId) * 2;
+}
+
 GmlPerson *
 gml_person_new (GmlPersonId id,
                 GmlConversation *conversation)

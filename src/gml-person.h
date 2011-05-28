@@ -78,6 +78,10 @@ gml_person_id_hash (gconstpointer v);
 GmlPersonId
 gml_person_generate_id (GSocketAddress *address);
 
+gboolean
+gml_person_parse_id (const char *string,
+                     GmlPersonId *id);
+
 GmlPerson *
 gml_person_new (GmlPersonId id,
                 GmlConversation *conversation);
