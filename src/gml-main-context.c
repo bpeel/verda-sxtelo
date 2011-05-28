@@ -106,7 +106,7 @@ get_epoll_events (GmlMainContextPollFlags flags)
   if (flags & GML_MAIN_CONTEXT_POLL_IN)
     events |= EPOLLIN | EPOLLRDHUP;
   if (flags & GML_MAIN_CONTEXT_POLL_OUT)
-    flags |= EPOLLOUT;
+    events |= EPOLLOUT;
 
   return events;
 }
