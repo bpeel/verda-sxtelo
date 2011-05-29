@@ -46,6 +46,9 @@ gml_person_set_remove_person (GmlPersonSet *set,
 void
 gml_person_set_free (GmlPersonSet *set);
 
+void
+gml_person_set_remove_useless_people (GmlPersonSet *set);
+
 G_END_DECLS
 
 #endif /* __GML_PERSON_SET_H__ */

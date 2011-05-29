@@ -83,3 +83,26 @@ gml_person_set_free (GmlPersonSet *set)
 {
   g_hash_table_destroy (set);
 }
+
+static gboolean
+remove_useless_people_cb (gpointer key,
+                          gpointer value,
+                          gpointer user_data)
+{
+  if (!gml_person_has_use (value))
+    {
+      gml_person_leave_conversation (value);
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+void
+gml_person_set_remove_useless_people (GmlPersonSet *set)
+{
+  g_hash_table_foreach_remove (set,
+                               remove_useless_people_cb,
+                               NULL);
+}

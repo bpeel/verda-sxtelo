@@ -36,6 +36,7 @@ struct _GmlServer
   GmlMainContext *main_context;
   GmlMainContextSource *server_socket_source;
   GmlMainContextSource *quit_source;
+  GmlMainContextSource *gc_timer_source;
   GSocket *server_socket;
 
   /* If this gets set then gml_server_run will return and report the
@@ -103,6 +104,10 @@ typedef struct
   GmlServer *server;
   GmlConversation *conversation;
 } GmlServerConversationHashData;
+
+/* Interval time in milli-seconds to run the dead person garbage
+   collector */
+#define GML_SERVER_GC_TIMEOUT (5 * 60 * 1000)
 
 static void
 free_conversation_hash_data (GmlServerConversationHashData *data)
@@ -334,6 +339,23 @@ gml_server_quit_cb (GmlMainContextSource *source,
   GmlServer *server = user_data;
 
   server->quit_received = TRUE;
+}
+
+static void
+gml_server_gc_timer_cb (GmlMainContextSource *source,
+                        void *user_data)
+{
+  GmlServer *server = user_data;
+
+  /* This is probably relatively expensive because it has to iterate
+     the entire list of people, but it only happens infrequently so
+     hopefully it's not a problem */
+  gml_person_set_remove_useless_people (server->person_set);
+
+  /* Restart the timer */
+  gml_main_context_set_timer (server->main_context,
+                              server->gc_timer_source,
+                              GML_SERVER_GC_TIMEOUT);
 }
 
 static void
@@ -672,6 +694,14 @@ gml_server_new (GSocketAddress *address,
                                gml_server_quit_cb,
                                server);
 
+  server->gc_timer_source =
+    gml_main_context_add_timer (server->main_context,
+                                gml_server_gc_timer_cb,
+                                server);
+  gml_main_context_set_timer (server->main_context,
+                              server->gc_timer_source,
+                              GML_SERVER_GC_TIMEOUT);
+
   return server;
 
  error:
@@ -724,6 +754,9 @@ gml_server_free (GmlServer *server)
 
   gml_main_context_remove_source (server->main_context,
                                   server->quit_source);
+
+  gml_main_context_remove_source (server->main_context,
+                                  server->gc_timer_source);
 
   gml_main_context_remove_source (server->main_context,
                                   server->server_socket_source);
