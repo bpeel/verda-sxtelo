@@ -8,10 +8,13 @@ source_h = \
 	$(srcdir)/gml-conversation.h \
 	$(srcdir)/gml-conversation-set.h \
 	$(srcdir)/gml-http-parser.h \
+	$(srcdir)/gml-leave-handler.h \
 	$(srcdir)/gml-main-context.h \
+	$(srcdir)/gml-new-person-handler.h \
 	$(srcdir)/gml-new-person-response.h \
 	$(srcdir)/gml-person.h \
 	$(srcdir)/gml-person-set.h \
+	$(srcdir)/gml-request-handler.h \
 	$(srcdir)/gml-response.h \
 	$(srcdir)/gml-server.h \
 	$(srcdir)/gml-string-response.h
@@ -21,11 +24,14 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-conversation.c \
 	$(srcdir)/gml-conversation-set.c \
 	$(srcdir)/gml-http-parser.c \
+	$(srcdir)/gml-leave-handler.c \
 	$(srcdir)/gml-main.c \
 	$(srcdir)/gml-main-context.c \
+	$(srcdir)/gml-new-person-handler.c \
 	$(srcdir)/gml-new-person-response.c \
 	$(srcdir)/gml-person.c \
 	$(srcdir)/gml-person-set.c \
+	$(srcdir)/gml-request-handler.c \
 	$(srcdir)/gml-response.c \
 	$(srcdir)/gml-server.c \
 	$(srcdir)/gml-string-response.c

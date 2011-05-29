@@ -27,10 +27,11 @@
 #include "gml-main-context.h"
 #include "gml-http-parser.h"
 #include "gml-person-set.h"
-#include "gml-new-person-response.h"
 #include "gml-string-response.h"
 #include "gml-conversation.h"
 #include "gml-conversation-set.h"
+#include "gml-new-person-handler.h"
+#include "gml-leave-handler.h"
 
 struct _GmlServer
 {
@@ -80,9 +81,9 @@ typedef struct
      input and we're ignoring further data */
   gboolean write_finished;
 
-  /* The next response that will be added to the response queue when a
-     complete request is received */
-  GmlResponse *next_response;
+  /* The current request handler or NULL if we couldn't find an
+     appropriate one when the request line was received */
+  GmlRequestHandler *current_request_handler;
 
   /* Queue of GmlResponses to send to this client */
   GQueue response_queue;
@@ -95,83 +96,19 @@ typedef struct
    collector */
 #define GML_SERVER_GC_TIMEOUT (5 * 60 * 1000)
 
-static GmlResponse *
-parse_new_person_request (GmlServerConnection *connection,
-                          const char *query_string)
-{
-  GmlServer *server = connection->server;
-  GmlConversation *conversation;
-  GSocketAddress *address;
-  GmlPerson *person;
-  GmlResponse *response;
-  const char *p;
-
-  /* The query string will be used as the room name. It should only
-     contain letters */
-  if (query_string == NULL || *query_string == 0)
-    goto bad_room_name;
-
-  for (p = query_string; *p; p++)
-    if (!g_ascii_isalpha (*p))
-      goto bad_room_name;
-
-  address = g_socket_get_remote_address (connection->client_socket, NULL);
-  conversation =
-    gml_conversation_set_get_conversation (server->pending_conversations,
-                                           query_string);
-  person = gml_person_set_generate_person (server->person_set,
-                                           address,
-                                           conversation);
-  g_object_unref (conversation);
-  if (address)
-    g_object_unref (address);
-
-  response = gml_new_person_response_new (person);
-
-  g_object_unref (person);
-
-  return response;
-
- bad_room_name:
-  return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
-}
-
-static GmlResponse *
-parse_leave_request (GmlServerConnection *connection,
-                     const char *query_string)
-{
-  GmlServer *server = connection->server;
-  GmlPersonId id;
-  GmlPerson *person;
-
-  if (!gml_person_parse_id (query_string, &id))
-    return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
-
-  if ((person = gml_person_set_get_person (server->person_set, id)) == NULL)
-    return gml_string_response_new (GML_STRING_RESPONSE_NOT_FOUND);
-
-  gml_person_leave_conversation (person);
-
-  gml_person_set_remove_person (server->person_set, person);
-
-  return gml_string_response_new (GML_STRING_RESPONSE_OK);
-}
-
 static const struct
 {
-  const char *method;
   const char *url;
-  GmlResponse * (* parse_func) (GmlServerConnection *connection,
-                                const char *query_string);
+  GType (* get_type_func) (void);
 }
 requests[] =
   {
-    { "GET", "/new_person", parse_new_person_request },
-    { "GET", "/leave", parse_leave_request }
+    { "/new_person", gml_new_person_handler_get_type },
+    { "/leave", gml_leave_handler_get_type }
   };
 
 static gboolean
-gml_server_request_line_received_cb (const char *method,
+gml_server_request_line_received_cb (const char *method_str,
                                      const char *uri,
                                      void *user_data)
 {
@@ -179,8 +116,19 @@ gml_server_request_line_received_cb (const char *method,
   const char *query_string;
   const char *question_mark;
   const char *url;
+  GmlRequestHandler *handler;
+  GmlRequestMethod method;
   char *url_copy = NULL;
   int i;
+
+  g_warn_if_fail (connection->current_request_handler == NULL);
+
+  if (!strcmp (method_str, "GET"))
+    method = GML_REQUEST_METHOD_GET;
+  else if (!strcmp (method_str, "POST"))
+    method = GML_REQUEST_METHOD_POST;
+  else
+    method = GML_REQUEST_METHOD_UNKNOWN;
 
   if ((question_mark = strchr (uri, '?')))
     {
@@ -197,24 +145,27 @@ gml_server_request_line_received_cb (const char *method,
   for (i = 0; i < G_N_ELEMENTS (requests); i++)
     if (!strcmp (url, requests[i].url))
       {
-        if (strcmp (method, requests[i].method))
-          connection->next_response =
-            gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
-        else
-          connection->next_response =
-            requests[i].parse_func (connection, query_string);
+        handler = g_object_new (requests[i].get_type_func (), NULL);
 
-        goto done;
+        goto got_handler;
       }
 
-  if (!strcmp (method, "GET") || !strcmp (method, "POST"))
-    connection->next_response =
-      gml_string_response_new (GML_STRING_RESPONSE_NOT_FOUND);
-  else
-    connection->next_response =
-      gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
+  /* If we didn't find a handler then construct a default handler
+     which will report an error */
+  handler = gml_request_handler_new ();
 
- done:
+ got_handler:
+  handler->socket_address =
+    g_socket_get_remote_address (connection->client_socket, NULL);
+  handler->conversation_set =
+    g_object_ref (connection->server->pending_conversations);
+  handler->person_set =
+    g_object_ref (connection->server->person_set);
+
+  gml_request_handler_request_line_received (handler, method, query_string);
+
+  connection->current_request_handler = handler;
+
   g_free (url_copy);
 
   return TRUE;
@@ -225,6 +176,11 @@ gml_server_header_received_cb (const char *field_name,
                                const char *value,
                                void *user_data)
 {
+  GmlServerConnection *connection = user_data;
+  GmlRequestHandler *handler = connection->current_request_handler;
+
+  gml_request_handler_header_received (handler, field_name, value);
+
   return TRUE;
 }
 
@@ -233,6 +189,11 @@ gml_server_data_received_cb (const guint8 *data,
                              unsigned int length,
                              void *user_data)
 {
+  GmlServerConnection *connection = user_data;
+  GmlRequestHandler *handler = connection->current_request_handler;
+
+  gml_request_handler_data_received (handler, data, length);
+
   return TRUE;
 }
 
@@ -240,11 +201,15 @@ static gboolean
 gml_server_request_finished_cb (void *user_data)
 {
   GmlServerConnection *connection = user_data;
+  GmlRequestHandler *handler = connection->current_request_handler;
+  GmlResponse *response;
 
-  /* We've successfully got a complete request so we'll queue the
-     response */
-  g_queue_push_tail (&connection->response_queue, connection->next_response);
-  connection->next_response = NULL;
+  response = gml_request_handler_request_finished (handler);
+
+  g_object_unref (handler);
+  connection->current_request_handler = NULL;
+
+  g_queue_push_tail (&connection->response_queue, response);
 
   return TRUE;
 }
@@ -292,10 +257,10 @@ gml_server_connection_clear_responses (GmlServerConnection *connection)
                    NULL);
   g_queue_clear (&connection->response_queue);
 
-  if (connection->next_response)
+  if (connection->current_request_handler)
     {
-      g_object_unref (connection->next_response);
-      connection->next_response = NULL;
+      g_object_unref (connection->current_request_handler);
+      connection->current_request_handler = NULL;
     }
 }
 
@@ -546,7 +511,7 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
                             &gml_server_http_parser_vtable,
                             connection);
 
-      connection->next_response = NULL;
+      connection->current_request_handler = NULL;
       g_queue_init (&connection->response_queue);
 
       connection->had_bad_input = FALSE;
