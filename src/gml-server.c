@@ -744,7 +744,7 @@ gml_server_free (GmlServer *server)
   while (server->connections)
     gml_server_remove_connection (server, server->connections->data);
 
-  gml_person_set_free (server->person_set);
+  g_object_unref (server->person_set);
 
   /* Destroying all of the people should make all of the conversations
      disappear so we don't need to bother removing all of the weak

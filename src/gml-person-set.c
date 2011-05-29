@@ -20,28 +20,52 @@
 #include <config.h>
 #endif
 
-#include <glib.h>
+#include <glib-object.h>
 
 #include "gml-person-set.h"
+
+G_DEFINE_TYPE (GmlPersonSet, gml_person_set, G_TYPE_OBJECT);
+
+static void
+gml_person_set_finalize (GObject *object)
+{
+  GmlPersonSet *self = (GmlPersonSet *) object;
+
+  g_hash_table_destroy (self->hash_table);
+
+  G_OBJECT_CLASS (gml_person_set_parent_class)->finalize (object);
+}
+
+static void
+gml_person_set_class_init (GmlPersonSetClass *klass)
+{
+  GObjectClass *gobject_class = (GObjectClass *) klass;
+
+  gobject_class->finalize = gml_person_set_finalize;
+}
+
+static void
+gml_person_set_init (GmlPersonSet *self)
+{
+  self->hash_table = g_hash_table_new_full (gml_person_id_hash,
+                                            gml_person_id_equal,
+                                            NULL,
+                                            (GDestroyNotify) g_object_unref);
+}
 
 GmlPersonSet *
 gml_person_set_new (void)
 {
-  GmlPersonSet *set;
+  GmlPersonSet *self = g_object_new (GML_TYPE_PERSON_SET, NULL);
 
-  set = g_hash_table_new_full (gml_person_id_hash,
-                               gml_person_id_equal,
-                               NULL,
-                               (GDestroyNotify) g_object_unref);
-
-  return set;
+  return self;
 }
 
 GmlPerson *
 gml_person_set_get_person (GmlPersonSet *set,
                            GmlPersonId id)
 {
-  return g_hash_table_lookup (set, &id);
+  return g_hash_table_lookup (set->hash_table, &id);
 }
 
 GmlPerson *
@@ -60,7 +84,7 @@ gml_person_set_generate_person (GmlPersonSet *set,
 
   person = gml_person_new (id, conversation);
 
-  g_hash_table_insert (set, &person->id, g_object_ref (person));
+  g_hash_table_insert (set->hash_table, &person->id, g_object_ref (person));
 
   return person;
 }
@@ -72,16 +96,10 @@ gml_person_set_remove_person (GmlPersonSet *set,
   gboolean success;
 
   /* This should also unref the person */
-  success = g_hash_table_remove (set, &person->id);
+  success = g_hash_table_remove (set->hash_table, &person->id);
 
   if (!success)
     g_warning ("Tried to remove a GmlPerson that is not in the GmlPersonSet");
-}
-
-void
-gml_person_set_free (GmlPersonSet *set)
-{
-  g_hash_table_destroy (set);
 }
 
 static gboolean
@@ -102,7 +120,7 @@ remove_useless_people_cb (gpointer key,
 void
 gml_person_set_remove_useless_people (GmlPersonSet *set)
 {
-  g_hash_table_foreach_remove (set,
+  g_hash_table_foreach_remove (set->hash_table,
                                remove_useless_people_cb,
                                NULL);
 }

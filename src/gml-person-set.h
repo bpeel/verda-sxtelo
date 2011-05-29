@@ -19,13 +19,50 @@
 #ifndef __GML_PERSON_SET_H__
 #define __GML_PERSON_SET_H__
 
-#include <glib.h>
+#include <glib-object.h>
 #include <gio/gio.h>
 #include "gml-person.h"
 
 G_BEGIN_DECLS
 
-typedef GHashTable GmlPersonSet;
+#define GML_TYPE_PERSON_SET                                             \
+  (gml_person_set_get_type())
+#define GML_PERSON_SET(obj)                                             \
+  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                                   \
+                               GML_TYPE_PERSON_SET,                     \
+                               GmlPersonSet))
+#define GML_PERSON_SET_CLASS(klass)                                     \
+  (G_TYPE_CHECK_CLASS_CAST ((klass),                                    \
+                            GML_TYPE_PERSON_SET,                        \
+                            GmlPersonSetClass))
+#define GML_IS_PERSON_SET(obj)                                          \
+  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                                   \
+                               GML_TYPE_PERSON_SET))
+#define GML_IS_PERSON_SET_CLASS(klass)                                  \
+  (G_TYPE_CHECK_CLASS_TYPE ((klass),                                    \
+                            GML_TYPE_PERSON_SET))
+#define GML_PERSON_SET_GET_CLASS(obj)                                   \
+  (G_TYPE_INSTANCE_GET_CLASS ((obj),                                    \
+                              GML_PERSON_SET,                           \
+                              GmlPersonSetClass))
+
+typedef struct _GmlPersonSet      GmlPersonSet;
+typedef struct _GmlPersonSetClass GmlPersonSetClass;
+
+struct _GmlPersonSetClass
+{
+  GObjectClass parent_class;
+};
+
+struct _GmlPersonSet
+{
+  GObject parent;
+
+  GHashTable *hash_table;
+};
+
+GType
+gml_person_set_get_type (void) G_GNUC_CONST;
 
 GmlPersonSet *
 gml_person_set_new (void);
@@ -42,9 +79,6 @@ gml_person_set_generate_person (GmlPersonSet *set,
 void
 gml_person_set_remove_person (GmlPersonSet *set,
                               GmlPerson *person);
-
-void
-gml_person_set_free (GmlPersonSet *set);
 
 void
 gml_person_set_remove_useless_people (GmlPersonSet *set);
