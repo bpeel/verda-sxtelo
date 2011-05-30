@@ -18,6 +18,7 @@ source_h = \
 	$(srcdir)/gml-person-set.h \
 	$(srcdir)/gml-request-handler.h \
 	$(srcdir)/gml-response.h \
+	$(srcdir)/gml-send-message-handler.h \
 	$(srcdir)/gml-server.h \
 	$(srcdir)/gml-string-response.h
 
@@ -37,6 +38,7 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-person-set.c \
 	$(srcdir)/gml-request-handler.c \
 	$(srcdir)/gml-response.c \
+	$(srcdir)/gml-send-message-handler.c \
 	$(srcdir)/gml-server.c \
 	$(srcdir)/gml-string-response.c
 
