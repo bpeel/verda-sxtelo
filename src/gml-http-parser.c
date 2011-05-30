@@ -612,10 +612,13 @@ gml_http_parser_parse_data (GmlHttpParser *parser,
         case GML_HTTP_PARSER_READING_CHUNK_TERMINATOR1:
           {
             if (*data != '\r')
-              g_set_error (error,
-                           GML_HTTP_PARSER_ERROR,
-                           GML_HTTP_PARSER_ERROR_INVALID,
-                           "Invalid chunk terminator received");
+              {
+                g_set_error (error,
+                             GML_HTTP_PARSER_ERROR,
+                             GML_HTTP_PARSER_ERROR_INVALID,
+                             "Invalid chunk terminator received");
+                return FALSE;
+              }
 
             data++;
             length--;
@@ -627,10 +630,13 @@ gml_http_parser_parse_data (GmlHttpParser *parser,
         case GML_HTTP_PARSER_READING_CHUNK_TERMINATOR2:
           {
             if (*data != '\n')
-              g_set_error (error,
-                           GML_HTTP_PARSER_ERROR,
-                           GML_HTTP_PARSER_ERROR_INVALID,
-                           "Invalid chunk terminator received");
+              {
+                g_set_error (error,
+                             GML_HTTP_PARSER_ERROR,
+                             GML_HTTP_PARSER_ERROR_INVALID,
+                             "Invalid chunk terminator received");
+                return FALSE;
+              }
 
             data++;
             length--;
