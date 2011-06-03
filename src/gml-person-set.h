@@ -1,5 +1,5 @@
 /*
- * Gemelo - A person_set for chatting with strangers in a foreign language
+ * Gemelo - A server for chatting with strangers in a foreign language
  * Copyright (C) 2011  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
