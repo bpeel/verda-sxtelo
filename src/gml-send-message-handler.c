@@ -58,7 +58,8 @@ real_finalize (GObject *object)
   if (handler->data_iconv != (GIConv) -1)
     g_iconv_close (handler->data_iconv);
 
-  g_string_free (handler->message_buffer, TRUE);
+  if (handler->message_buffer)
+    g_string_free (handler->message_buffer, TRUE);
 
   G_OBJECT_CLASS (gml_send_message_handler_parent_class)->finalize (object);
 }
@@ -227,12 +228,22 @@ real_request_finished (GmlRequestHandler *handler)
 
   if (self->person)
     {
+      unsigned int message_len;
+      char *message_buf;
+
       if (self->data_iconv == (GIConv) -1
-          || !gml_chunked_iconv_eos (&self->chunked_iconv))
+          || !gml_chunked_iconv_eos (&self->chunked_iconv)
+          || self->person->conversation == NULL)
         return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
 
-      /* TODO: do something useful with the message! */
-      g_print ("Got message: \"%s\"\n", self->message_buffer->str);
+      message_len = self->message_buffer->len;
+      message_buf = g_string_free (self->message_buffer, FALSE);
+      self->message_buffer = NULL;
+
+      gml_conversation_add_message (self->person->conversation,
+                                    GML_BUFFER_USAGE_TAKE,
+                                    message_len,
+                                    message_buf);
 
       return gml_string_response_new (GML_STRING_RESPONSE_OK);
     }
