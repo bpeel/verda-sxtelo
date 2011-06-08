@@ -20,6 +20,7 @@
 #define __GML_CONVERSATION_H__
 
 #include <glib-object.h>
+#include "gml-buffer-usage.h"
 
 G_BEGIN_DECLS
 
@@ -55,13 +56,27 @@ struct _GmlConversationClass
 struct _GmlConversation
 {
   GObject parent;
+
+  GArray *messages;
 };
+
+typedef struct
+{
+  unsigned int length;
+  char *text;
+} GmlConversationMessage;
 
 GType
 gml_conversation_get_type (void) G_GNUC_CONST;
 
 GmlConversation *
 gml_conversation_new (void);
+
+void
+gml_conversation_add_message (GmlConversation *conversation,
+                              GmlBufferUsage buffer_usage,
+                              unsigned int length,
+                              const char *buffer);
 
 G_END_DECLS
 
