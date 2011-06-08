@@ -63,6 +63,7 @@ struct _GmlPerson
   GmlPersonId id;
 
   GmlConversation *conversation;
+  guint conversation_changed_handler;
 
   GTimer *use_age;
   unsigned int use_count;

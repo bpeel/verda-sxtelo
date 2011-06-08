@@ -24,23 +24,41 @@
 #include <string.h>
 
 #include "gml-person.h"
+#include "gml-marshal.h"
 
 G_DEFINE_TYPE (GmlPerson, gml_person, G_TYPE_OBJECT);
+
+enum
+{
+  CHANGED_SIGNAL,
+
+  LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0, };
 
 /* Time in seconds after the last 'use' of the person is removed
    before the person is considered not in use */
 #define GML_PERSON_USE_EXPIRY_TIME (60 * 5)
 
 static void
+forget_conversation (GmlPerson *person)
+{
+  if (person->conversation)
+    {
+      g_signal_handler_disconnect (person->conversation,
+                                   person->conversation_changed_handler);
+      g_object_unref (person->conversation);
+      person->conversation = NULL;
+    }
+}
+
+static void
 gml_person_dispose (GObject *object)
 {
   GmlPerson *person = GML_PERSON (object);
 
-  if (person->conversation)
-    {
-      g_object_unref (person->conversation);
-      person->conversation = NULL;
-    }
+  forget_conversation (person);
 
   G_OBJECT_CLASS (gml_person_parent_class)->dispose (object);
 }
@@ -62,6 +80,17 @@ gml_person_class_init (GmlPersonClass *klass)
 
   object_class->dispose = gml_person_dispose;
   object_class->finalize = gml_person_finalize;
+
+  signals[CHANGED_SIGNAL] =
+    g_signal_new ("changed",
+                  G_TYPE_FROM_CLASS (object_class),
+                  G_SIGNAL_RUN_FIRST,
+                  0, /* no class method */
+                  NULL, /* accumulator */
+                  NULL, /* accu_data */
+                  gml_marshal_VOID__VOID,
+                  G_TYPE_NONE, /* return type */
+                  0 /* num arguments */);
 }
 
 static void
@@ -142,6 +171,15 @@ gml_person_parse_id (const char *string,
   return p - string == sizeof (GmlPersonId) * 2;
 }
 
+static void
+conversation_changed_cb (GmlConversation *conversation,
+                         GmlPerson *person)
+{
+  g_signal_emit (person,
+                 signals[CHANGED_SIGNAL],
+                 0 /* detail */);
+}
+
 GmlPerson *
 gml_person_new (GmlPersonId id,
                 GmlConversation *conversation)
@@ -152,17 +190,23 @@ gml_person_new (GmlPersonId id,
   person->conversation = g_object_ref (conversation);
   person->use_age = g_timer_new ();
 
+  person->conversation_changed_handler
+    = g_signal_connect (conversation,
+                        "changed",
+                        G_CALLBACK (conversation_changed_cb),
+                        person);
+
   return person;
 }
 
 void
 gml_person_leave_conversation (GmlPerson *person)
 {
-  if (person->conversation)
-    {
-      g_object_unref (person->conversation);
-      person->conversation = NULL;
-    }
+  forget_conversation (person);
+
+  g_signal_emit (person,
+                 signals[CHANGED_SIGNAL],
+                 0 /* detail */);
 }
 
 void
