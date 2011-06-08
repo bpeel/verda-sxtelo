@@ -5,6 +5,7 @@ INCLUDES = \
 	-DGML_LIBDIR=\""$(libdir)"\"
 
 source_h = \
+	$(srcdir)/gml-buffer-usage.h \
 	$(srcdir)/gml-chunked-iconv.h \
 	$(srcdir)/gml-conversation.h \
 	$(srcdir)/gml-conversation-set.h \
