@@ -62,6 +62,11 @@ struct _GmlResponseClass
   unsigned int (* add_data) (GmlResponse *response,
                              guint8 *buffer,
                              unsigned int buffer_size);
+  /* This should report TRUE if there is data immediately ready for
+     writing (eg, we should block for writing on the
+     socket. Overriding this is optional and the default
+     implementation just returns TRUE */
+  gboolean (* has_data) (GmlResponse *response);
   /* This should return TRUE once the response is fully generated */
   gboolean (* is_finished) (GmlResponse *response);
 };
@@ -81,6 +86,12 @@ gml_response_add_data (GmlResponse *response,
 
 gboolean
 gml_response_is_finished (GmlResponse *response);
+
+gboolean
+gml_response_has_data (GmlResponse *response);
+
+void
+gml_response_changed (GmlResponse *response);
 
 G_END_DECLS
 

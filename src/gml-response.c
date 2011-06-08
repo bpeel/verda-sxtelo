@@ -23,12 +23,42 @@
 #include <glib-object.h>
 
 #include "gml-response.h"
+#include "gml-marshal.h"
 
 G_DEFINE_ABSTRACT_TYPE (GmlResponse, gml_response, G_TYPE_OBJECT);
+
+enum
+{
+  CHANGED_SIGNAL,
+
+  LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0, };
+
+static gboolean
+gml_response_real_has_data (GmlResponse *self)
+{
+  return TRUE;
+}
 
 static void
 gml_response_class_init (GmlResponseClass *klass)
 {
+  GObjectClass *object_class = (GObjectClass *) klass;
+
+  klass->has_data = gml_response_real_has_data;
+
+  signals[CHANGED_SIGNAL] =
+    g_signal_new ("changed",
+                  G_TYPE_FROM_CLASS (object_class),
+                  G_SIGNAL_RUN_FIRST,
+                  0, /* no class method */
+                  NULL, /* accumulator */
+                  NULL, /* accu_data */
+                  gml_marshal_VOID__VOID,
+                  G_TYPE_NONE, /* return type */
+                  0 /* num arguments */);
 }
 
 static void
@@ -50,4 +80,18 @@ gboolean
 gml_response_is_finished (GmlResponse *response)
 {
   return GML_RESPONSE_GET_CLASS (response)->is_finished (response);
+}
+
+gboolean
+gml_response_has_data (GmlResponse *response)
+{
+  return GML_RESPONSE_GET_CLASS (response)->has_data (response);
+}
+
+void
+gml_response_changed (GmlResponse *response)
+{
+  g_signal_emit (response,
+                 signals[CHANGED_SIGNAL],
+                 0 /* detail */);
 }

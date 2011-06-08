@@ -109,6 +109,17 @@ requests[] =
     { "/leave", gml_leave_handler_get_type }
   };
 
+static void
+update_poll (GmlServerConnection *connection);
+
+static void
+response_changed_cb (GmlResponse *response,
+                     GmlServerConnection *connection)
+{
+  if (response == g_queue_peek_head (&connection->response_queue))
+    update_poll (connection);
+}
+
 static gboolean
 gml_server_request_line_received_cb (const char *method_str,
                                      const char *uri,
@@ -199,6 +210,17 @@ gml_server_data_received_cb (const guint8 *data,
   return TRUE;
 }
 
+static void
+queue_response (GmlServerConnection *connection,
+                GmlResponse *response)
+{
+  g_queue_push_tail (&connection->response_queue, response);
+  g_signal_connect (response,
+                    "changed",
+                    G_CALLBACK (response_changed_cb),
+                    connection);
+}
+
 static gboolean
 gml_server_request_finished_cb (void *user_data)
 {
@@ -211,7 +233,7 @@ gml_server_request_finished_cb (void *user_data)
   g_object_unref (handler);
   connection->current_request_handler = NULL;
 
-  g_queue_push_tail (&connection->response_queue, response);
+  queue_response (connection, response);
 
   return TRUE;
 }
@@ -252,12 +274,29 @@ gml_server_gc_timer_cb (GmlMainContextSource *source,
 }
 
 static void
+gml_server_connection_pop_response (GmlServerConnection *connection)
+{
+  GmlResponse *response;
+  int num_handlers;
+
+  g_return_if_fail (!g_queue_is_empty (&connection->response_queue));
+
+  response = g_queue_pop_head (&connection->response_queue);
+
+  num_handlers =
+    g_signal_handlers_disconnect_by_func (response,
+                                          response_changed_cb,
+                                          connection);
+  g_warn_if_fail (num_handlers == 1);
+
+  g_object_unref (response);
+}
+
+static void
 gml_server_connection_clear_responses (GmlServerConnection *connection)
 {
-  g_queue_foreach (&connection->response_queue,
-                   (GFunc) g_object_unref,
-                   NULL);
-  g_queue_clear (&connection->response_queue);
+  while (!g_queue_is_empty (&connection->response_queue))
+    gml_server_connection_pop_response (connection);
 
   if (connection->current_request_handler)
     {
@@ -281,7 +320,7 @@ set_bad_input (GmlServerConnection *connection, GError *error)
   else
     response = gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
 
-  g_queue_push_tail (&connection->response_queue, response);
+  queue_response (connection, response);
 
   connection->had_bad_input = TRUE;
 }
@@ -329,10 +368,19 @@ update_poll (GmlServerConnection *connection)
       connection->write_finished = TRUE;
     }
 
-  if (!connection->write_finished
-      && (!g_queue_is_empty (&connection->response_queue)
-          || connection->output_length > 0))
-    flags |= GML_MAIN_CONTEXT_POLL_OUT;
+  if (!connection->write_finished)
+    {
+      if (connection->output_length > 0)
+        flags |= GML_MAIN_CONTEXT_POLL_OUT;
+      else if (!g_queue_is_empty (&connection->response_queue))
+        {
+          GmlResponse *response
+            = g_queue_peek_head (&connection->response_queue);
+
+          if (gml_response_has_data (response))
+            flags |= GML_MAIN_CONTEXT_POLL_OUT;
+        }
+    }
 
   /* If both ends of the connection are closed then we can abandon
      this connectin */
@@ -421,6 +469,9 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
             g_queue_peek_head (&connection->response_queue);
           unsigned int added;
 
+          if (!gml_response_has_data (response))
+            break;
+
           added =
             gml_response_add_data (response,
                                    connection->output_buffer
@@ -432,10 +483,12 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
 
           /* If the response is now finished then remove it from the queue */
           if (gml_response_is_finished (response))
-            {
-              g_object_unref (response);
-              g_queue_pop_head (&connection->response_queue);
-            }
+            gml_server_connection_pop_response (connection);
+          /* If the buffer wasn't big enough to fit a chunk in then
+             the response might not will the buffer so we should give
+             up until the buffer is emptied */
+          else
+            break;
         }
 
       if ((wrote = g_socket_send (connection->client_socket,
