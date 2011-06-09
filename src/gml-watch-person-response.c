@@ -46,10 +46,10 @@ end[] =
   "\r\n";
 
 /* We need at least this much space before we'll consider adding a
-   chunk to the buffer. The 10 is the length of 2³² in decimal, the
-   first 2 is for the chunk length terminator and the second two is
-   for the data terminator */
-#define CHUNK_LENGTH_SIZE (10 + 2 + 2)
+   chunk to the buffer. The 8 is the length of 2³²-1 in hexadecimal,
+   the first 2 is for the chunk length terminator and the second two
+   is for the data terminator */
+#define CHUNK_LENGTH_SIZE (8 + 2 + 2)
 
 static unsigned int
 gml_watch_person_response_add_data (GmlResponse *response,
@@ -115,7 +115,7 @@ gml_watch_person_response_add_data (GmlResponse *response,
               to_write = MIN (length - CHUNK_LENGTH_SIZE,
                               message->length - self->message_pos);
 
-              length_length = sprintf ((char *) data, "%u\r\n", to_write);
+              length_length = sprintf ((char *) data, "%x\r\n", to_write);
 
               length -= length_length;
               data += length_length;

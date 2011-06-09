@@ -466,11 +466,12 @@ gml_http_parser_parse_data (GmlHttpParser *parser,
           break;
 
         case GML_HTTP_PARSER_READING_CHUNK_LENGTH:
-          if (g_ascii_isdigit (*data))
+          if (g_ascii_isxdigit (*data))
             {
               unsigned int new_length;
 
-              new_length = parser->content_length * 10 + *data - '0';
+              new_length = (parser->content_length * 0x10
+                            + g_ascii_xdigit_value (*data));
 
               if (new_length < parser->content_length)
                 {
