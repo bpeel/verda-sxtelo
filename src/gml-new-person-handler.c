@@ -23,8 +23,8 @@
 #include <glib-object.h>
 
 #include "gml-new-person-handler.h"
-#include "gml-new-person-response.h"
 #include "gml-string-response.h"
+#include "gml-watch-person-response.h"
 
 G_DEFINE_TYPE (GmlNewPersonHandler,
                gml_new_person_handler,
@@ -81,7 +81,7 @@ real_request_finished (GmlRequestHandler *handler)
                                                handler->socket_address,
                                                conversation);
 
-      response = gml_new_person_response_new (person);
+      response = gml_watch_person_response_new (person);
 
       g_object_unref (conversation);
       g_object_unref (person);

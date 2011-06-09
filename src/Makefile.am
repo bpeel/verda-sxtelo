@@ -12,7 +12,6 @@ source_h = \
 	$(srcdir)/gml-leave-handler.h \
 	$(srcdir)/gml-main-context.h \
 	$(srcdir)/gml-new-person-handler.h \
-	$(srcdir)/gml-new-person-response.h \
 	$(srcdir)/gml-parse-content-type.h \
 	$(srcdir)/gml-person.h \
 	$(srcdir)/gml-person-set.h \
@@ -34,7 +33,6 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-main.c \
 	$(srcdir)/gml-main-context.c \
 	$(srcdir)/gml-new-person-handler.c \
-	$(srcdir)/gml-new-person-response.c \
 	$(srcdir)/gml-parse-content-type.c\
 	$(srcdir)/gml-person.c \
 	$(srcdir)/gml-person-set.c \
