@@ -184,6 +184,11 @@ gml_person_new (GmlPersonId id,
   person->conversation = g_object_ref (conversation);
   person->use_age = g_timer_new ();
 
+  if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
+    person->person_num = 0;
+  else
+    person->person_num = 1;
+
   person->conversation_changed_handler
     = g_signal_connect (conversation,
                         "changed",

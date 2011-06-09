@@ -61,6 +61,9 @@ struct _GmlPerson
   GObject parent;
 
   GmlPersonId id;
+  /* This will be zero for one of the people in the conversation and
+     one for the other */
+  unsigned int person_num;
 
   GmlConversation *conversation;
   guint conversation_changed_handler;
