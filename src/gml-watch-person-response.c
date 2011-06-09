@@ -54,6 +54,18 @@ end[] =
   "0\r\n"
   "\r\n";
 
+static guint8
+header_first_person_start[] =
+  "32\r\n"
+  "[\"header\", {\"num\": 0, \"id\": \"";
+static guint8
+header_second_person_start[] =
+  "32\r\n"
+  "[\"header\", {\"num\": 1, \"id\": \"";
+static guint8
+header_end[] =
+  "\"}]\r\n\r\n";
+
 /* We need at least this much space before we'll consider adding a
    chunk to the buffer. The 8 is the length of 2³²-1 in hexadecimal,
    the first 2 is for the chunk length terminator and the second two
@@ -100,9 +112,57 @@ gml_watch_person_response_add_data (GmlResponse *response,
   while (TRUE)
     switch (self->state)
       {
-      case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER:
+      case GML_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER:
         {
           if (write_static_message (self, &message_data, header))
+            {
+              self->message_pos = 0;
+              self->state = GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_START;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
+        {
+          if (self->person->person_num == 0
+              ? write_static_message (self, &message_data,
+                                      header_first_person_start)
+              : write_static_message (self, &message_data,
+                                      header_second_person_start))
+            {
+              self->message_pos = 0;
+              self->state = GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID:
+        {
+          char id_buf[17];
+
+          G_STATIC_ASSERT (sizeof (GmlPersonId) == sizeof (guint64));
+
+          g_snprintf (id_buf, sizeof (id_buf),
+                      "%016" G_GINT64_MODIFIER "X",
+                      self->person->id);
+
+          if (write_message (self, &message_data, (guint8 *) id_buf, 16))
+            {
+              self->message_pos = 0;
+              self->state = GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_END;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_END:
+        {
+          if (write_static_message (self, &message_data, header_end))
             {
               self->message_pos = 0;
               self->state = GML_WATCH_PERSON_RESPONSE_AWAITING_START;
@@ -222,7 +282,10 @@ gml_watch_person_response_has_data (GmlResponse *response)
 
   switch (self->state)
     {
-    case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER:
+    case GML_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER:
+    case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
+    case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID:
+    case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER_END:
       return TRUE;
 
     case GML_WATCH_PERSON_RESPONSE_AWAITING_START:
