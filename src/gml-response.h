@@ -48,7 +48,8 @@ G_BEGIN_DECLS
   "Cache-Control: no-cache\r\n"
 
 #define GML_RESPONSE_COMMON_HEADERS \
-  "Server: gemelo/" PACKAGE_VERSION "\r\n"
+  "Server: gemelo/" PACKAGE_VERSION "\r\n" \
+  "Access-Control-Allow-Origin: *\r\n"
 
 typedef struct _GmlResponse      GmlResponse;
 typedef struct _GmlResponseClass GmlResponseClass;
