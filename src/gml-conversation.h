@@ -20,7 +20,6 @@
 #define __GML_CONVERSATION_H__
 
 #include <glib-object.h>
-#include "gml-buffer-usage.h"
 
 G_BEGIN_DECLS
 
@@ -87,9 +86,9 @@ gml_conversation_finish (GmlConversation *conversation);
 
 void
 gml_conversation_add_message (GmlConversation *conversation,
-                              GmlBufferUsage buffer_usage,
-                              unsigned int length,
-                              const char *buffer);
+                              unsigned int person_num,
+                              const char *buffer,
+                              unsigned int length);
 
 G_END_DECLS
 

@@ -23,7 +23,6 @@
 #include <glib-object.h>
 
 #include "gml-conversation.h"
-#include "gml-buffer-usage.h"
 #include "gml-marshal.h"
 
 G_DEFINE_TYPE (GmlConversation, gml_conversation, G_TYPE_OBJECT);
@@ -119,28 +118,18 @@ gml_conversation_finish (GmlConversation *conversation)
 
 void
 gml_conversation_add_message (GmlConversation *conversation,
-                              GmlBufferUsage buffer_usage,
-                              unsigned int length,
-                              const char *buffer)
+                              unsigned int person_num,
+                              const char *buffer,
+                              unsigned int length)
+
 {
   GmlConversationMessage *message;
+  GString *message_str;
 
   /* Ignore attempts to add messages to a conversation that has not
      yet started */
   if (conversation->state != GML_CONVERSATION_IN_PROGRESS)
-    {
-      switch (buffer_usage)
-        {
-        case GML_BUFFER_USAGE_TAKE:
-          g_free ((char *) buffer);
-          break;
-
-        case GML_BUFFER_USAGE_COPY:
-          break;
-        }
-
-      return;
-    }
+    return;
 
   g_array_set_size (conversation->messages,
                     conversation->messages->len + 1);
@@ -148,18 +137,29 @@ gml_conversation_add_message (GmlConversation *conversation,
                             GmlConversationMessage,
                             conversation->messages->len - 1);
 
-  switch (buffer_usage)
+  message_str = g_string_sized_new (length + 32);
+
+  g_string_append_printf (message_str,
+                          "[\"message\", \"{\"person\": %u, "
+                          "\"text\": \"",
+                          person_num);
+  while (length-- > 0)
     {
-    case GML_BUFFER_USAGE_COPY:
-      message->text = g_strdup (buffer);
-      break;
+      /* Replace any control characters or spaces with a space */
+      if (*buffer <= ' ')
+        g_string_append_c (message_str, ' ');
+      /* Quote quote characters */
+      else if (*buffer == '"')
+        g_string_append (message_str, "\\\"");
+      else
+        g_string_append_c (message_str, *buffer);
 
-    case GML_BUFFER_USAGE_TAKE:
-      message->text = (char *) buffer;
-      break;
+      buffer++;
     }
+  g_string_append (message_str, "\"}]\r\n");
 
-  message->length = length;
+  message->length = message_str->len;
+  message->text = g_string_free (message_str, FALSE);
 
   gml_conversation_changed (conversation);
 }
