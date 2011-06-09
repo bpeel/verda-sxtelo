@@ -41,7 +41,16 @@ header[] =
   "\r\n";
 
 static guint8
+start[] =
+  "1a\r\n"
+  "[\"state\", \"in-progress\"]\r\n"
+  "\r\n";
+
+static guint8
 end[] =
+  "13\r\n"
+  "[\"state\", \"done\"]\r\n"
+  "\r\n"
   "0\r\n"
   "\r\n";
 
@@ -51,36 +60,78 @@ end[] =
    is for the data terminator */
 #define CHUNK_LENGTH_SIZE (8 + 2 + 2)
 
+typedef struct
+{
+  guint8 *data;
+  unsigned int length;
+} WriteMessageData;
+
+static gboolean
+write_message (GmlWatchPersonResponse *self,
+               WriteMessageData *message_data,
+               const guint8 *message,
+               unsigned int message_length)
+{
+  unsigned int to_write = MIN (message_data->length,
+                               message_length - self->message_pos);
+
+  memcpy (message_data->data, message + self->message_pos, to_write);
+  message_data->data += to_write;
+  message_data->length -= to_write;
+  self->message_pos += to_write;
+
+  return self->message_pos >= message_length;
+}
+
+#define write_static_message(self, message_data, message) \
+  write_message (self, message_data, message, sizeof (message) - 1)
+
 static unsigned int
 gml_watch_person_response_add_data (GmlResponse *response,
-                                    guint8 *data,
-                                    unsigned int length)
+                                    guint8 *data_in,
+                                    unsigned int length_in)
 {
   GmlWatchPersonResponse *self = GML_WATCH_PERSON_RESPONSE (response);
-  unsigned int added = 0;
+  WriteMessageData message_data;
+
+  message_data.data = data_in;
+  message_data.length = length_in;
 
   while (TRUE)
     switch (self->state)
       {
       case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER:
         {
-          unsigned int to_write
-            = MIN (length, sizeof (header) - 1 - self->message_pos);
-
-          memcpy (data, header + self->message_pos, to_write);
-          data += to_write;
-          length -= to_write;
-          added += to_write;
-          self->message_pos += to_write;
-
-          if (self->message_pos >= sizeof (header) - 1)
+          if (write_static_message (self, &message_data, header))
             {
               self->message_pos = 0;
-              self->state = GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
+              self->state = GML_WATCH_PERSON_RESPONSE_AWAITING_START;
             }
           else
             goto done;
         }
+        break;
+
+      case GML_WATCH_PERSON_RESPONSE_AWAITING_START:
+        {
+          GmlConversation *conversation = self->person->conversation;
+
+          if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
+            goto done;
+
+          self->message_pos = 0;
+          self->state = GML_WATCH_PERSON_RESPONSE_WRITING_START;
+        }
+        break;
+
+      case GML_WATCH_PERSON_RESPONSE_WRITING_START:
+        if (write_static_message (self, &message_data, start))
+          {
+            self->message_pos = 0;
+            self->state = GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
+          }
+        else
+          goto done;
         break;
 
       case GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
@@ -93,7 +144,7 @@ gml_watch_person_response_add_data (GmlResponse *response,
           /* If there's not enough space left in the buffer to
              write a large chunk length then we'll wait until the
              next call to add any data */
-          if (length <= CHUNK_LENGTH_SIZE)
+          if (message_data.length <= CHUNK_LENGTH_SIZE)
             goto done;
 
           if (self->message_num >= conversation->messages->len)
@@ -112,21 +163,21 @@ gml_watch_person_response_add_data (GmlResponse *response,
                                         GmlConversationMessage,
                                         self->message_num);
 
-              to_write = MIN (length - CHUNK_LENGTH_SIZE,
+              to_write = MIN (message_data.length - CHUNK_LENGTH_SIZE,
                               message->length - self->message_pos);
 
-              length_length = sprintf ((char *) data, "%x\r\n", to_write);
+              length_length = sprintf ((char *) message_data.data,
+                                       "%x\r\n", to_write);
 
-              length -= length_length;
-              data += length_length;
-              added += length_length;
+              message_data.length -= length_length;
+              message_data.data += length_length;
 
-              memcpy (data, message->text + self->message_pos, to_write);
-              memcpy (data + to_write, "\r\n", 2);
+              memcpy (message_data.data,
+                      message->text + self->message_pos, to_write);
+              memcpy (message_data.data + to_write, "\r\n", 2);
 
-              length -= to_write + 2;
-              data += to_write + 2;
-              added += to_write + 2;
+              message_data.length -= to_write + 2;
+              message_data.data += to_write + 2;
 
               self->message_pos += to_write;
 
@@ -141,16 +192,7 @@ gml_watch_person_response_add_data (GmlResponse *response,
 
       case GML_WATCH_PERSON_RESPONSE_WRITING_END:
         {
-          unsigned int to_write
-            = MIN (length, sizeof (end) - 1 - self->message_pos);
-
-          memcpy (data, end + self->message_pos, to_write);
-          data += to_write;
-          length -= to_write;
-          added += to_write;
-          self->message_pos += to_write;
-
-          if (self->message_pos >= sizeof (end) - 1)
+          if (write_static_message (self, &message_data, end))
             self->state = GML_WATCH_PERSON_RESPONSE_DONE;
           else
             goto done;
@@ -162,7 +204,7 @@ gml_watch_person_response_add_data (GmlResponse *response,
       }
 
  done:
-  return added;
+  return message_data.data - data_in;
 }
 
 static gboolean
@@ -181,6 +223,13 @@ gml_watch_person_response_has_data (GmlResponse *response)
   switch (self->state)
     {
     case GML_WATCH_PERSON_RESPONSE_WRITING_HEADER:
+      return TRUE;
+
+    case GML_WATCH_PERSON_RESPONSE_AWAITING_START:
+      return (self->person->conversation->state
+              != GML_CONVERSATION_AWAITING_PARTNER);
+
+    case GML_WATCH_PERSON_RESPONSE_WRITING_START:
       return TRUE;
 
     case GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
