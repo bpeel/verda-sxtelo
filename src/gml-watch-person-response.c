@@ -85,28 +85,29 @@ gml_watch_person_response_add_data (GmlResponse *response,
 
       case GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
         {
-          /* If the person has lost its conversation then we're done */
-          if (self->person == NULL || self->person->conversation == NULL)
+          GmlConversation *conversation = self->person->conversation;
+          GmlConversationMessage *message;
+          unsigned int to_write;
+          int length_length;
+
+          /* If there's not enough space left in the buffer to
+             write a large chunk length then we'll wait until the
+             next call to add any data */
+          if (length <= CHUNK_LENGTH_SIZE)
+            goto done;
+
+          if (self->message_num >= conversation->messages->len)
             {
-              self->message_pos = 0;
-              self->state = GML_WATCH_PERSON_RESPONSE_WRITING_END;
+              if (conversation->state == GML_CONVERSATION_FINISHED)
+                {
+                  self->message_pos = 0;
+                  self->state = GML_WATCH_PERSON_RESPONSE_WRITING_END;
+                }
+              else
+                goto done;
             }
           else
             {
-              GmlConversation *conversation = self->person->conversation;
-              GmlConversationMessage *message;
-              unsigned int to_write;
-              int length_length;
-
-              /* If there's not enough space left in the buffer to
-                 write a large chunk length then we'll wait until the
-                 next call to add any data */
-              if (length <= CHUNK_LENGTH_SIZE)
-                goto done;
-
-              if (self->message_num >= conversation->messages->len)
-                goto done;
-
               message = &g_array_index (conversation->messages,
                                         GmlConversationMessage,
                                         self->message_num);
@@ -183,7 +184,7 @@ gml_watch_person_response_has_data (GmlResponse *response)
       return TRUE;
 
     case GML_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
-      if (self->person == NULL || self->person->conversation == NULL)
+      if (self->person->conversation->state == GML_CONVERSATION_FINISHED)
         return TRUE;
 
       return self->message_num < self->person->conversation->messages->len;

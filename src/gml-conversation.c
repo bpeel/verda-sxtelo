@@ -88,6 +88,33 @@ static void
 gml_conversation_init (GmlConversation *self)
 {
   self->messages = g_array_new (FALSE, FALSE, sizeof (GmlConversationMessage));
+
+  self->state = GML_CONVERSATION_AWAITING_PARTNER;
+}
+
+static void
+gml_conversation_changed (GmlConversation *conversation)
+{
+  g_signal_emit (conversation,
+                 signals[CHANGED_SIGNAL],
+                 0 /* detail */);
+}
+
+void
+gml_conversation_start (GmlConversation *conversation)
+{
+  if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
+    {
+      conversation->state = GML_CONVERSATION_IN_PROGRESS;
+      gml_conversation_changed (conversation);
+    }
+}
+
+void
+gml_conversation_finish (GmlConversation *conversation)
+{
+  conversation->state = GML_CONVERSATION_FINISHED;
+  gml_conversation_changed (conversation);
 }
 
 void
@@ -97,6 +124,23 @@ gml_conversation_add_message (GmlConversation *conversation,
                               const char *buffer)
 {
   GmlConversationMessage *message;
+
+  /* Ignore attempts to add messages to a conversation that has not
+     yet started */
+  if (conversation->state != GML_CONVERSATION_IN_PROGRESS)
+    {
+      switch (buffer_usage)
+        {
+        case GML_BUFFER_USAGE_TAKE:
+          g_free ((char *) buffer);
+          break;
+
+        case GML_BUFFER_USAGE_COPY:
+          break;
+        }
+
+      return;
+    }
 
   g_array_set_size (conversation->messages,
                     conversation->messages->len + 1);
@@ -117,9 +161,7 @@ gml_conversation_add_message (GmlConversation *conversation,
 
   message->length = length;
 
-  g_signal_emit (conversation,
-                 signals[CHANGED_SIGNAL],
-                 0 /* detail */);
+  gml_conversation_changed (conversation);
 }
 
 GmlConversation *

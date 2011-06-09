@@ -57,6 +57,13 @@ struct _GmlConversation
 {
   GObject parent;
 
+  enum
+  {
+    GML_CONVERSATION_AWAITING_PARTNER,
+    GML_CONVERSATION_IN_PROGRESS,
+    GML_CONVERSATION_FINISHED
+  } state;
+
   GArray *messages;
 };
 
@@ -71,6 +78,12 @@ gml_conversation_get_type (void) G_GNUC_CONST;
 
 GmlConversation *
 gml_conversation_new (void);
+
+void
+gml_conversation_start (GmlConversation *conversation);
+
+void
+gml_conversation_finish (GmlConversation *conversation);
 
 void
 gml_conversation_add_message (GmlConversation *conversation,

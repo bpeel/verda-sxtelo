@@ -31,34 +31,32 @@ typedef struct
   char *room_name;
   GmlConversationSet *set;
   GmlConversation *conversation;
+  guint conversation_changed_handler;
 } GmlConversationSetHashData;
 
 static void
 free_hash_data (GmlConversationSetHashData *data)
 {
+  g_signal_handler_disconnect (data->conversation,
+                               data->conversation_changed_handler);
+  g_object_unref (data->conversation);
   g_free (data->room_name);
   g_slice_free (GmlConversationSetHashData, data);
 }
 
 static void
-conversation_weak_ref_cb (gpointer user_data,
-                          GObject *where_the_object_was)
+conversation_changed_cb (GmlConversation *conversation,
+                         GmlConversationSetHashData *data)
 {
-  GmlConversationSetHashData *data = user_data;
-
-  /* This will also destroy the hash data */
-  g_hash_table_remove (data->set->hash_table, data->room_name);
+  if (conversation->state != GML_CONVERSATION_AWAITING_PARTNER)
+    /* This will also destroy the hash data */
+    g_hash_table_remove (data->set->hash_table, data->room_name);
 }
 
 static void
 gml_conversation_set_finalize (GObject *object)
 {
   GmlConversationSet *self = (GmlConversationSet *) object;
-
-  /* By the time this happens all of the people should be destroyed so
-     there should be no conversations. Therefore we don't have to
-     bother removing all of the weak references */
-  g_warn_if_fail (g_hash_table_size (self->hash_table) == 0);
 
   g_hash_table_destroy (self->hash_table);
 
@@ -112,12 +110,16 @@ gml_conversation_set_get_conversation (GmlConversationSet *set,
       data->set = set;
       data->conversation = conversation;
 
-      /* Take a weak reference on the conversation so we can remove it
-         from the pending conversation list if the first person
-         disappears before another person joins */
-      g_object_weak_ref (G_OBJECT (conversation),
-                         conversation_weak_ref_cb,
-                         data);
+      /* Listen for the changed signal so we can remove the
+         conversation from the hash table if the first person leaves
+         before a second joins */
+      data->conversation_changed_handler =
+        g_signal_connect (conversation, "changed",
+                          G_CALLBACK (conversation_changed_cb),
+                          data);
+
+      /* Take a reference for the hash table */
+      g_object_ref (conversation);
 
       g_hash_table_insert (set->hash_table,
                            data->room_name,
@@ -127,12 +129,10 @@ gml_conversation_set_get_conversation (GmlConversationSet *set,
     {
       conversation = g_object_ref (data->conversation);
 
-      g_object_weak_unref (G_OBJECT (conversation),
-                           conversation_weak_ref_cb,
-                           data);
-
-      /* This should also free the data */
-      g_hash_table_remove (set->hash_table, room_name);
+      /* We have a second person so the conversation has now
+         started. This should also end up removing the conversation
+         from the hash table because the state will change */
+      gml_conversation_start (conversation);
     }
 
   return conversation;

@@ -67,10 +67,9 @@ struct _GmlConversationSet
      conversations that only have one person. The key is the name of
      the room and the value is the a GmlServerConversationHashData
      struct (which contains a pointer to the conversation). The hash
-     table only takes a weak reference on the conversation so we can
-     detect if the person leaves before a second person joins and just
-     destroy the conversation. The data for the weak reference is the
-     same pointer to the hash data */
+     table listens for the changed signal on the conversation so that
+     it can remove the conversation if the first person leaves before
+     the second person joins. */
   GHashTable *hash_table;
 };
 

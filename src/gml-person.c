@@ -42,8 +42,10 @@ static guint signals[LAST_SIGNAL] = { 0, };
 #define GML_PERSON_USE_EXPIRY_TIME (60 * 5)
 
 static void
-forget_conversation (GmlPerson *person)
+gml_person_dispose (GObject *object)
 {
+  GmlPerson *person = GML_PERSON (object);
+
   if (person->conversation)
     {
       g_signal_handler_disconnect (person->conversation,
@@ -51,14 +53,6 @@ forget_conversation (GmlPerson *person)
       g_object_unref (person->conversation);
       person->conversation = NULL;
     }
-}
-
-static void
-gml_person_dispose (GObject *object)
-{
-  GmlPerson *person = GML_PERSON (object);
-
-  forget_conversation (person);
 
   G_OBJECT_CLASS (gml_person_parent_class)->dispose (object);
 }
@@ -202,11 +196,7 @@ gml_person_new (GmlPersonId id,
 void
 gml_person_leave_conversation (GmlPerson *person)
 {
-  forget_conversation (person);
-
-  g_signal_emit (person,
-                 signals[CHANGED_SIGNAL],
-                 0 /* detail */);
+  gml_conversation_finish (person->conversation);
 }
 
 void
