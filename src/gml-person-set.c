@@ -89,19 +89,6 @@ gml_person_set_generate_person (GmlPersonSet *set,
   return person;
 }
 
-void
-gml_person_set_remove_person (GmlPersonSet *set,
-                              GmlPerson *person)
-{
-  gboolean success;
-
-  /* This should also unref the person */
-  success = g_hash_table_remove (set->hash_table, &person->id);
-
-  if (!success)
-    g_warning ("Tried to remove a GmlPerson that is not in the GmlPersonSet");
-}
-
 static gboolean
 remove_useless_people_cb (gpointer key,
                           gpointer value,

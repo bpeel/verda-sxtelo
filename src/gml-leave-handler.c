@@ -81,8 +81,6 @@ real_request_finished (GmlRequestHandler *handler)
     {
       gml_person_leave_conversation (self->person);
 
-      gml_person_set_remove_person (handler->person_set, self->person);
-
       return gml_string_response_new (GML_STRING_RESPONSE_OK);
     }
   else if (self->response)

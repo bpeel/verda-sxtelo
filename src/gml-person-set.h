@@ -77,10 +77,6 @@ gml_person_set_generate_person (GmlPersonSet *set,
                                 GmlConversation *conversation);
 
 void
-gml_person_set_remove_person (GmlPersonSet *set,
-                              GmlPerson *person);
-
-void
 gml_person_set_remove_useless_people (GmlPersonSet *set);
 
 G_END_DECLS
