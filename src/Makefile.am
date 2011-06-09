@@ -21,7 +21,9 @@ source_h = \
 	$(srcdir)/gml-response.h \
 	$(srcdir)/gml-send-message-handler.h \
 	$(srcdir)/gml-server.h \
-	$(srcdir)/gml-string-response.h
+	$(srcdir)/gml-string-response.h \
+	$(srcdir)/gml-watch-person-handler.h \
+	$(srcdir)/gml-watch-person-response.h
 
 gemelo_SOURCES = \
 	$(source_h) \
@@ -41,7 +43,9 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-response.c \
 	$(srcdir)/gml-send-message-handler.c \
 	$(srcdir)/gml-server.c \
-	$(srcdir)/gml-string-response.c
+	$(srcdir)/gml-string-response.c \
+	$(srcdir)/gml-watch-person-handler.c \
+	$(srcdir)/gml-watch-person-response.c
 
 gemelo_LDFLAGS = \
 	$(GLIB_LIBS)

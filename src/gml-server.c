@@ -33,6 +33,7 @@
 #include "gml-new-person-handler.h"
 #include "gml-leave-handler.h"
 #include "gml-send-message-handler.h"
+#include "gml-watch-person-handler.h"
 
 struct _GmlServer
 {
@@ -105,6 +106,7 @@ static const struct
 requests[] =
   {
     { "/send_message", gml_send_message_handler_get_type },
+    { "/watch_person", gml_watch_person_handler_get_type },
     { "/new_person", gml_new_person_handler_get_type },
     { "/leave", gml_leave_handler_get_type }
   };
