@@ -1,0 +1,46 @@
+body {
+    background-color: rgb(128, 128, 255);
+    font-family: sans-serif;
+}
+
+.logo-header {
+    text-align: center;
+}
+
+.logo-header img {
+    background-color: rgb(255, 255, 255);
+    padding: 8px;
+    border: 1px solid black;
+}
+
+.content {
+    background-color: rgb(255, 255, 255);
+    width: 800px;
+    border: 1px solid black;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 8px;
+}
+
+#messages {
+    padding: 8px;
+    border: 2px solid rgb(128, 128, 128);
+    margin-bottom: 8px;
+    margin-top: 8px;
+}
+
+#status-note {
+    font-style: italic;
+}
+
+#message-box {
+    width: 700px;
+}
+
+.message-stranger {
+    color: rgb(255, 0, 0);
+}
+
+.message-you {
+    color: rgb(0, 0, 255);
+}

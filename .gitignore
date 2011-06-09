@@ -23,6 +23,8 @@
 /src/gml-enum-types.h
 /src/stamp-enum-types
 /src/stamp-marshal
+/web/Makefile
+/web/Makefile.in
 /stamp-h1
 
 .deps

@@ -40,6 +40,7 @@ AC_PATH_PROG([GLIB_GENMARSHAL], [glib-genmarshal])
 AC_CONFIG_FILES([
         Makefile
         src/Makefile
+        web/Makefile
 ])
 
 AC_OUTPUT
