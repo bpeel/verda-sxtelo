@@ -284,7 +284,10 @@ gml_main_context_poll (GmlMainContext *mc,
                          timeout);
 
   if (n_events == -1)
-    g_warning ("epoll_wait failed: %s", strerror (errno));
+    {
+      if (errno != EINTR)
+        g_warning ("epoll_wait failed: %s", strerror (errno));
+    }
   else
     {
       int i;
