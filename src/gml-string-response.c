@@ -55,6 +55,14 @@ not_found_response[] =
   "This location is not supported by this server\r\n";
 
 static const char
+preflight_post_ok[] =
+  "HTTP/1.1 200 OK\r\n"
+  GML_RESPONSE_COMMON_HEADERS
+  "Access-Control-Allow-Headers: Content-Type\r\n"
+  "Content-Length: 0\r\n"
+  "\r\n";
+
+static const char
 ok_response[] =
   "HTTP/1.1 200 OK\r\n"
   GML_RESPONSE_COMMON_HEADERS
@@ -84,6 +92,11 @@ get_message (GmlStringResponseType type,
     case GML_STRING_RESPONSE_NOT_FOUND:
       *message_buffer = not_found_response;
       *message_length = sizeof (not_found_response) - 1;
+      return;
+
+    case GML_STRING_RESPONSE_PREFLIGHT_POST_OK:
+      *message_buffer = preflight_post_ok;
+      *message_length = sizeof (preflight_post_ok) - 1;
       return;
 
     case GML_STRING_RESPONSE_OK:

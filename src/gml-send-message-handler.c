@@ -21,6 +21,7 @@
 #endif
 
 #include <glib-object.h>
+#include <string.h>
 
 #include "gml-send-message-handler.h"
 #include "gml-string-response.h"
@@ -92,15 +93,20 @@ real_request_line_received (GmlRequestHandler *handler,
   GmlSendMessageHandler *self = GML_SEND_MESSAGE_HANDLER (handler);
   GmlPersonId id;
 
-  if (method == GML_REQUEST_METHOD_POST
+  if ((method == GML_REQUEST_METHOD_POST
+       || method == GML_REQUEST_METHOD_OPTIONS)
       && gml_person_parse_id (query_string, &id))
     {
-      self->person = gml_person_set_get_person (handler->person_set, id);
+      GmlPerson *person;
 
-      if (self->person == NULL)
+      person = gml_person_set_get_person (handler->person_set, id);
+
+      if (person == NULL)
         set_error (self, GML_STRING_RESPONSE_NOT_FOUND);
+      else if (method == GML_REQUEST_METHOD_OPTIONS)
+        self->is_options_request = TRUE;
       else
-        g_object_ref (self->person);
+        self->person = g_object_ref (person);
     }
   else
     set_error (self, GML_STRING_RESPONSE_BAD_REQUEST);
@@ -160,7 +166,7 @@ real_header_received (GmlRequestHandler *handler,
   GmlSendMessageHandler *self = GML_SEND_MESSAGE_HANDLER (handler);
 
   /* Ignore the header if we've already encountered some error */
-  if (self->person)
+  if (self->response == NULL)
     {
       if (!g_ascii_strcasecmp (field_name, "content-type"))
         {
@@ -190,6 +196,16 @@ real_header_received (GmlRequestHandler *handler,
           else
             set_error (self, GML_STRING_RESPONSE_BAD_REQUEST);
         }
+      else if (!g_ascii_strcasecmp (field_name,
+                                    "Access-Control-Request-Method"))
+        {
+          if (!self->is_options_request
+              || self->had_request_method
+              || strcmp (value, "POST"))
+            set_error (self, GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
+          else
+            self->had_request_method = TRUE;
+        }
     }
 }
 
@@ -200,7 +216,7 @@ real_data_received (GmlRequestHandler *handler,
 {
   GmlSendMessageHandler *self = GML_SEND_MESSAGE_HANDLER (handler);
 
-  /* Ignore the header if we've already encountered some error */
+  /* Ignore the data if we've already encountered some error */
   if (self->person)
     {
       /* If we haven't got a GIConv then that must mean we didn't see
@@ -226,7 +242,16 @@ real_request_finished (GmlRequestHandler *handler)
 {
   GmlSendMessageHandler *self = GML_SEND_MESSAGE_HANDLER (handler);
 
-  if (self->person)
+  if (self->response)
+    return g_object_ref (self->response);
+  else if (self->is_options_request)
+    {
+      if (self->had_request_method)
+        return gml_string_response_new (GML_STRING_RESPONSE_PREFLIGHT_POST_OK);
+      else
+        return gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
+    }
+  else if (self->person)
     {
       if (self->data_iconv == (GIConv) -1
           || !gml_chunked_iconv_eos (&self->chunked_iconv)
@@ -243,8 +268,6 @@ real_request_finished (GmlRequestHandler *handler)
 
       return gml_string_response_new (GML_STRING_RESPONSE_OK);
     }
-  else if (self->response)
-    return g_object_ref (self->response);
   else
     {
       g_warn_if_reached ();

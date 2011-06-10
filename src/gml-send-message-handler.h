@@ -60,6 +60,9 @@ struct _GmlSendMessageHandler
 {
   GmlRequestHandler parent;
 
+  gboolean is_options_request;
+  gboolean had_request_method;
+
   GmlPerson *person;
 
   GmlResponse *response;

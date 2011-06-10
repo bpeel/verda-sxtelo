@@ -142,6 +142,8 @@ gml_server_request_line_received_cb (const char *method_str,
     method = GML_REQUEST_METHOD_GET;
   else if (!strcmp (method_str, "POST"))
     method = GML_REQUEST_METHOD_POST;
+  else if (!strcmp (method_str, "OPTIONS"))
+    method = GML_REQUEST_METHOD_OPTIONS;
   else
     method = GML_REQUEST_METHOD_UNKNOWN;
 
