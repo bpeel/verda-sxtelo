@@ -140,7 +140,7 @@ gml_conversation_add_message (GmlConversation *conversation,
   message_str = g_string_sized_new (length + 32);
 
   g_string_append_printf (message_str,
-                          "[\"message\", \"{\"person\": %u, "
+                          "[\"message\", {\"person\": %u, "
                           "\"text\": \"",
                           person_num);
   while (length-- > 0)
