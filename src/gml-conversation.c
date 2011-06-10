@@ -137,7 +137,7 @@ gml_conversation_add_message (GmlConversation *conversation,
   while (length-- > 0)
     {
       /* Replace any control characters or spaces with a space */
-      if (*buffer <= ' ')
+      if ((guint8) *buffer <= ' ')
         g_string_append_c (message_str, ' ');
       /* Quote quote characters */
       else if (*buffer == '"')
