@@ -37,14 +37,6 @@ enum
 static guint signals[LAST_SIGNAL] = { 0, };
 
 static void
-gml_conversation_dispose (GObject *object)
-{
-  GmlConversation *self = (GmlConversation *) object;
-
-  G_OBJECT_CLASS (gml_conversation_parent_class)->dispose (object);
-}
-
-static void
 gml_conversation_finalize (GObject *object)
 {
   GmlConversation *self = (GmlConversation *) object;
@@ -68,7 +60,6 @@ gml_conversation_class_init (GmlConversationClass *klass)
 {
   GObjectClass *object_class = (GObjectClass *) klass;
 
-  object_class->dispose = gml_conversation_dispose;
   object_class->finalize = gml_conversation_finalize;
 
   signals[CHANGED_SIGNAL] =
