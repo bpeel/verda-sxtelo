@@ -1,11 +1,27 @@
 function ChatSession ()
 {
   this.terminatorRegexp = /\r\n/;
-  this.state = "connecting";
   this.personId = null;
   this.personNumber = null;
   this.messagesAdded = 0;
+  this.messageQueue = [];
 }
+
+ChatSession.prototype.setState = function (state)
+{
+  this.state = state;
+
+  if (state == "in-progress")
+  {
+    $("#message-box").removeAttr ("disabled");
+    $("#submit-message").removeAttr ("disabled");
+  }
+  else
+  {
+    $("#message-box").attr ("disabled", "disabled");
+    $("#submit-message").attr ("disabled", "disabled");
+  }
+};
 
 ChatSession.prototype.getUrl = function (method)
 {
@@ -32,6 +48,7 @@ ChatSession.prototype.setError = function (msg)
   this.clearCheckDataInterval ();
 
   $("#status-note").text (msg);
+  this.setState ("error");
 };
 
 ChatSession.prototype.handleHeader = function (header)
@@ -47,7 +64,7 @@ ChatSession.prototype.handleHeader = function (header)
   this.personId = header.id;
 
   $("#status-note").text ("Waiting for someone to join the conversation");
-  this.state = "awaiting-partner";
+  this.setState ("awaiting-partner");
 };
 
 ChatSession.prototype.handleStateChange = function (newState)
@@ -61,7 +78,7 @@ ChatSession.prototype.handleStateChange = function (newState)
     if (this.state == "awaiting-partner")
     {
       $("#status-note").text ("You are in a conversation. Say hello!");
-      this.state = "in-progress";
+      this.setState ("in-progress");
     }
     break;
 
@@ -69,7 +86,7 @@ ChatSession.prototype.handleStateChange = function (newState)
     if (this.state == "in-progress")
     {
       $("#status-note").text ("The other person has left the conversation");
-      this.state = "done";
+      this.setState ("done");
     }
     break;
   }
@@ -264,9 +281,84 @@ ChatSession.prototype.watchCompleteCb = function (xhr, status)
   }
 };
 
+ChatSession.prototype.sendMessageReadyStateChangeCb = function ()
+{
+  if (!this.sendMessageAjax)
+    return;
+
+  if (this.sendMessageAjax.readyState == 4)
+  {
+    if (this.sendMessageAjax.status == 200)
+    {
+      this.sendMessageAjax = null;
+      this.sendNextMessage ();
+    }
+    else
+    {
+      this.sendMessageAjax = null;
+      this.setError ();
+    }
+  }
+};
+
+ChatSession.prototype.sendNextMessage = function ()
+{
+  if (this.sendMessageAjax)
+    return;
+
+  if (this.messageQueue.length < 1)
+    return;
+
+  var message = this.messageQueue.shift ();
+
+  this.sendMessageAjax = $.ajaxSettings.xhr ();
+  this.sendMessageAjax.onreadystatechange =
+    this.sendMessageReadyStateChangeCb.bind (this);
+  this.sendMessageAjax.open ("POST",
+                             this.getUrl ("send_message?" + this.personId));
+  this.sendMessageAjax.setRequestHeader ("Content-Type",
+                                         "text/plain; charset=UTF-8");
+  this.sendMessageAjax.send (message);
+};
+
+ChatSession.prototype.queueCurrentMessage = function ()
+{
+  var message;
+
+  if (this.state != "in-progress")
+    return;
+
+  message = $("#message-box").val ();
+
+  if (message.length > 0)
+  {
+    $("#message-box").val ("");
+    this.messageQueue.push (message);
+    this.sendNextMessage ();
+  }
+};
+
+ChatSession.prototype.submitMessageClickCb = function ()
+{
+  this.queueCurrentMessage ();
+};
+
+ChatSession.prototype.keyDownCb = function (event)
+{
+  if (event.which == 10 || event.which == 13)
+  {
+    event.preventDefault ();
+    this.queueCurrentMessage ();
+  }
+};
+
 ChatSession.prototype.loadCb = function ()
 {
+  this.setState ("connecting");
   this.startWatchAjax ();
+
+  $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
+  $("#message-box").bind ("keydown", this.keyDownCb.bind (this));
 };
 
 (function ()
