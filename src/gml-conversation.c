@@ -139,9 +139,12 @@ gml_conversation_add_message (GmlConversation *conversation,
       /* Replace any control characters or spaces with a space */
       if ((guint8) *buffer <= ' ')
         g_string_append_c (message_str, ' ');
-      /* Quote quote characters */
-      else if (*buffer == '"')
-        g_string_append (message_str, "\\\"");
+      /* Quote special characters */
+      else if (*buffer == '"' || *buffer == '\\')
+        {
+          g_string_append_c (message_str, '\\');
+          g_string_append_c (message_str, *buffer);
+        }
       else
         g_string_append_c (message_str, *buffer);
 
