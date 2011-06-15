@@ -36,6 +36,10 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
+/* Time in seconds after the last message has been added to the
+   conversation before it is considered not in use */
+#define GML_CONVERSATION_STALE_TIME (60 * 5)
+
 static void
 gml_conversation_finalize (GObject *object)
 {
@@ -51,6 +55,8 @@ gml_conversation_finalize (GObject *object)
     }
 
   g_array_free (self->messages, TRUE);
+
+  g_timer_destroy (self->stale_age);
 
   G_OBJECT_CLASS (gml_conversation_parent_class)->finalize (object);
 }
@@ -80,6 +86,8 @@ gml_conversation_init (GmlConversation *self)
   self->messages = g_array_new (FALSE, FALSE, sizeof (GmlConversationMessage));
 
   self->state = GML_CONVERSATION_AWAITING_PARTNER;
+
+  self->stale_age = g_timer_new ();
 }
 
 static void
@@ -105,6 +113,14 @@ gml_conversation_finish (GmlConversation *conversation)
 {
   conversation->state = GML_CONVERSATION_FINISHED;
   gml_conversation_changed (conversation);
+}
+
+void
+gml_conversation_check_stale (GmlConversation *conversation)
+{
+  if (g_timer_elapsed (conversation->stale_age, NULL)
+      > GML_CONVERSATION_STALE_TIME)
+    gml_conversation_finish (conversation);
 }
 
 void
@@ -154,6 +170,8 @@ gml_conversation_add_message (GmlConversation *conversation,
 
   message->length = message_str->len;
   message->text = g_string_free (message_str, FALSE);
+
+  g_timer_start (conversation->stale_age);
 
   gml_conversation_changed (conversation);
 }

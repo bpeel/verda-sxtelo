@@ -94,9 +94,6 @@ gml_person_new (GmlPersonId id,
                 GmlConversation *conversation);
 
 void
-gml_person_leave_conversation (GmlPerson *person);
-
-void
 gml_person_add_use (GmlPerson *person);
 
 void

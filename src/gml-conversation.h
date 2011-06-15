@@ -64,6 +64,8 @@ struct _GmlConversation
   } state;
 
   GArray *messages;
+
+  GTimer *stale_age;
 };
 
 typedef struct
@@ -83,6 +85,9 @@ gml_conversation_start (GmlConversation *conversation);
 
 void
 gml_conversation_finish (GmlConversation *conversation);
+
+void
+gml_conversation_check_stale (GmlConversation *conversation);
 
 void
 gml_conversation_add_message (GmlConversation *conversation,

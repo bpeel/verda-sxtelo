@@ -79,7 +79,8 @@ real_request_finished (GmlRequestHandler *handler)
 
   if (self->person)
     {
-      gml_person_leave_conversation (self->person);
+      if (self->person->conversation)
+        gml_conversation_finish (self->person->conversation);
 
       return gml_string_response_new (GML_STRING_RESPONSE_OK);
     }

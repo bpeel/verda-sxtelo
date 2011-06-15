@@ -94,12 +94,13 @@ remove_useless_people_cb (gpointer key,
                           gpointer value,
                           gpointer user_data)
 {
-  if (!gml_person_has_use (value))
-    {
-      gml_person_leave_conversation (value);
+  GmlPerson *person = value;
 
-      return TRUE;
-    }
+  if (person->conversation)
+    gml_conversation_check_stale (person->conversation);
+
+  if (!gml_person_has_use (person))
+    return TRUE;
 
   return FALSE;
 }
