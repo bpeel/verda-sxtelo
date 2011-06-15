@@ -308,11 +308,10 @@ gml_main_context_poll (GmlMainContext *mc,
 
                 if (event->events & EPOLLOUT)
                   flags |= GML_MAIN_CONTEXT_POLL_OUT;
-                /* Any other events we'll report as ready for
-                   reading. That way any errors will be recognised in
-                   the next read call */
-                if (event->events & ~EPOLLOUT)
+                if (event->events & (EPOLLIN | EPOLLRDHUP))
                   flags |= GML_MAIN_CONTEXT_POLL_IN;
+                if (event->events & (EPOLLHUP | EPOLLERR))
+                  flags |= GML_MAIN_CONTEXT_POLL_ERROR;
 
                 callback (source, source->fd, flags, source->user_data);
               }

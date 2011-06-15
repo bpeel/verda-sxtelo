@@ -22,6 +22,8 @@
 
 #include <glib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <errno.h>
 
 #include "gml-server.h"
 #include "gml-main-context.h"
@@ -406,7 +408,25 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
   GmlServer *server = connection->server;
   char buf[1024];
 
-  if (flags & GML_MAIN_CONTEXT_POLL_IN)
+  if (flags & GML_MAIN_CONTEXT_POLL_ERROR)
+    {
+      int value;
+      unsigned int value_len = sizeof (value);
+
+      if (getsockopt (g_socket_get_fd (connection->client_socket),
+                      SOL_SOCKET,
+                      SO_ERROR,
+                      &value,
+                      &value_len) == -1
+          || value_len != sizeof (value)
+          || value == 0)
+        g_print ("Unknown error on socket\n");
+      else
+        g_print ("Error on socket: %s\n", strerror (value));
+
+      gml_server_remove_connection (server, connection);
+    }
+  else if (flags & GML_MAIN_CONTEXT_POLL_IN)
     {
       GError *error = NULL;
 

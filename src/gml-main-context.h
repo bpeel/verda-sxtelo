@@ -33,6 +33,7 @@ typedef enum
 {
   GML_MAIN_CONTEXT_POLL_IN = 1 << 0,
   GML_MAIN_CONTEXT_POLL_OUT = 1 << 1,
+  GML_MAIN_CONTEXT_POLL_ERROR = 1 << 2,
 } GmlMainContextPollFlags;
 
 #define GML_MAIN_CONTEXT_ERROR (gml_main_context_error_quark ())
