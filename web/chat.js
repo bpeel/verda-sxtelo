@@ -42,7 +42,7 @@ ChatSession.prototype.clearWatchAjax = function ()
 ChatSession.prototype.setError = function (msg)
 {
   if (!msg)
-    msg = "An error occurred";
+    msg = "@ERROR_OCCURRED";
 
   this.clearWatchAjax ();
   this.clearCheckDataInterval ();
@@ -54,7 +54,7 @@ ChatSession.prototype.setError = function (msg)
 ChatSession.prototype.handleHeader = function (header)
 {
   if (typeof (header) != "object")
-    this.setError ("Bad data received");
+    this.setError ("@BAD_DATA@");
 
   /* Ignore the header if we've already got further than this state */
   if (this.state != "connecting")
@@ -63,21 +63,21 @@ ChatSession.prototype.handleHeader = function (header)
   this.personNumber = header.num;
   this.personId = header.id;
 
-  $("#status-note").text ("Waiting for someone to join the conversation");
+  $("#status-note").text ("@WAITING_FOR_SOMEONE@");
   this.setState ("awaiting-partner");
 };
 
 ChatSession.prototype.handleStateChange = function (newState)
 {
   if (typeof (newState) != "string")
-    this.setError ("Bad data received");
+    this.setError ("@BAD_DATA@");
 
   switch (newState)
   {
   case "in-progress":
     if (this.state == "awaiting-partner")
     {
-      $("#status-note").text ("You are in a conversation. Say hello!");
+      $("#status-note").text ("@IN_CONVERSATION@");
       this.setState ("in-progress");
     }
     break;
@@ -85,7 +85,7 @@ ChatSession.prototype.handleStateChange = function (newState)
   case "done":
     if (this.state == "in-progress")
     {
-      $("#status-note").text ("The other person has left the conversation");
+      $("#status-note").text ("@PERSON_LEFT@");
       this.setState ("done");
     }
     break;
@@ -95,7 +95,7 @@ ChatSession.prototype.handleStateChange = function (newState)
 ChatSession.prototype.handleChatMessage = function (message)
 {
   if (typeof (message) != "object")
-    this.setError ("Bad data received");
+    this.setError ("@BAD_DATA@");
 
   /* Ignore the message if we've already got further than this state */
   if (this.state != "in-progress")
@@ -110,7 +110,7 @@ ChatSession.prototype.handleChatMessage = function (message)
     var span = $(document.createElement ("span"));
     div.append (span);
     span.text (message.person == this.personNumber
-               ? "You" : "Stranger");
+               ? "@YOU@:" : "@STRANGER@:");
     span.addClass (message.person == this.personNumber
                    ? "message-you" : "message-stranger");
 
@@ -128,7 +128,7 @@ ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
       || typeof (message[0]) != "string")
-    this.setError ("Bad data received");
+    this.setError ("@BAD_DATA@");
 
   switch (message[0])
   {
@@ -165,7 +165,7 @@ ChatSession.prototype.checkData = function ()
       }
       catch (e)
       {
-        this.setError ("The server sent some invalid data");
+        this.setError ("@BAD_DATA@");
         return;
       }
 
@@ -242,7 +242,7 @@ ChatSession.prototype.startWatchAjax = function ()
   if (this.personId)
     method = "watch_person?" + this.personId;
   else
-    method = "new_person?english";
+    method = "new_person?@ROOM_NAME@";
 
   this.clearWatchAjax ();
 

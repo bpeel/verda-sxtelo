@@ -25,6 +25,9 @@
 /src/stamp-marshal
 /web/Makefile
 /web/Makefile.in
+/web/chat.*.html
+/web/chat.*.js
+/web/*.language-stamp
 /stamp-h1
 
 .deps
