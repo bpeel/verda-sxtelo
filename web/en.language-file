@@ -30,3 +30,27 @@ Stranger
 
 @ROOM_NAME@
 english
+
+@WELCOME_NOTE@
+Welcome to Gemelo!
+
+@BLURB@
+
+Gemelo is a place to practice speaking a foreign language with a
+complete stranger! Use it find like-minded people who are learning the
+same language as you and then chat with them. You can correct each
+other's mistakes and learn quickly. All chats are completely anonymous
+but you are free to exchange contact details if you wish.
+
+@SELECT_LANGUAGE@
+
+First, select which language you would like to chat in. This language
+will also be used for the Gemelo interface.
+
+@CHAT_BUTTON_BLURB@
+
+Next, press the chat button to begin chatting!
+
+@CHAT_BUTTON@
+
+Chat

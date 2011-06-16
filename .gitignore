@@ -27,6 +27,7 @@
 /web/Makefile.in
 /web/chat.*.html
 /web/chat.*.js
+/web/index.*.html
 /web/*.language-stamp
 /stamp-h1
 

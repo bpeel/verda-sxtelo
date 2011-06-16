@@ -30,3 +30,27 @@ Nekonato
 
 @ROOM_NAME@
 esperanto
+
+@WELCOME_NOTE@
+Bonvenon al Gemelo!
+
+@BLURB@
+
+Gemelo estas retejo kie oni povas praktiki paroli fremdan lingvon kun
+nekonatulo! Uzu ĝin por trovi samideanojn kiuj lernas la saman lingvon
+kiel vi kaj tuj babilu kun ili. Vi povas korteki la fuŝoj de unu la
+alian kaj rapide lerni. Ĉiuj babiloj estas tute anonimaj sed vi rajtas
+ŝanĝi kontaktinformon se vi volas.
+
+@SELECT_LANGUAGE@
+
+Unue, elektu kiun lingvon en kiu vi volas babili. En ĉi tiu lingvo la
+interfaco ankaŭ montriĝos.
+
+@CHAT_BUTTON_BLURB@
+
+Sekve, premu la ‘babilu’ butonon kaj komencu babili!
+
+@CHAT_BUTTON@
+
+Babilu
