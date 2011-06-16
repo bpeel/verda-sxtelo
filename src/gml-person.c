@@ -50,6 +50,7 @@ gml_person_dispose (GObject *object)
     {
       g_signal_handler_disconnect (person->conversation,
                                    person->conversation_changed_handler);
+      gml_conversation_finish (person->conversation);
       g_object_unref (person->conversation);
       person->conversation = NULL;
     }
