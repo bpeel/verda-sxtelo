@@ -42,7 +42,7 @@ ChatSession.prototype.clearWatchAjax = function ()
 ChatSession.prototype.setError = function (msg)
 {
   if (!msg)
-    msg = "@ERROR_OCCURRED";
+    msg = "@ERROR_OCCURRED@";
 
   this.clearWatchAjax ();
   this.clearCheckDataInterval ();
