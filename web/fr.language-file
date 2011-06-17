@@ -1,0 +1,57 @@
+@LANG_CODE@
+fr
+
+@CONNECTING@
+Connexion...
+
+@SEND_BUTTON@
+Envoyer!
+
+@ERROR_OCCURRED@
+Une erreur est survenue
+
+@BAD_DATA@
+Mauvaise donnée reçu
+
+@WAITING_FOR_SOMEONE@
+En attente qu'une personne rejoingne la conversation
+
+@IN_CONVERSATION@
+Vous êtes en conversation. Dites bonjour !
+
+@PERSON_LEFT@
+La personne a quitté la conversation
+
+@YOU@
+Vous
+
+@STRANGER@
+Étranger
+
+@ROOM_NAME@
+français
+
+@WELCOME_NOTE@
+Bienvenue sur Gemelo!
+
+@BLURB@
+
+Gemelo est un endroit pour pratiquer une langue étrangère avec un
+parfait inconnu ! Utilisez Gemelo pour trouver des personnes qui comme
+vous apprennent la même langue et conversez avec eux. Vous pouvez
+ainsi vous corriger mutuellement et apprendre plus vite. Toutes les
+conversations sont totalement anonymes mais vous être libres
+d'échanger vos coordonnées si vous le souhaitez.
+
+@SELECT_LANGUAGE@
+
+D'abord, choisissez une langage dans laquelle vous voulez converser.
+Cette langue sera aussi utilisée pour l'interface Gemelo.
+
+@CHAT_BUTTON_BLURB@
+
+Ensuite pressez le bouton Chat pour commencer à chatter.
+
+@CHAT_BUTTON@
+
+Chat
