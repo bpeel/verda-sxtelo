@@ -26,6 +26,9 @@ dist_webfiles_DATA = \
 	gemelo-logo.svg \
 	jquery-1.6.1.js
 
+webfiles_DATA = \
+	index.html.var
+
 %.language-stamp : %.language-file $(TRANSLATABLE_FILES) $(srcdir)/translate-file.pl
 	lang=`echo "$<" | sed 's/.*\([a-z][a-z]\).language-file/\1/'`; \
 	for x in $(TRANSLATABLE_FILES); do \
@@ -38,7 +41,11 @@ dist_webfiles_DATA = \
 
 all-local : $(LANGUAGE_STAMPS)
 
-CLEANFILES = $(LANGUAGE_STAMPS) $(LANGUAGES:%=*.%.html) $(LANGUAGES:%=*.%.js)
+CLEANFILES = \
+	$(LANGUAGE_STAMPS) \
+	$(LANGUAGES:%=*.%.html) \
+	$(LANGUAGES:%=*.%.js) \
+	index.html.var
 
 install-data-hook :
 	for lang in $(LANGUAGES); do \
@@ -55,3 +62,13 @@ uninstall-hook :
 			rm -f $(DESTDIR)$(webfilesdir)/`basename "$$output"`; \
 		done; \
 	done
+
+index.html.var :
+	echo "URI: index.en.html" >> $@; \
+	echo >> $@; \
+	for lang in $(LANGUAGES); do \
+		echo "URI: index.$$lang.html" >> $@; \
+		echo "Content-Type: text/html; charset=UTF-8" >> $@; \
+		echo "Content-Language: $$lang" >> $@; \
+		echo >> $@; \
+	done;

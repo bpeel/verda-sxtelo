@@ -28,6 +28,7 @@
 /web/chat.*.html
 /web/chat.*.js
 /web/index.*.html
+/web/index.html.var
 /web/*.language-stamp
 /stamp-h1
 
