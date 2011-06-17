@@ -17,13 +17,13 @@ LANGUAGE_FILES = \
 EXTRA_DIST = \
 	$(LANGUAGE_FILES) \
 	$(TRANSLATABLE_FILES) \
+	gemelo-logo.svg \
 	translate-file.pl
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
 	gemelo.css \
 	gemelo-logo.png \
-	gemelo-logo.svg \
 	jquery-1.6.1.js
 
 webfiles_DATA = \
