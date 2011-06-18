@@ -40,7 +40,7 @@ body {
     padding: 8px;
 }
 
-#messages {
+#messages-box {
     padding: 8px;
     border: 2px solid rgb(128, 128, 128);
     margin-bottom: 8px;
@@ -90,4 +90,14 @@ body {
 
 .button-box {
     text-align: center;
+}
+
+.message-note {
+    margin-top: 8px;
+    color: rgb(90, 90, 90);
+    font-style: italic;
+}
+
+#new-conversation-button {
+    margin-top: 4px;
 }

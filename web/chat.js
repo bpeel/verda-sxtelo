@@ -105,6 +105,7 @@ ChatSession.prototype.handleStateChange = function (newState)
     {
       $("#status-note").text ("@PERSON_LEFT@");
       this.setState ("done");
+      $("#conversation-finished-note").show ();
     }
     break;
   }
@@ -372,6 +373,11 @@ ChatSession.prototype.keyDownCb = function (event)
   }
 };
 
+ChatSession.prototype.newConversationCb = function ()
+{
+  window.location.reload ();
+};
+
 ChatSession.prototype.loadCb = function ()
 {
   this.setState ("connecting");
@@ -379,6 +385,8 @@ ChatSession.prototype.loadCb = function ()
 
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-input-box").bind ("keydown", this.keyDownCb.bind (this));
+  $("#new-conversation-button").bind ("click",
+                                      this.newConversationCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
 };
