@@ -121,6 +121,7 @@ block_sigint (void)
 
   sigemptyset (&sigset);
   sigaddset (&sigset, SIGINT);
+  sigaddset (&sigset, SIGTERM);
 
   if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
     g_warning ("pthread_sigmask failed: %s", strerror (errno));

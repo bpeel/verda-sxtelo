@@ -271,6 +271,7 @@ gml_main_context_add_quit (GmlMainContext *mc,
 
   sigemptyset (&sigset);
   sigaddset (&sigset, SIGINT);
+  sigaddset (&sigset, SIGTERM);
 
   source->mc = mc;
   source->fd = signalfd (-1, &sigset, SFD_NONBLOCK | SFD_CLOEXEC);
