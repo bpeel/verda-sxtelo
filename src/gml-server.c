@@ -39,7 +39,6 @@
 
 struct _GmlServer
 {
-  GmlMainContext *main_context;
   GmlMainContextSource *server_socket_source;
   GmlMainContextSource *quit_source;
   GmlMainContextSource *gc_timer_source;
@@ -274,8 +273,7 @@ gml_server_gc_timer_cb (GmlMainContextSource *source,
   gml_person_set_remove_useless_people (server->person_set);
 
   /* Restart the timer */
-  gml_main_context_set_timer (server->main_context,
-                              server->gc_timer_source,
+  gml_main_context_set_timer (server->gc_timer_source,
                               GML_SERVER_GC_TIMEOUT);
 }
 
@@ -337,7 +335,7 @@ gml_server_remove_connection (GmlServer *server,
 {
   gml_server_connection_clear_responses (connection);
 
-  gml_main_context_remove_source (server->main_context, connection->source);
+  gml_main_context_remove_source (connection->source);
   g_object_unref (connection->client_socket);
   server->connections = g_list_delete_link (server->connections,
                                             connection->list_node);
@@ -346,8 +344,7 @@ gml_server_remove_connection (GmlServer *server,
   /* Reset the poll on the server socket in case we previously stopped
      listening because we ran out of file descriptors. This will do
      nothing if we were already listening */
-  gml_main_context_modify_poll (server->main_context,
-                                server->server_socket_source,
+  gml_main_context_modify_poll (server->server_socket_source,
                                 GML_MAIN_CONTEXT_POLL_IN);
 }
 
@@ -400,8 +397,7 @@ update_poll (GmlServerConnection *connection)
   if (connection->read_finished && connection->write_finished)
     gml_server_remove_connection (connection->server, connection);
   else
-    gml_main_context_modify_poll (connection->server->main_context,
-                                  connection->source,
+    gml_main_context_modify_poll (connection->source,
                                   flags);
 }
 
@@ -576,8 +572,7 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
           g_print ("Too many open files to accept connection\n");
 
           /* Stop listening for new connections until someone disconnects */
-          gml_main_context_modify_poll (server->main_context,
-                                        server->server_socket_source,
+          gml_main_context_modify_poll (server->server_socket_source,
                                         0);
           g_clear_error (&error);
         }
@@ -596,7 +591,7 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
       connection->server = server;
       connection->client_socket = client_socket;
       connection->source =
-        gml_main_context_add_poll (server->main_context,
+        gml_main_context_add_poll (NULL /* default context */,
                                    g_socket_get_fd (client_socket),
                                    GML_MAIN_CONTEXT_POLL_IN,
                                    gml_server_connection_poll_cb,
@@ -634,11 +629,6 @@ gml_server_new (GSocketAddress *address,
 
   server = g_new0 (GmlServer, 1);
 
-  server->main_context = gml_main_context_new (error);
-
-  if (server->main_context == NULL)
-    goto error;
-
   server->server_socket = g_socket_new (g_socket_address_get_family (address),
                                         G_SOCKET_TYPE_STREAM,
                                         G_SOCKET_PROTOCOL_DEFAULT,
@@ -664,31 +654,27 @@ gml_server_new (GSocketAddress *address,
   server->pending_conversations = gml_conversation_set_new ();
 
   server->server_socket_source =
-    gml_main_context_add_poll (server->main_context,
+    gml_main_context_add_poll (NULL /* default context */,
                                g_socket_get_fd (server->server_socket),
                                GML_MAIN_CONTEXT_POLL_IN,
                                gml_server_pending_connection_cb,
                                server);
 
   server->quit_source =
-    gml_main_context_add_quit (server->main_context,
+    gml_main_context_add_quit (NULL /* default context */,
                                gml_server_quit_cb,
                                server);
 
   server->gc_timer_source =
-    gml_main_context_add_timer (server->main_context,
+    gml_main_context_add_timer (NULL /* default context */,
                                 gml_server_gc_timer_cb,
                                 server);
-  gml_main_context_set_timer (server->main_context,
-                              server->gc_timer_source,
+  gml_main_context_set_timer (server->gc_timer_source,
                               GML_SERVER_GC_TIMEOUT);
 
   return server;
 
  error:
-  if (server->main_context)
-    gml_main_context_free (server->main_context);
-
   if (server->server_socket)
     g_object_unref (server->server_socket);
 
@@ -704,7 +690,7 @@ gml_server_run (GmlServer *server,
   server->quit_received = FALSE;
 
   do
-    gml_main_context_poll (server->main_context, -1);
+    gml_main_context_poll (NULL /* default context */, -1);
   while (server->fatal_error == NULL
          && !server->quit_received);
 
@@ -729,15 +715,11 @@ gml_server_free (GmlServer *server)
 
   g_object_unref (server->pending_conversations);
 
-  gml_main_context_remove_source (server->main_context,
-                                  server->quit_source);
+  gml_main_context_remove_source (server->quit_source);
 
-  gml_main_context_remove_source (server->main_context,
-                                  server->gc_timer_source);
+  gml_main_context_remove_source (server->gc_timer_source);
 
-  gml_main_context_remove_source (server->main_context,
-                                  server->server_socket_source);
-  gml_main_context_free (server->main_context);
+  gml_main_context_remove_source (server->server_socket_source);
 
   g_object_unref (server->server_socket);
 

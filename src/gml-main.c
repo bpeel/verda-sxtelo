@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "gml-server.h"
+#include "gml-main-context.h"
 
 static char *option_listen_address = "0.0.0.0";
 static int option_listen_port = 5142;
@@ -103,6 +104,7 @@ int
 main (int argc, char **argv)
 {
   GError *error = NULL;
+  GmlMainContext *mc;
   GmlServer *server;
 
   g_type_init ();
@@ -113,16 +115,31 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-  server = create_server (&error);
+  mc = gml_main_context_get_default (&error);
 
-  if (server == NULL)
-    fprintf (stderr, "%s\n", error->message);
+  if (mc == NULL)
+    {
+      fprintf (stderr, "%s\n", error->message);
+      g_clear_error (&error);
+    }
   else
     {
-      if (!gml_server_run (server, &error))
-        fprintf (stderr, "%s\n", error->message);
+      server = create_server (&error);
 
-      gml_server_free (server);
+      if (server == NULL)
+        {
+          fprintf (stderr, "%s\n", error->message);
+          g_clear_error (&error);
+        }
+      else
+        {
+          if (!gml_server_run (server, &error))
+            fprintf (stderr, "%s\n", error->message);
+
+          gml_server_free (server);
+        }
+
+      gml_main_context_free (mc);
     }
 
   return 0;

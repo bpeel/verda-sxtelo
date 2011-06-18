@@ -55,6 +55,9 @@ typedef void (* GmlMainContextQuitCallback) (GmlMainContextSource *source,
 GmlMainContext *
 gml_main_context_new (GError **error);
 
+GmlMainContext *
+gml_main_context_get_default (GError **error);
+
 GmlMainContextSource *
 gml_main_context_add_poll (GmlMainContext *mc,
                            int fd,
@@ -63,8 +66,7 @@ gml_main_context_add_poll (GmlMainContext *mc,
                            void *user_data);
 
 void
-gml_main_context_modify_poll (GmlMainContext *mc,
-                              GmlMainContextSource *source,
+gml_main_context_modify_poll (GmlMainContextSource *source,
                               GmlMainContextPollFlags flags);
 
 GmlMainContextSource *
@@ -78,13 +80,11 @@ gml_main_context_add_quit (GmlMainContext *mc,
                            void *user_data);
 
 void
-gml_main_context_set_timer (GmlMainContext *mc,
-                            GmlMainContextSource *source,
+gml_main_context_set_timer (GmlMainContextSource *source,
                             unsigned int timeout_msecs);
 
 void
-gml_main_context_remove_source (GmlMainContext *mc,
-                                GmlMainContextSource *source);
+gml_main_context_remove_source (GmlMainContextSource *source);
 
 void
 gml_main_context_poll (GmlMainContext *mc,

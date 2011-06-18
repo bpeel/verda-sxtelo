@@ -28,6 +28,8 @@
 #include <sys/signalfd.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "gml-main-context.h"
 
@@ -56,11 +58,48 @@ struct _GmlMainContextSource
     GML_MAIN_CONTEXT_TIMER_SOURCE,
     GML_MAIN_CONTEXT_QUIT_SOURCE
   } type;
+
   int fd;
+
   gpointer user_data;
   void *callback;
+
   GmlMainContextPollFlags current_flags;
+
+  GmlMainContext *mc;
 };
+
+static GmlMainContext *gml_main_context_default = NULL;
+
+GmlMainContext *
+gml_main_context_get_default (GError **error)
+{
+  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+  if (gml_main_context_default == NULL)
+    gml_main_context_default = gml_main_context_new (error);
+
+  return gml_main_context_default;
+}
+
+static GmlMainContext *
+gml_main_context_get_default_or_abort (void)
+{
+  GmlMainContext *mc;
+  GError *error = NULL;
+
+  mc = gml_main_context_get_default (&error);
+
+  if (mc == NULL)
+    {
+      fprintf (stderr, "failed to create default main context: %s\n",
+               error->message);
+      g_clear_error (&error);
+      exit (1);
+    }
+
+  return mc;
+}
 
 GmlMainContext *
 gml_main_context_new (GError **error)
@@ -122,6 +161,10 @@ gml_main_context_add_poll (GmlMainContext *mc,
   GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
   struct epoll_event event;
 
+  if (mc == NULL)
+    mc = gml_main_context_get_default_or_abort ();
+
+  source->mc = mc;
   source->fd = fd;
   source->callback = callback;
   source->type = GML_MAIN_CONTEXT_POLL_SOURCE;
@@ -141,8 +184,7 @@ gml_main_context_add_poll (GmlMainContext *mc,
 }
 
 void
-gml_main_context_modify_poll (GmlMainContext *mc,
-                              GmlMainContextSource *source,
+gml_main_context_modify_poll (GmlMainContextSource *source,
                               GmlMainContextPollFlags flags)
 {
   struct epoll_event event;
@@ -155,7 +197,7 @@ gml_main_context_modify_poll (GmlMainContext *mc,
   event.events = get_epoll_events (flags);
   event.data.ptr = source;
 
-  if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_MOD, source->fd, &event) == -1)
+  if (epoll_ctl (source->mc->epoll_fd, EPOLL_CTL_MOD, source->fd, &event) == -1)
     g_warning ("EPOLL_CTL_MOD failed: %s", strerror (errno));
 
   source->current_flags = flags;
@@ -168,6 +210,10 @@ gml_main_context_add_timer (GmlMainContext *mc,
 {
   GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
 
+  if (mc == NULL)
+    mc = gml_main_context_get_default_or_abort ();
+
+  source->mc = mc;
   source->fd = timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
   source->callback = callback;
   source->type = GML_MAIN_CONTEXT_TIMER_SOURCE;
@@ -192,8 +238,7 @@ gml_main_context_add_timer (GmlMainContext *mc,
 }
 
 void
-gml_main_context_set_timer (GmlMainContext *mc,
-                            GmlMainContextSource *source,
+gml_main_context_set_timer (GmlMainContextSource *source,
                             unsigned int timeout_msecs)
 {
   struct itimerspec timer, old_timer;
@@ -221,12 +266,16 @@ gml_main_context_add_quit (GmlMainContext *mc,
   GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
   sigset_t sigset;
 
+  if (mc == NULL)
+    mc = gml_main_context_get_default_or_abort ();
+
   sigemptyset (&sigset);
   sigaddset (&sigset, SIGINT);
 
   if (sigprocmask (SIG_BLOCK, &sigset, NULL) == -1)
     g_warning ("sigprocmask failed: %s", strerror (errno));
 
+  source->mc = mc;
   source->fd = signalfd (-1, &sigset, SFD_NONBLOCK | SFD_CLOEXEC);
   source->callback = callback;
   source->type = GML_MAIN_CONTEXT_QUIT_SOURCE;
@@ -251,9 +300,9 @@ gml_main_context_add_quit (GmlMainContext *mc,
 }
 
 void
-gml_main_context_remove_source (GmlMainContext *mc,
-                                GmlMainContextSource *source)
+gml_main_context_remove_source (GmlMainContextSource *source)
 {
+  GmlMainContext *mc = source->mc;
   struct epoll_event event;
 
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
@@ -273,6 +322,9 @@ gml_main_context_poll (GmlMainContext *mc,
                        int timeout)
 {
   int n_events;
+
+  if (mc == NULL)
+    mc = gml_main_context_get_default_or_abort ();
 
   g_array_set_size (mc->events, mc->n_sources);
 
@@ -367,12 +419,17 @@ gml_main_context_poll (GmlMainContext *mc,
 void
 gml_main_context_free (GmlMainContext *mc)
 {
+  g_return_if_fail (mc != NULL);
+
   if (mc->n_sources > 0)
     g_warning ("Sources still remain on a main context that is being freed");
 
   g_array_free (mc->events, TRUE);
   close (mc->epoll_fd);
   g_free (mc);
+
+  if (mc == gml_main_context_default)
+    gml_main_context_default = NULL;
 }
 
 GQuark
