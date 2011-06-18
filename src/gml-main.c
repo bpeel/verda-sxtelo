@@ -26,6 +26,8 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <grp.h>
+#include <pwd.h>
 
 #include "gml-server.h"
 #include "gml-main-context.h"
@@ -35,6 +37,8 @@ static char *option_listen_address = "0.0.0.0";
 static int option_listen_port = 5142;
 static char *option_log_file = NULL;
 static gboolean option_daemonize = FALSE;
+static char *option_user = NULL;
+static char *option_group = NULL;
 
 static GOptionEntry
 options[] =
@@ -54,6 +58,14 @@ options[] =
     {
       "daemonize", 'd', 0, G_OPTION_ARG_NONE, &option_daemonize,
       "Launch the server in a separate detached process", NULL
+    },
+    {
+      "user", 'u', 0, G_OPTION_ARG_STRING, &option_user,
+      "Run the daemon as USER", "USER"
+    },
+    {
+      "group", 'g', 0, G_OPTION_ARG_STRING, &option_group,
+      "Run the daemon as GROUP", "GROUP"
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -168,6 +180,48 @@ daemonize (void)
   freopen ("/dev/null", "w", stderr);
 }
 
+static void
+set_user (const char *user_name)
+{
+  struct passwd *user_info;
+
+  user_info = getpwnam (user_name);
+
+  if (user_info == NULL)
+    {
+      fprintf (stderr, "Unknown user \"%s\"\n", user_name);
+      exit (EXIT_FAILURE);
+    }
+
+  if (setuid (user_info->pw_uid) == -1)
+    {
+      fprintf (stderr, "Error setting user privileges: %s\n",
+               strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+}
+
+static void
+set_group (const char *group_name)
+{
+  struct group *group_info;
+
+  group_info = getgrnam (group_name);
+
+  if (group_info == NULL)
+    {
+      fprintf (stderr, "Unknown group \"%s\"\n", group_name);
+      exit (EXIT_FAILURE);
+    }
+
+  if (setgid (group_info->gr_gid) == -1)
+    {
+      fprintf (stderr, "Error setting group privileges: %s\n",
+               strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+}
+
 int
 main (int argc, char **argv)
 {
@@ -210,6 +264,10 @@ main (int argc, char **argv)
             }
           else
             {
+              if (option_group)
+                set_group (option_group);
+              if (option_user)
+                set_user (option_user);
               if (option_daemonize)
                 daemonize ();
 
