@@ -342,6 +342,13 @@ gml_server_remove_connection (GmlServer *server,
   server->connections = g_list_delete_link (server->connections,
                                             connection->list_node);
   g_slice_free (GmlServerConnection, connection);
+
+  /* Reset the poll on the server socket in case we previously stopped
+     listening because we ran out of file descriptors. This will do
+     nothing if we were already listening */
+  gml_main_context_modify_poll (server->main_context,
+                                server->server_socket_source,
+                                GML_MAIN_CONTEXT_POLL_IN);
 }
 
 static void
@@ -563,6 +570,17 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
       if (error->domain == G_IO_ERROR
           && error->code == G_IO_ERROR_WOULD_BLOCK)
         g_clear_error (&error);
+      else if (error->domain == G_IO_ERROR
+               && error->code == G_IO_ERROR_TOO_MANY_OPEN_FILES)
+        {
+          g_print ("Too many open files to accept connection\n");
+
+          /* Stop listening for new connections until someone disconnects */
+          gml_main_context_modify_poll (server->main_context,
+                                        server->server_socket_source,
+                                        0);
+          g_clear_error (&error);
+        }
       else
         /* This will cause gml_server_run to return */
         server->fatal_error = error;
