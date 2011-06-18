@@ -396,6 +396,20 @@ ChatSession.prototype.unloadCb = function ()
   }
 };
 
+/* .bind is only implemented in recent browsers so this provides a
+ * fallback if it's not available. Gemelo only ever uses it bind the
+ * 'this' context so it doesn't bother with any other arguments */
+if (!Function.prototype.bind)
+  {
+    Function.prototype.bind = function (obj)
+    {
+      var originalFunc = this;
+      return function () {
+        return originalFunc.apply (obj, [].slice.call (arguments));
+      };
+    };
+  }
+
 (function ()
 {
   var cs = new ChatSession ();
