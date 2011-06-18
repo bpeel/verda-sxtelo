@@ -31,12 +31,12 @@ ChatSession.prototype.setState = function (state)
 
   if (state == "in-progress")
   {
-    $("#message-box").removeAttr ("disabled");
+    $("#message-input-box").removeAttr ("disabled");
     $("#submit-message").removeAttr ("disabled");
   }
   else
   {
-    $("#message-box").attr ("disabled", "disabled");
+    $("#message-input-box").attr ("disabled", "disabled");
     $("#submit-message").attr ("disabled", "disabled");
   }
 };
@@ -348,11 +348,11 @@ ChatSession.prototype.queueCurrentMessage = function ()
   if (this.state != "in-progress")
     return;
 
-  message = $("#message-box").val ();
+  message = $("#message-input-box").val ();
 
   if (message.length > 0)
   {
-    $("#message-box").val ("");
+    $("#message-input-box").val ("");
     this.messageQueue.push (message);
     this.sendNextMessage ();
   }
@@ -378,7 +378,7 @@ ChatSession.prototype.loadCb = function ()
   this.startWatchAjax ();
 
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
-  $("#message-box").bind ("keydown", this.keyDownCb.bind (this));
+  $("#message-input-box").bind ("keydown", this.keyDownCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
 };
