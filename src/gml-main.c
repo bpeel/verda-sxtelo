@@ -113,6 +113,7 @@ main (int argc, char **argv)
   GmlMainContext *mc;
   GmlServer *server;
 
+  g_thread_init (NULL);
   g_type_init ();
 
   if (!process_arguments (&argc, &argv, &error))

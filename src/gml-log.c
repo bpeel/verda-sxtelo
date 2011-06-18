@@ -25,31 +25,21 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "gml-log.h"
-#include "gml-main-context.h"
 
-static int gml_log_fd = -1;
+static FILE *gml_log_file = NULL;
 static GString *gml_log_buffer = NULL;
-static GmlMainContextSource *gml_log_source = NULL;
+static GThread *gml_log_thread = NULL;
+static GMutex *gml_log_mutex = NULL;
+static GCond *gml_log_cond = NULL;
+static gboolean gml_log_finished = FALSE;
 
 gboolean
 gml_log_available (void)
 {
-  return gml_log_fd != -1;
-}
-
-static void
-gml_log_update_poll (void)
-{
-  GmlMainContextPollFlags poll_flags;
-
-  if (gml_log_buffer->len > 0)
-    poll_flags = GML_MAIN_CONTEXT_POLL_OUT;
-  else
-    poll_flags = 0;
-
-  gml_main_context_modify_poll (gml_log_source, poll_flags);
+  return gml_log_thread != NULL;
 }
 
 void
@@ -60,8 +50,10 @@ gml_log (const char *format,
   GTimeVal now;
   char *now_string;
 
-  if (gml_log_fd == -1)
+  if (gml_log_thread == NULL)
     return;
+
+  g_mutex_lock (gml_log_mutex);
 
   g_string_append_c (gml_log_buffer, '[');
 
@@ -78,89 +70,92 @@ gml_log (const char *format,
 
   g_string_append_c (gml_log_buffer, '\n');
 
-  gml_log_update_poll ();
+  g_cond_signal (gml_log_cond);
+
+  g_mutex_unlock (gml_log_mutex);
 }
 
 static void
-gml_log_free_resources (void)
+block_sigint (void)
 {
-  if (gml_log_source)
-    {
-      gml_main_context_remove_source (gml_log_source);
-      gml_log_source = NULL;
-    }
+  sigset_t sigset;
 
-  if (gml_log_fd != -1)
-    {
-      close (gml_log_fd);
-      gml_log_fd = -1;
-    }
+  sigemptyset (&sigset);
+  sigaddset (&sigset, SIGINT);
 
-  if (gml_log_buffer)
-    {
-      g_string_free (gml_log_buffer, TRUE);
-      gml_log_buffer = NULL;
-    }
+  if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
+    g_warning ("pthread_sigmask failed: %s", strerror (errno));
 }
 
-static void
-gml_log_poll_cb (GmlMainContextSource *source,
-                 int fd,
-                 GmlMainContextPollFlags flags,
-                 void *user_data)
+static gpointer
+gml_log_thread_func (gpointer data)
 {
-  ssize_t wrote;
+  GString *alternate_buffer;
+  gboolean had_error = FALSE;
+  GString *tmp;
 
-  wrote = write (fd, gml_log_buffer->str, gml_log_buffer->len);
+  block_sigint ();
 
-  if (wrote == -1)
+  alternate_buffer = g_string_new (NULL);
+
+  g_mutex_lock (gml_log_mutex);
+
+  while (!gml_log_finished || gml_log_buffer->len > 0)
     {
-      if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
+      size_t wrote;
+
+      /* Wait until there's something to do */
+      while (!gml_log_finished && gml_log_buffer->len == 0)
+        g_cond_wait (gml_log_cond, gml_log_mutex);
+
+      if (had_error)
+        /* Just ignore the data */
+        g_string_set_size (gml_log_buffer, 0);
+      else
         {
-          g_warning ("write failed on log file");
-          gml_log_free_resources ();
+          /* Swap the log buffer for an empty alternate buffer so we can
+             write from the normal one */
+          tmp = gml_log_buffer;
+          gml_log_buffer = alternate_buffer;
+          alternate_buffer = tmp;
+
+          /* Release the mutex while we do a blocking write */
+          g_mutex_unlock (gml_log_mutex);
+
+          wrote = fwrite (alternate_buffer->str,
+                          1 /* size */,
+                          alternate_buffer->len,
+                          gml_log_file);
+
+          /* If there was an error then we'll just start ignoring data
+             until we're told to quit */
+          if (wrote != alternate_buffer->len)
+            had_error = TRUE;
+          else
+            fflush (gml_log_file);
+
+          g_string_set_size (alternate_buffer, 0);
+
+          g_mutex_lock (gml_log_mutex);
         }
     }
-  else
-    {
-      /* Move any remaining data to the beginning */
-      memmove (gml_log_buffer->str,
-               gml_log_buffer->str + wrote,
-               gml_log_buffer->len - wrote);
-      g_string_set_size (gml_log_buffer, gml_log_buffer->len - wrote);
 
-      gml_log_update_poll ();
-    }
-}
+  g_mutex_unlock (gml_log_mutex);
 
-static int
-gml_log_set_non_blocking (int fd, gboolean value)
-{
-  int flags;
+  g_string_free (alternate_buffer, TRUE);
 
-  flags = fcntl (fd, F_GETFL);
-
-  if (flags == -1)
-    return -1;
-
-  if (value)
-    flags |= O_NONBLOCK;
-  else
-    flags &= ~O_NONBLOCK;
-
-  return fcntl (fd, F_SETFL, flags);
+  return NULL;
 }
 
 gboolean
 gml_log_set_file (const char *filename,
                   GError **error)
 {
-  int fd;
+  FILE *file;
 
-  fd = open (filename, O_WRONLY | O_CREAT | O_APPEND,
-             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  file = fopen (filename, "a");
 
-  if (fd == -1)
+  if (file == NULL)
     {
       g_set_error_literal (error,
                            G_FILE_ERROR,
@@ -169,25 +164,21 @@ gml_log_set_file (const char *filename,
       return FALSE;
     }
 
-  if (gml_log_set_non_blocking (fd, TRUE) == -1)
-    {
-      g_set_error_literal (error,
-                           G_FILE_ERROR,
-                           g_file_error_from_errno (errno),
-                           strerror (errno));
-      close (fd);
-      return FALSE;
-    }
+  gml_log_close ();
 
-  gml_log_free_resources ();
-
-  gml_log_fd = fd;
+  gml_log_file = file;
   gml_log_buffer = g_string_new (NULL);
-  gml_log_source = gml_main_context_add_poll (NULL /* default context */,
-                                              fd,
-                                              0,
-                                              gml_log_poll_cb,
-                                              NULL);
+  gml_log_mutex = g_mutex_new ();
+  gml_log_cond = g_cond_new ();
+  gml_log_finished = FALSE;
+
+  gml_log_thread = g_thread_create (gml_log_thread_func,
+                                    NULL, /* data */
+                                    TRUE, /* joinable */
+                                    error);
+
+  if (gml_log_thread == NULL)
+    gml_log_close ();
 
   return TRUE;
 }
@@ -195,31 +186,39 @@ gml_log_set_file (const char *filename,
 void
 gml_log_close (void)
 {
-  if (gml_log_fd == -1)
-    return;
-
-  /* Try to flush all of the data in blocking mode before closing */
-  if (gml_log_buffer->len > 0
-      && gml_log_set_non_blocking (gml_log_fd, FALSE) != -1)
+  if (gml_log_thread)
     {
-      const char *pos = gml_log_buffer->str;
-      const char *end = gml_log_buffer->str + gml_log_buffer->len;
+      g_mutex_lock (gml_log_mutex);
+      gml_log_finished = TRUE;
+      g_cond_signal (gml_log_cond);
+      g_mutex_unlock (gml_log_mutex);
 
-      while (pos < end)
-        {
-          int wrote;
+      g_thread_join (gml_log_thread);
 
-          wrote = write (gml_log_fd, pos, end - pos);
-
-          if (wrote == -1)
-            {
-              if (errno != EINTR)
-                break;
-            }
-          else
-            pos += wrote;
-        }
+      gml_log_thread = NULL;
     }
 
-  gml_log_free_resources ();
+  if (gml_log_cond)
+    {
+      g_cond_free (gml_log_cond);
+      gml_log_cond = NULL;
+    }
+
+  if (gml_log_mutex)
+    {
+      g_mutex_free (gml_log_mutex);
+      gml_log_mutex = NULL;
+    }
+
+  if (gml_log_buffer)
+    {
+      g_string_free (gml_log_buffer, TRUE);
+      gml_log_buffer = NULL;
+    }
+
+  if (gml_log_file)
+    {
+      fclose (gml_log_file);
+      gml_log_file = NULL;
+    }
 }

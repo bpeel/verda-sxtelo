@@ -8,7 +8,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
 
-PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.16 gobject-2.0 >= 2.16 gio-2.0 >= 2.22])
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.16 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gthread-2.0])
 
 have_epoll=yes
 AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)
