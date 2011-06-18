@@ -136,6 +136,8 @@ ChatSession.prototype.handleChatMessage = function (message)
 
     $("#messages").append (div);
 
+    window.scrollTo (0, document.body.scrollHeight);
+
     this.messagesAdded++;
   }
 
