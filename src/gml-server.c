@@ -36,6 +36,7 @@
 #include "gml-leave-handler.h"
 #include "gml-send-message-handler.h"
 #include "gml-watch-person-handler.h"
+#include "gml-log.h"
 
 struct _GmlServer
 {
@@ -93,6 +94,10 @@ typedef struct
 
   unsigned int output_length;
   guint8 output_buffer[GML_SERVER_OUTPUT_BUFFER_SIZE];
+
+  /* IP address of the connection. This is only filled in if logging
+     is enabled */
+  char *peer_address_string;
 } GmlServerConnection;
 
 /* Interval time in milli-seconds to run the dead person garbage
@@ -259,6 +264,8 @@ gml_server_quit_cb (GmlMainContextSource *source,
   GmlServer *server = user_data;
 
   server->quit_received = TRUE;
+
+  gml_log ("Quit signal received");
 }
 
 static void
@@ -339,6 +346,7 @@ gml_server_remove_connection (GmlServer *server,
   g_object_unref (connection->client_socket);
   server->connections = g_list_delete_link (server->connections,
                                             connection->list_node);
+  g_free (connection->peer_address_string);
   g_slice_free (GmlServerConnection, connection);
 
   /* Reset the poll on the server socket in case we previously stopped
@@ -369,7 +377,9 @@ update_poll (GmlServerConnection *connection)
                               TRUE, /* shutdown_write */
                               &error))
         {
-          g_print ("shutdown socket failed: %s\n", error->message);
+          gml_log ("shutdown socket failed for %s: %s",
+                   connection->peer_address_string,
+                   error->message);
           g_clear_error (&error);
           gml_server_remove_connection (connection->server, connection);
           return;
@@ -423,9 +433,12 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
                       &value_len) == -1
           || value_len != sizeof (value)
           || value == 0)
-        g_print ("Unknown error on socket\n");
+        gml_log ("Unknown error on socket for %s",
+                 connection->peer_address_string);
       else
-        g_print ("Error on socket: %s\n", strerror (value));
+        gml_log ("Error on socket for %s: %s",
+                 connection->peer_address_string,
+                 strerror (value));
 
       gml_server_remove_connection (server, connection);
     }
@@ -439,8 +452,6 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
                           sizeof (buf),
                           NULL, /* cancellable */
                           &error);
-
-      /* FIXME, the g_prints should be in some kind of logging mechanism */
 
       if (got == 0)
         {
@@ -461,7 +472,9 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
           if (error->domain != G_IO_ERROR
               || error->code != G_IO_ERROR_WOULD_BLOCK)
             {
-              g_print ("Error reading from socket: %s\n", error->message);
+              gml_log ("Error reading from socket for %s: %s",
+                       connection->peer_address_string,
+                       error->message);
               gml_server_remove_connection (server, connection);
             }
 
@@ -527,7 +540,9 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
           if (error->domain != G_IO_ERROR
               || error->code != G_IO_ERROR_WOULD_BLOCK)
             {
-              g_print ("Error writing to socket: %s\n", error->message);
+              g_print ("Error writing to socket for %s: %s",
+                       connection->peer_address_string,
+                       error->message);
               gml_server_remove_connection (server, connection);
             }
 
@@ -544,6 +559,34 @@ gml_server_connection_poll_cb (GmlMainContextSource *source,
           update_poll (connection);
         }
     }
+}
+
+static char *
+get_peer_address_string (GSocket *client_socket)
+{
+  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
+  char *address_string = NULL;
+
+  if (address)
+    {
+      if (G_IS_INET_SOCKET_ADDRESS (address))
+        {
+          GInetSocketAddress *inet_socket_address
+            = (GInetSocketAddress *) address;
+          GInetAddress *inet_address
+            = g_inet_socket_address_get_address (inet_socket_address);
+
+          address_string =
+            g_inet_address_to_string ((GInetAddress *) inet_address);
+        }
+
+      g_object_unref (address);
+    }
+
+  if (address_string == NULL)
+    return g_strdup ("(unknown)");
+  else
+    return address_string;
 }
 
 static void
@@ -569,7 +612,7 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
       else if (error->domain == G_IO_ERROR
                && error->code == G_IO_ERROR_TOO_MANY_OPEN_FILES)
         {
-          g_print ("Too many open files to accept connection\n");
+          gml_log ("Too many open files to accept connection");
 
           /* Stop listening for new connections until someone disconnects */
           gml_main_context_modify_poll (server->server_socket_source,
@@ -611,6 +654,18 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
       connection->write_finished = FALSE;
 
       connection->output_length = 0;
+
+      /* If logging is available then we'll want to store the peer
+         address as a string so we've got something to refer to */
+      if (gml_log_available ())
+        {
+          connection->peer_address_string
+            = get_peer_address_string (client_socket);
+          gml_log ("Accepted connection from %s",
+                   connection->peer_address_string);
+        }
+      else
+        connection->peer_address_string = NULL;
 
       /* Store the list node so we can quickly remove the connection
          from the list */

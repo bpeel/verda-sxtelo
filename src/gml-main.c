@@ -26,9 +26,11 @@
 
 #include "gml-server.h"
 #include "gml-main-context.h"
+#include "gml-log.h"
 
 static char *option_listen_address = "0.0.0.0";
 static int option_listen_port = 5142;
+static char *option_log_file = NULL;
 
 static GOptionEntry
 options[] =
@@ -40,6 +42,10 @@ options[] =
     {
       "port", 'p', 0, G_OPTION_ARG_INT, &option_listen_port,
       "Port to listen on", "port"
+    },
+    {
+      "log", 'l', 0, G_OPTION_ARG_STRING, &option_log_file,
+      "File to write log messages to", "file"
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -124,19 +130,34 @@ main (int argc, char **argv)
     }
   else
     {
-      server = create_server (&error);
-
-      if (server == NULL)
+      if (option_log_file
+          && !gml_log_set_file (option_log_file, &error))
         {
-          fprintf (stderr, "%s\n", error->message);
+          fprintf (stderr, "Error setting log file: %s\n", error->message);
           g_clear_error (&error);
         }
       else
         {
-          if (!gml_server_run (server, &error))
-            fprintf (stderr, "%s\n", error->message);
+          server = create_server (&error);
 
-          gml_server_free (server);
+          if (server == NULL)
+            {
+              fprintf (stderr, "%s\n", error->message);
+              g_clear_error (&error);
+            }
+          else
+            {
+              gml_log ("Server listening on port %i", option_listen_port);
+
+              if (!gml_server_run (server, &error))
+                gml_log ("%s", error->message);
+
+              gml_log ("Exiting...");
+
+              gml_server_free (server);
+            }
+
+          gml_log_close ();
         }
 
       gml_main_context_free (mc);
