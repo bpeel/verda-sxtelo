@@ -377,6 +377,21 @@ ChatSession.prototype.loadCb = function ()
 
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-box").bind ("keydown", this.keyDownCb.bind (this));
+
+  $(window).unload (this.unloadCb.bind (this));
+};
+
+ChatSession.prototype.unloadCb = function ()
+{
+  if (this.personId)
+  {
+    /* Try to squeeze in a synchronous Ajax to let the server know the
+     * person has left */
+    var ajax = $.ajaxSettings.xhr ();
+    ajax.open ("GET", this.getUrl ("leave?" + this.personId),
+               false /* not asynchronous */);
+    ajax.send (null);
+  }
 };
 
 (function ()
