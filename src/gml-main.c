@@ -23,6 +23,9 @@
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 #include "gml-server.h"
 #include "gml-main-context.h"
@@ -31,6 +34,7 @@
 static char *option_listen_address = "0.0.0.0";
 static int option_listen_port = 5142;
 static char *option_log_file = NULL;
+static gboolean option_daemonize = FALSE;
 
 static GOptionEntry
 options[] =
@@ -46,6 +50,10 @@ options[] =
     {
       "log", 'l', 0, G_OPTION_ARG_STRING, &option_log_file,
       "File to write log messages to", "file"
+    },
+    {
+      "daemonize", 'd', 0, G_OPTION_ARG_NONE, &option_daemonize,
+      "Launch the server in a separate detached process", NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -106,6 +114,59 @@ create_server (GError **error)
   return server;
 }
 
+static void
+block_sigint (void)
+{
+  sigset_t sigset;
+
+  sigemptyset (&sigset);
+  sigaddset (&sigset, SIGINT);
+
+  if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
+    g_warning ("pthread_sigmask failed: %s", strerror (errno));
+}
+
+static void
+daemonize (void)
+{
+  pid_t pid, sid;
+
+  pid = fork ();
+
+  if (pid < 0)
+    {
+      g_warning ("fork failed: %s", strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+  if (pid > 0)
+    /* Parent process, we can just quit */
+    exit (EXIT_SUCCESS);
+
+  /* Reset the file mask (not really sure why we do this..) */
+  umask (0);
+
+  /* Create a new SID for the child process */
+  sid = setsid ();
+  if (sid < 0)
+    {
+      g_warning ("setsid failed: %s", strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+
+  /* Change the working directory so we're resilient against it being
+     removed */
+  if (chdir ("/") < 0)
+    {
+      g_warning ("chdir failed: %s", strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+
+  /* Redirect standard files to /dev/null */
+  freopen ("/dev/null", "r", stdin);
+  freopen ("/dev/null", "w", stdout);
+  freopen ("/dev/null", "w", stderr);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -148,6 +209,11 @@ main (int argc, char **argv)
             }
           else
             {
+              if (option_daemonize)
+                daemonize ();
+
+              block_sigint ();
+
               if (!gml_log_start (&error))
                 {
                   /* This probably shouldn't happen. By the time we

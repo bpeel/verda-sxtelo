@@ -272,9 +272,6 @@ gml_main_context_add_quit (GmlMainContext *mc,
   sigemptyset (&sigset);
   sigaddset (&sigset, SIGINT);
 
-  if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
-    g_warning ("pthread_sigmask failed: %s", strerror (errno));
-
   source->mc = mc;
   source->fd = signalfd (-1, &sigset, SFD_NONBLOCK | SFD_CLOEXEC);
   source->callback = callback;
