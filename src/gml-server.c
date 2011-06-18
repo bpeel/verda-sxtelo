@@ -41,15 +41,12 @@
 struct _GmlServer
 {
   GmlMainContextSource *server_socket_source;
-  GmlMainContextSource *quit_source;
   GmlMainContextSource *gc_timer_source;
   GSocket *server_socket;
 
   /* If this gets set then gml_server_run will return and report the
      error */
   GError *fatal_error;
-
-  gboolean quit_received;
 
   /* List of open connections */
   GList *connections;
@@ -256,17 +253,6 @@ gml_server_http_parser_vtable =
     .data_received = gml_server_data_received_cb,
     .request_finished = gml_server_request_finished_cb
   };
-
-static void
-gml_server_quit_cb (GmlMainContextSource *source,
-                    void *user_data)
-{
-  GmlServer *server = user_data;
-
-  server->quit_received = TRUE;
-
-  gml_log ("Quit signal received");
-}
 
 static void
 gml_server_gc_timer_cb (GmlMainContextSource *source,
@@ -715,11 +701,6 @@ gml_server_new (GSocketAddress *address,
                                gml_server_pending_connection_cb,
                                server);
 
-  server->quit_source =
-    gml_main_context_add_quit (NULL /* default context */,
-                               gml_server_quit_cb,
-                               server);
-
   server->gc_timer_source =
     gml_main_context_add_timer (NULL /* default context */,
                                 gml_server_gc_timer_cb,
@@ -738,16 +719,38 @@ gml_server_new (GSocketAddress *address,
   return NULL;
 }
 
+static void
+gml_server_quit_cb (GmlMainContextSource *source,
+                    void *user_data)
+{
+  gboolean *quit_received_ptr = user_data;
+
+  *quit_received_ptr = TRUE;
+
+  gml_log ("Quit signal received");
+}
+
 gboolean
 gml_server_run (GmlServer *server,
                 GError **error)
 {
-  server->quit_received = FALSE;
+  GmlMainContextSource *quit_source;
+  gboolean quit_received = FALSE;
+
+  /* We have to make the quit source here instead of during
+     gml_server_new because if we are daemonized then the process will
+     be different by the time we reach here so the signalfd needs to
+     be created in the new process */
+  quit_source = gml_main_context_add_quit (NULL /* default context */,
+                                           gml_server_quit_cb,
+                                           &quit_received);
 
   do
     gml_main_context_poll (NULL /* default context */, -1);
   while (server->fatal_error == NULL
-         && !server->quit_received);
+         && !quit_received);
+
+  gml_main_context_remove_source (quit_source);
 
   if (server->fatal_error)
     {
@@ -769,8 +772,6 @@ gml_server_free (GmlServer *server)
   g_object_unref (server->person_set);
 
   g_object_unref (server->pending_conversations);
-
-  gml_main_context_remove_source (server->quit_source);
 
   gml_main_context_remove_source (server->gc_timer_source);
 
