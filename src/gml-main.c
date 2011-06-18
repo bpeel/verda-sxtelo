@@ -148,12 +148,23 @@ main (int argc, char **argv)
             }
           else
             {
-              gml_log ("Server listening on port %i", option_listen_port);
+              if (!gml_log_start (&error))
+                {
+                  /* This probably shouldn't happen. By the time we
+                     get here may have daemonized so we can't really
+                     print anything but let's do it anyway. */
+                  g_warning ("Error starting log file: %s\n", error->message);
+                  g_clear_error (&error);
+                }
+              else
+                {
+                  gml_log ("Server listening on port %i", option_listen_port);
 
-              if (!gml_server_run (server, &error))
-                gml_log ("%s", error->message);
+                  if (!gml_server_run (server, &error))
+                    gml_log ("%s", error->message);
 
-              gml_log ("Exiting...");
+                  gml_log ("Exiting...");
+                }
 
               gml_server_free (server);
             }

@@ -34,6 +34,9 @@ gboolean
 gml_log_set_file (const char *filename,
                   GError **error);
 
+gboolean
+gml_log_start (GError **error);
+
 void
 gml_log_close (void);
 

@@ -39,7 +39,7 @@ static gboolean gml_log_finished = FALSE;
 gboolean
 gml_log_available (void)
 {
-  return gml_log_thread != NULL;
+  return gml_log_mutex != NULL;
 }
 
 void
@@ -50,7 +50,7 @@ gml_log (const char *format,
   GTimeVal now;
   char *now_string;
 
-  if (gml_log_thread == NULL)
+  if (!gml_log_available ())
     return;
 
   g_mutex_lock (gml_log_mutex);
@@ -171,6 +171,15 @@ gml_log_set_file (const char *filename,
   gml_log_mutex = g_mutex_new ();
   gml_log_cond = g_cond_new ();
   gml_log_finished = FALSE;
+
+  return TRUE;
+}
+
+gboolean
+gml_log_start (GError **error)
+{
+  if (!gml_log_available () || gml_log_thread != NULL)
+    return TRUE;
 
   gml_log_thread = g_thread_create (gml_log_thread_func,
                                     NULL, /* data */
