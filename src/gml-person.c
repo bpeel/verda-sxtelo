@@ -25,6 +25,7 @@
 
 #include "gml-person.h"
 #include "gml-marshal.h"
+#include "gml-main-context.h"
 
 G_DEFINE_TYPE (GmlPerson, gml_person, G_TYPE_OBJECT);
 
@@ -37,9 +38,9 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
-/* Time in seconds after the last 'use' of the person is removed
+/* Time in microseconds after the last 'use' of the person is removed
    before the person is considered not in use */
-#define GML_PERSON_USE_EXPIRY_TIME (60 * 5)
+#define GML_PERSON_USE_EXPIRY_TIME (60 * 5 * (gint64) 1000000)
 
 static void
 gml_person_dispose (GObject *object)
@@ -59,22 +60,11 @@ gml_person_dispose (GObject *object)
 }
 
 static void
-gml_person_finalize (GObject *object)
-{
-  GmlPerson *person = GML_PERSON (object);
-
-  g_timer_destroy (person->use_age);
-
-  G_OBJECT_CLASS (gml_person_parent_class)->finalize (object);
-}
-
-static void
 gml_person_class_init (GmlPersonClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = gml_person_dispose;
-  object_class->finalize = gml_person_finalize;
 
   signals[CHANGED_SIGNAL] =
     g_signal_new ("changed",
@@ -183,7 +173,7 @@ gml_person_new (GmlPersonId id,
 
   person->id = id;
   person->conversation = g_object_ref (conversation);
-  person->use_age = g_timer_new ();
+  person->use_age = gml_main_context_get_monotonic_clock (NULL);
 
   if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
     person->person_num = 0;
@@ -218,16 +208,17 @@ gml_person_add_use (GmlPerson *person)
 void
 gml_person_remove_use (GmlPerson *person)
 {
-  g_return_if_fail (person->use_age > 0);
+  g_return_if_fail (person->use_count > 0);
 
   if (--person->use_count == 0)
-    g_timer_start (person->use_age);
+    person->use_age = gml_main_context_get_monotonic_clock (NULL);
 }
 
 gboolean
 gml_person_has_use (GmlPerson *person)
 {
   return (person->use_count > 0
-          || (g_timer_elapsed (person->use_age, NULL)
+          || ((gml_main_context_get_monotonic_clock (NULL)
+               - person->use_age)
               < GML_PERSON_USE_EXPIRY_TIME));
 }

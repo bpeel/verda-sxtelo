@@ -90,6 +90,9 @@ void
 gml_main_context_poll (GmlMainContext *mc,
                        int timeout);
 
+gint64
+gml_main_context_get_monotonic_clock (GmlMainContext *mc);
+
 void
 gml_main_context_free (GmlMainContext *mc);
 

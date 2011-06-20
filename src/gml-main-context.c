@@ -48,6 +48,9 @@ struct _GmlMainContext
   unsigned int n_sources;
   /* Array for receiving events */
   GArray *events;
+
+  gboolean monotonic_time_valid;
+  gint64 monotonic_time;
 };
 
 struct _GmlMainContextSource
@@ -133,6 +136,7 @@ gml_main_context_new (GError **error)
       mc->epoll_fd = fd;
       mc->n_sources = 0;
       mc->events = g_array_new (FALSE, FALSE, sizeof (struct epoll_event));
+      mc->monotonic_time_valid = FALSE;
 
       return mc;
     }
@@ -333,6 +337,10 @@ gml_main_context_poll (GmlMainContext *mc,
                          mc->n_sources,
                          timeout);
 
+  /* Once we've polled we can assume that some time has passed so our
+     cached value of the monotonic clock is no longer valid */
+  mc->monotonic_time_valid = FALSE;
+
   if (n_events == -1)
     {
       if (errno != EINTR)
@@ -412,6 +420,25 @@ gml_main_context_poll (GmlMainContext *mc,
             }
         }
     }
+}
+
+gint64
+gml_main_context_get_monotonic_clock (GmlMainContext *mc)
+{
+  if (mc == NULL)
+    mc = gml_main_context_get_default_or_abort ();
+
+  /* Because in theory the program doesn't block between calls to
+     poll, we can act as if no time passes between calls to
+     epoll. That way we can cache the clock value instead of having to
+     do a system call every time we need it */
+  if (!mc->monotonic_time_valid)
+    {
+      mc->monotonic_time = g_get_monotonic_time ();
+      mc->monotonic_time_valid = TRUE;
+    }
+
+  return mc->monotonic_time;
 }
 
 void

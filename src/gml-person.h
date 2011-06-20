@@ -68,7 +68,7 @@ struct _GmlPerson
   GmlConversation *conversation;
   guint conversation_changed_handler;
 
-  GTimer *use_age;
+  gint64 use_age;
   unsigned int use_count;
 };
 

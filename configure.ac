@@ -8,7 +8,9 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
 
-PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.16 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gthread-2.0])
+dnl gio 2.22 is needed for the socket API
+dnl glib 2.28 is needed for g_get_monotonic_time
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.28 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gthread-2.0])
 
 have_epoll=yes
 AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)

@@ -65,7 +65,7 @@ struct _GmlConversation
 
   GArray *messages;
 
-  GTimer *stale_age;
+  gint64 stale_age;
 };
 
 typedef struct
