@@ -55,6 +55,15 @@ not_found_response[] =
   "This location is not supported by this server\r\n";
 
 static const char
+request_timeout[] =
+  "HTTP/1.1 408 Request Timeout\r\n"
+  GML_RESPONSE_COMMON_HEADERS
+  "Content-Type: text/plain; charset=ISO-8859-1\r\n"
+  "Content-Length: 54\r\n"
+  "\r\n"
+  "No request appeared within a reasonable time period.\r\n";
+
+static const char
 preflight_post_ok[] =
   "HTTP/1.1 200 OK\r\n"
   GML_RESPONSE_COMMON_HEADERS
@@ -97,6 +106,11 @@ get_message (GmlStringResponseType type,
     case GML_STRING_RESPONSE_PREFLIGHT_POST_OK:
       *message_buffer = preflight_post_ok;
       *message_length = sizeof (preflight_post_ok) - 1;
+      return;
+
+    case GML_STRING_RESPONSE_REQUEST_TIMEOUT:
+      *message_buffer = request_timeout;
+      *message_length = sizeof (request_timeout) - 1;
       return;
 
     case GML_STRING_RESPONSE_OK:

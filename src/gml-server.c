@@ -95,11 +95,22 @@ typedef struct
   /* IP address of the connection. This is only filled in if logging
      is enabled */
   char *peer_address_string;
+
+  /* Time since the response queue became empty. The connection will
+   * be removed if this stays empty for too long */
+  gint64 no_response_age;
 } GmlServerConnection;
 
 /* Interval time in milli-seconds to run the dead person garbage
    collector */
 #define GML_SERVER_GC_TIMEOUT (5 * 60 * 1000)
+
+/* Time in microseconds after which a connection with no responses
+ * will be considered dead. This is necessary to avoid keeping around
+ * connections that open the socket and then don't send any
+ * data. These would otherwise hang out indefinitely and use up
+ * resources. */
+#define GML_SERVER_NO_RESPONSE_TIMEOUT (5 * 60 * (gint64) 1000000)
 
 static const struct
 {
@@ -116,6 +127,10 @@ requests[] =
 
 static void
 update_poll (GmlServerConnection *connection);
+
+static void
+gml_server_remove_connection (GmlServer *server,
+                              GmlServerConnection *connection);
 
 static void
 response_changed_cb (GmlResponse *response,
@@ -255,22 +270,6 @@ gml_server_http_parser_vtable =
   };
 
 static void
-gml_server_gc_timer_cb (GmlMainContextSource *source,
-                        void *user_data)
-{
-  GmlServer *server = user_data;
-
-  /* This is probably relatively expensive because it has to iterate
-     the entire list of people, but it only happens infrequently so
-     hopefully it's not a problem */
-  gml_person_set_remove_useless_people (server->person_set);
-
-  /* Restart the timer */
-  gml_main_context_set_timer (server->gc_timer_source,
-                              GML_SERVER_GC_TIMEOUT);
-}
-
-static void
 gml_server_connection_pop_response (GmlServerConnection *connection)
 {
   GmlResponse *response;
@@ -285,6 +284,12 @@ gml_server_connection_pop_response (GmlServerConnection *connection)
                                           response_changed_cb,
                                           connection);
   g_warn_if_fail (num_handlers == 1);
+
+  /* Whenever we end up with an empty response queue will start
+   * counting the time the connection has been idle so that we can
+   * remove it if it gets too old */
+  if (g_queue_is_empty (&connection->response_queue))
+    connection->no_response_age = gml_main_context_get_monotonic_clock (NULL);
 
   g_object_unref (response);
 }
@@ -303,23 +308,74 @@ gml_server_connection_clear_responses (GmlServerConnection *connection)
 }
 
 static void
-set_bad_input (GmlServerConnection *connection, GError *error)
+set_bad_input_with_code (GmlServerConnection *connection,
+                         GmlStringResponseType code)
 {
   GmlResponse *response;
 
   /* Replace all of the queued responses with an error response */
   gml_server_connection_clear_responses (connection);
 
-  if (error->domain == GML_HTTP_PARSER_ERROR
-      && error->code == GML_HTTP_PARSER_ERROR_UNSUPPORTED)
-    response =
-      gml_string_response_new (GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
-  else
-    response = gml_string_response_new (GML_STRING_RESPONSE_BAD_REQUEST);
+  response = gml_string_response_new (code);
 
   queue_response (connection, response);
 
   connection->had_bad_input = TRUE;
+}
+
+static void
+set_bad_input (GmlServerConnection *connection, GError *error)
+{
+  if (error->domain == GML_HTTP_PARSER_ERROR
+      && error->code == GML_HTTP_PARSER_ERROR_UNSUPPORTED)
+    set_bad_input_with_code (connection,
+                             GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
+  else
+    set_bad_input_with_code (connection, GML_STRING_RESPONSE_BAD_REQUEST);
+}
+
+static void
+check_dead_connection_cb (gpointer data,
+                          gpointer user_data)
+{
+  GmlServerConnection *connection = data;
+
+  if (g_queue_is_empty (&connection->response_queue)
+      && ((gml_main_context_get_monotonic_clock (NULL)
+           - connection->no_response_age)
+          >= GML_SERVER_NO_RESPONSE_TIMEOUT))
+    {
+      /* If we've already had bad input then we'll just remove the
+       * connection. This will happen if the client doesn't close its
+       * end of the connection after we finish sending the bad input
+       * message */
+      if (connection->had_bad_input)
+        gml_server_remove_connection (connection->server, connection);
+      else
+        {
+          set_bad_input_with_code (connection,
+                                   GML_STRING_RESPONSE_REQUEST_TIMEOUT);
+          update_poll (connection);
+        }
+    }
+}
+
+static void
+gml_server_gc_timer_cb (GmlMainContextSource *source,
+                        void *user_data)
+{
+  GmlServer *server = user_data;
+
+  g_list_foreach (server->connections, check_dead_connection_cb, NULL);
+
+  /* This is probably relatively expensive because it has to iterate
+     the entire list of people, but it only happens infrequently so
+     hopefully it's not a problem */
+  gml_person_set_remove_useless_people (server->person_set);
+
+  /* Restart the timer */
+  gml_main_context_set_timer (server->gc_timer_source,
+                              GML_SERVER_GC_TIMEOUT);
 }
 
 static void
@@ -652,6 +708,8 @@ gml_server_pending_connection_cb (GmlMainContextSource *source,
         }
       else
         connection->peer_address_string = NULL;
+
+      connection->no_response_age = gml_main_context_get_monotonic_clock (NULL);
 
       /* Store the list node so we can quickly remove the connection
          from the list */
