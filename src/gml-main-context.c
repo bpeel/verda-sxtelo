@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/epoll.h>
-#include <sys/timerfd.h>
 #include <sys/signalfd.h>
 #include <unistd.h>
 #include <signal.h>
@@ -58,7 +57,6 @@ struct _GmlMainContextSource
   enum
   {
     GML_MAIN_CONTEXT_POLL_SOURCE,
-    GML_MAIN_CONTEXT_TIMER_SOURCE,
     GML_MAIN_CONTEXT_QUIT_SOURCE
   } type;
 
@@ -208,61 +206,6 @@ gml_main_context_modify_poll (GmlMainContextSource *source,
 }
 
 GmlMainContextSource *
-gml_main_context_add_timer (GmlMainContext *mc,
-                            GmlMainContextTimerCallback callback,
-                            void *user_data)
-{
-  GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
-
-  if (mc == NULL)
-    mc = gml_main_context_get_default_or_abort ();
-
-  source->mc = mc;
-  source->fd = timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
-  source->callback = callback;
-  source->type = GML_MAIN_CONTEXT_TIMER_SOURCE;
-  source->user_data = user_data;
-
-  if (source->fd == -1)
-    g_warning ("Failed to create timerfd: %s", strerror (errno));
-  else
-    {
-      struct epoll_event event;
-
-      event.events = EPOLLIN;
-      event.data.ptr = source;
-
-      if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_ADD, source->fd, &event) == -1)
-        g_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
-
-      mc->n_sources++;
-    }
-
-  return source;
-}
-
-void
-gml_main_context_set_timer (GmlMainContextSource *source,
-                            unsigned int timeout_msecs)
-{
-  struct itimerspec timer, old_timer;
-
-  g_return_if_fail (source->type != GML_MAIN_CONTEXT_POLL_SOURCE);
-  g_return_if_fail (source->fd != -1);
-
-  timer.it_interval.tv_sec = 0;
-  timer.it_interval.tv_nsec = 0;
-  timer.it_value.tv_sec = timeout_msecs / 1000;
-  timer.it_value.tv_nsec = timeout_msecs % 1000 * 1000000L;
-
-  if (timerfd_settime (source->fd,
-                       0, /* flags (relative timer) */
-                       &timer,
-                       &old_timer) == -1)
-    g_warning ("timerfd_settime failed: %s", strerror (errno));
-}
-
-GmlMainContextSource *
 gml_main_context_add_quit (GmlMainContext *mc,
                            GmlMainContextQuitCallback callback,
                            void *user_data)
@@ -310,8 +253,7 @@ gml_main_context_remove_source (GmlMainContextSource *source)
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
     g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
 
-  if (source->type == GML_MAIN_CONTEXT_TIMER_SOURCE
-      || source->type == GML_MAIN_CONTEXT_QUIT_SOURCE)
+  if (source->type == GML_MAIN_CONTEXT_QUIT_SOURCE)
     close (source->fd);
 
   g_slice_free (GmlMainContextSource, source);
@@ -372,27 +314,6 @@ gml_main_context_poll (GmlMainContext *mc,
                   flags |= GML_MAIN_CONTEXT_POLL_ERROR;
 
                 callback (source, source->fd, flags, source->user_data);
-              }
-              break;
-
-            case GML_MAIN_CONTEXT_TIMER_SOURCE:
-              {
-                GmlMainContextTimerCallback callback = source->callback;
-                uint64_t count;
-                int got;
-
-                got = read (source->fd, &count, sizeof (count));
-
-                if (got == -1)
-                  {
-                    if (errno != EAGAIN)
-                      g_warning ("Read on timerfd failed: %s",
-                                 strerror (errno));
-                  }
-                else if (got != sizeof (count))
-                  g_warning ("Read on timerfd returned %i", got);
-                else
-                  callback (source, source->user_data);
               }
               break;
 

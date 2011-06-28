@@ -41,7 +41,6 @@
 struct _GmlServer
 {
   GmlMainContextSource *server_socket_source;
-  GmlMainContextSource *gc_timer_source;
   GSocket *server_socket;
 
   /* If this gets set then gml_server_run will return and report the
@@ -54,6 +53,8 @@ struct _GmlServer
   GmlConversationSet *pending_conversations;
 
   GmlPersonSet *person_set;
+
+  gint64 last_gc_time;
 };
 
 #define GML_SERVER_OUTPUT_BUFFER_SIZE 1024
@@ -101,9 +102,9 @@ typedef struct
   gint64 no_response_age;
 } GmlServerConnection;
 
-/* Interval time in milli-seconds to run the dead person garbage
+/* Interval time in micro-seconds to run the dead person garbage
    collector */
-#define GML_SERVER_GC_TIMEOUT (5 * 60 * 1000)
+#define GML_SERVER_GC_TIMEOUT (5 * 60 * (gint64) 1000000)
 
 /* Time in microseconds after which a connection with no responses
  * will be considered dead. This is necessary to avoid keeping around
@@ -361,11 +362,8 @@ check_dead_connection_cb (gpointer data,
 }
 
 static void
-gml_server_gc_timer_cb (GmlMainContextSource *source,
-                        void *user_data)
+gml_server_run_gc (GmlServer *server)
 {
-  GmlServer *server = user_data;
-
   g_list_foreach (server->connections, check_dead_connection_cb, NULL);
 
   /* This is probably relatively expensive because it has to iterate
@@ -373,9 +371,7 @@ gml_server_gc_timer_cb (GmlMainContextSource *source,
      hopefully it's not a problem */
   gml_person_set_remove_useless_people (server->person_set);
 
-  /* Restart the timer */
-  gml_main_context_set_timer (server->gc_timer_source,
-                              GML_SERVER_GC_TIMEOUT);
+  server->last_gc_time = gml_main_context_get_monotonic_clock (NULL);
 }
 
 static void
@@ -759,12 +755,7 @@ gml_server_new (GSocketAddress *address,
                                gml_server_pending_connection_cb,
                                server);
 
-  server->gc_timer_source =
-    gml_main_context_add_timer (NULL /* default context */,
-                                gml_server_gc_timer_cb,
-                                server);
-  gml_main_context_set_timer (server->gc_timer_source,
-                              GML_SERVER_GC_TIMEOUT);
+  server->last_gc_time = gml_main_context_get_monotonic_clock (NULL);
 
   return server;
 
@@ -803,10 +794,27 @@ gml_server_run (GmlServer *server,
                                            gml_server_quit_cb,
                                            &quit_received);
 
-  do
-    gml_main_context_poll (NULL /* default context */, -1);
-  while (server->fatal_error == NULL
-         && !quit_received);
+  while (TRUE)
+    {
+      gint64 wait_time;
+
+      wait_time = (server->last_gc_time + GML_SERVER_GC_TIMEOUT
+                   - gml_main_context_get_monotonic_clock (NULL));
+      if (wait_time < 0)
+        wait_time = 0;
+
+      gml_main_context_poll (NULL /* default context */,
+                             /* microseconds to milliseconds rounding up */
+                             (wait_time + 999) / 1000);
+
+      if (quit_received || server->fatal_error)
+        break;
+
+      if (gml_main_context_get_monotonic_clock (NULL)
+          - server->last_gc_time
+          >= GML_SERVER_GC_TIMEOUT)
+        gml_server_run_gc (server);
+    }
 
   gml_main_context_remove_source (quit_source);
 
@@ -830,8 +838,6 @@ gml_server_free (GmlServer *server)
   g_object_unref (server->person_set);
 
   g_object_unref (server->pending_conversations);
-
-  gml_main_context_remove_source (server->gc_timer_source);
 
   gml_main_context_remove_source (server->server_socket_source);
 

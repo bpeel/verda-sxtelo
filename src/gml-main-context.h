@@ -70,18 +70,9 @@ gml_main_context_modify_poll (GmlMainContextSource *source,
                               GmlMainContextPollFlags flags);
 
 GmlMainContextSource *
-gml_main_context_add_timer (GmlMainContext *mc,
-                            GmlMainContextTimerCallback callback,
-                            void *user_data);
-
-GmlMainContextSource *
 gml_main_context_add_quit (GmlMainContext *mc,
                            GmlMainContextQuitCallback callback,
                            void *user_data);
-
-void
-gml_main_context_set_timer (GmlMainContextSource *source,
-                            unsigned int timeout_msecs);
 
 void
 gml_main_context_remove_source (GmlMainContextSource *source);
