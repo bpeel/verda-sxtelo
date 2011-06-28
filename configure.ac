@@ -14,7 +14,7 @@ PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.28 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gt
 
 have_epoll=yes
 AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)
-AC_CHECK_FUNC(epoll_create1, , have_epoll=no)
+AC_CHECK_FUNC(epoll_create, , have_epoll=no)
 AC_CHECK_FUNC(epoll_ctl, , have_epoll=no)
 AS_IF([test "x$have_epoll" = "xno"],
       AC_MSG_ERROR([epoll support is required to build gemelo.

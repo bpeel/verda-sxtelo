@@ -111,7 +111,7 @@ gml_main_context_new (GError **error)
 
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-  fd = epoll_create1 (EPOLL_CLOEXEC);
+  fd = epoll_create (16);
 
   if (fd == -1)
     {
