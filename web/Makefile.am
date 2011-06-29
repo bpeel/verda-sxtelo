@@ -24,7 +24,9 @@ webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
 	gemelo.css \
 	gemelo-logo.png \
-	jquery-1.6.1.js
+	jquery-1.6.1.js \
+	favicon.ico \
+	favicon.png
 
 webfiles_DATA = \
 	index.html.var
