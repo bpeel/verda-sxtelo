@@ -127,19 +127,6 @@ create_server (GError **error)
 }
 
 static void
-block_sigint (void)
-{
-  sigset_t sigset;
-
-  sigemptyset (&sigset);
-  sigaddset (&sigset, SIGINT);
-  sigaddset (&sigset, SIGTERM);
-
-  if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
-    g_warning ("pthread_sigmask failed: %s", strerror (errno));
-}
-
-static void
 daemonize (void)
 {
   pid_t pid, sid;
@@ -270,8 +257,6 @@ main (int argc, char **argv)
                 set_user (option_user);
               if (option_daemonize)
                 daemonize ();
-
-              block_sigint ();
 
               if (!gml_log_start (&error))
                 {

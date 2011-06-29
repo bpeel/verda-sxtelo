@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/epoll.h>
-#include <sys/signalfd.h>
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -47,6 +46,15 @@ struct _GmlMainContext
   unsigned int n_sources;
   /* Array for receiving events */
   GArray *events;
+
+  /* List of quit sources. All of these get invoked when a quit signal
+     is received */
+  GSList *quit_sources;
+
+  GmlMainContextSource *quit_pipe_source;
+  int quit_pipe[2];
+  void (* old_int_handler) (int);
+  void (* old_term_handler) (int);
 
   gboolean monotonic_time_valid;
   gint64 monotonic_time;
@@ -135,6 +143,8 @@ gml_main_context_new (GError **error)
       mc->n_sources = 0;
       mc->events = g_array_new (FALSE, FALSE, sizeof (struct epoll_event));
       mc->monotonic_time_valid = FALSE;
+      mc->quit_sources = NULL;
+      mc->quit_pipe_source = NULL;
 
       return mc;
     }
@@ -205,40 +215,81 @@ gml_main_context_modify_poll (GmlMainContextSource *source,
   source->current_flags = flags;
 }
 
+static void
+gml_main_context_quit_foreach_cb (void *data,
+                                  void *user_data)
+{
+  GmlMainContextSource *source = data;
+  GmlMainContextQuitCallback callback = source->callback;
+
+  callback (source, source->user_data);
+}
+
+static void
+gml_main_context_quit_pipe_cb (GmlMainContextSource *source,
+                               int fd,
+                               GmlMainContextPollFlags flags,
+                               void *user_data)
+{
+  GmlMainContext *mc = user_data;
+  guint8 byte;
+
+  if (read (mc->quit_pipe[0], &byte, sizeof (byte)) == -1)
+    {
+      if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+        g_warning ("Read from quit pipe failed: %s", strerror (errno));
+    }
+  else
+    g_slist_foreach (mc->quit_sources, gml_main_context_quit_foreach_cb, mc);
+}
+
+static void
+gml_main_context_quit_signal_cb (int signum)
+{
+  GmlMainContext *mc = gml_main_context_get_default_or_abort ();
+  guint8 byte = 42;
+
+  while (write (mc->quit_pipe[1], &byte, 1) == -1
+         && errno == EINTR);
+}
+
 GmlMainContextSource *
 gml_main_context_add_quit (GmlMainContext *mc,
                            GmlMainContextQuitCallback callback,
                            void *user_data)
 {
   GmlMainContextSource *source = g_slice_new (GmlMainContextSource);
-  sigset_t sigset;
 
   if (mc == NULL)
     mc = gml_main_context_get_default_or_abort ();
 
-  sigemptyset (&sigset);
-  sigaddset (&sigset, SIGINT);
-  sigaddset (&sigset, SIGTERM);
-
   source->mc = mc;
-  source->fd = signalfd (-1, &sigset, SFD_NONBLOCK | SFD_CLOEXEC);
+  source->fd = -1;
   source->callback = callback;
   source->type = GML_MAIN_CONTEXT_QUIT_SOURCE;
   source->user_data = user_data;
 
-  if (source->fd == -1)
-    g_warning ("Failed to create timerfd: %s", strerror (errno));
-  else
+  mc->quit_sources = g_slist_prepend (mc->quit_sources, source);
+
+  mc->n_sources++;
+
+  if (mc->quit_pipe_source == NULL)
     {
-      struct epoll_event event;
+      if (pipe (mc->quit_pipe) == -1)
+        g_warning ("Failed to create quit pipe: %s", strerror (errno));
+      else
+        {
+          mc->quit_pipe_source
+            = gml_main_context_add_poll (mc, mc->quit_pipe[0],
+                                         GML_MAIN_CONTEXT_POLL_IN,
+                                         gml_main_context_quit_pipe_cb,
+                                         mc);
 
-      event.events = EPOLLIN;
-      event.data.ptr = source;
-
-      if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_ADD, source->fd, &event) == -1)
-        g_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
-
-      mc->n_sources++;
+          mc->old_int_handler =
+            signal (SIGINT, gml_main_context_quit_signal_cb);
+          mc->old_term_handler =
+            signal (SIGTERM, gml_main_context_quit_signal_cb);
+        }
     }
 
   return source;
@@ -250,11 +301,17 @@ gml_main_context_remove_source (GmlMainContextSource *source)
   GmlMainContext *mc = source->mc;
   struct epoll_event event;
 
-  if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
-    g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
+  switch (source->type)
+    {
+    case GML_MAIN_CONTEXT_POLL_SOURCE:
+      if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
+        g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
+      break;
 
-  if (source->type == GML_MAIN_CONTEXT_QUIT_SOURCE)
-    close (source->fd);
+    case GML_MAIN_CONTEXT_QUIT_SOURCE:
+      mc->quit_sources = g_slist_remove (mc->quit_sources, source);
+      break;
+    }
 
   g_slice_free (GmlMainContextSource, source);
 
@@ -318,25 +375,7 @@ gml_main_context_poll (GmlMainContext *mc,
               break;
 
             case GML_MAIN_CONTEXT_QUIT_SOURCE:
-              {
-                GmlMainContextQuitCallback callback = source->callback;
-                struct signalfd_siginfo info;
-                int got;
-
-                got = read (source->fd, &info, sizeof (info));
-
-                if (got == -1)
-                  {
-                    if (errno != EAGAIN)
-                      g_warning ("Read on signalfd failed: %s",
-                                 strerror (errno));
-                  }
-                else if (got != sizeof (info))
-                  g_warning ("Read on signalfd returned %i "
-                             "(expected %i)", got, (int) sizeof (info));
-                else
-                  callback (source, source->user_data);
-              }
+              g_warn_if_reached ();
               break;
             }
         }
@@ -366,6 +405,15 @@ void
 gml_main_context_free (GmlMainContext *mc)
 {
   g_return_if_fail (mc != NULL);
+
+  if (mc->quit_pipe_source)
+    {
+      signal (SIGINT, mc->old_int_handler);
+      signal (SIGTERM, mc->old_term_handler);
+      gml_main_context_remove_source (mc->quit_pipe_source);
+      close (mc->quit_pipe[0]);
+      close (mc->quit_pipe[1]);
+    }
 
   if (mc->n_sources > 0)
     g_warning ("Sources still remain on a main context that is being freed");
