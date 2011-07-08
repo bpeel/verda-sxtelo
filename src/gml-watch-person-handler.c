@@ -53,6 +53,7 @@ real_request_line_received (GmlRequestHandler *handler,
   GmlPersonId id;
 
   if (method == GML_REQUEST_METHOD_GET
+      && query_string != NULL
       && gml_person_parse_id (query_string, &id))
     {
       GmlPerson *person = gml_person_set_get_person (handler->person_set, id);
