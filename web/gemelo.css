@@ -101,3 +101,13 @@ body {
 #new-conversation-button {
     margin-top: 4px;
 }
+
+.like-buttons-container {
+    position: relative;
+}
+
+.like-buttons {
+    float: right;
+    position: absolute;
+    right: 0px;
+}
