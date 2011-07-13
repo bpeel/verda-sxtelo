@@ -66,6 +66,9 @@ struct _GmlConversation
   GArray *messages;
 
   gint64 stale_age;
+
+  /* Bitmask of people that are currently typing */
+  unsigned int typing_mask;
 };
 
 typedef struct
@@ -94,6 +97,11 @@ gml_conversation_add_message (GmlConversation *conversation,
                               unsigned int person_num,
                               const char *buffer,
                               unsigned int length);
+
+void
+gml_conversation_set_typing (GmlConversation *conversation,
+                             unsigned int person_num,
+                             gboolean typing);
 
 G_END_DECLS
 

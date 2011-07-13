@@ -175,6 +175,25 @@ gml_conversation_add_message (GmlConversation *conversation,
   gml_conversation_changed (conversation);
 }
 
+void
+gml_conversation_set_typing (GmlConversation *conversation,
+                             unsigned int person_num,
+                             gboolean typing)
+{
+  unsigned int new_mask = conversation->typing_mask;
+
+  if (typing)
+    new_mask |= 1 << person_num;
+  else
+    new_mask &= ~(1 << person_num);
+
+  if (new_mask != conversation->typing_mask)
+    {
+      conversation->typing_mask = new_mask;
+      gml_conversation_changed (conversation);
+    }
+}
+
 GmlConversation *
 gml_conversation_new (void)
 {

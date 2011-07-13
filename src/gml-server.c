@@ -36,6 +36,8 @@
 #include "gml-leave-handler.h"
 #include "gml-send-message-handler.h"
 #include "gml-watch-person-handler.h"
+#include "gml-start-typing-handler.h"
+#include "gml-stop-typing-handler.h"
 #include "gml-log.h"
 
 struct _GmlServer
@@ -120,6 +122,8 @@ static const struct
 }
 requests[] =
   {
+    { "/start_typing", gml_start_typing_handler_get_type },
+    { "/stop_typing", gml_stop_typing_handler_get_type },
     { "/send_message", gml_send_message_handler_get_type },
     { "/watch_person", gml_watch_person_handler_get_type },
     { "/new_person", gml_new_person_handler_get_type },

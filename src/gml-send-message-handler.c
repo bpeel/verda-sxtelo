@@ -263,6 +263,11 @@ real_request_finished (GmlRequestHandler *handler)
                                     self->person->person_num,
                                     self->message_buffer->str,
                                     self->message_buffer->len);
+      /* Sending a message implicitly marks the person as no longer
+         typing */
+      gml_conversation_set_typing (self->person->conversation,
+                                   self->person->person_num,
+                                   FALSE);
 
       g_string_free (self->message_buffer, TRUE);
       self->message_buffer = NULL;

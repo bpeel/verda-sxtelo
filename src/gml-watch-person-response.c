@@ -122,6 +122,15 @@ write_message (GmlWatchPersonResponse *self,
 #define write_static_message(self, message_data, message) \
   write_message (self, message_data, message, sizeof (message) - 1)
 
+static gboolean
+gml_watch_person_response_get_typing_state (GmlWatchPersonResponse *self)
+{
+  GmlPerson *person = self->person;
+  GmlConversation *conversation = person->conversation;
+
+  return !!(conversation->typing_mask & (1 << (person->person_num ^ 1)));
+}
+
 static unsigned int
 gml_watch_person_response_add_data (GmlResponse *response,
                                     guint8 *data_in,
@@ -225,24 +234,68 @@ gml_watch_person_response_add_data (GmlResponse *response,
           unsigned int to_write;
           int length_length;
 
-          /* If there's not enough space left in the buffer to
-             write a large chunk length then we'll wait until the
-             next call to add any data */
-          if (message_data.length <= CHUNK_LENGTH_SIZE)
-            goto done;
-
           if (self->message_num >= conversation->messages->len)
             {
+              gboolean typing_state;
+
               if (conversation->state == GML_CONVERSATION_FINISHED)
                 {
                   self->message_pos = 0;
                   self->state = GML_WATCH_PERSON_RESPONSE_WRITING_END;
+                }
+              else if ((typing_state =
+                        gml_watch_person_response_get_typing_state (self))
+                       != self->last_typing_state)
+                {
+                  static const guint8 typing_message[] =
+                    "c\r\n"
+                    "[\"typing\"]\r\n"
+                    "\r\n";
+                  static const guint8 not_typing_message[] =
+                    "10\r\n"
+                    "[\"not-typing\"]\r\n"
+                    "\r\n";
+
+                  if (typing_state)
+                    {
+                      /* Only add the typing mask if there's enough
+                         space in the buffer for the entire message so
+                         that we can't accidentally add it in the
+                         middle of sending a message */
+                      if (sizeof (typing_message) - 1 <= message_data.length)
+                        {
+                          write_static_message (self,
+                                                &message_data,
+                                                typing_message);
+                          self->message_pos = 0;
+                          self->last_typing_state = TRUE;
+                        }
+                      else
+                        goto done;
+                    }
+                  else if (sizeof (not_typing_message) - 1
+                           <= message_data.length)
+                    {
+                      write_static_message (self,
+                                            &message_data,
+                                            not_typing_message);
+                      self->message_pos = 0;
+                      self->last_typing_state = FALSE;
+                    }
+                  else
+                    goto done;
                 }
               else
                 goto done;
             }
           else
             {
+              /* If there's not enough space left in the buffer to
+                 write a large chunk length then we'll wait until the
+                 next call to add any data */
+              if (message_data.length <= CHUNK_LENGTH_SIZE)
+                goto done;
+
               message = &g_array_index (conversation->messages,
                                         GmlConversationMessage,
                                         self->message_num);
@@ -323,7 +376,9 @@ gml_watch_person_response_has_data (GmlResponse *response)
       if (self->person->conversation->state == GML_CONVERSATION_FINISHED)
         return TRUE;
 
-      return self->message_num < self->person->conversation->messages->len;
+      return (self->message_num < self->person->conversation->messages->len
+              || (self->last_typing_state
+                  != gml_watch_person_response_get_typing_state (self)));
 
     case GML_WATCH_PERSON_RESPONSE_WRITING_END:
       return TRUE;

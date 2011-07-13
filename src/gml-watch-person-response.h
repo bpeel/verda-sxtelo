@@ -76,6 +76,8 @@ struct _GmlWatchPersonResponse
 
   unsigned int message_num;
   unsigned int message_pos;
+
+  gboolean last_typing_state;
 };
 
 GType
