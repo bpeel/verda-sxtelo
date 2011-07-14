@@ -92,10 +92,13 @@ body {
     text-align: center;
 }
 
-.message-note {
-    margin-top: 8px;
+.message-note, #typing-note {
     color: rgb(90, 90, 90);
     font-style: italic;
+}
+
+.message-note {
+    margin-top: 8px;
 }
 
 #new-conversation-button {

@@ -59,3 +59,7 @@ Chat
 @START_A_NEW_CONVERSATION@
 
 Commencer une conversation nouvelle
+
+@TYPING@
+
+L'autre personne est en train d'écrire...

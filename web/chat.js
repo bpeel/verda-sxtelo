@@ -23,6 +23,7 @@ function ChatSession ()
   this.personNumber = null;
   this.messagesAdded = 0;
   this.messageQueue = [];
+  this.sentTypingState = false;
 }
 
 ChatSession.prototype.setState = function (state)
@@ -38,6 +39,7 @@ ChatSession.prototype.setState = function (state)
   {
     $("#message-input-box").attr ("disabled", "disabled");
     $("#submit-message").attr ("disabled", "disabled");
+    $("#typing-note-text").hide ();
   }
 };
 
@@ -145,6 +147,17 @@ ChatSession.prototype.handleChatMessage = function (message)
   this.messageNumber++;
 };
 
+ChatSession.prototype.handleTyping = function ()
+{
+  if (this.state == "in-progress")
+    $("#typing-note-text").show ();
+};
+
+ChatSession.prototype.handleNotTyping = function ()
+{
+  $("#typing-note-text").hide ();
+};
+
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -163,6 +176,14 @@ ChatSession.prototype.processMessage = function (message)
 
   case "message":
     this.handleChatMessage (message[1]);
+    break;
+
+  case "typing":
+    this.handleTyping ();
+    break;
+
+  case "not-typing":
+    this.handleNotTyping ();
     break;
   }
 };
@@ -328,9 +349,34 @@ ChatSession.prototype.sendNextMessage = function ()
     return;
 
   if (this.messageQueue.length < 1)
+  {
+    /* Check if we need to update the typing state */
+    var newTypingState = $("#message-input-box").val ().length > 0;
+    if (newTypingState != this.sentTypingState)
+    {
+      this.sentTypingState = newTypingState;
+
+      this.sendMessageAjax = $.ajaxSettings.xhr ();
+      this.sendMessageAjax.onreadystatechange =
+        this.sendMessageReadyStateChangeCb.bind (this);
+      this.sendMessageAjax.open ("GET",
+                                 this.getUrl ((newTypingState ?
+                                               "start_typing?" :
+                                               "stop_typing?") +
+                                              this.personId));
+      this.sendMessageAjax.setRequestHeader ("Content-Type",
+                                             "text/plain; charset=UTF-8");
+      this.sendMessageAjax.send (message);
+    }
+
     return;
+  }
 
   var message = this.messageQueue.shift ();
+
+  /* The server assumes we've stopped typing whenever a message is
+   * sent */
+  this.sentTypingState = false;
 
   this.sendMessageAjax = $.ajaxSettings.xhr ();
   this.sendMessageAjax.onreadystatechange =
@@ -373,6 +419,12 @@ ChatSession.prototype.keyDownCb = function (event)
   }
 };
 
+ChatSession.prototype.inputCb = function (event)
+{
+  /* Maybe update the typing status */
+  this.sendNextMessage ();
+};
+
 ChatSession.prototype.newConversationCb = function ()
 {
   window.location.reload ();
@@ -385,6 +437,7 @@ ChatSession.prototype.loadCb = function ()
 
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-input-box").bind ("keydown", this.keyDownCb.bind (this));
+  $("#message-input-box").bind ("input", this.inputCb.bind (this));
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
 

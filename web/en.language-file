@@ -58,3 +58,7 @@ Chat
 @START_A_NEW_CONVERSATION@
 
 Start a new conversation
+
+@TYPING@
+
+The other person is typing...
