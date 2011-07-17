@@ -80,13 +80,19 @@ gml_conversation_class_init (GmlConversationClass *klass)
 }
 
 static void
+gml_conversation_reset_stale_age (GmlConversation *conversation)
+{
+  conversation->stale_age = gml_main_context_get_monotonic_clock (NULL);
+}
+
+static void
 gml_conversation_init (GmlConversation *self)
 {
   self->messages = g_array_new (FALSE, FALSE, sizeof (GmlConversationMessage));
 
   self->state = GML_CONVERSATION_AWAITING_PARTNER;
 
-  self->stale_age = gml_main_context_get_monotonic_clock (NULL);
+  gml_conversation_reset_stale_age (self);
 }
 
 static void
@@ -103,6 +109,7 @@ gml_conversation_start (GmlConversation *conversation)
   if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
     {
       conversation->state = GML_CONVERSATION_IN_PROGRESS;
+      gml_conversation_reset_stale_age (conversation);
       gml_conversation_changed (conversation);
     }
 }
@@ -170,7 +177,7 @@ gml_conversation_add_message (GmlConversation *conversation,
   message->length = message_str->len;
   message->text = g_string_free (message_str, FALSE);
 
-  conversation->stale_age = gml_main_context_get_monotonic_clock (NULL);
+  gml_conversation_reset_stale_age (conversation);
 
   gml_conversation_changed (conversation);
 }
