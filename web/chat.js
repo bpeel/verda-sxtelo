@@ -488,9 +488,21 @@ ChatSession.prototype.unloadCb = function ()
     /* Try to squeeze in a synchronous Ajax to let the server know the
      * person has left */
     var ajax = getAjaxObject ();
+
     ajax.open ("GET", this.getUrl ("leave?" + this.personId),
                false /* not asynchronous */);
     ajax.send (null);
+
+    /* If this is an XDomainRequest then making it asynchronous
+     * doesn't work but we can do a synchronous request back to the
+     * same domain. With any luck this will cause it to wait long
+     * enough to also flush the leave request */
+    if (ajax.xdr)
+      {
+        var xhr = new XMLHttpRequest ();
+        xhr.open ("GET", window.location.url, false);
+        xhr.send (null);
+      }
   }
 };
 
