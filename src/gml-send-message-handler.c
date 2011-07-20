@@ -221,11 +221,24 @@ real_data_received (GmlRequestHandler *handler,
   if (self->person)
     {
       /* If we haven't got a GIConv then that must mean we didn't see
-         the content-type header so let's assume that's an error */
+         the content-type header. In this case we'll try to parse the
+         data as text/plain in UTF-8 and hope for the best. This is
+         necessary because when using XDomainRequest on Internet
+         Exploiter it's not possible to set the content-type header or
+         control the charset it sends */
       if (self->data_iconv == (GIConv) -1)
         {
-          set_error (self, GML_STRING_RESPONSE_BAD_REQUEST);
-          return;
+          self->data_iconv = g_iconv_open ("UTF-8", "UTF-8");
+
+          if (self->data_iconv == (GIConv) -1)
+            {
+              set_error (self, GML_STRING_RESPONSE_UNSUPPORTED_REQUEST);
+              return;
+            }
+
+          gml_chunked_iconv_init (&self->chunked_iconv,
+                                  self->data_iconv,
+                                  self->message_buffer);
         }
 
       if (!gml_chunked_iconv_add_data (&self->chunked_iconv,
