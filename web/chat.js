@@ -16,6 +16,51 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+function getAjaxObject ()
+{
+  /* On IE we'll use XDomainRequest but make it look like an
+   * XMLHttpRequest object */
+  if (window["XDomainRequest"])
+    {
+      var obj = {};
+      obj.xdr = new XDomainRequest ();
+
+      obj.xdr.onprogress = function ()
+        {
+          obj.readyState = 3;
+          obj.responseText = obj.xdr.responseText;
+          if (obj.onreadystatechange)
+            obj.onreadystatechange ();
+        };
+      obj.xdr.onload = function ()
+        {
+          obj.status = 200;
+          obj.readyState = 4;
+          obj.responseText = obj.xdr.responseText;
+          if (obj.onreadystatechange)
+            obj.onreadystatechange ();
+        };
+      obj.xdr.onerror = function ()
+        {
+          obj.status = 300;
+          obj.readyState = 4;
+          if (obj.onreadystatechange)
+            obj.onreadystatechange ();
+        }
+      obj.xdr.ontimeout = obj.xdr.onerror;
+
+      obj.setRequestHeader = function () { };
+
+      obj.abort = function () { this.xdr.abort (); };
+      obj.open = function () { this.xdr.open.apply (this.xdr, arguments); };
+      obj.send = function () { this.xdr.send.apply (this.xdr, arguments); };
+
+      return obj;
+    }
+  else
+    return new XMLHttpRequest ();
+}
+
 function ChatSession ()
 {
   this.terminatorRegexp = /\r\n/;
@@ -269,14 +314,6 @@ ChatSession.prototype.watchReadyStateChangeCb = function ()
   }
 };
 
-ChatSession.prototype.watchXhrCb = function ()
-{
-  var req = $.ajaxSettings.xhr ();
-  this.watchAjax = req;
-  req.onreadystatechange = this.watchReadyStateChangeCb.bind (this);
-  return req;
-};
-
 ChatSession.prototype.startWatchAjax = function ()
 {
   var method;
@@ -291,7 +328,7 @@ ChatSession.prototype.startWatchAjax = function ()
   this.watchPosition = 0;
   this.messageNumber = 0;
 
-  this.watchAjax = $.ajaxSettings.xhr ();
+  this.watchAjax = getAjaxObject ();
 
   this.watchAjax.onreadystatechange = this.watchReadyStateChangeCb.bind (this);
 
@@ -356,7 +393,7 @@ ChatSession.prototype.sendNextMessage = function ()
     {
       this.sentTypingState = newTypingState;
 
-      this.sendMessageAjax = $.ajaxSettings.xhr ();
+      this.sendMessageAjax = getAjaxObject ();
       this.sendMessageAjax.onreadystatechange =
         this.sendMessageReadyStateChangeCb.bind (this);
       this.sendMessageAjax.open ("GET",
@@ -378,7 +415,7 @@ ChatSession.prototype.sendNextMessage = function ()
    * sent */
   this.sentTypingState = false;
 
-  this.sendMessageAjax = $.ajaxSettings.xhr ();
+  this.sendMessageAjax = getAjaxObject ();
   this.sendMessageAjax.onreadystatechange =
     this.sendMessageReadyStateChangeCb.bind (this);
   this.sendMessageAjax.open ("POST",
@@ -450,7 +487,7 @@ ChatSession.prototype.unloadCb = function ()
   {
     /* Try to squeeze in a synchronous Ajax to let the server know the
      * person has left */
-    var ajax = $.ajaxSettings.xhr ();
+    var ajax = getAjaxObject ();
     ajax.open ("GET", this.getUrl ("leave?" + this.personId),
                false /* not asynchronous */);
     ajax.send (null);
