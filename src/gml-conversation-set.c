@@ -23,6 +23,7 @@
 #include <glib-object.h>
 
 #include "gml-conversation-set.h"
+#include "gml-log.h"
 
 G_DEFINE_TYPE (GmlConversationSet, gml_conversation_set, G_TYPE_OBJECT);
 
@@ -124,6 +125,8 @@ gml_conversation_set_get_conversation (GmlConversationSet *set,
       g_hash_table_insert (set->hash_table,
                            data->room_name,
                            data);
+
+      gml_log ("New conversation pending in \"%s\"", room_name);
     }
   else
     {
@@ -133,6 +136,8 @@ gml_conversation_set_get_conversation (GmlConversationSet *set,
          started. This should also end up removing the conversation
          from the hash table because the state will change */
       gml_conversation_start (conversation);
+
+      gml_log ("Conversation started in \"%s\"", room_name);
     }
 
   return conversation;

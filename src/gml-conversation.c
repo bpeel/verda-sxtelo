@@ -25,6 +25,7 @@
 #include "gml-conversation.h"
 #include "gml-marshal.h"
 #include "gml-main-context.h"
+#include "gml-log.h"
 
 G_DEFINE_TYPE (GmlConversation, gml_conversation, G_TYPE_OBJECT);
 
@@ -117,8 +118,12 @@ gml_conversation_start (GmlConversation *conversation)
 void
 gml_conversation_finish (GmlConversation *conversation)
 {
-  conversation->state = GML_CONVERSATION_FINISHED;
-  gml_conversation_changed (conversation);
+  if (conversation->state != GML_CONVERSATION_FINISHED)
+    {
+      gml_log ("Conversation finished");
+      conversation->state = GML_CONVERSATION_FINISHED;
+      gml_conversation_changed (conversation);
+    }
 }
 
 void
