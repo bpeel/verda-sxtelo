@@ -1,1 +1,1 @@
-SUBDIRS = src web
+SUBDIRS = src web doc

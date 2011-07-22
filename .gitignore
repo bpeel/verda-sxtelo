@@ -30,6 +30,8 @@
 /web/index.*.html
 /web/index.html.var
 /web/*.language-stamp
+/doc/Makefile
+/doc/Makefile.in
 /stamp-h1
 
 .deps

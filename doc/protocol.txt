@@ -1,0 +1,146 @@
+== Description ==
+
+The protocol for the Gemelo server is built around HTTP so that it can
+be accessed from Javascript using XMLHttpRequest. All requests report
+the Access-Control-Allow-Origin header so that they can be used after
+a cross-domain check.
+
+== Requests ==
+
+The server accepts the following requests:
+
+* GET /new_person?<room_name>
+
+This creates a new person in the given ‘room’. The web client uses the
+room name to specify what language to speak in (ie, it could be
+‘english’, ‘esperanto’ or ‘francais’). The name can only use the
+characters a-z. The rooms are created on the fly by the server so the
+name is not restricted to any of the existing languages. If there is
+already a person waiting for a conversation in the room the new person
+will be immediately paired with that person and the conversation will
+begin. If not then the conversation will be pending. Either way the
+response will be the same as if the watch_person request had been
+called on that new person. The format is described below.
+
+* GET /watch_person?<person_id>
+
+This can be used to recover from a broken connection and restart
+listening to the messages for a particular person. All of the messages
+from the conversation will be resent. There is no restriction on the
+number of simoultaneous connections that can listen to a particular
+person.
+
+* GET /start_typing?<person_id>
+
+This should be sent to inform the server when the user starts
+typing. The response will be dummy plain text.
+
+* GET /stop_typing?<person_id>
+
+This should be sent to inform the server if the user stops typing
+without sending a message. There's no need to send this after a
+message is sent because the server automatically assumes the user has
+stopped typing. The response will be dummy plain text.
+
+* GET /leave?<person_id>
+
+This should be sent when the user closes the window so that the server
+can inform the other person that the conversation is over. This should
+even be sent if the conversation is still pending so that the server
+can know the user has given up waiting.
+
+* POST /send_message?<person_id>
+
+This is used to send a message to the conversation. The Content-Type
+of the data should be text/plain and it may be in any character
+encoding as long as this is specified in the request. If no
+content-type header is received the server will assume the data is
+text/plain in UTF-8. The message is directly stored in the data for
+the request. There is no need to escape HTML characters or any other
+special characters. This request can also support the ‘OPTIONS’ method
+which some browsers will do as a pre-flight cross-domain security
+check.
+
+== Data response ==
+
+The response to the /watch_person and /new_person requests is a long
+series of JSON objects. The server will keep the connection open and
+report the response slowly as chunked data until the conversation is
+over. Each JSON object is separated by ‘\r\n’. The objects are all a
+one- or two-element array where the first element is a string
+specifying the name of the command and the second element is the data
+for the command. The format of the data depends on the command. The
+client should ignore any commands it doesn't understand. The response
+is in UTF-8 and is reported as text/plain. The following commands may
+be sent:
+
+* "padding"
+
+This command will be sent multiple times at the beginning of the
+connection to pad the data out to at least 2KB. This is needed for
+XMLHttpRequest on Chrome and Internet Exploiter because it doesn't
+call the onreadystatechanged handler until at least that amount of
+data has been received. The argument will be a string which should be
+ignored.
+
+* "header"
+
+This is the first command sent by the server. The argument is a JSON
+hash object describing the person. The object contains the following
+string keys:
+
+  "num": This contains a single integer which will be either be 0 or 1
+  to specify which of the two people in the conversation this
+  request belongs to.
+
+  "id": This is a string containing 16 hexdecimal characters to
+  identify this person. This value should be passed as the query
+  string to all of the other requests.
+
+* "state"
+
+This is sent when the state of the conversation changes. The argument
+is a single string which can be one of the following:
+
+  "in-progress": The conversation has begun which means a second
+  person has joined. The client can now start sending messages.
+
+  "done": The other person has left the conversation or the
+  conversation timed out waiting for another person to join. The
+  server will end the response after sending this.
+
+* "message"
+
+A new message has been added to the conversation. The argument is a
+javascript hash object containing the following fields:
+
+  "person": This has a number specifying which person send the
+  message. Ie, if this matches the "num" sent in the "header" command
+  then the message was sent by same person, otherwise it was sent by
+  the stranger.
+
+  "text": This contains the text of the message as a javascript
+  string.
+
+* "typing"
+
+This is sent when the other person starts typing. There is no
+argument.
+
+* "not-typing"
+
+This is sent when the other person stops typing. There is no argument.
+
+== Example session ==
+
+Here is an example of the data that might be sent in response to the
+/new_person request:
+
+["padding", "blah blah"]
+["header", {"num": 1, "id": "22AF4273A8B8253B"}]
+["state", "in-progress"]
+["typing"]
+["message", {"person": 0, "text": "Hello <B"}]
+["not-typing"]
+["message", {"person": 1, "text": "Goodbye \"stranger\""}]
+["state", "done"]
