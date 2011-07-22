@@ -5,6 +5,9 @@ be accessed from Javascript using XMLHttpRequest. All requests report
 the Access-Control-Allow-Origin header so that they can be used after
 a cross-domain check.
 
+By default the server listens on port 5142. The ‘official’ server
+listens on that port at http://gemelo.org:5142/
+
 == Requests ==
 
 The server accepts the following requests:
@@ -130,6 +133,13 @@ argument.
 * "not-typing"
 
 This is sent when the other person stops typing. There is no argument.
+
+== Timeouts ==
+
+If a conversation doesn't receive a message after a long timeout or
+one of the people doesn't have anyone watching it for the timeout then
+it is assumed to be dead and it will act as if a /leave request was
+received. The timeout is somewhere between 5 and 10 minutes.
 
 == Example session ==
 
