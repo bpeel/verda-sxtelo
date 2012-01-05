@@ -1,1 +1,5 @@
-SUBDIRS = server web doc
+SUBDIRS = web doc
+
+if BUILD_SERVER
+SUBDIRS += server
+endif

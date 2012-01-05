@@ -12,13 +12,22 @@ dnl gio 2.22 is needed for the socket API
 dnl glib 2.28 is needed for g_get_monotonic_time
 PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.28 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gthread-2.0])
 
-have_epoll=yes
-AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)
-AC_CHECK_FUNC(epoll_create, , have_epoll=no)
-AC_CHECK_FUNC(epoll_ctl, , have_epoll=no)
-AS_IF([test "x$have_epoll" = "xno"],
-      AC_MSG_ERROR([epoll support is required to build gemelo.
-This should be provided by glibc since version 2.3.2]))
+AC_ARG_ENABLE([server],
+              [AC_HELP_STRING([--enable-server=@<:@no/yes@:>@],
+                              [Enable building the server @<:@default=yes@:>@])],
+              [],
+              [enable_server=yes])
+
+AS_IF([test "x$enable_server" = "xyes"],
+      [have_epoll=yes
+       AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)
+       AC_CHECK_FUNC(epoll_create, , have_epoll=no)
+       AC_CHECK_FUNC(epoll_ctl, , have_epoll=no)
+       AS_IF([test "x$have_epoll" = "xno"],
+             AC_MSG_ERROR([epoll support is required to build the gemelo server.
+This should be provided by glibc since version 2.3.2]))])
+
+AM_CONDITIONAL(BUILD_SERVER, [test "x$enable_server" = "xyes"])
 
 AC_PATH_PROG([GLIB_MKENUMS], [glib-mkenums])
 AC_PATH_PROG([GLIB_GENMARSHAL], [glib-genmarshal])
