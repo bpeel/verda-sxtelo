@@ -23,6 +23,15 @@
 /server/gml-enum-types.h
 /server/stamp-enum-types
 /server/stamp-marshal
+/client/Makefile
+/client/Makefile.in
+/client/gemelo-client
+/client/gml-marshal.c
+/client/gml-marshal.h
+/client/gml-enum-types.c
+/client/gml-enum-types.h
+/client/stamp-enum-types
+/client/stamp-marshal
 /web/Makefile
 /web/Makefile.in
 /web/chat.*.html

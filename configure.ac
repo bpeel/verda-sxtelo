@@ -29,12 +29,25 @@ This should be provided by glibc since version 2.3.2]))])
 
 AM_CONDITIONAL(BUILD_SERVER, [test "x$enable_server" = "xyes"])
 
+AC_ARG_ENABLE([client],
+              [AC_HELP_STRING([--enable-client=@<:@no/yes@:>@],
+                              [Enable building the client @<:@default=yes@:>@])],
+              [],
+              [enable_client=yes])
+
+AS_IF([test "x$enable_client" = "xyes"],
+      [PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
+       PKG_CHECK_MODULES(SOUP, [libsoup-2.4])])
+
+AM_CONDITIONAL(BUILD_CLIENT, [test "x$enable_client" = "xyes"])
+
 AC_PATH_PROG([GLIB_MKENUMS], [glib-mkenums])
 AC_PATH_PROG([GLIB_GENMARSHAL], [glib-genmarshal])
 
 AC_CONFIG_FILES([
         Makefile
         server/Makefile
+        client/Makefile
         web/Makefile
         doc/Makefile
 ])
