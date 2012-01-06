@@ -78,8 +78,15 @@ connection_error_cb (GmlConnection *connection,
                      GMainLoop *main_loop)
 {
   fprintf (stderr, "%s\n", error->message);
+}
 
-  g_main_loop_quit (main_loop);
+static void
+running_cb (GmlConnection *connection,
+            GParamSpec *pspec,
+            GMainLoop *main_loop)
+{
+  if (!gml_connection_get_running (connection))
+    g_main_loop_quit (main_loop);
 }
 
 static void
@@ -144,8 +151,6 @@ main (int argc, char **argv)
   connection = gml_connection_new (option_server_base_url,
                                    option_room);
 
-  gml_connection_set_running (connection, TRUE);
-
   main_loop = g_main_loop_new (NULL, FALSE);
 
   g_signal_connect (connection,
@@ -164,6 +169,12 @@ main (int argc, char **argv)
                     "notify::state",
                     G_CALLBACK (state_cb),
                     NULL);
+  g_signal_connect (connection,
+                    "notify::running",
+                    G_CALLBACK (running_cb),
+                    main_loop);
+
+  gml_connection_set_running (connection, TRUE);
 
   g_main_loop_run (main_loop);
 

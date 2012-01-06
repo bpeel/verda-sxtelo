@@ -514,6 +514,15 @@ gml_connection_message_completed_cb (SoupSession *soup_session,
      state */
   if (message->status_code == SOUP_STATUS_CANCELLED)
     priv->running_state = GML_CONNECTION_RUNNING_STATE_DISCONNECTED;
+  /* If the message is complete and the conversation is over then
+     there's no point in connecting again because we'll just get a
+     copy of the conversation again */
+  else if (message->status_code == SOUP_STATUS_OK
+           && priv->state == GML_CONNECTION_STATE_DONE)
+    {
+      priv->running_state = GML_CONNECTION_RUNNING_STATE_DISCONNECTED;
+      g_object_notify (G_OBJECT (connection), "running");
+    }
   /* If the connection just ended without an error then we'll try to
      reconnect immediately */
   else
