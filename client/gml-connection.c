@@ -97,6 +97,8 @@ struct _GmlConnectionPrivate
   GmlConnectionRunningState running_state;
   GmlConnectionState state;
   gboolean stranger_typing;
+  int next_message_num;
+  int latest_message;
 };
 
 static void
@@ -297,13 +299,20 @@ handle_message (GmlConnection *connection,
           || !get_object_string_member (message_object, "text", &text))
         goto bad_data;
 
-      g_signal_emit (connection,
-                     signals[SIGNAL_MESSAGE],
-                     0, /* detail */
-                     num == priv->num
-                     ? GML_CONNECTION_PERSON_YOU
-                     : GML_CONNECTION_PERSON_STRANGER,
-                     text);
+      /* Silently drop messages that we've already received */
+      if (priv->latest_message < priv->next_message_num)
+        {
+          g_signal_emit (connection,
+                         signals[SIGNAL_MESSAGE],
+                         0, /* detail */
+                         num == priv->num
+                         ? GML_CONNECTION_PERSON_YOU
+                         : GML_CONNECTION_PERSON_STRANGER,
+                         text);
+          priv->latest_message = priv->next_message_num;
+        }
+
+      priv->next_message_num++;
     }
   else if (!strcmp (method_string, "state"))
     {
@@ -575,6 +584,11 @@ gml_connection_queue_message (GmlConnection *connection)
                     G_CALLBACK (gml_connection_got_chunk_cb),
                     connection);
 
+  /* The server will resend all of the messages in the conversation so
+     we want to start counting from 0 again. All messages before
+     priv->latest_message will be silently dropped */
+  priv->next_message_num = 0;
+
   soup_session_queue_message (priv->soup_session,
                               priv->message,
                               gml_connection_message_completed_cb,
@@ -772,6 +786,8 @@ gml_connection_init (GmlConnection *self)
   priv = self->priv = GML_CONNECTION_GET_PRIVATE (self);
 
   priv->line_buffer = g_string_new (NULL);
+  priv->next_message_num = 0;
+  priv->latest_message = -1;
 }
 
 static void
