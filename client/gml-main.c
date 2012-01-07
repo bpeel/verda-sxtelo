@@ -133,6 +133,32 @@ state_cb (GObject *object,
     }
 }
 
+gboolean
+message_timeout_cb (gpointer data)
+{
+  GmlConnection *connection = data;
+  static int counter = 0;
+
+  if (counter++ >= 10)
+    {
+      gml_connection_leave (connection);
+      return FALSE;
+    }
+  else if (counter & 1)
+    {
+      gml_connection_set_typing (connection, TRUE);
+      return TRUE;
+    }
+  else
+    {
+      char *message = g_strdup_printf ("message %i", counter);
+      gml_connection_send_message (connection, message);
+      gml_connection_set_typing (connection, FALSE);
+      g_free (message);
+      return TRUE;
+    }
+}
+
 int
 main (int argc, char **argv)
 {
@@ -174,7 +200,11 @@ main (int argc, char **argv)
                     G_CALLBACK (running_cb),
                     main_loop);
 
+  gml_connection_send_message (connection, "hello");
+
   gml_connection_set_running (connection, TRUE);
+
+  g_timeout_add_seconds (2, message_timeout_cb, connection);
 
   g_main_loop_run (main_loop);
 

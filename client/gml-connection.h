@@ -112,8 +112,22 @@ gml_connection_get_running (GmlConnection *connection);
 gboolean
 gml_connection_get_stranger_typing (GmlConnection *connection);
 
+gboolean
+gml_connection_get_typing (GmlConnection *connection);
+
+void
+gml_connection_set_typing (GmlConnection *connection,
+                           gboolean typing);
+
 GmlConnectionState
 gml_connection_get_state (GmlConnection *connection);
+
+void
+gml_connection_send_message (GmlConnection *connection,
+                             const char *message);
+
+void
+gml_connection_leave (GmlConnection *connection);
 
 GQuark
 gml_connection_error_quark (void);

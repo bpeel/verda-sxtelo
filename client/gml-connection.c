@@ -38,6 +38,7 @@ enum
   PROP_ROOM,
   PROP_RUNNING,
   PROP_STRANGER_TYPING,
+  PROP_TYPING,
   PROP_STATE
 };
 
@@ -59,6 +60,9 @@ gml_connection_finalize (GObject *object);
 
 static void
 gml_connection_queue_message (GmlConnection *connection);
+
+static void
+gml_connection_maybe_send_command (GmlConnection *connection);
 
 G_DEFINE_TYPE (GmlConnection, gml_connection, G_TYPE_OBJECT);
 
@@ -97,9 +101,231 @@ struct _GmlConnectionPrivate
   GmlConnectionRunningState running_state;
   GmlConnectionState state;
   gboolean stranger_typing;
+  gboolean typing;
+  gboolean sent_typing_state;
   int next_message_num;
   int latest_message;
+  GQueue command_queue;
+  SoupMessage *command_message;
 };
+
+typedef enum
+{
+  GML_CONNECTION_COMMAND_MESSAGE,
+  GML_CONNECTION_COMMAND_LEAVE
+} GmlConnectionCommandType;
+
+typedef struct
+{
+  GmlConnectionCommandType type;
+  GList node;
+  /* Over-allocated */
+  char text[1];
+} GmlConnectionCommand;
+
+static GmlConnectionCommand *
+gml_connection_pop_command (GmlConnection *connection)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  return g_queue_pop_head_link (&priv->command_queue)->data;
+}
+
+static SoupMessage *
+gml_connection_make_message (GmlConnection *connection,
+                             const char *http_method,
+                             const char *method,
+                             const char *param)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+  SoupMessage *msg;
+  GString *uri;
+  char *encoded_param;
+
+  uri = g_string_new (priv->server_base_url);
+
+  if (uri->len == 0 || uri->str[uri->len - 1] != '/')
+    g_string_append_c (uri, '/');
+
+  g_string_append (uri, method);
+  g_string_append_c (uri, '?');
+
+  encoded_param = soup_uri_encode (param, NULL);
+  g_string_append (uri, encoded_param);
+  g_free (encoded_param);
+
+  msg = soup_message_new (http_method, uri->str);
+
+  g_string_free (uri, TRUE);
+
+  return msg;
+}
+
+static void
+gml_connection_signal_error (GmlConnection *connection,
+                             GError *error)
+{
+  g_signal_emit (connection,
+                 signals[SIGNAL_GOT_ERROR],
+                 0, /* detail */
+                 error);
+}
+
+static void
+gml_connection_signal_error_from_message (GmlConnection *connection,
+                                          SoupMessage *message)
+{
+  GError *error;
+
+  error =
+    g_error_new (SOUP_HTTP_ERROR,
+                 message->status_code,
+                 message->status_code == SOUP_STATUS_OK
+                 ? "The HTTP connection finished"
+                 : (message->status_code == 401
+                    || message->status_code == 403)
+                 ? "The HTTP authentication failed"
+                 : SOUP_STATUS_IS_SERVER_ERROR (message->status_code)
+                 ? "There was a server error"
+                 : SOUP_STATUS_IS_CLIENT_ERROR (message->status_code)
+                 ? "There was a client error"
+                 : SOUP_STATUS_IS_TRANSPORT_ERROR (message->status_code)
+                 ? "There was a transport error"
+                 : "There was an error with the HTTP connection");
+
+  gml_connection_signal_error (connection, error);
+
+  g_error_free (error);
+}
+
+static void
+command_message_complete_cb (SoupSession *soup_session,
+                             SoupMessage *message,
+                             gpointer user_data)
+{
+  GmlConnection *connection = user_data;
+  GmlConnectionPrivate *priv = connection->priv;
+
+  priv->command_message = NULL;
+
+  if (message->status_code != SOUP_STATUS_CANCELLED)
+    {
+      gml_connection_maybe_send_command (connection);
+
+      if (message->status_code != SOUP_STATUS_OK)
+        gml_connection_signal_error_from_message (connection, message);
+    }
+}
+
+static void
+gml_connection_command_free (GmlConnectionCommand *cmd)
+{
+  g_free (cmd);
+}
+
+static void
+gml_connection_maybe_send_command (GmlConnection *connection)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  /* If there's already a command in-progress then we'll wait until
+     it's finished */
+  if (priv->command_message)
+    return;
+
+  /* Wait until the conversation is in progress */
+  if (priv->state != GML_CONNECTION_STATE_IN_PROGRESS)
+    return;
+
+  if (g_queue_is_empty (&priv->command_queue))
+    {
+      if (priv->sent_typing_state != priv->typing)
+        {
+          priv->sent_typing_state = priv->typing;
+
+          priv->command_message
+            = gml_connection_make_message (connection,
+                                           "GET",
+                                           priv->typing
+                                           ? "start_typing"
+                                           : "stop_typing",
+                                           priv->person_id);
+
+          soup_session_queue_message (priv->soup_session,
+                                      priv->command_message,
+                                      command_message_complete_cb,
+                                      connection);
+        }
+    }
+  else
+    {
+      GmlConnectionCommand *cmd = gml_connection_pop_command (connection);
+
+      switch (cmd->type)
+        {
+        case GML_CONNECTION_COMMAND_MESSAGE:
+          priv->command_message
+            = gml_connection_make_message (connection,
+                                           "POST",
+                                           "send_message",
+                                           priv->person_id);
+
+          soup_message_set_request (priv->command_message,
+                                    "text/plain; charset=utf-8",
+                                    SOUP_MEMORY_COPY,
+                                    cmd->text,
+                                    strlen (cmd->text));
+
+          /* The server automatically assumes we're not typing anymore
+             when the client sends a message */
+          priv->sent_typing_state = FALSE;
+          break;
+
+        case GML_CONNECTION_COMMAND_LEAVE:
+          priv->command_message
+            = gml_connection_make_message (connection,
+                                           "GET",
+                                           "leave",
+                                           priv->person_id);
+          break;
+        }
+
+      gml_connection_command_free (cmd);
+
+      soup_session_queue_message (priv->soup_session,
+                                  priv->command_message,
+                                  command_message_complete_cb,
+                                  connection);
+    }
+}
+
+static void
+gml_connection_add_command (GmlConnection *connection,
+                            GmlConnectionCommandType type,
+                            const char *text)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+  GmlConnectionCommand *cmd;
+  int text_len;
+
+  if (text == NULL)
+    text_len = 0;
+  else
+    text_len = strlen (text);
+
+  cmd = g_malloc (sizeof (GmlConnectionCommand) + text_len);
+
+  cmd->type = type;
+  cmd->node.data = cmd;
+  cmd->node.prev = NULL;
+  cmd->node.next = NULL;
+  memcpy (cmd->text, text, text_len);
+  cmd->text[text_len] = '\0';
+
+  g_queue_push_tail_link (&priv->command_queue, &cmd->node);
+
+  gml_connection_maybe_send_command (connection);
+}
 
 static void
 gml_connection_get_property (GObject *object,
@@ -118,6 +344,11 @@ gml_connection_get_property (GObject *object,
     case PROP_STRANGER_TYPING:
       g_value_set_boolean (value,
                            gml_connection_get_stranger_typing (connection));
+      break;
+
+    case PROP_TYPING:
+      g_value_set_boolean (value,
+                           gml_connection_get_typing (connection));
       break;
 
     case PROP_STATE:
@@ -222,6 +453,20 @@ gml_connection_set_stranger_typing (GmlConnection *connection,
     }
 }
 
+void
+gml_connection_set_typing (GmlConnection *connection,
+                           gboolean typing)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  if (priv->typing != typing)
+    {
+      priv->typing = typing;
+      gml_connection_maybe_send_command (connection);
+      g_object_notify (G_OBJECT (connection), "typing");
+    }
+}
+
 static void
 gml_connection_set_state (GmlConnection *connection,
                           GmlConnectionState state)
@@ -231,6 +476,7 @@ gml_connection_set_state (GmlConnection *connection,
   if (priv->state != state)
     {
       priv->state = state;
+      gml_connection_maybe_send_command (connection);
       g_object_notify (G_OBJECT (connection), "state");
     }
 }
@@ -352,16 +598,6 @@ handle_message (GmlConnection *connection,
                GML_CONNECTION_ERROR_BAD_DATA,
                "Bad data received from the server");
   return FALSE;
-}
-
-static void
-gml_connection_signal_error (GmlConnection *connection,
-                             GError *error)
-{
-  g_signal_emit (connection,
-                 signals[SIGNAL_GOT_ERROR],
-                 0, /* detail */
-                 error);
 }
 
 static void
@@ -527,29 +763,9 @@ gml_connection_message_completed_cb (SoupSession *soup_session,
      reconnect immediately */
   else
     {
-      GError *error;
-
       gml_connection_queue_reconnect (connection);
 
-      error =
-        g_error_new (SOUP_HTTP_ERROR,
-                     message->status_code,
-                     message->status_code == SOUP_STATUS_OK
-                     ? "The HTTP connection finished"
-                     : (message->status_code == 401
-                      || message->status_code == 403)
-                     ? "The HTTP authentication failed"
-                     : SOUP_STATUS_IS_SERVER_ERROR (message->status_code)
-                     ? "There was a server error"
-                     : SOUP_STATUS_IS_CLIENT_ERROR (message->status_code)
-                     ? "There was a client error"
-                     : SOUP_STATUS_IS_TRANSPORT_ERROR (message->status_code)
-                     ? "There was a transport error"
-                     : "There was an error with the HTTP connection");
-
-      gml_connection_signal_error (connection, error);
-
-      g_error_free (error);
+      gml_connection_signal_error_from_message (connection, message);
     }
 }
 
@@ -557,33 +773,18 @@ static void
 gml_connection_queue_message (GmlConnection *connection)
 {
   GmlConnectionPrivate *priv = connection->priv;
-  GString *url;
-  const char *param;
-  char *encoded_param;
-
-  url = g_string_new (priv->server_base_url);
-
-  if (url->len == 0 || url->str[url->len - 1] != '/')
-    g_string_append_c (url, '/');
 
   if (priv->person_id)
-    {
-      g_string_append (url, "watch_person?");
-      param = priv->person_id;
-    }
+    priv->message = gml_connection_make_message (connection,
+                                                 "GET",
+                                                 "watch_person",
+                                                 priv->person_id);
   else
-    {
-      g_string_append (url, "new_person?");
-      param = priv->room;
-    }
+    priv->message = gml_connection_make_message (connection,
+                                                 "GET",
+                                                 "new_person",
+                                                 priv->room);
 
-  encoded_param = soup_uri_encode (param, NULL);
-  g_string_append (url, encoded_param);
-  g_free (encoded_param);
-
-  priv->message = soup_message_new ("GET", url->str);
-
-  g_string_free (url, TRUE);
 
   g_signal_connect (priv->message, "got-headers",
                     G_CALLBACK (gml_connection_got_headers_cb),
@@ -748,6 +949,16 @@ gml_connection_class_init (GmlConnectionClass *klass)
                                 | G_PARAM_STATIC_BLURB);
   g_object_class_install_property (gobject_class, PROP_STRANGER_TYPING, pspec);
 
+  pspec = g_param_spec_boolean ("typing",
+                                "Typing",
+                                "Whether the user is typing.",
+                                FALSE,
+                                G_PARAM_READABLE
+                                | G_PARAM_STATIC_NAME
+                                | G_PARAM_STATIC_NICK
+                                | G_PARAM_STATIC_BLURB);
+  g_object_class_install_property (gobject_class, PROP_TYPING, pspec);
+
   pspec = g_param_spec_enum ("state",
                              "State",
                              "State of the conversation",
@@ -797,6 +1008,7 @@ gml_connection_init (GmlConnection *self)
   priv->line_buffer = g_string_new (NULL);
   priv->next_message_num = 0;
   priv->latest_message = -1;
+  g_queue_init (&priv->command_queue);
 }
 
 static void
@@ -806,6 +1018,11 @@ gml_connection_dispose (GObject *object)
   GmlConnectionPrivate *priv = self->priv;
 
   gml_connection_set_running_internal (self, FALSE);
+
+  if (priv->command_message)
+    soup_session_cancel_message (priv->soup_session,
+                                 priv->command_message,
+                                 SOUP_STATUS_CANCELLED);
 
   if (priv->soup_session)
     {
@@ -827,6 +1044,12 @@ gml_connection_finalize (GObject *object)
 {
   GmlConnection *self = (GmlConnection *) object;
   GmlConnectionPrivate *priv = self->priv;
+
+  while (!g_queue_is_empty (&priv->command_queue))
+    {
+      GmlConnectionCommand *cmd = gml_connection_pop_command (self);
+      gml_connection_command_free (cmd);
+    }
 
   g_free (priv->server_base_url);
   g_free (priv->room);
@@ -857,12 +1080,37 @@ gml_connection_get_stranger_typing (GmlConnection *connection)
   return priv->stranger_typing;
 }
 
+gboolean
+gml_connection_get_typing (GmlConnection *connection)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  return priv->typing;
+}
+
 GmlConnectionState
 gml_connection_get_state (GmlConnection *connection)
 {
   GmlConnectionPrivate *priv = connection->priv;
 
   return priv->state;
+}
+
+void
+gml_connection_send_message (GmlConnection *connection,
+                             const char *message)
+{
+  gml_connection_add_command (connection,
+                              GML_CONNECTION_COMMAND_MESSAGE,
+                              message);
+}
+
+void
+gml_connection_leave (GmlConnection *connection)
+{
+  gml_connection_add_command (connection,
+                              GML_CONNECTION_COMMAND_LEAVE,
+                              NULL);
 }
 
 GQuark
