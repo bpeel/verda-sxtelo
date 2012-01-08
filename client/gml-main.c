@@ -23,11 +23,21 @@
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <readline/readline.h>
+#include <term.h>
 
 #include "gml-connection.h"
 
+static void
+format_print (const char *format, ...);
+
 static char *option_server_base_url = "http://www.gemelo.org:5142/";
 static char *option_room = "english";
+
+static GmlConnection *connection;
+static GMainLoop *main_loop;
+static GSource *stdin_source = NULL;
 
 static GOptionEntry
 options[] =
@@ -42,6 +52,9 @@ options[] =
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
+
+static const char typing_prompt[] = "gemelo*> ";
+static const char not_typing_prompt[] = "gemelo > ";
 
 static gboolean
 process_arguments (int *argc, char ***argv,
@@ -74,16 +87,14 @@ process_arguments (int *argc, char ***argv,
 
 static void
 connection_error_cb (GmlConnection *connection,
-                     GError *error,
-                     GMainLoop *main_loop)
+                     GError *error)
 {
-  fprintf (stderr, "%s\n", error->message);
+  format_print ("error: %s\n", error->message);
 }
 
 static void
 running_cb (GmlConnection *connection,
-            GParamSpec *pspec,
-            GMainLoop *main_loop)
+            GParamSpec *pspec)
 {
   if (!gml_connection_get_running (connection))
     g_main_loop_quit (main_loop);
@@ -94,9 +105,26 @@ message_cb (GmlConnection *connection,
             GmlConnectionPerson person,
             const char *message)
 {
-  printf ("%s: %s\n",
-          person == GML_CONNECTION_PERSON_YOU ? "you" : "stranger",
-          message);
+  format_print ("%s: %s\n",
+                person == GML_CONNECTION_PERSON_YOU ? "you" : "stranger",
+                message);
+}
+
+static void
+output_ti (char *name)
+{
+  const char *s;
+
+  s = tigetstr (name);
+  if (s && s != (char *) -1)
+    fputs (s, stdout);
+}
+
+static void
+clear_line (void)
+{
+  output_ti ("cr");
+  output_ti ("dl1");
 }
 
 static void
@@ -105,10 +133,33 @@ stranger_typing_cb (GObject *object,
 {
   GmlConnection *connection = GML_CONNECTION (object);
 
+  clear_line ();
+
   if (gml_connection_get_stranger_typing (connection))
-    printf ("typing\n");
+    rl_set_prompt (typing_prompt);
   else
-    printf ("not typing\n");
+    rl_set_prompt (not_typing_prompt);
+
+  rl_forced_update_display ();
+}
+
+static void
+print_state_message (GmlConnection *connection)
+{
+  switch (gml_connection_get_state (connection))
+    {
+    case GML_CONNECTION_STATE_AWAITING_PARTNER:
+      format_print ("Waiting for someone to join the conversation...\n");
+      break;
+
+    case GML_CONNECTION_STATE_IN_PROGRESS:
+      format_print ("You are now in a conversation with a stranger. Say hi!\n");
+      break;
+
+    case GML_CONNECTION_STATE_DONE:
+      format_print ("The conversation has finished\n");
+      break;
+    }
 }
 
 static void
@@ -117,54 +168,113 @@ state_cb (GObject *object,
 {
   GmlConnection *connection = GML_CONNECTION (object);
 
-  switch (gml_connection_get_state (connection))
+  print_state_message (connection);
+}
+
+static void
+remove_stdin_source (void)
+{
+  if (stdin_source)
     {
-    case GML_CONNECTION_STATE_AWAITING_PARTNER:
-      printf ("awaiting partner\n");
-      break;
-
-    case GML_CONNECTION_STATE_IN_PROGRESS:
-      printf ("in progress\n");
-      break;
-
-    case GML_CONNECTION_STATE_DONE:
-      printf ("done\n");
-      break;
+      clear_line ();
+      rl_callback_handler_remove ();
+      g_source_destroy (stdin_source);
+      stdin_source = NULL;
     }
 }
 
-gboolean
-message_timeout_cb (gpointer data)
+static gboolean
+stdin_cb (gpointer user_data)
 {
-  GmlConnection *connection = data;
-  static int counter = 0;
+  rl_callback_read_char ();
 
-  if (counter++ >= 10)
+  return TRUE;
+}
+
+static void
+readline_cb (char *line)
+{
+  if (line == NULL)
     {
-      gml_connection_leave (connection);
-      return FALSE;
+      remove_stdin_source ();
+
+      if (gml_connection_get_state (connection)
+          == GML_CONNECTION_STATE_IN_PROGRESS)
+        gml_connection_leave (connection);
+      else
+        g_main_loop_quit (main_loop);
     }
-  else if (counter & 1)
+}
+
+static void
+format_print (const char *format, ...)
+{
+  va_list ap;
+
+  va_start (ap, format);
+
+  clear_line ();
+
+  vfprintf (stdout, format, ap);
+
+  if (stdin_source)
+    rl_forced_update_display ();
+
+  va_end (ap);
+}
+
+static int
+newline_cb (int count, int key)
+{
+  if (*rl_line_buffer)
     {
-      gml_connection_set_typing (connection, TRUE);
-      return TRUE;
+      gml_connection_send_message (connection, rl_line_buffer);
+      rl_replace_line ("", TRUE);
     }
-  else
-    {
-      char *message = g_strdup_printf ("message %i", counter);
-      gml_connection_send_message (connection, message);
-      gml_connection_set_typing (connection, FALSE);
-      g_free (message);
-      return TRUE;
-    }
+
+  return 0;
+}
+
+static void
+redisplay_hook (void)
+{
+  /* There doesn't appear to be a good way to hook into notifications
+     of the buffer being modified so we'll just hook into the
+     redisplay function which should hopefully get called every time
+     it is modified. If the buffer is not empty then we'll assume the
+     user is typing. If the user is already marked as typing then this
+     will do nothing */
+  gml_connection_set_typing (connection, *rl_line_buffer != '\0');
+
+  /* Chain up */
+  rl_redisplay ();
+}
+
+static void
+make_stdin_source (void)
+{
+  GIOChannel *io_channel;
+
+  rl_callback_handler_install (not_typing_prompt, readline_cb);
+  rl_redisplay_function = redisplay_hook;
+  rl_bind_key ('\r', newline_cb);
+
+  io_channel = g_io_channel_unix_new (STDIN_FILENO);
+  stdin_source = g_io_create_watch (io_channel, G_IO_IN);
+  g_io_channel_unref (io_channel);
+
+  g_source_set_callback (stdin_source,
+                         stdin_cb,
+                         NULL /* data */,
+                         NULL /* notify */);
+
+  g_source_attach (stdin_source, NULL);
 }
 
 int
 main (int argc, char **argv)
 {
   GError *error = NULL;
-  GmlConnection *connection;
-  GMainLoop *main_loop;
 
   g_type_init ();
 
@@ -173,6 +283,8 @@ main (int argc, char **argv)
       fprintf (stderr, "%s\n", error->message);
       return EXIT_FAILURE;
     }
+
+  make_stdin_source ();
 
   connection = gml_connection_new (option_server_base_url,
                                    option_room);
@@ -200,15 +312,15 @@ main (int argc, char **argv)
                     G_CALLBACK (running_cb),
                     main_loop);
 
-  gml_connection_send_message (connection, "hello");
-
   gml_connection_set_running (connection, TRUE);
 
-  g_timeout_add_seconds (2, message_timeout_cb, connection);
+  print_state_message (connection);
 
   g_main_loop_run (main_loop);
 
   g_main_loop_unref (main_loop);
+
+  remove_stdin_source ();
 
   g_object_unref (connection);
 

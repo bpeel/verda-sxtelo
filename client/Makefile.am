@@ -18,7 +18,9 @@ gemelo_client_SOURCES = \
 gemelo_client_LDFLAGS = \
 	$(GLIB_LIBS) \
 	$(SOUP_LIBS) \
-	$(JSON_GLIB_LIBS)
+	$(JSON_GLIB_LIBS) \
+	-lreadline \
+	-ltermcap
 
 # These need to be defined before we can include the glib Makefiles
 # below

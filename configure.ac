@@ -37,7 +37,15 @@ AC_ARG_ENABLE([client],
 
 AS_IF([test "x$enable_client" = "xyes"],
       [PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
-       PKG_CHECK_MODULES(SOUP, [libsoup-2.4])])
+       PKG_CHECK_MODULES(SOUP, [libsoup-2.4])
+       AC_CHECK_HEADER([readline/readline.h], ,
+                       AC_MSG_ERROR([readline required to build the client]))
+       AC_CHECK_LIB([readline], readline, ,
+                    AC_MSG_ERROR([readline required to build the client]))
+       AC_CHECK_HEADER([term.h], ,
+                       AC_MSG_ERROR([term.h required to build the client]))
+       AC_CHECK_LIB([termcap], tgetent, ,
+                    AC_MSG_ERROR([libtermcap required to build the client]))])
 
 AM_CONDITIONAL(BUILD_CLIENT, [test "x$enable_client" = "xyes"])
 
