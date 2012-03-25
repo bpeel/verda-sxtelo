@@ -417,7 +417,6 @@ gml_watch_person_response_dispose (GObject *object)
 
   if (self->person)
     {
-      gml_person_remove_use (self->person);
       g_signal_handler_disconnect (self->person,
                                    self->person_changed_handler);
       g_object_unref (self->person);
@@ -441,8 +440,6 @@ gml_watch_person_response_new (GmlPerson *person)
     g_object_new (GML_TYPE_WATCH_PERSON_RESPONSE, NULL);
 
   self->person = g_object_ref (person);
-
-  gml_person_add_use (person);
 
   self->person_changed_handler =
     g_signal_connect (person,

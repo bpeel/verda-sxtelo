@@ -62,6 +62,18 @@ gml_person_set_new (void)
 }
 
 GmlPerson *
+gml_person_set_activate_person (GmlPersonSet *set,
+                                GmlPersonId id)
+{
+  GmlPerson *person = gml_person_set_get_person (set, id);
+
+  if (person)
+    gml_person_make_noise (person);
+
+  return person;
+}
+
+GmlPerson *
 gml_person_set_get_person (GmlPersonSet *set,
                            GmlPersonId id)
 {
@@ -90,25 +102,27 @@ gml_person_set_generate_person (GmlPersonSet *set,
 }
 
 static gboolean
-remove_useless_people_cb (gpointer key,
-                          gpointer value,
-                          gpointer user_data)
+remove_silent_people_cb (gpointer key,
+                         gpointer value,
+                         gpointer user_data)
 {
   GmlPerson *person = value;
 
-  if (person->conversation)
-    gml_conversation_check_stale (person->conversation);
+  if (gml_person_is_silent (person))
+    {
+      if (person->conversation)
+        gml_conversation_finish (person->conversation);
 
-  if (!gml_person_has_use (person))
-    return TRUE;
-
-  return FALSE;
+      return TRUE;
+    }
+  else
+    return FALSE;
 }
 
 void
-gml_person_set_remove_useless_people (GmlPersonSet *set)
+gml_person_set_remove_silent_people (GmlPersonSet *set)
 {
   g_hash_table_foreach_remove (set->hash_table,
-                               remove_useless_people_cb,
+                               remove_silent_people_cb,
                                NULL);
 }

@@ -56,7 +56,8 @@ real_request_line_received (GmlRequestHandler *handler,
       && query_string != NULL
       && gml_person_parse_id (query_string, &id))
     {
-      GmlPerson *person = gml_person_set_get_person (handler->person_set, id);
+      GmlPerson *person
+        = gml_person_set_activate_person (handler->person_set, id);
 
       if (person == NULL)
         self->response

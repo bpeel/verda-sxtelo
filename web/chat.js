@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
+
 function getAjaxObject ()
 {
   /* On IE we'll use XDomainRequest but make it look like an
@@ -336,6 +338,7 @@ ChatSession.prototype.startWatchAjax = function ()
   this.watchAjax.send (null);
 
   this.resetCheckDataInterval ();
+  this.resetKeepAlive ();
 };
 
 ChatSession.prototype.watchCompleteCb = function (xhr, status)
@@ -404,6 +407,25 @@ ChatSession.prototype.sendNextMessage = function ()
       this.sendMessageAjax.setRequestHeader ("Content-Type",
                                              "text/plain; charset=UTF-8");
       this.sendMessageAjax.send (message);
+
+      this.resetKeepAlive ();
+    }
+    else if ((this.state == "in-progress" ||
+              this.state == "awaiting-partner") &&
+             ((new Date ()).getTime () -
+              this.keepAliveTime.getTime () >=
+              KEEP_ALIVE_TIME))
+    {
+      this.sendMessageAjax = getAjaxObject ();
+      this.sendMessageAjax.onreadystatechange =
+        this.sendMessageReadyStateChangeCb.bind (this);
+      this.sendMessageAjax.open ("GET",
+                                 this.getUrl ("keep_alive?" + this.personId));
+      this.sendMessageAjax.setRequestHeader ("Content-Type",
+                                             "text/plain; charset=UTF-8");
+      this.sendMessageAjax.send (message);
+
+      this.resetKeepAlive ();
     }
 
     return;
@@ -423,6 +445,8 @@ ChatSession.prototype.sendNextMessage = function ()
   this.sendMessageAjax.setRequestHeader ("Content-Type",
                                          "text/plain; charset=UTF-8");
   this.sendMessageAjax.send (message);
+
+  this.resetKeepAlive ();
 };
 
 ChatSession.prototype.queueCurrentMessage = function ()
@@ -504,6 +528,15 @@ ChatSession.prototype.unloadCb = function ()
         xhr.send (null);
       }
   }
+};
+
+ChatSession.prototype.resetKeepAlive = function ()
+{
+  if (this.keepAliveTimeout)
+    clearTimeout (this.keepAliveTimeout);
+  this.keepAliveTime = new Date ();
+  this.keepAliveTimeout = setTimeout (this.sendNextMessage.bind (this),
+                                      KEEP_ALIVE_TIME);
 };
 
 /* .bind is only implemented in recent browsers so this provides a

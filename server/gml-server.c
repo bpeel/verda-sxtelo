@@ -38,6 +38,7 @@
 #include "gml-watch-person-handler.h"
 #include "gml-start-typing-handler.h"
 #include "gml-stop-typing-handler.h"
+#include "gml-keep-alive-handler.h"
 #include "gml-log.h"
 
 struct _GmlServer
@@ -122,6 +123,7 @@ static const struct
 }
 requests[] =
   {
+    { "/keep_alive", gml_keep_alive_handler_get_type },
     { "/start_typing", gml_start_typing_handler_get_type },
     { "/stop_typing", gml_stop_typing_handler_get_type },
     { "/send_message", gml_send_message_handler_get_type },
@@ -373,7 +375,7 @@ gml_server_run_gc (GmlServer *server)
   /* This is probably relatively expensive because it has to iterate
      the entire list of people, but it only happens infrequently so
      hopefully it's not a problem */
-  gml_person_set_remove_useless_people (server->person_set);
+  gml_person_set_remove_silent_people (server->person_set);
 
   server->last_gc_time = gml_main_context_get_monotonic_clock (NULL);
 }

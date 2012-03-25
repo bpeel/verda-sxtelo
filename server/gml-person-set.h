@@ -68,6 +68,10 @@ GmlPersonSet *
 gml_person_set_new (void);
 
 GmlPerson *
+gml_person_set_activate_person (GmlPersonSet *set,
+                                GmlPersonId id);
+
+GmlPerson *
 gml_person_set_get_person (GmlPersonSet *set,
                            GmlPersonId id);
 
@@ -77,7 +81,7 @@ gml_person_set_generate_person (GmlPersonSet *set,
                                 GmlConversation *conversation);
 
 void
-gml_person_set_remove_useless_people (GmlPersonSet *set);
+gml_person_set_remove_silent_people (GmlPersonSet *set);
 
 G_END_DECLS
 

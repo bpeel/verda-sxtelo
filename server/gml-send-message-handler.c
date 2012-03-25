@@ -100,7 +100,7 @@ real_request_line_received (GmlRequestHandler *handler,
     {
       GmlPerson *person;
 
-      person = gml_person_set_get_person (handler->person_set, id);
+      person = gml_person_set_activate_person (handler->person_set, id);
 
       if (person == NULL)
         set_error (self, GML_STRING_RESPONSE_NOT_FOUND);

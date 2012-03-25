@@ -78,6 +78,10 @@ G_DEFINE_TYPE (GmlConnection, gml_connection, G_TYPE_OBJECT);
 /* If the timeout reaches this maximum then it won't be doubled further */
 #define GML_CONNECTION_MAX_TIMEOUT 512
 
+/* Time in seconds after the last message before sending a keep alive
+   message (2.5 minutes) */
+#define GML_CONNECTION_KEEP_ALIVE_TIME 150
+
 typedef enum
 {
   GML_CONNECTION_RUNNING_STATE_DISCONNECTED,
@@ -107,6 +111,10 @@ struct _GmlConnectionPrivate
   int latest_message;
   GQueue command_queue;
   SoupMessage *command_message;
+
+  /* A timeout for sending a keep alive message */
+  guint keep_alive_timeout;
+  GTimer *keep_alive_time;
 };
 
 typedef enum
@@ -122,6 +130,35 @@ typedef struct
   /* Over-allocated */
   char text[1];
 } GmlConnectionCommand;
+
+static gboolean
+gml_connection_keep_alive_cb (void *data)
+{
+  GmlConnection *connection = data;
+  GmlConnectionPrivate *priv = connection->priv;
+
+  priv->keep_alive_timeout = 0;
+
+  gml_connection_maybe_send_command (connection);
+
+  return FALSE;
+}
+
+static void
+gml_connection_queue_keep_alive (GmlConnection *connection)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  if (priv->keep_alive_timeout)
+    g_source_remove (priv->keep_alive_timeout);
+
+  priv->keep_alive_timeout
+    = g_timeout_add_seconds (GML_CONNECTION_KEEP_ALIVE_TIME + 1,
+                             gml_connection_keep_alive_cb,
+                             connection);
+
+  g_timer_start (priv->keep_alive_time);
+}
 
 static GmlConnectionCommand *
 gml_connection_pop_command (GmlConnection *connection)
@@ -224,6 +261,29 @@ gml_connection_command_free (GmlConnectionCommand *cmd)
 }
 
 static void
+gml_connection_maybe_send_keep_alive (GmlConnection *connection)
+{
+  GmlConnectionPrivate *priv = connection->priv;
+
+  if (g_timer_elapsed (priv->keep_alive_time, NULL) >=
+      GML_CONNECTION_KEEP_ALIVE_TIME)
+    {
+      gml_connection_queue_keep_alive (connection);
+
+      priv->command_message
+        = gml_connection_make_message (connection,
+                                       "GET",
+                                       "keep_alive",
+                                       priv->person_id);
+
+      soup_session_queue_message (priv->soup_session,
+                                  priv->command_message,
+                                  command_message_complete_cb,
+                                  connection);
+    }
+}
+
+static void
 gml_connection_maybe_send_command (GmlConnection *connection)
 {
   GmlConnectionPrivate *priv = connection->priv;
@@ -235,12 +295,19 @@ gml_connection_maybe_send_command (GmlConnection *connection)
 
   /* Wait until the conversation is in progress */
   if (priv->state != GML_CONNECTION_STATE_IN_PROGRESS)
-    return;
+    {
+      if (priv->state == GML_CONNECTION_STATE_AWAITING_PARTNER)
+        gml_connection_maybe_send_keep_alive (connection);
+
+      return;
+    }
 
   if (g_queue_is_empty (&priv->command_queue))
     {
       if (priv->sent_typing_state != priv->typing)
         {
+          gml_connection_queue_keep_alive (connection);
+
           priv->sent_typing_state = priv->typing;
 
           priv->command_message
@@ -256,6 +323,8 @@ gml_connection_maybe_send_command (GmlConnection *connection)
                                       command_message_complete_cb,
                                       connection);
         }
+      else
+        gml_connection_maybe_send_keep_alive (connection);
     }
   else
     {
@@ -291,6 +360,8 @@ gml_connection_maybe_send_command (GmlConnection *connection)
         }
 
       gml_connection_command_free (cmd);
+
+      gml_connection_queue_keep_alive (connection);
 
       soup_session_queue_message (priv->soup_session,
                                   priv->command_message,
@@ -745,6 +816,12 @@ gml_connection_message_completed_cb (SoupSession *soup_session,
   GmlConnection *connection = user_data;
   GmlConnectionPrivate *priv = connection->priv;
 
+  if (priv->keep_alive_timeout)
+    {
+      g_source_remove (priv->keep_alive_timeout);
+      priv->keep_alive_timeout = 0;
+    }
+
   /* If the message was cancelled then we'll assume these came from a
      request to stop running so we'll switch to the disconnected
      state */
@@ -798,6 +875,8 @@ gml_connection_queue_message (GmlConnection *connection)
      we want to start counting from 0 again. All messages before
      priv->latest_message will be silently dropped */
   priv->next_message_num = 0;
+
+  gml_connection_queue_keep_alive (connection);
 
   soup_session_queue_message (priv->soup_session,
                               priv->message,
@@ -1009,6 +1088,8 @@ gml_connection_init (GmlConnection *self)
   priv->next_message_num = 0;
   priv->latest_message = -1;
   g_queue_init (&priv->command_queue);
+
+  priv->keep_alive_time = g_timer_new ();
 }
 
 static void
@@ -1056,6 +1137,8 @@ gml_connection_finalize (GObject *object)
   g_free (priv->person_id);
 
   g_string_free (priv->line_buffer, TRUE);
+
+  g_timer_destroy (priv->keep_alive_time);
 
   G_OBJECT_CLASS (gml_connection_parent_class)->finalize (object);
 }

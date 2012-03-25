@@ -9,6 +9,7 @@ source_h = \
 	$(srcdir)/gml-conversation.h \
 	$(srcdir)/gml-conversation-set.h \
 	$(srcdir)/gml-http-parser.h \
+	$(srcdir)/gml-keep-alive-handler.h \
 	$(srcdir)/gml-leave-handler.h \
 	$(srcdir)/gml-log.h \
 	$(srcdir)/gml-main-context.h \
@@ -32,6 +33,7 @@ gemelo_SOURCES = \
 	$(srcdir)/gml-conversation.c \
 	$(srcdir)/gml-conversation-set.c \
 	$(srcdir)/gml-http-parser.c \
+	$(srcdir)/gml-keep-alive-handler.c \
 	$(srcdir)/gml-leave-handler.c \
 	$(srcdir)/gml-log.c \
 	$(srcdir)/gml-main.c \

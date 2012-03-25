@@ -64,6 +64,13 @@ special characters. This request can also support the ‘OPTIONS’ method
 which some browsers will do as a pre-flight cross-domain security
 check.
 
+* GET /keep_alive?<person_id>
+
+This should be sent by the client at least every 2.5 minutes if no
+ohter request is send. If no request is received after a certain
+amount of time the server will assume the client has disconnected and
+it will end any conversation that the person was in.
+
 == Data response ==
 
 The response to the /watch_person and /new_person requests is a long
@@ -136,10 +143,10 @@ This is sent when the other person stops typing. There is no argument.
 
 == Timeouts ==
 
-If a conversation doesn't receive a message after a long timeout or
-one of the people doesn't have anyone watching it for the timeout then
-it is assumed to be dead and it will act as if a /leave request was
-received. The timeout is somewhere between 5 and 10 minutes.
+If the server doesn't receive a request from a client after a long
+timeout it will act as if the client sent a /leave message. This will
+cause the conversation to end. The timeout is somewhere between 5 and
+10 minutes.
 
 == Example session ==
 

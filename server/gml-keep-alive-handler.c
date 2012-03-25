@@ -1,6 +1,6 @@
 /*
  * Gemelo - A server for chatting with strangers in a foreign language
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2012  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,17 +22,17 @@
 
 #include <glib-object.h>
 
-#include "gml-start-typing-handler.h"
+#include "gml-keep-alive-handler.h"
 #include "gml-string-response.h"
 
-G_DEFINE_TYPE (GmlStartTypingHandler,
-               gml_start_typing_handler,
+G_DEFINE_TYPE (GmlKeepAliveHandler,
+               gml_keep_alive_handler,
                GML_TYPE_REQUEST_HANDLER);
 
 static void
 real_dispose (GObject *object)
 {
-  GmlStartTypingHandler *handler = GML_START_TYPING_HANDLER (object);
+  GmlKeepAliveHandler *handler = GML_KEEP_ALIVE_HANDLER (object);
 
   if (handler->person)
     {
@@ -46,7 +46,7 @@ real_dispose (GObject *object)
       handler->response = NULL;
     }
 
-  G_OBJECT_CLASS (gml_start_typing_handler_parent_class)->dispose (object);
+  G_OBJECT_CLASS (gml_keep_alive_handler_parent_class)->dispose (object);
 }
 
 static void
@@ -54,7 +54,7 @@ real_request_line_received (GmlRequestHandler *handler,
                             GmlRequestMethod method,
                             const char *query_string)
 {
-  GmlStartTypingHandler *self = GML_START_TYPING_HANDLER (handler);
+  GmlKeepAliveHandler *self = GML_KEEP_ALIVE_HANDLER (handler);
   GmlPersonId id;
 
   if (method == GML_REQUEST_METHOD_GET
@@ -76,17 +76,10 @@ real_request_line_received (GmlRequestHandler *handler,
 static GmlResponse *
 real_request_finished (GmlRequestHandler *handler)
 {
-  GmlStartTypingHandler *self = GML_START_TYPING_HANDLER (handler);
+  GmlKeepAliveHandler *self = GML_KEEP_ALIVE_HANDLER (handler);
 
   if (self->person)
-    {
-      if (self->person->conversation)
-        gml_conversation_set_typing (self->person->conversation,
-                                     self->person->person_num,
-                                     TRUE);
-
-      return gml_string_response_new (GML_STRING_RESPONSE_OK);
-    }
+    return gml_string_response_new (GML_STRING_RESPONSE_OK);
   else if (self->response)
     return g_object_ref (self->response);
   else
@@ -98,7 +91,7 @@ real_request_finished (GmlRequestHandler *handler)
 }
 
 static void
-gml_start_typing_handler_class_init (GmlStartTypingHandlerClass *klass)
+gml_keep_alive_handler_class_init (GmlKeepAliveHandlerClass *klass)
 {
   GObjectClass *object_class = (GObjectClass *) klass;
   GmlRequestHandlerClass *request_handler_class
@@ -111,6 +104,6 @@ gml_start_typing_handler_class_init (GmlStartTypingHandlerClass *klass)
 }
 
 static void
-gml_start_typing_handler_init (GmlStartTypingHandler *self)
+gml_keep_alive_handler_init (GmlKeepAliveHandler *self)
 {
 }

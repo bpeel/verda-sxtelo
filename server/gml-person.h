@@ -68,8 +68,7 @@ struct _GmlPerson
   GmlConversation *conversation;
   guint conversation_changed_handler;
 
-  gint64 use_age;
-  unsigned int use_count;
+  gint64 last_noise_time;
 };
 
 GType
@@ -94,13 +93,10 @@ gml_person_new (GmlPersonId id,
                 GmlConversation *conversation);
 
 void
-gml_person_add_use (GmlPerson *person);
-
-void
-gml_person_remove_use (GmlPerson *person);
+gml_person_make_noise (GmlPerson *person);
 
 gboolean
-gml_person_has_use (GmlPerson *person);
+gml_person_is_silent (GmlPerson *person);
 
 G_END_DECLS
 

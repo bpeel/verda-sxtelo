@@ -65,8 +65,6 @@ struct _GmlConversation
 
   GArray *messages;
 
-  gint64 stale_age;
-
   /* Bitmask of people that are currently typing */
   unsigned int typing_mask;
 };
@@ -88,9 +86,6 @@ gml_conversation_start (GmlConversation *conversation);
 
 void
 gml_conversation_finish (GmlConversation *conversation);
-
-void
-gml_conversation_check_stale (GmlConversation *conversation);
 
 void
 gml_conversation_add_message (GmlConversation *conversation,

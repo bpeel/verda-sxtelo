@@ -38,9 +38,9 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
-/* Time in microseconds after the last 'use' of the person is removed
-   before the person is considered not in use */
-#define GML_PERSON_USE_EXPIRY_TIME (60 * 5 * (gint64) 1000000)
+/* Time in microseconds after the last request is sent on a person
+   before he/she is considered to be silent */
+#define GML_PERSON_SILENCE_TIME (60 * 5 * (gint64) 1000000)
 
 static void
 gml_person_dispose (GObject *object)
@@ -81,6 +81,7 @@ gml_person_class_init (GmlPersonClass *klass)
 static void
 gml_person_init (GmlPerson *self)
 {
+  gml_person_make_noise (self);
 }
 
 gboolean
@@ -173,7 +174,6 @@ gml_person_new (GmlPersonId id,
 
   person->id = id;
   person->conversation = g_object_ref (conversation);
-  person->use_age = gml_main_context_get_monotonic_clock (NULL);
 
   if (conversation->state == GML_CONVERSATION_AWAITING_PARTNER)
     person->person_num = 0;
@@ -196,29 +196,15 @@ gml_person_leave_conversation (GmlPerson *person)
 }
 
 void
-gml_person_add_use (GmlPerson *person)
+gml_person_make_noise (GmlPerson *person)
 {
-  /* This adds a mark to indicate that something is using the person
-     (such as it being followed by a GmlListenResponse). If this count
-     remains 0 for 5 minutes then the person is a candidate to be
-     garbage collected */
-  person->use_count++;
-}
-
-void
-gml_person_remove_use (GmlPerson *person)
-{
-  g_return_if_fail (person->use_count > 0);
-
-  if (--person->use_count == 0)
-    person->use_age = gml_main_context_get_monotonic_clock (NULL);
+  person->last_noise_time = gml_main_context_get_monotonic_clock (NULL);
 }
 
 gboolean
-gml_person_has_use (GmlPerson *person)
+gml_person_is_silent (GmlPerson *person)
 {
-  return (person->use_count > 0
-          || ((gml_main_context_get_monotonic_clock (NULL)
-               - person->use_age)
-              < GML_PERSON_USE_EXPIRY_TIME));
+  return ((gml_main_context_get_monotonic_clock (NULL)
+           - person->last_noise_time)
+          > GML_PERSON_SILENCE_TIME);
 }
