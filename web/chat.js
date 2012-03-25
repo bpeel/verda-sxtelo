@@ -193,6 +193,9 @@ ChatSession.prototype.handleChatMessage = function (message)
     {
       this.unreadMessages++;
       document.title = "(" + this.unreadMessages + ") Gemelo";
+      var messageAlertSound = document.getElementById ("message-alert-sound");
+      if (messageAlertSound && messageAlertSound.play)
+        messageAlertSound.play ();
     }
 
     this.messagesAdded++;
