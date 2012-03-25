@@ -71,6 +71,7 @@ function ChatSession ()
   this.messagesAdded = 0;
   this.messageQueue = [];
   this.sentTypingState = false;
+  this.unreadMessages = 0;
 }
 
 ChatSession.prototype.setState = function (state)
@@ -187,6 +188,12 @@ ChatSession.prototype.handleChatMessage = function (message)
     $("#messages").append (div);
 
     window.scrollTo (0, document.body.scrollHeight);
+
+    if (document.hasFocus && !document.hasFocus ())
+    {
+      this.unreadMessages++;
+      document.title = "(" + this.unreadMessages + ") Gemelo";
+    }
 
     this.messagesAdded++;
   }
@@ -491,6 +498,12 @@ ChatSession.prototype.newConversationCb = function ()
   window.location.reload ();
 };
 
+ChatSession.prototype.focusCb = function ()
+{
+  this.unreadMessages = 0;
+  document.title = "Gemelo";
+};
+
 ChatSession.prototype.loadCb = function ()
 {
   this.setState ("connecting");
@@ -501,6 +514,7 @@ ChatSession.prototype.loadCb = function ()
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
+  $(window).focus (this.focusCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
 };
