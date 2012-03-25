@@ -26,7 +26,9 @@ dist_webfiles_DATA = \
 	gemelo-logo.png \
 	jquery-1.6.1.js \
 	favicon.ico \
-	favicon.png
+	favicon.png \
+	message-alert-sound.ogg \
+	message-alert-sound.mp3
 
 webfiles_DATA = \
 	index.html.var
