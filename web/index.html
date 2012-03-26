@@ -26,8 +26,17 @@
     <script type="text/javascript" src="https://apis.google.com/js/plusone.js">
       {lang: '@LANG_CODE@'}
     </script>
+    <script type="text/javascript" src="jquery-1.6.1.js"></script>
+    <script type="text/javascript" src="gemelo.@LANG_CODE@.js"></script>
   </head>
   <body>
+    <div class="language-select">
+      <span>
+        <a href="index.en.html">English</a> |
+        <a href="index.eo.html">Esperanto</a> |
+        <a href="index.fr.html">Français</a>
+      </span>
+    </div>
     <div class="logo-header">
       <img src="gemelo-logo.png" alt="Gemelo">
     </div>
@@ -42,15 +51,45 @@
         @SELECT_LANGUAGE@
       </p>
       <div class="button-box">
-        <a href="index.en.html" class="big-button first">
-          English
-        </a>
-        <a href="index.eo.html" class="big-button first">
-          Esperanto
-        </a>
-        <a href="index.fr.html" class="big-button">
-          Français
-        </a>
+        <select id="language-select">
+          <option value="ar" @SELECTED_AR@>عربي (ar)</option>
+          <option value="az" @SELECTED_AZ@>Azərbaycanca / آذری (az)</option>
+          <option value="bg" @SELECTED_BG@>Български (bg)</option>
+          <option value="ca" @SELECTED_CA@>Català (ca)</option>
+          <option value="cs" @SELECTED_CS@>Čeština (cs)</option>
+          <option value="da" @SELECTED_DA@>Dansk (da)</option>
+          <option value="de" @SELECTED_DE@>Deutsch (de)</option>
+          <option value="el" @SELECTED_EL@>Ελληνικά (el)</option>
+          <option value="en" @SELECTED_EN@>English (en)</option>
+          <option value="eo" @SELECTED_EO@>Esperanto (eo)</option>
+          <option value="es" @SELECTED_ES@>Español (es)</option>
+          <option value="fa" @SELECTED_FA@>فارسی (fa)</option>
+          <option value="fi" @SELECTED_FI@>Suomi (fi)</option>
+          <option value="fr" @SELECTED_FR@>Français (fr)</option>
+          <option value="he" @SELECTED_HE@>עברית (he)</option>
+          <option value="hr" @SELECTED_HR@>Hrvatski (hr)</option>
+          <option value="hsb" @SELECTED_HSB@>Hornjoserbsce (hsb)</option>
+          <option value="hu" @SELECTED_HU@>Magyar (hu)</option>
+          <option value="id" @SELECTED_ID@>Bahasa Indonesia (id)</option>
+          <option value="it" @SELECTED_IT@>Italiano (it)</option>
+          <option value="ja" @SELECTED_JA@>日本語 (ja)</option>
+          <option value="ko" @SELECTED_KO@>한국어 (ko)</option>
+          <option value="lt" @SELECTED_LT@>Lietuvių (lt)</option>
+          <option value="nl" @SELECTED_NL@>Nederlands (nl)</option>
+          <option value="no" @SELECTED_NO@>Norsk (no)</option>
+          <option value="pl" @SELECTED_PL@>Polski (pl)</option>
+          <option value="pt" @SELECTED_PT@>Português (pt)</option>
+          <option value="ro" @SELECTED_RO@>Română (ro)</option>
+          <option value="ru" @SELECTED_RU@>Русский (ru)</option>
+          <option value="sk" @SELECTED_SK@>Slovenčina (sk)</option>
+          <option value="sl" @SELECTED_SL@>Slovensko (sl)</option>
+          <option value="sv" @SELECTED_SV@>Svenska (sv)</option>
+          <option value="tr" @SELECTED_TR@>Türkçe (tr)</option>
+          <option value="uk" @SELECTED_UK@>Українська (uk)</option>
+          <option value="vi" @SELECTED_VI@>Việt nam (vi)</option>
+          <option value="zhcn" @SELECTED_ZHCN@>简体中文 (zh-cn)</option>
+          <option value="zhtw" @SELECTED_ZHTW@>正體中文 (zh-tw)</option>
+        </select>
       </div>
       <p>
         @CHAT_BUTTON_BLURB@
@@ -61,7 +100,7 @@
         </div>
       </div>
       <div class="button-box">
-        <a href="chat.@LANG_CODE@.html" class="big-button">
+        <a href="#" class="big-button" id="chat-button">
           @CHAT_BUTTON@
         </a>
       </div>

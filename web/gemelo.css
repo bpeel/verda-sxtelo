@@ -114,3 +114,17 @@ body {
     position: absolute;
     right: 0px;
 }
+
+.language-select {
+    text-align: right;
+}
+
+.language-select span {
+    padding: 4px;
+    border: 1px solid black;
+    background-color: rgb(255, 255, 255);
+}
+
+.language-select span a {
+    text-decoration: none;
+}

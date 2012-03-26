@@ -28,9 +28,6 @@ Vous
 @STRANGER@
 Étranger
 
-@ROOM_NAME@
-francais
-
 @WELCOME_NOTE@
 Bienvenue sur Gemelo!
 
@@ -46,7 +43,7 @@ vos coordonnées si vous le souhaitez.
 @SELECT_LANGUAGE@
 
 Pour commencer, choisissez une langage dans laquelle vous voulez
-converser. Cette langue sera aussi utilisée pour l'interface Gemelo.
+converser.
 
 @CHAT_BUTTON_BLURB@
 

@@ -1,6 +1,7 @@
 TRANSLATABLE_FILES = \
 	$(srcdir)/chat.html \
 	$(srcdir)/chat.js \
+	$(srcdir)/gemelo.js \
 	$(srcdir)/index.html
 
 LANGUAGES = \

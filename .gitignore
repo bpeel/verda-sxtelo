@@ -36,6 +36,7 @@
 /web/Makefile.in
 /web/chat.*.html
 /web/chat.*.js
+/web/gemelo.*.js
 /web/index.*.html
 /web/index.html.var
 /web/*.language-stamp

@@ -28,9 +28,6 @@ You
 @STRANGER@
 Stranger
 
-@ROOM_NAME@
-english
-
 @WELCOME_NOTE@
 Welcome to Gemelo!
 
@@ -44,8 +41,7 @@ but you are free to exchange contact details if you wish.
 
 @SELECT_LANGUAGE@
 
-First, select which language you would like to chat in. This language
-will also be used for the Gemelo interface.
+First, select which language you would like to chat in.
 
 @CHAT_BUTTON_BLURB@
 

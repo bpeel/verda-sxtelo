@@ -72,6 +72,12 @@ function ChatSession ()
   this.messageQueue = [];
   this.sentTypingState = false;
   this.unreadMessages = 0;
+
+  var search = window.location.search;
+  if (search && search.match (/^\?[a-z]+$/))
+    this.langCode = search.substring (1);
+  else
+    this.langCode = "@LANG_CODE@";
 }
 
 ChatSession.prototype.setState = function (state)
@@ -333,7 +339,7 @@ ChatSession.prototype.startWatchAjax = function ()
   if (this.personId)
     method = "watch_person?" + this.personId;
   else
-    method = "new_person?@ROOM_NAME@";
+    method = "new_person?" + this.langCode;
 
   this.clearWatchAjax ();
 

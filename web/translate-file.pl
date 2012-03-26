@@ -92,7 +92,28 @@ sub read_translation_file
 
 sub make_regexp
 {
-    return "@(" . join("|", map(quotemeta($_), @_)) . ")@";
+    return "@(" . join("|", map(quotemeta($_), @_)) . "|SELECTED_[A-Z]+)@";
+}
+
+sub get_replacement
+{
+    my ($trans, $key) = @_;
+
+    if ($key =~ /\ASELECTED_([A-Z]+)\z/)
+    {
+        if ($1 eq uc($trans->{"LANG_CODE"}))
+        {
+            return "selected=\"selected\"";
+        }
+        else
+        {
+            return "";
+        }
+    }
+    else
+    {
+        return $trans->{$key};
+    }
 }
 
 sub translate_file
@@ -103,7 +124,7 @@ sub translate_file
 
     while (my $line = <$infile>)
     {
-        $line =~ s/$re/$trans->{$1}/eg;
+        $line =~ s/$re/get_replacement($trans, $1)/eg;
         print $outfile $line;
 
         my @bad_replacements = $line =~ /@([a-z_0-9A-Z]+)@/g;
