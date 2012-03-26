@@ -16,14 +16,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+var YEAR_IN_SECONDS = 31556926;
+
 function chatCb ()
 {
   var langCode = document.getElementById ("language-select").value;
+  var expiresDate = new Date ((new Date ()).getTime () +
+                              YEAR_IN_SECONDS * 1000);
+  document.cookie = ("langCode=" + langCode + ";max-age=" + YEAR_IN_SECONDS +
+                     ";expires=" + expiresDate.toGMTString ());
   window.location = "chat.@LANG_CODE@.html?" + langCode;
 }
 
 function loadCb ()
 {
+  var match;
+
+  if (document.cookie &&
+      (match = document.cookie.match (/(?:; *|^)langCode=([a-z]+)(?:$|;)/)))
+    $("#language-select").val (match[1]);
+
   $("#chat-button").bind ("click", chatCb);
 }
 
