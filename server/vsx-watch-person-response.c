@@ -434,12 +434,14 @@ person_changed_cb (VsxPerson *person,
 }
 
 VsxResponse *
-vsx_watch_person_response_new (VsxPerson *person)
+vsx_watch_person_response_new (VsxPerson *person,
+                               int last_message)
 {
   VsxWatchPersonResponse *self =
     g_object_new (VSX_TYPE_WATCH_PERSON_RESPONSE, NULL);
 
   self->person = g_object_ref (person);
+  self->message_num = last_message;
 
   self->person_changed_handler =
     g_signal_connect (person,

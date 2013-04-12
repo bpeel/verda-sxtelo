@@ -111,7 +111,6 @@ struct _VsxConnectionPrivate
   gboolean typing;
   gboolean sent_typing_state;
   int next_message_num;
-  int latest_message;
   GQueue command_queue;
   SoupMessage *command_message;
 
@@ -654,18 +653,13 @@ handle_message (VsxConnection *connection,
           || !get_object_string_member (message_object, "text", &text))
         goto bad_data;
 
-      /* Silently drop messages that we've already received */
-      if (priv->latest_message < priv->next_message_num)
-        {
-          g_signal_emit (connection,
-                         signals[SIGNAL_MESSAGE],
-                         0, /* detail */
-                         num == priv->num
-                         ? VSX_CONNECTION_PERSON_YOU
-                         : VSX_CONNECTION_PERSON_STRANGER,
-                         text);
-          priv->latest_message = priv->next_message_num;
-        }
+      g_signal_emit (connection,
+                     signals[SIGNAL_MESSAGE],
+                     0, /* detail */
+                     num == priv->num
+                     ? VSX_CONNECTION_PERSON_YOU
+                     : VSX_CONNECTION_PERSON_STRANGER,
+                     text);
 
       priv->next_message_num++;
     }
@@ -893,8 +887,9 @@ vsx_connection_queue_message (VsxConnection *connection)
     priv->message = vsx_connection_make_message (connection,
                                                  "GET",
                                                  "watch_person",
-                                                 "s",
-                                                 priv->person_id);
+                                                 "si",
+                                                 priv->person_id,
+                                                 priv->next_message_num);
   else
     priv->message = vsx_connection_make_message (connection,
                                                  "GET",
@@ -911,11 +906,6 @@ vsx_connection_queue_message (VsxConnection *connection)
   g_signal_connect (priv->message, "got-chunk",
                     G_CALLBACK (vsx_connection_got_chunk_cb),
                     connection);
-
-  /* The server will resend all of the messages in the conversation so
-     we want to start counting from 0 again. All messages before
-     priv->latest_message will be silently dropped */
-  priv->next_message_num = 0;
 
   vsx_connection_queue_keep_alive (connection);
 
@@ -1138,7 +1128,6 @@ vsx_connection_init (VsxConnection *self)
 
   priv->line_buffer = g_string_new (NULL);
   priv->next_message_num = 0;
-  priv->latest_message = -1;
   g_queue_init (&priv->command_queue);
 
   priv->keep_alive_time = g_timer_new ();

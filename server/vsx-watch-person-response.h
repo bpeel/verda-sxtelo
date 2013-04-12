@@ -84,7 +84,8 @@ GType
 vsx_watch_person_response_get_type (void) G_GNUC_CONST;
 
 VsxResponse *
-vsx_watch_person_response_new (VsxPerson *person);
+vsx_watch_person_response_new (VsxPerson *person,
+                               int last_message);
 
 G_END_DECLS
 

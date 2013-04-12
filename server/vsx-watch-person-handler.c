@@ -52,18 +52,28 @@ real_request_line_received (VsxRequestHandler *handler,
 {
   VsxWatchPersonHandler *self = VSX_WATCH_PERSON_HANDLER (handler);
   VsxPersonId id;
+  int last_message;
 
   if (method == VSX_REQUEST_METHOD_GET
-      && vsx_arguments_parse ("p", query_string, &id))
+      && vsx_arguments_parse ("pi",
+                              query_string,
+                              &id,
+                              &last_message))
     {
-      VsxPerson *person
-        = vsx_person_set_activate_person (handler->person_set, id);
+      VsxPerson *person = vsx_person_set_get_person (handler->person_set, id);
 
       if (person == NULL)
         self->response
           = vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
+      else if (last_message < 0
+               || last_message > person->conversation->messages->len)
+        self->response
+          = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
       else
-        self->response = vsx_watch_person_response_new (person);
+        {
+          vsx_person_make_noise (person);
+          self->response = vsx_watch_person_response_new (person, last_message);
+        }
     }
   else
     self->response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);

@@ -81,7 +81,7 @@ real_request_finished (VsxRequestHandler *handler)
                                                handler->socket_address,
                                                conversation);
 
-      response = vsx_watch_person_response_new (person);
+      response = vsx_watch_person_response_new (person, 0);
 
       g_object_unref (conversation);
       g_object_unref (person);
