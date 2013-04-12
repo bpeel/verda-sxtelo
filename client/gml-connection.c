@@ -1,6 +1,6 @@
 /*
  * Gemelo - A server for chatting with strangers in a foreign language
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "gml-connection.h"
 #include "gml-marshal.h"
@@ -36,6 +37,7 @@ enum
   PROP_SERVER_BASE_URL,
   PROP_SOUP_SESSION,
   PROP_ROOM,
+  PROP_PLAYER_NAME,
   PROP_RUNNING,
   PROP_STRANGER_TYPING,
   PROP_TYPING,
@@ -93,6 +95,7 @@ struct _GmlConnectionPrivate
 {
   char *server_base_url;
   char *room;
+  char *player_name;
   SoupSession *soup_session;
   SoupMessage *message;
   GString *line_buffer;
@@ -172,12 +175,14 @@ static SoupMessage *
 gml_connection_make_message (GmlConnection *connection,
                              const char *http_method,
                              const char *method,
-                             const char *param)
+                             const char *template,
+                             ...)
 {
   GmlConnectionPrivate *priv = connection->priv;
   SoupMessage *msg;
   GString *uri;
-  char *encoded_param;
+  va_list ap;
+  int arg;
 
   uri = g_string_new (priv->server_base_url);
 
@@ -187,9 +192,34 @@ gml_connection_make_message (GmlConnection *connection,
   g_string_append (uri, method);
   g_string_append_c (uri, '?');
 
-  encoded_param = soup_uri_encode (param, NULL);
-  g_string_append (uri, encoded_param);
-  g_free (encoded_param);
+  va_start (ap, template);
+
+  for (arg = 0; template[arg]; arg++)
+    {
+      if (arg > 0)
+        g_string_append_c (uri, '&');
+
+      switch (template[arg])
+        {
+        case 's':
+          {
+            char *encoded_param =
+              soup_uri_encode (va_arg (ap, char *), "&");
+            g_string_append (uri, encoded_param);
+            g_free (encoded_param);
+          }
+          break;
+
+        case 'i':
+          g_string_append_printf (uri, "%i", va_arg (ap, int));
+          break;
+
+        default:
+          g_assert_not_reached ();
+        }
+    }
+
+  va_end (ap);
 
   msg = soup_message_new (http_method, uri->str);
 
@@ -274,6 +304,7 @@ gml_connection_maybe_send_keep_alive (GmlConnection *connection)
         = gml_connection_make_message (connection,
                                        "GET",
                                        "keep_alive",
+                                       "s",
                                        priv->person_id);
 
       soup_session_queue_message (priv->soup_session,
@@ -316,6 +347,7 @@ gml_connection_maybe_send_command (GmlConnection *connection)
                                            priv->typing
                                            ? "start_typing"
                                            : "stop_typing",
+                                           "s",
                                            priv->person_id);
 
           soup_session_queue_message (priv->soup_session,
@@ -337,6 +369,7 @@ gml_connection_maybe_send_command (GmlConnection *connection)
             = gml_connection_make_message (connection,
                                            "POST",
                                            "send_message",
+                                           "s",
                                            priv->person_id);
 
           soup_message_set_request (priv->command_message,
@@ -355,6 +388,7 @@ gml_connection_maybe_send_command (GmlConnection *connection)
             = gml_connection_make_message (connection,
                                            "GET",
                                            "leave",
+                                           "s",
                                            priv->person_id);
           break;
         }
@@ -458,6 +492,10 @@ gml_connection_set_property (GObject *object,
 
     case PROP_ROOM:
       priv->room = g_strdup (g_value_get_string (value));
+      break;
+
+    case PROP_PLAYER_NAME:
+      priv->player_name = g_strdup (g_value_get_string (value));
       break;
 
     default:
@@ -855,12 +893,15 @@ gml_connection_queue_message (GmlConnection *connection)
     priv->message = gml_connection_make_message (connection,
                                                  "GET",
                                                  "watch_person",
+                                                 "s",
                                                  priv->person_id);
   else
     priv->message = gml_connection_make_message (connection,
                                                  "GET",
                                                  "new_person",
-                                                 priv->room);
+                                                 "ss",
+                                                 priv->room,
+                                                 priv->player_name);
 
 
   g_signal_connect (priv->message, "got-headers",
@@ -993,6 +1034,17 @@ gml_connection_class_init (GmlConnectionClass *klass)
                                | G_PARAM_STATIC_NICK
                                | G_PARAM_STATIC_BLURB);
   g_object_class_install_property (gobject_class, PROP_ROOM, pspec);
+
+  pspec = g_param_spec_string ("player-name",
+                               "Player name",
+                               "Name of the player",
+                               "player",
+                               G_PARAM_WRITABLE
+                               | G_PARAM_CONSTRUCT_ONLY
+                               | G_PARAM_STATIC_NAME
+                               | G_PARAM_STATIC_NICK
+                               | G_PARAM_STATIC_BLURB);
+  g_object_class_install_property (gobject_class, PROP_PLAYER_NAME, pspec);
 
   pspec = g_param_spec_object ("soup-session",
                                "Soup session",
@@ -1134,6 +1186,7 @@ gml_connection_finalize (GObject *object)
 
   g_free (priv->server_base_url);
   g_free (priv->room);
+  g_free (priv->player_name);
   g_free (priv->person_id);
 
   g_string_free (priv->line_buffer, TRUE);
@@ -1145,11 +1198,13 @@ gml_connection_finalize (GObject *object)
 
 GmlConnection *
 gml_connection_new (const char *server_base_url,
-                    const char *room)
+                    const char *room,
+                    const char *player_name)
 {
   GmlConnection *self = g_object_new (GML_TYPE_CONNECTION,
                                       "server-base-url", server_base_url,
                                       "room", room,
+                                      "player-name", player_name,
                                       NULL);
 
   return self;

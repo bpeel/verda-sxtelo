@@ -34,6 +34,7 @@ format_print (const char *format, ...);
 
 static char *option_server_base_url = "http://www.gemelo.org:5142/";
 static char *option_room = "english";
+static char *option_player_name = NULL;
 
 static GmlConnection *connection;
 static GMainLoop *main_loop;
@@ -49,6 +50,10 @@ options[] =
     {
       "room", 'r', 0, G_OPTION_ARG_STRING, &option_room,
       "Room to connect to", "room"
+    },
+    {
+      "player-name", 'p', 0, G_OPTION_ARG_STRING, &option_player_name,
+      "Name of the player", "player"
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -286,8 +291,12 @@ main (int argc, char **argv)
 
   make_stdin_source ();
 
+  if (option_player_name == NULL)
+    option_player_name = g_strdup (g_get_user_name ());
+
   connection = gml_connection_new (option_server_base_url,
-                                   option_room);
+                                   option_room,
+                                   option_player_name);
 
   main_loop = g_main_loop_new (NULL, FALSE);
 
