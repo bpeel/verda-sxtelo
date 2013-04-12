@@ -1,5 +1,5 @@
 /*
- * Gemelo - A server for chatting with strangers in a foreign language
+ * Verda Ŝtelo - An anagram game in Esperanto for the web
  * Copyright (C) 2011  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
@@ -198,7 +198,7 @@ ChatSession.prototype.handleChatMessage = function (message)
     if (document.hasFocus && !document.hasFocus ())
     {
       this.unreadMessages++;
-      document.title = "(" + this.unreadMessages + ") Gemelo";
+      document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
       var messageAlertSound = document.getElementById ("message-alert-sound");
       if (messageAlertSound && messageAlertSound.play)
         messageAlertSound.play ();
@@ -510,7 +510,7 @@ ChatSession.prototype.newConversationCb = function ()
 ChatSession.prototype.focusCb = function ()
 {
   this.unreadMessages = 0;
-  document.title = "Gemelo";
+  document.title = "Verda Ŝtelo";
 };
 
 ChatSession.prototype.loadCb = function ()
@@ -563,7 +563,7 @@ ChatSession.prototype.resetKeepAlive = function ()
 };
 
 /* .bind is only implemented in recent browsers so this provides a
- * fallback if it's not available. Gemelo only ever uses it bind the
+ * fallback if it's not available. Verda Ŝtelo only ever uses it bind the
  * 'this' context so it doesn't bother with any other arguments */
 if (!Function.prototype.bind)
   {

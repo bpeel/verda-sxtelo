@@ -1,4 +1,4 @@
-bin_PROGRAMS = gemelo-client
+bin_PROGRAMS = verda-sxtelo-client
 
 INCLUDES = \
 	$(GLIB_CFLAGS) \
@@ -6,16 +6,16 @@ INCLUDES = \
 	$(JSON_GLIB_CFLAGS)
 
 source_h = \
-	$(srcdir)/gml-connection.h
+	$(srcdir)/vsx-connection.h
 
-gemelo_client_SOURCES = \
+verda_sxtelo_client_SOURCES = \
 	$(source_h) \
-	$(srcdir)/gml-connection.c \
-	$(srcdir)/gml-enum-types.c \
-	$(srcdir)/gml-main.c \
-	$(srcdir)/gml-marshal.c
+	$(srcdir)/vsx-connection.c \
+	$(srcdir)/vsx-enum-types.c \
+	$(srcdir)/vsx-main.c \
+	$(srcdir)/vsx-marshal.c
 
-gemelo_client_LDFLAGS = \
+verda_sxtelo_client_LDFLAGS = \
 	$(GLIB_LIBS) \
 	$(SOUP_LIBS) \
 	$(JSON_GLIB_LIBS) \
@@ -30,12 +30,12 @@ BUILT_SOURCES =
 EXTRA_DIST =
 
 # glib-mkenums rules
-glib_enum_h = gml-enum-types.h
-glib_enum_c = gml-enum-types.c
+glib_enum_h = vsx-enum-types.h
+glib_enum_c = vsx-enum-types.c
 glib_enum_headers = $(source_h)
 include $(top_srcdir)/build/Makefile.am.enums
 
 # glib-genmarshal rules
-glib_marshal_list = gml-marshal.list
-glib_marshal_prefix = gml_marshal
+glib_marshal_list = vsx-marshal.list
+glib_marshal_prefix = vsx_marshal
 include $(top_srcdir)/build/Makefile.am.marshal

@@ -1,7 +1,7 @@
 TRANSLATABLE_FILES = \
 	$(srcdir)/chat.html \
 	$(srcdir)/chat.js \
-	$(srcdir)/gemelo.js \
+	$(srcdir)/verda-sxtelo.js \
 	$(srcdir)/index.html
 
 LANGUAGES = \
@@ -18,13 +18,13 @@ LANGUAGE_FILES = \
 EXTRA_DIST = \
 	$(LANGUAGE_FILES) \
 	$(TRANSLATABLE_FILES) \
-	gemelo-logo.svg \
+	verda-sxtelo-logo.svg \
 	translate-file.pl
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
-	gemelo.css \
-	gemelo-logo.png \
+	verda-sxtelo.css \
+	verda-sxtelo-logo.png \
 	jquery-1.6.1.js \
 	favicon.ico \
 	favicon.png \

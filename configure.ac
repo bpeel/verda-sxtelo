@@ -1,4 +1,4 @@
-AC_INIT([gemelo], 0.1)
+AC_INIT([verda-sxtelo], 0.1)
 
 AM_CONFIG_HEADER([config.h])
 
@@ -24,7 +24,7 @@ AS_IF([test "x$enable_server" = "xyes"],
        AC_CHECK_FUNC(epoll_create, , have_epoll=no)
        AC_CHECK_FUNC(epoll_ctl, , have_epoll=no)
        AS_IF([test "x$have_epoll" = "xno"],
-             AC_MSG_ERROR([epoll support is required to build the gemelo server.
+             AC_MSG_ERROR([epoll support is required to build the verda sxtelo server.
 This should be provided by glibc since version 2.3.2]))])
 
 AM_CONDITIONAL(BUILD_SERVER, [test "x$enable_server" = "xyes"])

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Gemelo - A server for chatting with strangers in a foreign language
+# Verda Ŝtelo - An anagram game in Esperanto for the web
 # Copyright (C) 2011  Neil Roberts
 #
 # This program is free software: you can redistribute it and/or modify
