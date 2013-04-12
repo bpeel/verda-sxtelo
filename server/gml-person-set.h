@@ -1,6 +1,6 @@
 /*
  * Gemelo - A server for chatting with strangers in a foreign language
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,6 +77,7 @@ gml_person_set_get_person (GmlPersonSet *set,
 
 GmlPerson *
 gml_person_set_generate_person (GmlPersonSet *set,
+                                const char *player_name,
                                 GSocketAddress *address,
                                 GmlConversation *conversation);
 

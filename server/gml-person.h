@@ -65,6 +65,8 @@ struct _GmlPerson
      one for the other */
   unsigned int person_num;
 
+  char *player_name;
+
   GmlConversation *conversation;
   guint conversation_changed_handler;
 
@@ -90,6 +92,7 @@ gml_person_parse_id (const char *string,
 
 GmlPerson *
 gml_person_new (GmlPersonId id,
+                const char *player_name,
                 GmlConversation *conversation);
 
 void

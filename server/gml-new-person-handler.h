@@ -61,6 +61,7 @@ struct _GmlNewPersonHandler
   GmlRequestHandler parent;
 
   char *room_name;
+  char *player_name;
 };
 
 GType

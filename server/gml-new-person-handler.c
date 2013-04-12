@@ -25,6 +25,7 @@
 #include "gml-new-person-handler.h"
 #include "gml-string-response.h"
 #include "gml-watch-person-response.h"
+#include "gml-arguments.h"
 
 G_DEFINE_TYPE (GmlNewPersonHandler,
                gml_new_person_handler,
@@ -36,6 +37,7 @@ real_finalize (GObject *object)
   GmlNewPersonHandler *handler = GML_NEW_PERSON_HANDLER (object);
 
   g_free (handler->room_name);
+  g_free (handler->player_name);
 
   G_OBJECT_CLASS (gml_new_person_handler_parent_class)->finalize (object);
 }
@@ -46,21 +48,18 @@ real_request_line_received (GmlRequestHandler *handler,
                             const char *query_string)
 {
   GmlNewPersonHandler *self = GML_NEW_PERSON_HANDLER (handler);
-  const char *p;
 
   if (method != GML_REQUEST_METHOD_GET)
     return;
 
-  /* The query string will be used as the room name. It should only
-     contain letters */
-  if (query_string == NULL || *query_string == 0)
-    return;
-
-  for (p = query_string; *p; p++)
-    if (!g_ascii_isalpha (*p))
-      return;
-
-  self->room_name = g_strdup (query_string);
+  if (!gml_arguments_parse ("nn",
+                            query_string,
+                            &self->room_name,
+                            &self->player_name))
+    {
+      self->room_name = NULL;
+      self->player_name = NULL;
+    }
 }
 
 static GmlResponse *
@@ -69,7 +68,7 @@ real_request_finished (GmlRequestHandler *handler)
   GmlNewPersonHandler *self = GML_NEW_PERSON_HANDLER (handler);
   GmlResponse *response;
 
-  if (self->room_name)
+  if (self->room_name && self->player_name)
     {
       GmlConversation *conversation;
       GmlPerson *person;
@@ -78,6 +77,7 @@ real_request_finished (GmlRequestHandler *handler)
         gml_conversation_set_get_conversation (handler->conversation_set,
                                                self->room_name);
       person = gml_person_set_generate_person (handler->person_set,
+                                               self->player_name,
                                                handler->socket_address,
                                                conversation);
 
