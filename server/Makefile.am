@@ -5,6 +5,7 @@ INCLUDES = \
 	-DGML_LIBDIR=\""$(libdir)"\"
 
 source_h = \
+	$(srcdir)/gml-arguments.h \
 	$(srcdir)/gml-chunked-iconv.h \
 	$(srcdir)/gml-conversation.h \
 	$(srcdir)/gml-conversation-set.h \
@@ -29,6 +30,7 @@ source_h = \
 
 gemelo_SOURCES = \
 	$(source_h) \
+	$(srcdir)/gml-arguments.c \
 	$(srcdir)/gml-chunked-iconv.c \
 	$(srcdir)/gml-conversation.c \
 	$(srcdir)/gml-conversation-set.c \
