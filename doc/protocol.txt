@@ -1,37 +1,44 @@
 == Description ==
 
-The protocol for the Gemelo server is built around HTTP so that it can
-be accessed from Javascript using XMLHttpRequest. All requests report
-the Access-Control-Allow-Origin header so that they can be used after
-a cross-domain check.
+The protocol for the Verda Ŝtelo server is built around HTTP so that
+it can be accessed from Javascript using XMLHttpRequest. All requests
+report the Access-Control-Allow-Origin header so that they can be used
+after a cross-domain check.
 
 By default the server listens on port 5142. The ‘official’ server
-listens on that port at http://gemelo.org:5142/
+listens on that port at http://vs.busydoingnothing.co.uk:5142/
 
 == Requests ==
 
-The server accepts the following requests:
+Requests sent to the server should be of the form:
 
-* GET /new_person?<room_name>
+ [GET|POST] /<query_name>?<arg0>&<arg1>&...
 
-This creates a new person in the given ‘room’. The web client uses the
-room name to specify what language to speak in (ie, it could be
-‘english’, ‘esperanto’ or ‘francais’). The name can only use the
-characters a-z. The rooms are created on the fly by the server so the
-name is not restricted to any of the existing languages. If there is
-already a person waiting for a conversation in the room the new person
-will be immediately paired with that person and the conversation will
-begin. If not then the conversation will be pending. Either way the
-response will be the same as if the watch_person request had been
-called on that new person. The format is described below.
+The arguments can be escaped with % and a 2 digit hex escape sequence
+to encode other characters including the ampersand.
 
-* GET /watch_person?<person_id>
+The accepted requests are:
+
+* GET /new_person?<room_name>&<person_name>
+
+This creates a new person in the given ‘room’ with the given name. The
+web client always just uses the room ‘default’. The names can use any
+valid Unicode characters. The rooms are created on the fly by the
+server. Eventually this could be used to play against specific people.
+If there is already a game in that room that has not started then the
+new person will immediately join that game. Otherwise a new game will
+be created. Either way the response will be the same as if the
+watch_person request had been called on that new person. The format is
+described below.
+
+* GET /watch_person?<person_id>&<last_message>
 
 This can be used to recover from a broken connection and restart
-listening to the messages for a particular person. All of the messages
-from the conversation will be resent. There is no restriction on the
-number of simoultaneous connections that can listen to a particular
-person.
+listening to the messages for a particular person. The state of the
+game that the person is in will be resent from scratch. There is no
+restriction on the number of simultaneous connections that can listen
+to a particular person. The messages starting from ‘last_message’ will
+be resent.
 
 * GET /start_typing?<person_id>
 
@@ -48,9 +55,9 @@ stopped typing. The response will be dummy plain text.
 * GET /leave?<person_id>
 
 This should be sent when the user closes the window so that the server
-can inform the other person that the conversation is over. This should
-even be sent if the conversation is still pending so that the server
-can know the user has given up waiting.
+can inform the other players that the person has left. This should
+even be sent if the game has not started so that the server can know
+the user has given up waiting.
 
 * POST /send_message?<person_id>
 
@@ -64,12 +71,23 @@ special characters. This request can also support the ‘OPTIONS’ method
 which some browsers will do as a pre-flight cross-domain security
 check.
 
+* GET /move_tile?<person_id>&<tile_num>&<x>&<y>
+
+Requests that the given tile move to the given coordinates. The
+response will be a dummy plain text.
+
+* GET /flip_tile?<person_id>&<tile_num>
+
+Requests that the given tile be flipped so that it is facing up. The
+first time this command is received the game is also started which
+means that no new players will join.
+
 * GET /keep_alive?<person_id>
 
 This should be sent by the client at least every 2.5 minutes if no
 ohter request is send. If no request is received after a certain
 amount of time the server will assume the client has disconnected and
-it will end any conversation that the person was in.
+will remove the player from the game they are in.
 
 == Data response ==
 
@@ -99,25 +117,31 @@ This is the first command sent by the server. The argument is a JSON
 hash object describing the person. The object contains the following
 string keys:
 
-  "num": This contains a single integer which will be either be 0 or 1
-  to specify which of the two people in the conversation this
-  request belongs to.
+  "num": This contains a single integer which will be an index to
+  specify which person this connection belongs to.
 
   "id": This is a string containing 16 hexdecimal characters to
   identify this person. This value should be passed as the query
   string to all of the other requests.
 
-* "state"
+* "tile"
 
-This is sent when the state of the conversation changes. The argument
-is a single string which can be one of the following:
+This is sent to update the position of a tile. The argument is an
+object containing the following keys:
 
-  "in-progress": The conversation has begun which means a second
-  person has joined. The client can now start sending messages.
+  "num": The tile number. If this is a tile number that the client
+  hasn't seen before then it should consider it to be a new tile,
+  otherwise it should move an existing tile.
 
-  "done": The other person has left the conversation or the
-  conversation timed out waiting for another person to join. The
-  server will end the response after sending this.
+  "x": The new x position of the tile as an integer in pixels.
+
+  "y": The new y position of the tile as an integer in pixels.
+
+  "facing-up": A boolean value to specify whether the tile is facing
+  up or down.
+
+  "letter": An integer value representing the Unicode character that
+  should be displayed on the top of this tile.
 
 * "message"
 
@@ -125,21 +149,27 @@ A new message has been added to the conversation. The argument is a
 javascript hash object containing the following fields:
 
   "person": This has a number specifying which person send the
-  message. Ie, if this matches the "num" sent in the "header" command
-  then the message was sent by same person, otherwise it was sent by
-  the stranger.
+  message. Ie, if this matches the "num" sent in the "person_num"
+  command then the message was sent by same person, otherwise it was
+  sent by one of the other players described in a "person" command.
 
   "text": This contains the text of the message as a javascript
   string.
 
-* "typing"
+* "player"
 
-This is sent when the other person starts typing. There is no
-argument.
+Updates details of one of the players in the same game. The argument
+is a javascript hash object containing the following fields:
 
-* "not-typing"
+  "num": The index number of this player.
 
-This is sent when the other person stops typing. There is no argument.
+  "name": The name chosen for the player in the new_person command.
+
+  "connected": A boolean value which is initially true and switches to
+  false once the player sends a leave command.
+
+  "typing": A boolean value to indicate whether the player is
+  currently typing a message.
 
 == Timeouts ==
 
@@ -147,17 +177,3 @@ If the server doesn't receive a request from a client after a long
 timeout it will act as if the client sent a /leave message. This will
 cause the conversation to end. The timeout is somewhere between 5 and
 10 minutes.
-
-== Example session ==
-
-Here is an example of the data that might be sent in response to the
-/new_person request:
-
-["padding", "blah blah"]
-["header", {"num": 1, "id": "22AF4273A8B8253B"}]
-["state", "in-progress"]
-["typing"]
-["message", {"person": 0, "text": "Hello <B"}]
-["not-typing"]
-["message", {"person": 1, "text": "Goodbye \"stranger\""}]
-["state", "done"]
