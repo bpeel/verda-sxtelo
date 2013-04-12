@@ -1197,11 +1197,13 @@ vsx_connection_finalize (GObject *object)
 }
 
 VsxConnection *
-vsx_connection_new (const char *server_base_url,
+vsx_connection_new (SoupSession *soup_session,
+                    const char *server_base_url,
                     const char *room,
                     const char *player_name)
 {
   VsxConnection *self = g_object_new (VSX_TYPE_CONNECTION,
+                                      "soup-session", soup_session,
                                       "server-base-url", server_base_url,
                                       "room", room,
                                       "player-name", player_name,

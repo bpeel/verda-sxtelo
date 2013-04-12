@@ -99,7 +99,8 @@ GType
 vsx_connection_get_type (void) G_GNUC_CONST;
 
 VsxConnection *
-vsx_connection_new (const char *server_base_url,
+vsx_connection_new (SoupSession *soup_session,
+                    const char *server_base_url,
                     const char *room,
                     const char *player_name);
 

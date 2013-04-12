@@ -35,6 +35,7 @@ format_print (const char *format, ...);
 static char *option_server_base_url = "http://vs.busydoingnothing.co.uk:5142/";
 static char *option_room = "english";
 static char *option_player_name = NULL;
+static gboolean option_debug = FALSE;
 
 static VsxConnection *connection;
 static GMainLoop *main_loop;
@@ -54,6 +55,10 @@ options[] =
     {
       "player-name", 'p', 0, G_OPTION_ARG_STRING, &option_player_name,
       "Name of the player", "player"
+    },
+    {
+      "debug", 'd', 0, G_OPTION_ARG_NONE, &option_debug,
+      "Enable HTTP debugging", NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
@@ -276,10 +281,36 @@ make_stdin_source (void)
   g_source_attach (stdin_source, NULL);
 }
 
+static void
+logging_printer_cb (SoupLogger *logger,
+                    SoupLoggerLogLevel level,
+                    char direction,
+                    const char *data,
+                    gpointer user_data)
+{
+  format_print ("%c %s\n", direction, data);
+}
+
+static void
+add_logging_feature (SoupSession *session)
+{
+  SoupLogger *logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, -1);
+
+  soup_logger_set_printer (logger,
+                           logging_printer_cb,
+                           NULL, /* user_data */
+                           NULL /* destroy */);
+
+  soup_session_add_feature (session, SOUP_SESSION_FEATURE (logger));
+
+  g_object_unref (logger);
+}
+
 int
 main (int argc, char **argv)
 {
   GError *error = NULL;
+  SoupSession *soup_session;
 
   g_type_init ();
 
@@ -289,12 +320,18 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
+  soup_session = soup_session_async_new ();
+
+  if (option_debug)
+    add_logging_feature (soup_session);
+
   make_stdin_source ();
 
   if (option_player_name == NULL)
     option_player_name = g_strdup (g_get_user_name ());
 
-  connection = vsx_connection_new (option_server_base_url,
+  connection = vsx_connection_new (soup_session,
+                                   option_server_base_url,
                                    option_room,
                                    option_player_name);
 
@@ -332,6 +369,8 @@ main (int argc, char **argv)
   remove_stdin_source ();
 
   g_object_unref (connection);
+
+  g_object_unref (soup_session);
 
   return 0;
 }
