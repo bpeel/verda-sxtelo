@@ -26,6 +26,7 @@
 #include "vsx-send-message-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-parse-content-type.h"
+#include "vsx-arguments.h"
 
 G_DEFINE_TYPE (VsxSendMessageHandler,
                vsx_send_message_handler,
@@ -95,8 +96,7 @@ real_request_line_received (VsxRequestHandler *handler,
 
   if ((method == VSX_REQUEST_METHOD_POST
        || method == VSX_REQUEST_METHOD_OPTIONS)
-      && query_string != NULL
-      && vsx_person_parse_id (query_string, &id))
+      && vsx_arguments_parse ("p", query_string, &id))
     {
       VsxPerson *person;
 

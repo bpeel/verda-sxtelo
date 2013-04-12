@@ -24,6 +24,7 @@
 
 #include "vsx-leave-handler.h"
 #include "vsx-string-response.h"
+#include "vsx-arguments.h"
 
 G_DEFINE_TYPE (VsxLeaveHandler,
                vsx_leave_handler,
@@ -58,8 +59,7 @@ real_request_line_received (VsxRequestHandler *handler,
   VsxPersonId id;
 
   if (method == VSX_REQUEST_METHOD_GET
-      && query_string != NULL
-      && vsx_person_parse_id (query_string, &id))
+      && vsx_arguments_parse ("p", query_string, &id))
     {
       self->person = vsx_person_set_activate_person (handler->person_set, id);
 

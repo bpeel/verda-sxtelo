@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include "vsx-watch-person-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-watch-person-response.h"
+#include "vsx-arguments.h"
 
 G_DEFINE_TYPE (VsxWatchPersonHandler,
                vsx_watch_person_handler,
@@ -53,8 +54,7 @@ real_request_line_received (VsxRequestHandler *handler,
   VsxPersonId id;
 
   if (method == VSX_REQUEST_METHOD_GET
-      && query_string != NULL
-      && vsx_person_parse_id (query_string, &id))
+      && vsx_arguments_parse ("p", query_string, &id))
     {
       VsxPerson *person
         = vsx_person_set_activate_person (handler->person_set, id);

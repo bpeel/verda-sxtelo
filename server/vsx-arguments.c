@@ -26,6 +26,7 @@
 #include <errno.h>
 
 #include "vsx-arguments.h"
+#include "vsx-person.h"
 
 static gboolean
 uri_decode (const char *str,
@@ -180,6 +181,14 @@ vsx_arguments_parse (const char *template,
           }
           break;
 
+        case 'p': /* person id */
+          {
+            VsxPersonId *v = va_arg (ap, VsxPersonId *);
+            if (!vsx_person_parse_id (buf->str, v))
+              goto arg_error;
+          }
+          break;
+
         case 'n': /* name */
           if (!make_name (buf))
             goto arg_error;
@@ -210,6 +219,10 @@ vsx_arguments_parse (const char *template,
         {
         case 'i':
           va_arg (ap_copy, int *);
+          break;
+
+        case 'p':
+          va_arg (ap, VsxPersonId *);
           break;
 
         case 'n':
