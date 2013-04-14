@@ -23,20 +23,10 @@
 #include <glib-object.h>
 
 #include "vsx-conversation.h"
-#include "vsx-marshal.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
 
 G_DEFINE_TYPE (VsxConversation, vsx_conversation, G_TYPE_OBJECT);
-
-enum
-{
-  CHANGED_SIGNAL,
-
-  LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0, };
 
 static void
 vsx_conversation_finalize (GObject *object)
@@ -63,22 +53,13 @@ vsx_conversation_class_init (VsxConversationClass *klass)
   GObjectClass *object_class = (GObjectClass *) klass;
 
   object_class->finalize = vsx_conversation_finalize;
-
-  signals[CHANGED_SIGNAL] =
-    g_signal_new ("changed",
-                  G_TYPE_FROM_CLASS (object_class),
-                  G_SIGNAL_RUN_FIRST,
-                  0, /* no class method */
-                  NULL, /* accumulator */
-                  NULL, /* accu_data */
-                  vsx_marshal_VOID__VOID,
-                  G_TYPE_NONE, /* return type */
-                  0 /* num arguments */);
 }
 
 static void
 vsx_conversation_init (VsxConversation *self)
 {
+  vsx_signal_init (&self->changed_signal);
+
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 
   self->state = VSX_CONVERSATION_AWAITING_PARTNER;
@@ -87,9 +68,7 @@ vsx_conversation_init (VsxConversation *self)
 static void
 vsx_conversation_changed (VsxConversation *conversation)
 {
-  g_signal_emit (conversation,
-                 signals[CHANGED_SIGNAL],
-                 0 /* detail */);
+  vsx_signal_emit (&conversation->changed_signal, conversation);
 }
 
 void

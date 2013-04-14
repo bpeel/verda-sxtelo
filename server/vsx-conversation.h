@@ -22,6 +22,7 @@
 #include <glib-object.h>
 
 #include "vsx-player.h"
+#include "vsx-signal.h"
 
 G_BEGIN_DECLS
 
@@ -59,6 +60,8 @@ struct _VsxConversationClass
 struct _VsxConversation
 {
   GObject parent;
+
+  VsxSignal changed_signal;
 
   enum
   {

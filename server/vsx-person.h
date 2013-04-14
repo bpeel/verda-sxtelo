@@ -24,6 +24,7 @@
 
 #include "vsx-conversation.h"
 #include "vsx-player.h"
+#include "vsx-signal.h"
 
 G_BEGIN_DECLS
 
@@ -62,10 +63,12 @@ struct _VsxPerson
 {
   GObject parent;
 
+  VsxSignal changed_signal;
+
   VsxPersonId id;
 
   VsxConversation *conversation;
-  guint conversation_changed_handler;
+  VsxListener conversation_changed_listener;
 
   VsxPlayer *player;
 

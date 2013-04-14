@@ -417,8 +417,7 @@ vsx_watch_person_response_dispose (GObject *object)
 
   if (self->person)
     {
-      g_signal_handler_disconnect (self->person,
-                                   self->person_changed_handler);
+      vsx_list_remove (&self->person_changed_listener.link);
       g_object_unref (self->person);
       self->person = NULL;
     }
@@ -427,9 +426,12 @@ vsx_watch_person_response_dispose (GObject *object)
 }
 
 static void
-person_changed_cb (VsxPerson *person,
-                   VsxWatchPersonResponse *response)
+person_changed_cb (VsxListener *listener,
+                   void *data)
 {
+  VsxWatchPersonResponse *response =
+    vsx_container_of (listener, response, person_changed_listener);
+
   vsx_response_changed (VSX_RESPONSE (response));
 }
 
@@ -443,11 +445,9 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->person = g_object_ref (person);
   self->message_num = last_message;
 
-  self->person_changed_handler =
-    g_signal_connect (person,
-                      "changed",
-                      G_CALLBACK (person_changed_cb),
-                      self);
+  self->person_changed_listener.notify = person_changed_cb;
+  vsx_signal_add (&person->changed_signal,
+                  &self->person_changed_listener);
 
   return VSX_RESPONSE (self);
 }

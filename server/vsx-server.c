@@ -90,8 +90,8 @@ typedef struct
      appropriate one when the request line was received */
   VsxRequestHandler *current_request_handler;
 
-  /* Queue of VsxResponses to send to this client */
-  GQueue response_queue;
+  /* Queue of VsxServerQueuedResponses to send to this client */
+  VsxList response_queue;
 
   unsigned int output_length;
   guint8 output_buffer[VSX_SERVER_OUTPUT_BUFFER_SIZE];
@@ -104,6 +104,14 @@ typedef struct
    * be removed if this stays empty for too long */
   gint64 no_response_age;
 } VsxServerConnection;
+
+typedef struct
+{
+  VsxList link;
+  VsxListener response_changed_listener;
+  VsxResponse *response;
+  VsxServerConnection *connection;
+} VsxServerQueuedResponse;
 
 /* Interval time in micro-seconds to run the dead person garbage
    collector */
@@ -140,11 +148,17 @@ vsx_server_remove_connection (VsxServer *server,
                               VsxServerConnection *connection);
 
 static void
-response_changed_cb (VsxResponse *response,
-                     VsxServerConnection *connection)
+response_changed_cb (VsxListener *listener,
+                     void *data)
 {
-  if (response == g_queue_peek_head (&connection->response_queue))
-    update_poll (connection);
+  VsxServerQueuedResponse *queued_response =
+    vsx_container_of (listener, queued_response, response_changed_listener);
+
+  /* Update the poll if this is the first response in the queue (ie,
+   * the one that is currently being handled) */
+  if (&queued_response->link ==
+      queued_response->connection->response_queue.next)
+    update_poll (queued_response->connection);
 }
 
 static gboolean
@@ -243,11 +257,19 @@ static void
 queue_response (VsxServerConnection *connection,
                 VsxResponse *response)
 {
-  g_queue_push_tail (&connection->response_queue, response);
-  g_signal_connect (response,
-                    "changed",
-                    G_CALLBACK (response_changed_cb),
-                    connection);
+  VsxServerQueuedResponse *queued_response =
+    g_slice_new (VsxServerQueuedResponse);
+
+  /* This steals a reference on the response */
+  queued_response->response = response;
+  queued_response->connection = connection;
+
+  queued_response->response_changed_listener.notify = response_changed_cb;
+  vsx_signal_add (&response->changed_signal,
+                  &queued_response->response_changed_listener);
+
+  vsx_list_insert (connection->response_queue.prev,
+                   &queued_response->link);
 }
 
 static gboolean
@@ -279,32 +301,33 @@ vsx_server_http_parser_vtable =
 static void
 vsx_server_connection_pop_response (VsxServerConnection *connection)
 {
-  VsxResponse *response;
-  int num_handlers;
+  VsxServerQueuedResponse *queued_response;
 
-  g_return_if_fail (!g_queue_is_empty (&connection->response_queue));
+  g_return_if_fail (!vsx_list_empty (&connection->response_queue));
 
-  response = g_queue_pop_head (&connection->response_queue);
+  queued_response = vsx_container_of (connection->response_queue.next,
+                                      queued_response,
+                                      link);
 
-  num_handlers =
-    g_signal_handlers_disconnect_by_func (response,
-                                          response_changed_cb,
-                                          connection);
-  g_warn_if_fail (num_handlers == 1);
+  vsx_list_remove (&queued_response->response_changed_listener.link);
+
+  g_object_unref (queued_response->response);
+
+  vsx_list_remove (&queued_response->link);
+
+  g_slice_free (VsxServerQueuedResponse, queued_response);
 
   /* Whenever we end up with an empty response queue will start
    * counting the time the connection has been idle so that we can
    * remove it if it gets too old */
-  if (g_queue_is_empty (&connection->response_queue))
+  if (vsx_list_empty (&connection->response_queue))
     connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
-
-  g_object_unref (response);
 }
 
 static void
 vsx_server_connection_clear_responses (VsxServerConnection *connection)
 {
-  while (!g_queue_is_empty (&connection->response_queue))
+  while (!vsx_list_empty (&connection->response_queue))
     vsx_server_connection_pop_response (connection);
 
   if (connection->current_request_handler)
@@ -347,7 +370,7 @@ check_dead_connection_cb (gpointer data,
 {
   VsxServerConnection *connection = data;
 
-  if (g_queue_is_empty (&connection->response_queue)
+  if (vsx_list_empty (&connection->response_queue)
       && ((vsx_main_context_get_monotonic_clock (NULL)
            - connection->no_response_age)
           >= VSX_SERVER_NO_RESPONSE_TIMEOUT))
@@ -411,7 +434,7 @@ update_poll (VsxServerConnection *connection)
   /* Shutdown the socket if we've finished writing */
   if (!connection->write_finished
       && (connection->read_finished || connection->had_bad_input)
-      && g_queue_is_empty (&connection->response_queue)
+      && vsx_list_empty (&connection->response_queue)
       && connection->output_length == 0)
     {
       GError *error = NULL;
@@ -436,12 +459,14 @@ update_poll (VsxServerConnection *connection)
     {
       if (connection->output_length > 0)
         flags |= VSX_MAIN_CONTEXT_POLL_OUT;
-      else if (!g_queue_is_empty (&connection->response_queue))
+      else if (!vsx_list_empty (&connection->response_queue))
         {
-          VsxResponse *response
-            = g_queue_peek_head (&connection->response_queue);
+          VsxServerQueuedResponse *queued_response
+            = vsx_container_of (connection->response_queue.next,
+                                queued_response,
+                                link);
 
-          if (vsx_response_has_data (response))
+          if (vsx_response_has_data (queued_response->response))
             flags |= VSX_MAIN_CONTEXT_POLL_OUT;
         }
     }
@@ -547,10 +572,13 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
       /* Try to fill the output buffer as much as possible before
          initiating a write */
       while (connection->output_length < VSX_SERVER_OUTPUT_BUFFER_SIZE
-             && !g_queue_is_empty (&connection->response_queue))
+             && !vsx_list_empty (&connection->response_queue))
         {
-          VsxResponse *response =
-            g_queue_peek_head (&connection->response_queue);
+          VsxServerQueuedResponse *queued_response
+            = vsx_container_of (connection->response_queue.next,
+                                queued_response,
+                                link);
+          VsxResponse *response = queued_response->response;
           unsigned int added;
 
           if (!vsx_response_has_data (response))
@@ -691,7 +719,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                             connection);
 
       connection->current_request_handler = NULL;
-      g_queue_init (&connection->response_queue);
+      vsx_list_init (&connection->response_queue);
 
       connection->had_bad_input = FALSE;
       connection->read_finished = FALSE;

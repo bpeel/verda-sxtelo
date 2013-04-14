@@ -17,12 +17,9 @@
 /server/Makefile
 /server/Makefile.in
 /server/verda-sxtelo
-/server/vsx-marshal.c
-/server/vsx-marshal.h
 /server/vsx-enum-types.c
 /server/vsx-enum-types.h
 /server/stamp-enum-types
-/server/stamp-marshal
 /client/Makefile
 /client/Makefile.in
 /client/verda-sxtelo-client

@@ -12,6 +12,7 @@ source_h = \
 	$(srcdir)/vsx-http-parser.h \
 	$(srcdir)/vsx-keep-alive-handler.h \
 	$(srcdir)/vsx-leave-handler.h \
+	$(srcdir)/vsx-list.h \
 	$(srcdir)/vsx-log.h \
 	$(srcdir)/vsx-main-context.h \
 	$(srcdir)/vsx-new-person-handler.h \
@@ -23,6 +24,7 @@ source_h = \
 	$(srcdir)/vsx-response.h \
 	$(srcdir)/vsx-send-message-handler.h \
 	$(srcdir)/vsx-server.h \
+	$(srcdir)/vsx-signal.h \
 	$(srcdir)/vsx-start-typing-handler.h \
 	$(srcdir)/vsx-stop-typing-handler.h \
 	$(srcdir)/vsx-string-response.h \
@@ -38,6 +40,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-http-parser.c \
 	$(srcdir)/vsx-keep-alive-handler.c \
 	$(srcdir)/vsx-leave-handler.c \
+	$(srcdir)/vsx-list.c \
 	$(srcdir)/vsx-log.c \
 	$(srcdir)/vsx-main.c \
 	$(srcdir)/vsx-main-context.c \
@@ -71,8 +74,3 @@ glib_enum_h = vsx-enum-types.h
 glib_enum_c = vsx-enum-types.c
 glib_enum_headers = $(source_h)
 include $(top_srcdir)/build/Makefile.am.enums
-
-# glib-genmarshal rules
-glib_marshal_list = vsx-marshal.list
-glib_marshal_prefix = vsx_marshal
-include $(top_srcdir)/build/Makefile.am.marshal

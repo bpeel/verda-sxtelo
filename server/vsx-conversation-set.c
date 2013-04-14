@@ -32,26 +32,29 @@ typedef struct
   char *room_name;
   VsxConversationSet *set;
   VsxConversation *conversation;
-  guint conversation_changed_handler;
+  VsxListener conversation_changed_listener;
 } VsxConversationSetHashData;
 
 static void
 free_hash_data (VsxConversationSetHashData *data)
 {
-  g_signal_handler_disconnect (data->conversation,
-                               data->conversation_changed_handler);
+  vsx_list_remove (&data->conversation_changed_listener.link);
   g_object_unref (data->conversation);
   g_free (data->room_name);
   g_slice_free (VsxConversationSetHashData, data);
 }
 
 static void
-conversation_changed_cb (VsxConversation *conversation,
-                         VsxConversationSetHashData *data)
+conversation_changed_cb (VsxListener *listener,
+                         void *data)
 {
+  VsxConversationSetHashData *hash_data =
+    vsx_container_of (listener, hash_data, conversation_changed_listener);
+  VsxConversation *conversation = data;
+
   if (conversation->state != VSX_CONVERSATION_AWAITING_PARTNER)
     /* This will also destroy the hash data */
-    g_hash_table_remove (data->set->hash_table, data->room_name);
+    g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
 }
 
 static void
@@ -114,10 +117,10 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
       /* Listen for the changed signal so we can remove the
          conversation from the hash table if the first person leaves
          before a second joins */
-      data->conversation_changed_handler =
-        g_signal_connect (conversation, "changed",
-                          G_CALLBACK (conversation_changed_cb),
-                          data);
+      data->conversation_changed_listener.notify =
+        conversation_changed_cb;
+      vsx_signal_add (&conversation->changed_signal,
+                      &data->conversation_changed_listener);
 
       /* Take a reference for the hash table */
       g_object_ref (conversation);

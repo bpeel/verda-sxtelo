@@ -23,18 +23,8 @@
 #include <glib-object.h>
 
 #include "vsx-response.h"
-#include "vsx-marshal.h"
 
 G_DEFINE_ABSTRACT_TYPE (VsxResponse, vsx_response, G_TYPE_OBJECT);
-
-enum
-{
-  CHANGED_SIGNAL,
-
-  LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0, };
 
 static gboolean
 vsx_response_real_has_data (VsxResponse *self)
@@ -45,25 +35,13 @@ vsx_response_real_has_data (VsxResponse *self)
 static void
 vsx_response_class_init (VsxResponseClass *klass)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-
   klass->has_data = vsx_response_real_has_data;
-
-  signals[CHANGED_SIGNAL] =
-    g_signal_new ("changed",
-                  G_TYPE_FROM_CLASS (object_class),
-                  G_SIGNAL_RUN_FIRST,
-                  0, /* no class method */
-                  NULL, /* accumulator */
-                  NULL, /* accu_data */
-                  vsx_marshal_VOID__VOID,
-                  G_TYPE_NONE, /* return type */
-                  0 /* num arguments */);
 }
 
 static void
 vsx_response_init (VsxResponse *self)
 {
+  vsx_signal_init (&self->changed_signal);
 }
 
 unsigned int
@@ -91,7 +69,5 @@ vsx_response_has_data (VsxResponse *response)
 void
 vsx_response_changed (VsxResponse *response)
 {
-  g_signal_emit (response,
-                 signals[CHANGED_SIGNAL],
-                 0 /* detail */);
+  vsx_signal_emit (&response->changed_signal, response);
 }

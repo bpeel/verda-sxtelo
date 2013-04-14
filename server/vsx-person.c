@@ -24,19 +24,9 @@
 #include <string.h>
 
 #include "vsx-person.h"
-#include "vsx-marshal.h"
 #include "vsx-main-context.h"
 
 G_DEFINE_TYPE (VsxPerson, vsx_person, G_TYPE_OBJECT);
-
-enum
-{
-  CHANGED_SIGNAL,
-
-  LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0, };
 
 /* Time in microseconds after the last request is sent on a person
    before he/she is considered to be silent */
@@ -49,8 +39,7 @@ vsx_person_dispose (GObject *object)
 
   if (person->conversation)
     {
-      g_signal_handler_disconnect (person->conversation,
-                                   person->conversation_changed_handler);
+      vsx_list_remove (&person->conversation_changed_listener.link);
       vsx_conversation_finish (person->conversation);
       g_object_unref (person->conversation);
       person->conversation = NULL;
@@ -66,22 +55,13 @@ vsx_person_class_init (VsxPersonClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = vsx_person_dispose;
-
-  signals[CHANGED_SIGNAL] =
-    g_signal_new ("changed",
-                  G_TYPE_FROM_CLASS (object_class),
-                  G_SIGNAL_RUN_FIRST,
-                  0, /* no class method */
-                  NULL, /* accumulator */
-                  NULL, /* accu_data */
-                  vsx_marshal_VOID__VOID,
-                  G_TYPE_NONE, /* return type */
-                  0 /* num arguments */);
 }
 
 static void
 vsx_person_init (VsxPerson *self)
 {
+  vsx_signal_init (&self->changed_signal);
+
   vsx_person_make_noise (self);
 }
 
@@ -159,12 +139,13 @@ vsx_person_parse_id (const char *string,
 }
 
 static void
-conversation_changed_cb (VsxConversation *conversation,
-                         VsxPerson *person)
+conversation_changed_cb (VsxListener *listener,
+                         void *data)
 {
-  g_signal_emit (person,
-                 signals[CHANGED_SIGNAL],
-                 0 /* detail */);
+  VsxPerson *person =
+    vsx_container_of (listener, person, conversation_changed_listener);
+
+  vsx_signal_emit (&person->changed_signal, person);
 }
 
 VsxPerson *
@@ -174,16 +155,17 @@ vsx_person_new (VsxPersonId id,
 {
   VsxPerson *person = g_object_new (VSX_TYPE_PERSON, NULL);
 
+  vsx_signal_init (&person->changed_signal);
+
   person->id = id;
   person->conversation = g_object_ref (conversation);
 
   person->player = vsx_conversation_add_player (conversation, player_name);
 
-  person->conversation_changed_handler
-    = g_signal_connect (conversation,
-                        "changed",
-                        G_CALLBACK (conversation_changed_cb),
-                        person);
+  person->conversation_changed_listener.notify =
+    conversation_changed_cb;
+  vsx_signal_add (&conversation->changed_signal,
+                  &person->conversation_changed_listener);
 
   return person;
 }

@@ -59,7 +59,7 @@ struct _VsxWatchPersonResponse
 
   VsxPerson *person;
 
-  guint person_changed_handler;
+  VsxListener person_changed_listener;
 
   enum
   {

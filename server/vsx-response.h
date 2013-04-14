@@ -21,6 +21,8 @@
 
 #include <glib-object.h>
 
+#include "vsx-signal.h"
+
 G_BEGIN_DECLS
 
 #define VSX_TYPE_RESPONSE                                               \
@@ -75,6 +77,8 @@ struct _VsxResponseClass
 struct _VsxResponse
 {
   GObject parent;
+
+  VsxSignal changed_signal;
 };
 
 GType
