@@ -21,7 +21,9 @@
 
 #include <glib-object.h>
 #include <gio/gio.h>
+
 #include "vsx-conversation.h"
+#include "vsx-player.h"
 
 G_BEGIN_DECLS
 
@@ -61,14 +63,11 @@ struct _VsxPerson
   GObject parent;
 
   VsxPersonId id;
-  /* This will be zero for one of the people in the conversation and
-     one for the other */
-  unsigned int person_num;
-
-  char *player_name;
 
   VsxConversation *conversation;
   guint conversation_changed_handler;
+
+  VsxPlayer *player;
 
   gint64 last_noise_time;
 };

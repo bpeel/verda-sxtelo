@@ -18,6 +18,7 @@ source_h = \
 	$(srcdir)/vsx-parse-content-type.h \
 	$(srcdir)/vsx-person.h \
 	$(srcdir)/vsx-person-set.h \
+	$(srcdir)/vsx-player.h \
 	$(srcdir)/vsx-request-handler.h \
 	$(srcdir)/vsx-response.h \
 	$(srcdir)/vsx-send-message-handler.h \
@@ -44,6 +45,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-parse-content-type.c\
 	$(srcdir)/vsx-person.c \
 	$(srcdir)/vsx-person-set.c \
+	$(srcdir)/vsx-player.c \
 	$(srcdir)/vsx-request-handler.c \
 	$(srcdir)/vsx-response.c \
 	$(srcdir)/vsx-send-message-handler.c \

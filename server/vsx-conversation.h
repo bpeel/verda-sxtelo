@@ -21,6 +21,8 @@
 
 #include <glib-object.h>
 
+#include "vsx-player.h"
+
 G_BEGIN_DECLS
 
 #define VSX_TYPE_CONVERSATION                                           \
@@ -47,6 +49,8 @@ G_BEGIN_DECLS
 typedef struct _VsxConversation      VsxConversation;
 typedef struct _VsxConversationClass VsxConversationClass;
 
+#define VSX_CONVERSATION_MAX_PLAYERS 32
+
 struct _VsxConversationClass
 {
   GObjectClass parent_class;
@@ -67,6 +71,9 @@ struct _VsxConversation
 
   /* Bitmask of people that are currently typing */
   unsigned int typing_mask;
+
+  int n_players;
+  VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
 };
 
 typedef struct
@@ -97,6 +104,10 @@ void
 vsx_conversation_set_typing (VsxConversation *conversation,
                              unsigned int person_num,
                              gboolean typing);
+
+VsxPlayer *
+vsx_conversation_add_player (VsxConversation *conversation,
+                             const char *player_name);
 
 G_END_DECLS
 

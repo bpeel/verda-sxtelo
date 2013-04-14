@@ -183,6 +183,20 @@ vsx_conversation_set_typing (VsxConversation *conversation,
     }
 }
 
+VsxPlayer *
+vsx_conversation_add_player (VsxConversation *conversation,
+                             const char *player_name)
+{
+  VsxPlayer *player;
+
+  g_assert_cmpint (conversation->n_players, <, VSX_CONVERSATION_MAX_PLAYERS);
+
+  player = vsx_player_new (player_name, conversation->n_players);
+  conversation->players[conversation->n_players++] = player;
+
+  return player;
+}
+
 VsxConversation *
 vsx_conversation_new (void)
 {

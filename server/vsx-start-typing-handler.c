@@ -82,7 +82,7 @@ real_request_finished (VsxRequestHandler *handler)
     {
       if (self->person->conversation)
         vsx_conversation_set_typing (self->person->conversation,
-                                     self->person->person_num,
+                                     self->person->player->num,
                                      TRUE);
 
       return vsx_string_response_new (VSX_STRING_RESPONSE_OK);

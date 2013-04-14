@@ -54,19 +54,10 @@ vsx_person_dispose (GObject *object)
       vsx_conversation_finish (person->conversation);
       g_object_unref (person->conversation);
       person->conversation = NULL;
+      person->player = NULL;
     }
 
   G_OBJECT_CLASS (vsx_person_parent_class)->dispose (object);
-}
-
-static void
-vsx_person_finalize (GObject *object)
-{
-  VsxPerson *person = VSX_PERSON (object);
-
-  g_free (person->player_name);
-
-  G_OBJECT_CLASS (vsx_person_parent_class)->finalize (object);
 }
 
 static void
@@ -75,7 +66,6 @@ vsx_person_class_init (VsxPersonClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = vsx_person_dispose;
-  object_class->finalize = vsx_person_finalize;
 
   signals[CHANGED_SIGNAL] =
     g_signal_new ("changed",
@@ -186,12 +176,8 @@ vsx_person_new (VsxPersonId id,
 
   person->id = id;
   person->conversation = g_object_ref (conversation);
-  person->player_name = g_strdup (player_name);
 
-  if (conversation->state == VSX_CONVERSATION_AWAITING_PARTNER)
-    person->person_num = 0;
-  else
-    person->person_num = 1;
+  person->player = vsx_conversation_add_player (conversation, player_name);
 
   person->conversation_changed_handler
     = g_signal_connect (conversation,

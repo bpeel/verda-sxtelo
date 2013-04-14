@@ -273,13 +273,13 @@ real_request_finished (VsxRequestHandler *handler)
         return vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
 
       vsx_conversation_add_message (self->person->conversation,
-                                    self->person->person_num,
+                                    self->person->player->num,
                                     self->message_buffer->str,
                                     self->message_buffer->len);
       /* Sending a message implicitly marks the person as no longer
          typing */
       vsx_conversation_set_typing (self->person->conversation,
-                                   self->person->person_num,
+                                   self->person->player->num,
                                    FALSE);
 
       g_string_free (self->message_buffer, TRUE);

@@ -128,7 +128,7 @@ vsx_watch_person_response_get_typing_state (VsxWatchPersonResponse *self)
   VsxPerson *person = self->person;
   VsxConversation *conversation = person->conversation;
 
-  return !!(conversation->typing_mask & (1 << (person->person_num ^ 1)));
+  return !!(conversation->typing_mask & (1 << (person->player->num ^ 1)));
 }
 
 static unsigned int
@@ -159,7 +159,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
       case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
         {
-          if (self->person->person_num == 0
+          if (self->person->player->num == 0
               ? write_static_message (self, &message_data,
                                       header_first_person_start)
               : write_static_message (self, &message_data,
