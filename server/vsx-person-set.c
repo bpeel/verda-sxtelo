@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,43 +20,46 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-person-set.h"
 
-G_DEFINE_TYPE (VsxPersonSet, vsx_person_set, G_TYPE_OBJECT);
-
 static void
-vsx_person_set_finalize (GObject *object)
+vsx_person_set_free (void *object)
 {
-  VsxPersonSet *self = (VsxPersonSet *) object;
+  VsxPersonSet *self = object;
 
   g_hash_table_destroy (self->hash_table);
 
-  G_OBJECT_CLASS (vsx_person_set_parent_class)->finalize (object);
+  vsx_object_get_class ()->free (object);
 }
 
-static void
-vsx_person_set_class_init (VsxPersonSetClass *klass)
+static const VsxObjectClass *
+vsx_person_set_get_class (void)
 {
-  GObjectClass *gobject_class = (GObjectClass *) klass;
+  static VsxObjectClass klass;
 
-  gobject_class->finalize = vsx_person_set_finalize;
-}
+  if (klass.free == NULL)
+    {
+      klass = *vsx_object_get_class ();
+      klass.instance_size = sizeof (VsxPersonSet);
+      klass.free = vsx_person_set_free;
+    }
 
-static void
-vsx_person_set_init (VsxPersonSet *self)
-{
-  self->hash_table = g_hash_table_new_full (vsx_person_id_hash,
-                                            vsx_person_id_equal,
-                                            NULL,
-                                            (GDestroyNotify) g_object_unref);
+  return &klass;
 }
 
 VsxPersonSet *
 vsx_person_set_new (void)
 {
-  VsxPersonSet *self = g_object_new (VSX_TYPE_PERSON_SET, NULL);
+  VsxPersonSet *self = vsx_object_allocate (vsx_person_set_get_class ());
+
+  vsx_object_init (self);
+
+  self->hash_table = g_hash_table_new_full (vsx_person_id_hash,
+                                            vsx_person_id_equal,
+                                            NULL,
+                                            (GDestroyNotify) vsx_object_unref);
 
   return self;
 }
@@ -97,7 +100,7 @@ vsx_person_set_generate_person (VsxPersonSet *set,
 
   person = vsx_person_new (id, player_name, conversation);
 
-  g_hash_table_insert (set->hash_table, &person->id, g_object_ref (person));
+  g_hash_table_insert (set->hash_table, &person->id, vsx_object_ref (person));
 
   return person;
 }

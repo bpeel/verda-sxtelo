@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 #include <string.h>
 
 #include "vsx-send-message-handler.h"
@@ -28,34 +28,16 @@
 #include "vsx-parse-content-type.h"
 #include "vsx-arguments.h"
 
-G_DEFINE_TYPE (VsxSendMessageHandler,
-               vsx_send_message_handler,
-               VSX_TYPE_REQUEST_HANDLER);
-
 static void
-real_dispose (GObject *object)
+real_free (void *object)
 {
-  VsxSendMessageHandler *handler = VSX_SEND_MESSAGE_HANDLER (object);
+  VsxSendMessageHandler *handler = (VsxSendMessageHandler *) object;
 
   if (handler->person)
-    {
-      g_object_unref (handler->person);
-      handler->person = NULL;
-    }
+    vsx_object_unref (handler->person);
 
   if (handler->response)
-    {
-      g_object_unref (handler->response);
-      handler->response = NULL;
-    }
-
-  G_OBJECT_CLASS (vsx_send_message_handler_parent_class)->dispose (object);
-}
-
-static void
-real_finalize (GObject *object)
-{
-  VsxSendMessageHandler *handler = VSX_SEND_MESSAGE_HANDLER (object);
+    vsx_object_unref (handler->response);
 
   if (handler->data_iconv != (GIConv) -1)
     g_iconv_close (handler->data_iconv);
@@ -63,7 +45,7 @@ real_finalize (GObject *object)
   if (handler->message_buffer)
     g_string_free (handler->message_buffer, TRUE);
 
-  G_OBJECT_CLASS (vsx_send_message_handler_parent_class)->finalize (object);
+  vsx_request_handler_get_class ()->parent_class.free (object);
 }
 
 static void
@@ -72,7 +54,7 @@ set_error (VsxSendMessageHandler *self,
 {
   if (self->person)
     {
-      g_object_unref (self->person);
+      vsx_object_unref (self->person);
       self->person = NULL;
     }
 
@@ -91,7 +73,7 @@ real_request_line_received (VsxRequestHandler *handler,
                             VsxRequestMethod method,
                             const char *query_string)
 {
-  VsxSendMessageHandler *self = VSX_SEND_MESSAGE_HANDLER (handler);
+  VsxSendMessageHandler *self = (VsxSendMessageHandler *) handler;
   VsxPersonId id;
 
   if ((method == VSX_REQUEST_METHOD_POST
@@ -107,7 +89,7 @@ real_request_line_received (VsxRequestHandler *handler,
       else if (method == VSX_REQUEST_METHOD_OPTIONS)
         self->is_options_request = TRUE;
       else
-        self->person = g_object_ref (person);
+        self->person = vsx_object_ref (person);
     }
   else
     set_error (self, VSX_STRING_RESPONSE_BAD_REQUEST);
@@ -164,7 +146,7 @@ real_header_received (VsxRequestHandler *handler,
                       const char *field_name,
                       const char *value)
 {
-  VsxSendMessageHandler *self = VSX_SEND_MESSAGE_HANDLER (handler);
+  VsxSendMessageHandler *self = (VsxSendMessageHandler *) handler;
 
   /* Ignore the header if we've already encountered some error */
   if (self->response == NULL)
@@ -215,7 +197,7 @@ real_data_received (VsxRequestHandler *handler,
                     const guint8 *data,
                     unsigned int length)
 {
-  VsxSendMessageHandler *self = VSX_SEND_MESSAGE_HANDLER (handler);
+  VsxSendMessageHandler *self = (VsxSendMessageHandler *) handler;
 
   /* Ignore the data if we've already encountered some error */
   if (self->person)
@@ -254,10 +236,10 @@ real_data_received (VsxRequestHandler *handler,
 static VsxResponse *
 real_request_finished (VsxRequestHandler *handler)
 {
-  VsxSendMessageHandler *self = VSX_SEND_MESSAGE_HANDLER (handler);
+  VsxSendMessageHandler *self = (VsxSendMessageHandler *) handler;
 
   if (self->response)
-    return g_object_ref (self->response);
+    return vsx_object_ref (self->response);
   else if (self->is_options_request)
     {
       if (self->had_request_method)
@@ -295,26 +277,37 @@ real_request_finished (VsxRequestHandler *handler)
     }
 }
 
-static void
-vsx_send_message_handler_class_init (VsxSendMessageHandlerClass *klass)
+static const VsxRequestHandlerClass *
+vsx_send_message_handler_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-  VsxRequestHandlerClass *request_handler_class
-    = (VsxRequestHandlerClass *) klass;
+  static VsxRequestHandlerClass klass;
 
-  object_class->dispose = real_dispose;
-  object_class->finalize = real_finalize;
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_request_handler_get_class ();
+      klass.parent_class.instance_size = sizeof (VsxSendMessageHandler);
+      klass.parent_class.free = real_free;
 
-  request_handler_class->request_line_received = real_request_line_received;
-  request_handler_class->header_received = real_header_received;
-  request_handler_class->data_received = real_data_received;
-  request_handler_class->request_finished = real_request_finished;
+      klass.request_line_received = real_request_line_received;
+      klass.header_received = real_header_received;
+      klass.data_received = real_data_received;
+      klass.request_finished = real_request_finished;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_send_message_handler_init (VsxSendMessageHandler *self)
+VsxRequestHandler *
+vsx_send_message_handler_new (void)
 {
-  self->data_iconv = (GIConv) -1;
+  VsxSendMessageHandler *handler =
+    vsx_object_allocate (vsx_send_message_handler_get_class ());
 
-  self->message_buffer = g_string_new (NULL);
+  vsx_request_handler_init (handler);
+
+  handler->data_iconv = (GIConv) -1;
+
+  handler->message_buffer = g_string_new (NULL);
+
+  return (VsxRequestHandler *) handler;
 }

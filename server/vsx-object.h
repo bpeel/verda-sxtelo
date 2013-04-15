@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,27 +16,42 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_KEEP_ALIVE_HANDLER_H__
-#define __VSX_KEEP_ALIVE_HANDLER_H__
+#ifndef __VSX_OBJECT_H__
+#define __VSX_OBJECT_H__
 
 #include <glib.h>
-#include "vsx-request-handler.h"
-#include "vsx-person-set.h"
 
 G_BEGIN_DECLS
 
 typedef struct
 {
-  VsxRequestHandler parent;
+  size_t instance_size;
 
-  VsxPerson *person;
+  void (* free) (void *object);
+} VsxObjectClass;
 
-  VsxResponse *response;
-} VsxKeepAliveHandler;
+typedef struct
+{
+  const VsxObjectClass *klass;
 
-VsxRequestHandler *
-vsx_keep_alive_handler_new (void);
+  unsigned int ref_count;
+} VsxObject;
+
+void
+vsx_object_init (void *object);
+
+void *
+vsx_object_allocate (const void *klass);
+
+const VsxObjectClass *
+vsx_object_get_class (void) G_GNUC_CONST;
+
+void *
+vsx_object_ref (void *object);
+
+void
+vsx_object_unref (void *object);
 
 G_END_DECLS
 
-#endif /* __VSX_KEEP_ALIVE_HANDLER_H__ */
+#endif /* __VSX_OBJECT_H__ */

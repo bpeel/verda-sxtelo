@@ -20,29 +20,22 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-watch-person-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-watch-person-response.h"
 #include "vsx-arguments.h"
 
-G_DEFINE_TYPE (VsxWatchPersonHandler,
-               vsx_watch_person_handler,
-               VSX_TYPE_REQUEST_HANDLER);
-
 static void
-real_dispose (GObject *object)
+real_free (void *object)
 {
-  VsxWatchPersonHandler *handler = VSX_WATCH_PERSON_HANDLER (object);
+  VsxWatchPersonHandler *handler = object;
 
   if (handler->response)
-    {
-      g_object_unref (handler->response);
-      handler->response = NULL;
-    }
+    vsx_object_unref (handler->response);
 
-  G_OBJECT_CLASS (vsx_watch_person_handler_parent_class)->dispose (object);
+  vsx_request_handler_get_class ()->parent_class.free (object);
 }
 
 static void
@@ -50,7 +43,7 @@ real_request_line_received (VsxRequestHandler *handler,
                             VsxRequestMethod method,
                             const char *query_string)
 {
-  VsxWatchPersonHandler *self = VSX_WATCH_PERSON_HANDLER (handler);
+  VsxWatchPersonHandler *self = (VsxWatchPersonHandler *) handler;
   VsxPersonId id;
   int last_message;
 
@@ -82,10 +75,10 @@ real_request_line_received (VsxRequestHandler *handler,
 static VsxResponse *
 real_request_finished (VsxRequestHandler *handler)
 {
-  VsxWatchPersonHandler *self = VSX_WATCH_PERSON_HANDLER (handler);
+  VsxWatchPersonHandler *self = (VsxWatchPersonHandler *) handler;
 
   if (self->response)
-    return g_object_ref (self->response);
+    return vsx_object_ref (self->response);
   else
     {
       g_warn_if_reached ();
@@ -94,20 +87,31 @@ real_request_finished (VsxRequestHandler *handler)
     }
 }
 
-static void
-vsx_watch_person_handler_class_init (VsxWatchPersonHandlerClass *klass)
+static const VsxRequestHandlerClass *
+vsx_watch_person_handler_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-  VsxRequestHandlerClass *request_handler_class
-    = (VsxRequestHandlerClass *) klass;
+  static VsxRequestHandlerClass klass;
 
-  object_class->dispose = real_dispose;
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_request_handler_get_class ();
+      klass.parent_class.instance_size = sizeof (VsxWatchPersonHandler);
+      klass.parent_class.free = real_free;
 
-  request_handler_class->request_line_received = real_request_line_received;
-  request_handler_class->request_finished = real_request_finished;
+      klass.request_line_received = real_request_line_received;
+      klass.request_finished = real_request_finished;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_watch_person_handler_init (VsxWatchPersonHandler *self)
+VsxRequestHandler *
+vsx_watch_person_handler_new (void)
 {
+  VsxRequestHandler *handler =
+    vsx_object_allocate (vsx_watch_person_handler_get_class ());
+
+  vsx_request_handler_init (handler);
+
+  return handler;
 }

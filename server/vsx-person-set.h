@@ -19,50 +19,20 @@
 #ifndef __VSX_PERSON_SET_H__
 #define __VSX_PERSON_SET_H__
 
-#include <glib-object.h>
+#include <glib.h>
 #include <gio/gio.h>
+
 #include "vsx-person.h"
+#include "vsx-object.h"
 
 G_BEGIN_DECLS
 
-#define VSX_TYPE_PERSON_SET                                             \
-  (vsx_person_set_get_type())
-#define VSX_PERSON_SET(obj)                                             \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                                   \
-                               VSX_TYPE_PERSON_SET,                     \
-                               VsxPersonSet))
-#define VSX_PERSON_SET_CLASS(klass)                                     \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                                    \
-                            VSX_TYPE_PERSON_SET,                        \
-                            VsxPersonSetClass))
-#define VSX_IS_PERSON_SET(obj)                                          \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                                   \
-                               VSX_TYPE_PERSON_SET))
-#define VSX_IS_PERSON_SET_CLASS(klass)                                  \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                                    \
-                            VSX_TYPE_PERSON_SET))
-#define VSX_PERSON_SET_GET_CLASS(obj)                                   \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                                    \
-                              VSX_PERSON_SET,                           \
-                              VsxPersonSetClass))
-
-typedef struct _VsxPersonSet      VsxPersonSet;
-typedef struct _VsxPersonSetClass VsxPersonSetClass;
-
-struct _VsxPersonSetClass
+typedef struct
 {
-  GObjectClass parent_class;
-};
-
-struct _VsxPersonSet
-{
-  GObject parent;
+  VsxObject parent;
 
   GHashTable *hash_table;
-};
-
-GType
-vsx_person_set_get_type (void) G_GNUC_CONST;
+} VsxPersonSet;
 
 VsxPersonSet *
 vsx_person_set_new (void);

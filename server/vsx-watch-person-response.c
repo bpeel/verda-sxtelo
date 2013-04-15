@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,12 +24,6 @@
 #include <stdio.h>
 
 #include "vsx-watch-person-response.h"
-
-static void vsx_watch_person_response_dispose (GObject *object);
-
-G_DEFINE_TYPE (VsxWatchPersonResponse,
-               vsx_watch_person_response,
-               VSX_TYPE_RESPONSE);
 
 static guint8
 header[] =
@@ -136,7 +130,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                                     guint8 *data_in,
                                     unsigned int length_in)
 {
-  VsxWatchPersonResponse *self = VSX_WATCH_PERSON_RESPONSE (response);
+  VsxWatchPersonResponse *self = (VsxWatchPersonResponse *) response;
   WriteMessageData message_data;
 
   message_data.data = data_in;
@@ -347,7 +341,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 static gboolean
 vsx_watch_person_response_is_finished (VsxResponse *response)
 {
-  VsxWatchPersonResponse *self = VSX_WATCH_PERSON_RESPONSE (response);
+  VsxWatchPersonResponse *self = (VsxWatchPersonResponse *) response;
 
   return self->state == VSX_WATCH_PERSON_RESPONSE_DONE;
 }
@@ -355,7 +349,7 @@ vsx_watch_person_response_is_finished (VsxResponse *response)
 static gboolean
 vsx_watch_person_response_has_data (VsxResponse *response)
 {
-  VsxWatchPersonResponse *self = VSX_WATCH_PERSON_RESPONSE (response);
+  VsxWatchPersonResponse *self = (VsxWatchPersonResponse *) response;
 
   switch (self->state)
     {
@@ -393,36 +387,37 @@ vsx_watch_person_response_has_data (VsxResponse *response)
 }
 
 static void
-vsx_watch_person_response_class_init (VsxWatchPersonResponseClass *klass)
+vsx_watch_person_response_free (void *object)
 {
-  GObjectClass *gobject_class = (GObjectClass *) klass;
-  VsxResponseClass *response_class = (VsxResponseClass *) klass;
-
-  gobject_class->dispose = vsx_watch_person_response_dispose;
-
-  response_class->add_data = vsx_watch_person_response_add_data;
-  response_class->is_finished = vsx_watch_person_response_is_finished;
-  response_class->has_data = vsx_watch_person_response_has_data;
-}
-
-static void
-vsx_watch_person_response_init (VsxWatchPersonResponse *self)
-{
-}
-
-static void
-vsx_watch_person_response_dispose (GObject *object)
-{
-  VsxWatchPersonResponse *self = (VsxWatchPersonResponse *) object;
+  VsxWatchPersonResponse *self = object;
 
   if (self->person)
     {
       vsx_list_remove (&self->person_changed_listener.link);
-      g_object_unref (self->person);
-      self->person = NULL;
+      vsx_object_unref (self->person);
     }
 
-  G_OBJECT_CLASS (vsx_watch_person_response_parent_class)->dispose (object);
+  vsx_response_get_class ()->parent_class.free (object);
+}
+
+static VsxResponseClass *
+vsx_watch_person_response_get_class (void)
+{
+  static VsxResponseClass klass;
+
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_response_get_class ();
+
+      klass.parent_class.instance_size = sizeof (VsxWatchPersonResponse);
+      klass.parent_class.free = vsx_watch_person_response_free;
+
+      klass.add_data = vsx_watch_person_response_add_data;
+      klass.is_finished = vsx_watch_person_response_is_finished;
+      klass.has_data = vsx_watch_person_response_has_data;
+    }
+
+  return &klass;
 }
 
 static void
@@ -432,7 +427,7 @@ person_changed_cb (VsxListener *listener,
   VsxWatchPersonResponse *response =
     vsx_container_of (listener, response, person_changed_listener);
 
-  vsx_response_changed (VSX_RESPONSE (response));
+  vsx_response_changed ((VsxResponse *) response);
 }
 
 VsxResponse *
@@ -440,14 +435,16 @@ vsx_watch_person_response_new (VsxPerson *person,
                                int last_message)
 {
   VsxWatchPersonResponse *self =
-    g_object_new (VSX_TYPE_WATCH_PERSON_RESPONSE, NULL);
+    vsx_object_allocate (vsx_watch_person_response_get_class ());
 
-  self->person = g_object_ref (person);
+  vsx_response_init (self);
+
+  self->person = vsx_object_ref (person);
   self->message_num = last_message;
 
   self->person_changed_listener.notify = person_changed_cb;
   vsx_signal_add (&person->changed_signal,
                   &self->person_changed_listener);
 
-  return VSX_RESPONSE (self);
+  return (VsxResponse *) self;
 }

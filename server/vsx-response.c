@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,11 +20,9 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-response.h"
-
-G_DEFINE_ABSTRACT_TYPE (VsxResponse, vsx_response, G_TYPE_OBJECT);
 
 static gboolean
 vsx_response_real_has_data (VsxResponse *self)
@@ -32,16 +30,30 @@ vsx_response_real_has_data (VsxResponse *self)
   return TRUE;
 }
 
-static void
-vsx_response_class_init (VsxResponseClass *klass)
+const VsxResponseClass *
+vsx_response_get_class (void)
 {
-  klass->has_data = vsx_response_real_has_data;
+  static VsxResponseClass class;
+
+  if (class.parent_class.free == NULL)
+    {
+      class.parent_class = *vsx_object_get_class ();
+      class.parent_class.instance_size = sizeof (VsxResponse);
+
+      class.has_data = vsx_response_real_has_data;
+    }
+
+  return &class;
 }
 
-static void
-vsx_response_init (VsxResponse *self)
+void
+vsx_response_init (void *object)
 {
-  vsx_signal_init (&self->changed_signal);
+  VsxResponse *response = object;
+
+  vsx_object_init (object);
+
+  vsx_signal_init (&response->changed_signal);
 }
 
 unsigned int
@@ -49,21 +61,30 @@ vsx_response_add_data (VsxResponse *response,
                        guint8 *buffer,
                        unsigned int buffer_size)
 {
-  return VSX_RESPONSE_GET_CLASS (response)->add_data (response,
-                                                      buffer,
-                                                      buffer_size);
+  VsxResponseClass *klass =
+    (VsxResponseClass *) ((VsxObject *) response)->klass;
+
+  return klass->add_data (response,
+                          buffer,
+                          buffer_size);
 }
 
 gboolean
 vsx_response_is_finished (VsxResponse *response)
 {
-  return VSX_RESPONSE_GET_CLASS (response)->is_finished (response);
+  VsxResponseClass *klass =
+    (VsxResponseClass *) ((VsxObject *) response)->klass;
+
+  return klass->is_finished (response);
 }
 
 gboolean
 vsx_response_has_data (VsxResponse *response)
 {
-  return VSX_RESPONSE_GET_CLASS (response)->has_data (response);
+  VsxResponseClass *klass =
+    (VsxResponseClass *) ((VsxObject *) response)->klass;
+
+  return klass->has_data (response);
 }
 
 void

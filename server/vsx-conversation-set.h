@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,9 @@
 #ifndef __VSX_CONVERSATION_SET_H__
 #define __VSX_CONVERSATION_SET_H__
 
-#include <glib-object.h>
+#include <glib.h>
 #include <gio/gio.h>
+
 #include "vsx-conversation.h"
 
 /* This class represents a hash table of pending conversations. It
@@ -30,38 +31,9 @@
 
 G_BEGIN_DECLS
 
-#define VSX_TYPE_CONVERSATION_SET               \
-  (vsx_conversation_set_get_type())
-#define VSX_CONVERSATION_SET(obj)                               \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                           \
-                               VSX_TYPE_CONVERSATION_SET,       \
-                               VsxConversationSet))
-#define VSX_CONVERSATION_SET_CLASS(klass)               \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                    \
-                            VSX_TYPE_CONVERSATION_SET,  \
-                            VsxConversationSetClass))
-#define VSX_IS_CONVERSATION_SET(obj)                            \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                           \
-                               VSX_TYPE_CONVERSATION_SET))
-#define VSX_IS_CONVERSATION_SET_CLASS(klass)            \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                    \
-                            VSX_TYPE_CONVERSATION_SET))
-#define VSX_CONVERSATION_SET_GET_CLASS(obj)             \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                    \
-                              VSX_CONVERSATION_SET,     \
-                              VsxConversationSetClass))
-
-typedef struct _VsxConversationSet      VsxConversationSet;
-typedef struct _VsxConversationSetClass VsxConversationSetClass;
-
-struct _VsxConversationSetClass
+typedef struct
 {
-  GObjectClass parent_class;
-};
-
-struct _VsxConversationSet
-{
-  GObject parent;
+  VsxObject parent;
 
   /* Hash table of pending conversations. This only contains
      conversations that only have one person. The key is the name of
@@ -71,10 +43,7 @@ struct _VsxConversationSet
      it can remove the conversation if the first person leaves before
      the second person joins. */
   GHashTable *hash_table;
-};
-
-GType
-vsx_conversation_set_get_type (void) G_GNUC_CONST;
+} VsxConversationSet;
 
 VsxConversationSet *
 vsx_conversation_set_new (void);

@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,49 +20,46 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 #include <string.h>
 
 #include "vsx-person.h"
 #include "vsx-main-context.h"
-
-G_DEFINE_TYPE (VsxPerson, vsx_person, G_TYPE_OBJECT);
 
 /* Time in microseconds after the last request is sent on a person
    before he/she is considered to be silent */
 #define VSX_PERSON_SILENCE_TIME (60 * 5 * (gint64) 1000000)
 
 static void
-vsx_person_dispose (GObject *object)
+vsx_person_free (void *object)
 {
-  VsxPerson *person = VSX_PERSON (object);
+  VsxPerson *person = object;
 
   if (person->conversation)
     {
       vsx_list_remove (&person->conversation_changed_listener.link);
       vsx_conversation_finish (person->conversation);
-      g_object_unref (person->conversation);
+      vsx_object_unref (person->conversation);
       person->conversation = NULL;
       person->player = NULL;
     }
 
-  G_OBJECT_CLASS (vsx_person_parent_class)->dispose (object);
+  vsx_object_get_class ()->free (object);
 }
 
-static void
-vsx_person_class_init (VsxPersonClass *klass)
+static const VsxObjectClass *
+vsx_person_get_class (void)
 {
-  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  static VsxObjectClass klass;
 
-  object_class->dispose = vsx_person_dispose;
-}
+  if (klass.free == NULL)
+    {
+      klass = *vsx_object_get_class ();
+      klass.instance_size = sizeof (VsxPerson);
+      klass.free = vsx_person_free;
+    }
 
-static void
-vsx_person_init (VsxPerson *self)
-{
-  vsx_signal_init (&self->changed_signal);
-
-  vsx_person_make_noise (self);
+  return &klass;
 }
 
 gboolean
@@ -153,12 +150,17 @@ vsx_person_new (VsxPersonId id,
                 const char *player_name,
                 VsxConversation *conversation)
 {
-  VsxPerson *person = g_object_new (VSX_TYPE_PERSON, NULL);
+  VsxPerson *person =
+    vsx_object_allocate (vsx_person_get_class ());
+
+  vsx_object_init (person);
 
   vsx_signal_init (&person->changed_signal);
 
+  vsx_person_make_noise (person);
+
   person->id = id;
-  person->conversation = g_object_ref (conversation);
+  person->conversation = vsx_object_ref (conversation);
 
   person->player = vsx_conversation_add_player (conversation, player_name);
 

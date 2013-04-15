@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,37 +20,26 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-request-handler.h"
 #include "vsx-string-response.h"
 
-G_DEFINE_TYPE (VsxRequestHandler, vsx_request_handler, G_TYPE_OBJECT);
-
 static void
-vsx_request_handler_dispose (GObject *object)
+vsx_request_handler_free (void *object)
 {
-  VsxRequestHandler *handler = VSX_REQUEST_HANDLER (object);
+  VsxRequestHandler *handler = object;
 
   if (handler->socket_address)
-    {
-      g_object_unref (handler->socket_address);
-      handler->socket_address = NULL;
-    }
+    g_object_unref (handler->socket_address);
 
   if (handler->person_set)
-    {
-      g_object_unref (handler->person_set);
-      handler->person_set = NULL;
-    }
+    vsx_object_unref (handler->person_set);
 
   if (handler->conversation_set)
-    {
-      g_object_unref (handler->conversation_set);
-      handler->conversation_set = NULL;
-    }
+    vsx_object_unref (handler->conversation_set);
 
-  G_OBJECT_CLASS (vsx_request_handler_parent_class)->dispose (object);
+  vsx_object_get_class ()->free (object);
 }
 
 static void
@@ -89,34 +78,40 @@ vsx_request_handler_real_request_finished (VsxRequestHandler *handler)
     return vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
 }
 
-static void
-vsx_request_handler_class_init (VsxRequestHandlerClass *klass)
+const VsxRequestHandlerClass *
+vsx_request_handler_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-  VsxRequestHandlerClass *request_handler_class
-    = (VsxRequestHandlerClass *) klass;
+  static VsxRequestHandlerClass klass;
 
-  object_class->dispose = vsx_request_handler_dispose;
+  if (klass.parent_class.free == NULL)
+    {
+      klass.parent_class = *vsx_object_get_class ();
+      klass.parent_class.instance_size = sizeof (VsxRequestHandler);
+      klass.parent_class.free = vsx_request_handler_free;
 
-  request_handler_class->request_line_received
-    = vsx_request_handler_real_request_line_received;
-  request_handler_class->header_received
-    = vsx_request_handler_real_header_received;
-  request_handler_class->data_received
-    = vsx_request_handler_real_data_received;
-  request_handler_class->request_finished
-    = vsx_request_handler_real_request_finished;
+      klass.request_line_received =
+        vsx_request_handler_real_request_line_received;
+      klass.header_received = vsx_request_handler_real_header_received;
+      klass.data_received = vsx_request_handler_real_data_received;
+      klass.request_finished = vsx_request_handler_real_request_finished;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_request_handler_init (VsxRequestHandler *self)
+void
+vsx_request_handler_init (void *object)
 {
+  vsx_object_init (object);
 }
 
 VsxRequestHandler *
 vsx_request_handler_new (void)
 {
-  VsxRequestHandler *self = g_object_new (VSX_TYPE_REQUEST_HANDLER, NULL);
+  VsxRequestHandler *self =
+    vsx_object_allocate (vsx_request_handler_get_class ());
+
+  vsx_request_handler_init (self);
 
   return self;
 }
@@ -126,8 +121,10 @@ vsx_request_handler_request_line_received (VsxRequestHandler *handler,
                                            VsxRequestMethod method,
                                            const char *query_string)
 {
-  VSX_REQUEST_HANDLER_GET_CLASS (handler)
-    ->request_line_received (handler, method, query_string);
+  VsxRequestHandlerClass *klass =
+    (VsxRequestHandlerClass *) ((VsxObject *) handler)->klass;
+
+  klass->request_line_received (handler, method, query_string);
 }
 
 void
@@ -135,8 +132,10 @@ vsx_request_handler_header_received (VsxRequestHandler *handler,
                                      const char *field_name,
                                      const char *value)
 {
-  VSX_REQUEST_HANDLER_GET_CLASS (handler)
-    ->header_received (handler, field_name, value);
+  VsxRequestHandlerClass *klass =
+    (VsxRequestHandlerClass *) ((VsxObject *) handler)->klass;
+
+  klass->header_received (handler, field_name, value);
 }
 
 void
@@ -144,12 +143,17 @@ vsx_request_handler_data_received (VsxRequestHandler *handler,
                                    const guint8 *data,
                                    unsigned int length)
 {
-  VSX_REQUEST_HANDLER_GET_CLASS (handler)
-    ->data_received (handler, data, length);
+  VsxRequestHandlerClass *klass =
+    (VsxRequestHandlerClass *) ((VsxObject *) handler)->klass;
+
+  klass->data_received (handler, data, length);
 }
 
 VsxResponse *
 vsx_request_handler_request_finished (VsxRequestHandler *handler)
 {
-  return VSX_REQUEST_HANDLER_GET_CLASS (handler)->request_finished (handler);
+  VsxRequestHandlerClass *klass =
+    (VsxRequestHandlerClass *) ((VsxObject *) handler)->klass;
+
+  return klass->request_finished (handler);
 }

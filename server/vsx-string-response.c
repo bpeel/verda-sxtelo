@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,10 +22,6 @@
 
 #include <string.h>
 #include "vsx-string-response.h"
-
-G_DEFINE_TYPE (VsxStringResponse,
-               vsx_string_response,
-               VSX_TYPE_RESPONSE);
 
 static const char
 bad_request_response[] =
@@ -124,10 +120,10 @@ get_message (VsxStringResponseType type,
 
 static unsigned int
 vsx_string_response_add_data (VsxResponse *response,
-                             guint8 *data,
-                             unsigned int length)
+                              guint8 *data,
+                              unsigned int length)
 {
-  VsxStringResponse *self = VSX_STRING_RESPONSE (response);
+  VsxStringResponse *self = (VsxStringResponse *) response;
   const char *message_buffer;
   unsigned int message_length;
   unsigned int to_write;
@@ -145,7 +141,7 @@ vsx_string_response_add_data (VsxResponse *response,
 static gboolean
 vsx_string_response_is_finished (VsxResponse *response)
 {
-  VsxStringResponse *self = VSX_STRING_RESPONSE (response);
+  VsxStringResponse *self = (VsxStringResponse *) response;
   const char *message_buffer;
   unsigned int message_length;
 
@@ -154,27 +150,33 @@ vsx_string_response_is_finished (VsxResponse *response)
   return self->output_pos >= message_length;
 }
 
-static void
-vsx_string_response_class_init (VsxStringResponseClass *klass)
+static VsxResponseClass *
+vsx_string_response_get_class (void)
 {
-  VsxResponseClass *response_class = (VsxResponseClass *) klass;
+  static VsxResponseClass klass;
 
-  response_class->add_data = vsx_string_response_add_data;
-  response_class->is_finished = vsx_string_response_is_finished;
-}
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_response_get_class ();
 
-static void
-vsx_string_response_init (VsxStringResponse *self)
-{
+      klass.parent_class.instance_size = sizeof (VsxStringResponse);
+
+      klass.add_data = vsx_string_response_add_data;
+      klass.is_finished = vsx_string_response_is_finished;
+    }
+
+  return &klass;
 }
 
 VsxResponse *
 vsx_string_response_new (VsxStringResponseType type)
 {
   VsxStringResponse *self =
-    g_object_new (VSX_TYPE_STRING_RESPONSE, NULL);
+    vsx_object_allocate (vsx_string_response_get_class ());
+
+  vsx_response_init (self);
 
   self->type = type;
 
-  return VSX_RESPONSE (self);
+  return (VsxResponse *) self;
 }

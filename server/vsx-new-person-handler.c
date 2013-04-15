@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,26 +20,22 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-new-person-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-watch-person-response.h"
 #include "vsx-arguments.h"
 
-G_DEFINE_TYPE (VsxNewPersonHandler,
-               vsx_new_person_handler,
-               VSX_TYPE_REQUEST_HANDLER);
-
 static void
-real_finalize (GObject *object)
+real_free (void *object)
 {
-  VsxNewPersonHandler *handler = VSX_NEW_PERSON_HANDLER (object);
+  VsxNewPersonHandler *handler = (VsxNewPersonHandler *) object;
 
   g_free (handler->room_name);
   g_free (handler->player_name);
 
-  G_OBJECT_CLASS (vsx_new_person_handler_parent_class)->finalize (object);
+  vsx_request_handler_get_class ()->parent_class.free (object);
 }
 
 static void
@@ -47,7 +43,7 @@ real_request_line_received (VsxRequestHandler *handler,
                             VsxRequestMethod method,
                             const char *query_string)
 {
-  VsxNewPersonHandler *self = VSX_NEW_PERSON_HANDLER (handler);
+  VsxNewPersonHandler *self = (VsxNewPersonHandler *) handler;
 
   if (method != VSX_REQUEST_METHOD_GET)
     return;
@@ -65,7 +61,7 @@ real_request_line_received (VsxRequestHandler *handler,
 static VsxResponse *
 real_request_finished (VsxRequestHandler *handler)
 {
-  VsxNewPersonHandler *self = VSX_NEW_PERSON_HANDLER (handler);
+  VsxNewPersonHandler *self = (VsxNewPersonHandler *) handler;
   VsxResponse *response;
 
   if (self->room_name && self->player_name)
@@ -83,8 +79,8 @@ real_request_finished (VsxRequestHandler *handler)
 
       response = vsx_watch_person_response_new (person, 0);
 
-      g_object_unref (conversation);
-      g_object_unref (person);
+      vsx_object_unref (conversation);
+      vsx_object_unref (person);
     }
   else
     response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
@@ -92,20 +88,31 @@ real_request_finished (VsxRequestHandler *handler)
   return response;
 }
 
-static void
-vsx_new_person_handler_class_init (VsxNewPersonHandlerClass *klass)
+static const VsxRequestHandlerClass *
+vsx_new_person_handler_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-  VsxRequestHandlerClass *request_handler_class
-    = (VsxRequestHandlerClass *) klass;
+  static VsxRequestHandlerClass klass;
 
-  object_class->finalize = real_finalize;
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_request_handler_get_class ();
+      klass.parent_class.instance_size = sizeof (VsxNewPersonHandler);
+      klass.parent_class.free = real_free;
 
-  request_handler_class->request_line_received = real_request_line_received;
-  request_handler_class->request_finished = real_request_finished;
+      klass.request_line_received = real_request_line_received;
+      klass.request_finished = real_request_finished;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_new_person_handler_init (VsxNewPersonHandler *self)
+VsxRequestHandler *
+vsx_new_person_handler_new (void)
 {
+  VsxRequestHandler *handler =
+    vsx_object_allocate (vsx_new_person_handler_get_class ());
+
+  vsx_request_handler_init (handler);
+
+  return handler;
 }

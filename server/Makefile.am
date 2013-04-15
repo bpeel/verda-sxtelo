@@ -16,6 +16,7 @@ source_h = \
 	$(srcdir)/vsx-log.h \
 	$(srcdir)/vsx-main-context.h \
 	$(srcdir)/vsx-new-person-handler.h \
+	$(srcdir)/vsx-object.h \
 	$(srcdir)/vsx-parse-content-type.h \
 	$(srcdir)/vsx-person.h \
 	$(srcdir)/vsx-person-set.h \
@@ -45,6 +46,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-main.c \
 	$(srcdir)/vsx-main-context.c \
 	$(srcdir)/vsx-new-person-handler.c \
+	$(srcdir)/vsx-object.c \
 	$(srcdir)/vsx-parse-content-type.c\
 	$(srcdir)/vsx-person.c \
 	$(srcdir)/vsx-person-set.c \
@@ -61,16 +63,3 @@ verda_sxtelo_SOURCES = \
 
 verda_sxtelo_LDFLAGS = \
 	$(GLIB_LIBS)
-
-# These need to be defined before we can include the glib Makefiles
-# below
-CLEANFILES =
-DISTCLEANFILES =
-BUILT_SOURCES =
-EXTRA_DIST =
-
-# glib-mkenums rules
-glib_enum_h = vsx-enum-types.h
-glib_enum_c = vsx-enum-types.c
-glib_enum_headers = $(source_h)
-include $(top_srcdir)/build/Makefile.am.enums

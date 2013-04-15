@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -127,17 +127,17 @@ typedef struct
 static const struct
 {
   const char *url;
-  GType (* get_type_func) (void);
+  VsxRequestHandler * (* create_handler_func) (void);
 }
 requests[] =
   {
-    { "/keep_alive", vsx_keep_alive_handler_get_type },
-    { "/start_typing", vsx_start_typing_handler_get_type },
-    { "/stop_typing", vsx_stop_typing_handler_get_type },
-    { "/send_message", vsx_send_message_handler_get_type },
-    { "/watch_person", vsx_watch_person_handler_get_type },
-    { "/new_person", vsx_new_person_handler_get_type },
-    { "/leave", vsx_leave_handler_get_type }
+    { "/keep_alive", vsx_keep_alive_handler_new },
+    { "/start_typing", vsx_start_typing_handler_new },
+    { "/stop_typing", vsx_stop_typing_handler_new },
+    { "/send_message", vsx_send_message_handler_new },
+    { "/watch_person", vsx_watch_person_handler_new },
+    { "/new_person", vsx_new_person_handler_new },
+    { "/leave", vsx_leave_handler_new }
   };
 
 static void
@@ -201,7 +201,7 @@ vsx_server_request_line_received_cb (const char *method_str,
   for (i = 0; i < G_N_ELEMENTS (requests); i++)
     if (!strcmp (url, requests[i].url))
       {
-        handler = g_object_new (requests[i].get_type_func (), NULL);
+        handler = requests[i].create_handler_func ();
 
         goto got_handler;
       }
@@ -214,9 +214,9 @@ vsx_server_request_line_received_cb (const char *method_str,
   handler->socket_address =
     g_socket_get_remote_address (connection->client_socket, NULL);
   handler->conversation_set =
-    g_object_ref (connection->server->pending_conversations);
+    vsx_object_ref (connection->server->pending_conversations);
   handler->person_set =
-    g_object_ref (connection->server->person_set);
+    vsx_object_ref (connection->server->person_set);
 
   vsx_request_handler_request_line_received (handler, method, query_string);
 
@@ -281,7 +281,7 @@ vsx_server_request_finished_cb (void *user_data)
 
   response = vsx_request_handler_request_finished (handler);
 
-  g_object_unref (handler);
+  vsx_object_unref (handler);
   connection->current_request_handler = NULL;
 
   queue_response (connection, response);
@@ -311,7 +311,7 @@ vsx_server_connection_pop_response (VsxServerConnection *connection)
 
   vsx_list_remove (&queued_response->response_changed_listener.link);
 
-  g_object_unref (queued_response->response);
+  vsx_object_unref (queued_response->response);
 
   vsx_list_remove (&queued_response->link);
 
@@ -332,7 +332,7 @@ vsx_server_connection_clear_responses (VsxServerConnection *connection)
 
   if (connection->current_request_handler)
     {
-      g_object_unref (connection->current_request_handler);
+      vsx_object_unref (connection->current_request_handler);
       connection->current_request_handler = NULL;
     }
 }
@@ -869,9 +869,9 @@ vsx_server_free (VsxServer *server)
   while (server->connections)
     vsx_server_remove_connection (server, server->connections->data);
 
-  g_object_unref (server->person_set);
+  vsx_object_unref (server->person_set);
 
-  g_object_unref (server->pending_conversations);
+  vsx_object_unref (server->pending_conversations);
 
   vsx_main_context_remove_source (server->server_socket_source);
 

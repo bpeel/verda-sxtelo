@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,18 +20,16 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-conversation.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
 
-G_DEFINE_TYPE (VsxConversation, vsx_conversation, G_TYPE_OBJECT);
-
 static void
-vsx_conversation_finalize (GObject *object)
+vsx_conversation_free (void *object)
 {
-  VsxConversation *self = (VsxConversation *) object;
+  VsxConversation *self = object;
   int i;
 
   for (i = 0; i < self->messages->len; i++)
@@ -44,25 +42,22 @@ vsx_conversation_finalize (GObject *object)
 
   g_array_free (self->messages, TRUE);
 
-  G_OBJECT_CLASS (vsx_conversation_parent_class)->finalize (object);
+  vsx_object_get_class ()->free (object);
 }
 
-static void
-vsx_conversation_class_init (VsxConversationClass *klass)
+static const VsxObjectClass *
+vsx_conversation_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
+  static VsxObjectClass klass;
 
-  object_class->finalize = vsx_conversation_finalize;
-}
+  if (klass.free == NULL)
+    {
+      klass = *vsx_object_get_class ();
+      klass.instance_size = sizeof (VsxConversation);
+      klass.free = vsx_conversation_free;
+    }
 
-static void
-vsx_conversation_init (VsxConversation *self)
-{
-  vsx_signal_init (&self->changed_signal);
-
-  self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
-
-  self->state = VSX_CONVERSATION_AWAITING_PARTNER;
+  return &klass;
 }
 
 static void
@@ -179,7 +174,15 @@ vsx_conversation_add_player (VsxConversation *conversation,
 VsxConversation *
 vsx_conversation_new (void)
 {
-  VsxConversation *self = g_object_new (VSX_TYPE_CONVERSATION, NULL);
+  VsxConversation *self = vsx_object_allocate (vsx_conversation_get_class ());
+
+  vsx_object_init (self);
+
+  vsx_signal_init (&self->changed_signal);
+
+  self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
+
+  self->state = VSX_CONVERSATION_AWAITING_PARTNER;
 
   return self;
 }

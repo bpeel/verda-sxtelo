@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,47 +19,19 @@
 #ifndef __VSX_CONVERSATION_H__
 #define __VSX_CONVERSATION_H__
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-player.h"
 #include "vsx-signal.h"
+#include "vsx-object.h"
 
 G_BEGIN_DECLS
 
-#define VSX_TYPE_CONVERSATION                                           \
-  (vsx_conversation_get_type())
-#define VSX_CONVERSATION(obj)                                           \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                                   \
-                               VSX_TYPE_CONVERSATION,                   \
-                               VsxConversation))
-#define VSX_CONVERSATION_CLASS(klass)                                   \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                                    \
-                            VSX_TYPE_CONVERSATION,                      \
-                            VsxConversationClass))
-#define VSX_IS_CONVERSATION(obj)                                        \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                                   \
-                               VSX_TYPE_CONVERSATION))
-#define VSX_IS_CONVERSATION_CLASS(klass)                                \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                                    \
-                            VSX_TYPE_CONVERSATION))
-#define VSX_CONVERSATION_GET_CLASS(obj)                                 \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                                    \
-                              VSX_CONVERSATION,                         \
-                              VsxConversationClass))
-
-typedef struct _VsxConversation      VsxConversation;
-typedef struct _VsxConversationClass VsxConversationClass;
-
 #define VSX_CONVERSATION_MAX_PLAYERS 32
 
-struct _VsxConversationClass
+typedef struct
 {
-  GObjectClass parent_class;
-};
-
-struct _VsxConversation
-{
-  GObject parent;
+  VsxObject parent;
 
   VsxSignal changed_signal;
 
@@ -77,16 +49,13 @@ struct _VsxConversation
 
   int n_players;
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
-};
+} VsxConversation;
 
 typedef struct
 {
   unsigned int length;
   char *text;
 } VsxConversationMessage;
-
-GType
-vsx_conversation_get_type (void) G_GNUC_CONST;
 
 VsxConversation *
 vsx_conversation_new (void);

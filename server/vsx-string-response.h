@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,30 +23,6 @@
 
 G_BEGIN_DECLS
 
-#define VSX_TYPE_STRING_RESPONSE                \
-  (vsx_string_response_get_type())
-#define VSX_STRING_RESPONSE(obj)                                \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                           \
-                               VSX_TYPE_STRING_RESPONSE,        \
-                               VsxStringResponse))
-#define VSX_STRING_RESPONSE_CLASS(klass)                \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                    \
-                            VSX_TYPE_STRING_RESPONSE,   \
-                            VsxStringResponseClass))
-#define VSX_IS_STRING_RESPONSE(obj)                             \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                           \
-                               VSX_TYPE_STRING_RESPONSE))
-#define VSX_IS_STRING_RESPONSE_CLASS(klass)             \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                    \
-                            VSX_TYPE_STRING_RESPONSE))
-#define VSX_STRING_RESPONSE_GET_CLASS(obj)              \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                    \
-                              VSX_STRING_RESPONSE,      \
-                              VsxStringResponseClass))
-
-typedef struct _VsxStringResponse        VsxStringResponse;
-typedef struct _VsxStringResponseClass   VsxStringResponseClass;
-
 typedef enum
 {
   VSX_STRING_RESPONSE_BAD_REQUEST,
@@ -57,22 +33,14 @@ typedef enum
   VSX_STRING_RESPONSE_OK
 } VsxStringResponseType;
 
-struct _VsxStringResponseClass
-{
-  VsxResponseClass parent_class;
-};
-
-struct _VsxStringResponse
+typedef struct
 {
   VsxResponse parent;
 
   VsxStringResponseType type;
 
   unsigned int output_pos;
-};
-
-GType
-vsx_string_response_get_type (void) G_GNUC_CONST;
+} VsxStringResponse;
 
 VsxResponse *
 vsx_string_response_new (VsxStringResponseType type);

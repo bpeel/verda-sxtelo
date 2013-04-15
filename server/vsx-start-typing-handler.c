@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,34 +20,24 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-start-typing-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-arguments.h"
 
-G_DEFINE_TYPE (VsxStartTypingHandler,
-               vsx_start_typing_handler,
-               VSX_TYPE_REQUEST_HANDLER);
-
 static void
-real_dispose (GObject *object)
+real_free (void *object)
 {
-  VsxStartTypingHandler *handler = VSX_START_TYPING_HANDLER (object);
+  VsxStartTypingHandler *handler = object;
 
   if (handler->person)
-    {
-      g_object_unref (handler->person);
-      handler->person = NULL;
-    }
+    vsx_object_unref (handler->person);
 
   if (handler->response)
-    {
-      g_object_unref (handler->response);
-      handler->response = NULL;
-    }
+    vsx_object_unref (handler->response);
 
-  G_OBJECT_CLASS (vsx_start_typing_handler_parent_class)->dispose (object);
+  vsx_request_handler_get_class ()->parent_class.free (object);
 }
 
 static void
@@ -55,7 +45,7 @@ real_request_line_received (VsxRequestHandler *handler,
                             VsxRequestMethod method,
                             const char *query_string)
 {
-  VsxStartTypingHandler *self = VSX_START_TYPING_HANDLER (handler);
+  VsxStartTypingHandler *self = (VsxStartTypingHandler *) handler;
   VsxPersonId id;
 
   if (method == VSX_REQUEST_METHOD_GET
@@ -67,7 +57,7 @@ real_request_line_received (VsxRequestHandler *handler,
         self->response =
           vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
       else
-        g_object_ref (self->person);
+        vsx_object_ref (self->person);
     }
   else
     self->response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
@@ -76,7 +66,7 @@ real_request_line_received (VsxRequestHandler *handler,
 static VsxResponse *
 real_request_finished (VsxRequestHandler *handler)
 {
-  VsxStartTypingHandler *self = VSX_START_TYPING_HANDLER (handler);
+  VsxStartTypingHandler *self = (VsxStartTypingHandler *) handler;
 
   if (self->person)
     {
@@ -88,7 +78,7 @@ real_request_finished (VsxRequestHandler *handler)
       return vsx_string_response_new (VSX_STRING_RESPONSE_OK);
     }
   else if (self->response)
-    return g_object_ref (self->response);
+    return vsx_object_ref (self->response);
   else
     {
       g_warn_if_reached ();
@@ -97,20 +87,31 @@ real_request_finished (VsxRequestHandler *handler)
     }
 }
 
-static void
-vsx_start_typing_handler_class_init (VsxStartTypingHandlerClass *klass)
+static const VsxRequestHandlerClass *
+vsx_start_typing_handler_get_class (void)
 {
-  GObjectClass *object_class = (GObjectClass *) klass;
-  VsxRequestHandlerClass *request_handler_class
-    = (VsxRequestHandlerClass *) klass;
+  static VsxRequestHandlerClass klass;
 
-  object_class->dispose = real_dispose;
+  if (klass.parent_class.free == NULL)
+    {
+      klass = *vsx_request_handler_get_class ();
+      klass.parent_class.instance_size = sizeof (VsxStartTypingHandler);
+      klass.parent_class.free = real_free;
 
-  request_handler_class->request_line_received = real_request_line_received;
-  request_handler_class->request_finished = real_request_finished;
+      klass.request_line_received = real_request_line_received;
+      klass.request_finished = real_request_finished;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_start_typing_handler_init (VsxStartTypingHandler *self)
+VsxRequestHandler *
+vsx_start_typing_handler_new (void)
 {
+  VsxRequestHandler *handler =
+    vsx_object_allocate (vsx_start_typing_handler_get_class ());
+
+  vsx_request_handler_init (handler);
+
+  return handler;
 }

@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,36 +24,7 @@
 
 G_BEGIN_DECLS
 
-#define VSX_TYPE_WATCH_PERSON_RESPONSE          \
-  (vsx_watch_person_response_get_type())
-#define VSX_WATCH_PERSON_RESPONSE(obj)                          \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                           \
-                               VSX_TYPE_WATCH_PERSON_RESPONSE,  \
-                               VsxWatchPersonResponse))
-#define VSX_WATCH_PERSON_RESPONSE_CLASS(klass)                  \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                            \
-                            VSX_TYPE_WATCH_PERSON_RESPONSE,     \
-                            VsxWatchPersonResponseClass))
-#define VSX_IS_WATCH_PERSON_RESPONSE(obj)                       \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                           \
-                               VSX_TYPE_WATCH_PERSON_RESPONSE))
-#define VSX_IS_WATCH_PERSON_RESPONSE_CLASS(klass)               \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                            \
-                            VSX_TYPE_WATCH_PERSON_RESPONSE))
-#define VSX_WATCH_PERSON_RESPONSE_GET_CLASS(obj)                \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                            \
-                              VSX_WATCH_PERSON_RESPONSE,        \
-                              VsxWatchPersonResponseClass))
-
-typedef struct _VsxWatchPersonResponse        VsxWatchPersonResponse;
-typedef struct _VsxWatchPersonResponseClass   VsxWatchPersonResponseClass;
-
-struct _VsxWatchPersonResponseClass
-{
-  VsxResponseClass parent_class;
-};
-
-struct _VsxWatchPersonResponse
+typedef struct
 {
   VsxResponse parent;
 
@@ -78,10 +49,7 @@ struct _VsxWatchPersonResponse
   unsigned int message_pos;
 
   gboolean last_typing_state;
-};
-
-GType
-vsx_watch_person_response_get_type (void) G_GNUC_CONST;
+} VsxWatchPersonResponse;
 
 VsxResponse *
 vsx_watch_person_response_new (VsxPerson *person,
@@ -90,4 +58,3 @@ vsx_watch_person_response_new (VsxPerson *person,
 G_END_DECLS
 
 #endif /* __VSX_WATCH_PERSON_RESPONSE_H__ */
-

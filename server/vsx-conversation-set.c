@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +20,10 @@
 #include <config.h>
 #endif
 
-#include <glib-object.h>
+#include <glib.h>
 
 #include "vsx-conversation-set.h"
 #include "vsx-log.h"
-
-G_DEFINE_TYPE (VsxConversationSet, vsx_conversation_set, G_TYPE_OBJECT);
 
 typedef struct
 {
@@ -39,7 +37,7 @@ static void
 free_hash_data (VsxConversationSetHashData *data)
 {
   vsx_list_remove (&data->conversation_changed_listener.link);
-  g_object_unref (data->conversation);
+  vsx_object_unref (data->conversation);
   g_free (data->room_name);
   g_slice_free (VsxConversationSetHashData, data);
 }
@@ -58,26 +56,38 @@ conversation_changed_cb (VsxListener *listener,
 }
 
 static void
-vsx_conversation_set_finalize (GObject *object)
+vsx_conversation_set_free (void *object)
 {
-  VsxConversationSet *self = (VsxConversationSet *) object;
+  VsxConversationSet *self = object;
 
   g_hash_table_destroy (self->hash_table);
 
-  G_OBJECT_CLASS (vsx_conversation_set_parent_class)->finalize (object);
+  vsx_object_get_class ()->free (object);
 }
 
-static void
-vsx_conversation_set_class_init (VsxConversationSetClass *klass)
+static const VsxObjectClass *
+vsx_conversation_set_get_class (void)
 {
-  GObjectClass *gobject_class = (GObjectClass *) klass;
+  static VsxObjectClass klass;
 
-  gobject_class->finalize = vsx_conversation_set_finalize;
+  if (klass.free == NULL)
+    {
+      klass = *vsx_object_get_class ();
+      klass.instance_size = sizeof (VsxConversationSet);
+      klass.free = vsx_conversation_set_free;
+    }
+
+  return &klass;
 }
 
-static void
-vsx_conversation_set_init (VsxConversationSet *self)
+VsxConversationSet *
+vsx_conversation_set_new (void)
 {
+  VsxConversationSet *self =
+    vsx_object_allocate (vsx_conversation_set_get_class ());
+
+  vsx_object_init (self);
+
   /* The hash table doesn't have a destroy function for the key
      because its owned by the hash data */
   self->hash_table =
@@ -86,12 +96,6 @@ vsx_conversation_set_init (VsxConversationSet *self)
                            NULL, /* key_destroy */
                            /* value_destroy */
                            (GDestroyNotify) free_hash_data);
-}
-
-VsxConversationSet *
-vsx_conversation_set_new (void)
-{
-  VsxConversationSet *self = g_object_new (VSX_TYPE_CONVERSATION_SET, NULL);
 
   return self;
 }
@@ -123,7 +127,7 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
                       &data->conversation_changed_listener);
 
       /* Take a reference for the hash table */
-      g_object_ref (conversation);
+      vsx_object_ref (conversation);
 
       g_hash_table_insert (set->hash_table,
                            data->room_name,
@@ -133,7 +137,7 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
     }
   else
     {
-      conversation = g_object_ref (data->conversation);
+      conversation = vsx_object_ref (data->conversation);
 
       /* We have a second person so the conversation has now
          started. This should also end up removing the conversation
