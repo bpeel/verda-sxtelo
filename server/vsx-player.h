@@ -31,8 +31,8 @@ typedef struct
 
   char *name;
 
-  gsize escaped_name_len;
-  char *escaped_name;
+  gsize name_message_len;
+  char *name_message;
 } VsxPlayer;
 
 VsxPlayer *

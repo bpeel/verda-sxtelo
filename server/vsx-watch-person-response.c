@@ -111,6 +111,42 @@ write_message (VsxWatchPersonResponse *self,
   write_message (self, message_data, message, sizeof (message) - 1)
 
 static gboolean
+write_chunked_message (VsxWatchPersonResponse *self,
+                       WriteMessageData *message_data,
+                       const guint8 *message,
+                       unsigned int message_length)
+{
+  unsigned int to_write;
+  int length_length;
+
+  /* If there's not enough space left in the buffer to write a large
+     chunk length then we'll wait until the next call to add any
+     data */
+  if (message_data->length <= CHUNK_LENGTH_SIZE)
+    return FALSE;
+
+  to_write = MIN (message_data->length - CHUNK_LENGTH_SIZE,
+                  message_length - self->message_pos);
+
+  length_length = sprintf ((char *) message_data->data,
+                           "%x\r\n", to_write);
+
+  message_data->length -= length_length;
+  message_data->data += length_length;
+
+  memcpy (message_data->data,
+          message + self->message_pos, to_write);
+  memcpy (message_data->data + to_write, "\r\n", 2);
+
+  message_data->length -= to_write + 2;
+  message_data->data += to_write + 2;
+
+  self->message_pos += to_write;
+
+  return self->message_pos >= message_length;
+}
+
+static gboolean
 vsx_watch_person_response_get_typing_state (VsxWatchPersonResponse *self)
 {
   VsxPerson *person = self->person;
@@ -128,7 +164,7 @@ has_pending_data (VsxWatchPersonResponse *self,
 
   if (self->named_players < conversation->n_players)
     {
-      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START;
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME;
       return TRUE;
     }
 
@@ -243,69 +279,19 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         }
         break;
 
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START:
-        {
-          VsxPlayer *player =
-            self->person->conversation->players[self->named_players];
-          char num_buf[10 + 1];
-          char start_buf[8 + 2 + 35 + 10 + 1];
-          int num_len, start_len;
-
-          num_len = g_snprintf (num_buf,
-                                sizeof (num_buf),
-                                "%i",
-                                self->named_players);
-
-          start_len = g_snprintf (start_buf,
-                                  sizeof (start_buf),
-                                  "%x\r\n"
-                                  "[\"player-name\", "
-                                  "{\"num\": %s, \"name\": \"",
-                                  (unsigned int)
-                                  (35 + num_len + 5 + player->escaped_name_len),
-                                  num_buf);
-
-          if (write_message (self,
-                             &message_data,
-                             (guint8 *) start_buf,
-                             start_len))
-            {
-              self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME;
-            }
-          else
-            goto done;
-        }
-        break;
-
       case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
         {
           VsxPlayer *player =
             self->person->conversation->players[self->named_players];
 
-          if (write_message (self,
-                             &message_data,
-                             (const guint8 *) player->escaped_name,
-                             player->escaped_name_len))
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) player->name_message,
+                                     player->name_message_len))
             {
               self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END;
-            }
-          else
-            goto done;
-        }
-        break;
-
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END:
-        {
-          static const guint8 message[] = "\"}]\r\n\r\n";
-
-          if (write_static_message (self, &message_data, message))
-            {
-              self->message_pos = 0;
-              if (++self->named_players < self->person->conversation->n_players)
-                self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START;
-              else
+              if (++self->named_players
+                  >= self->person->conversation->n_players)
                 self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
           else
@@ -353,38 +339,15 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         {
           VsxConversation *conversation = self->person->conversation;
           VsxConversationMessage *message;
-          unsigned int to_write;
-          int length_length;
-
-          /* If there's not enough space left in the buffer to
-             write a large chunk length then we'll wait until the
-             next call to add any data */
-          if (message_data.length <= CHUNK_LENGTH_SIZE)
-            goto done;
 
           message = &g_array_index (conversation->messages,
                                     VsxConversationMessage,
                                     self->message_num);
 
-          to_write = MIN (message_data.length - CHUNK_LENGTH_SIZE,
-                          message->length - self->message_pos);
-
-          length_length = sprintf ((char *) message_data.data,
-                                   "%x\r\n", to_write);
-
-          message_data.length -= length_length;
-          message_data.data += length_length;
-
-          memcpy (message_data.data,
-                  message->text + self->message_pos, to_write);
-          memcpy (message_data.data + to_write, "\r\n", 2);
-
-          message_data.length -= to_write + 2;
-          message_data.data += to_write + 2;
-
-          self->message_pos += to_write;
-
-          if (self->message_pos >= message->length)
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) message->text,
+                                     message->length))
             {
               self->message_pos = 0;
               self->message_num++;
@@ -393,6 +356,8 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                   self->person->conversation->messages->len)
                 self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
+          else
+            goto done;
         }
         break;
 
@@ -441,9 +406,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
         return has_pending_data (self, &new_state);
       }
 
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:

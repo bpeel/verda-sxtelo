@@ -28,7 +28,7 @@ void
 vsx_player_free (VsxPlayer *player)
 {
   g_free (player->name);
-  g_free (player->escaped_name);
+  g_free (player->name_message);
 
   g_slice_free (VsxPlayer, player);
 }
@@ -44,8 +44,12 @@ vsx_player_new (const char *player_name,
   player->name = g_strdup (player_name);
   player->num = num;
 
-  /* Make an escaped version of the string so we can easily send it in
-   * a JSON object */
+  /* Encode the player name in a message so we can easily send it out
+   * to clients */
+  g_string_append_printf (buf,
+                          "[\"player-name\", {\"num\": %i, \"name\": \"",
+                          num);
+
   for (p = player_name; *p; p++)
     if (*p == '"' || *p == '\\')
       {
@@ -55,8 +59,10 @@ vsx_player_new (const char *player_name,
     else
       g_string_append_c (buf, *p);
 
-  player->escaped_name_len = buf->len;
-  player->escaped_name = g_string_free (buf, FALSE);
+  g_string_append (buf, "\"}]\r\n");
+
+  player->name_message_len = buf->len;
+  player->name_message = g_string_free (buf, FALSE);
 
   return player;
 }
