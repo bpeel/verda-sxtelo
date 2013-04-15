@@ -30,6 +30,9 @@ typedef struct
   unsigned int num;
 
   char *name;
+
+  gsize escaped_name_len;
+  char *escaped_name;
 } VsxPlayer;
 
 VsxPlayer *

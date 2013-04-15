@@ -28,6 +28,7 @@ void
 vsx_player_free (VsxPlayer *player)
 {
   g_free (player->name);
+  g_free (player->escaped_name);
 
   g_slice_free (VsxPlayer, player);
 }
@@ -37,9 +38,25 @@ vsx_player_new (const char *player_name,
                 unsigned int num)
 {
   VsxPlayer *player = g_slice_new (VsxPlayer);
+  GString *buf = g_string_new (NULL);
+  const char *p;
 
   player->name = g_strdup (player_name);
   player->num = num;
+
+  /* Make an escaped version of the string so we can easily send it in
+   * a JSON object */
+  for (p = player_name; *p; p++)
+    if (*p == '"' || *p == '\\')
+      {
+        g_string_append_c (buf, '\\');
+        g_string_append_c (buf, *p);
+      }
+    else
+      g_string_append_c (buf, *p);
+
+  player->escaped_name_len = buf->len;
+  player->escaped_name = g_string_free (buf, FALSE);
 
   return player;
 }
