@@ -34,12 +34,9 @@ typedef struct
 {
   VsxObject parent;
 
-  VsxSignal changed_signal;
-
   VsxPersonId id;
 
   VsxConversation *conversation;
-  VsxListener conversation_changed_listener;
 
   VsxPlayer *player;
 

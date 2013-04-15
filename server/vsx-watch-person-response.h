@@ -48,7 +48,7 @@ typedef struct
 
   VsxPerson *person;
 
-  VsxListener person_changed_listener;
+  VsxListener conversation_changed_listener;
 
   VsxWatchPersonResponseState state;
 

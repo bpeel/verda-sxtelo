@@ -421,7 +421,7 @@ vsx_watch_person_response_free (void *object)
 
   if (self->person)
     {
-      vsx_list_remove (&self->person_changed_listener.link);
+      vsx_list_remove (&self->conversation_changed_listener.link);
       vsx_object_unref (self->person);
     }
 
@@ -449,11 +449,11 @@ vsx_watch_person_response_get_class (void)
 }
 
 static void
-person_changed_cb (VsxListener *listener,
-                   void *data)
+conversation_changed_cb (VsxListener *listener,
+                         void *data)
 {
   VsxWatchPersonResponse *response =
-    vsx_container_of (listener, response, person_changed_listener);
+    vsx_container_of (listener, response, conversation_changed_listener);
 
   vsx_response_changed ((VsxResponse *) response);
 }
@@ -470,9 +470,9 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->person = vsx_object_ref (person);
   self->message_num = last_message;
 
-  self->person_changed_listener.notify = person_changed_cb;
-  vsx_signal_add (&person->changed_signal,
-                  &self->person_changed_listener);
+  self->conversation_changed_listener.notify = conversation_changed_cb;
+  vsx_signal_add (&person->conversation->changed_signal,
+                  &self->conversation_changed_listener);
 
   return (VsxResponse *) self;
 }

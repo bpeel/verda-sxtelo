@@ -37,7 +37,6 @@ vsx_person_free (void *object)
 
   if (person->conversation)
     {
-      vsx_list_remove (&person->conversation_changed_listener.link);
       vsx_conversation_finish (person->conversation);
       vsx_object_unref (person->conversation);
       person->conversation = NULL;
@@ -135,16 +134,6 @@ vsx_person_parse_id (const char *string,
   return p - string == sizeof (VsxPersonId) * 2;
 }
 
-static void
-conversation_changed_cb (VsxListener *listener,
-                         void *data)
-{
-  VsxPerson *person =
-    vsx_container_of (listener, person, conversation_changed_listener);
-
-  vsx_signal_emit (&person->changed_signal, person);
-}
-
 VsxPerson *
 vsx_person_new (VsxPersonId id,
                 const char *player_name,
@@ -155,19 +144,12 @@ vsx_person_new (VsxPersonId id,
 
   vsx_object_init (person);
 
-  vsx_signal_init (&person->changed_signal);
-
   vsx_person_make_noise (person);
 
   person->id = id;
   person->conversation = vsx_object_ref (conversation);
 
   person->player = vsx_conversation_add_player (conversation, player_name);
-
-  person->conversation_changed_listener.notify =
-    conversation_changed_cb;
-  vsx_signal_add (&conversation->changed_signal,
-                  &person->conversation_changed_listener);
 
   return person;
 }
