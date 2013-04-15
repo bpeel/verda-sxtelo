@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -158,10 +158,6 @@ print_state_message (VsxConnection *connection)
 {
   switch (vsx_connection_get_state (connection))
     {
-    case VSX_CONNECTION_STATE_AWAITING_PARTNER:
-      format_print ("Waiting for someone to join the conversation...\n");
-      break;
-
     case VSX_CONNECTION_STATE_IN_PROGRESS:
       format_print ("You are now in a conversation with a stranger. Say hi!\n");
       break;

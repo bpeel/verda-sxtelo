@@ -50,7 +50,7 @@ conversation_changed_cb (VsxListener *listener,
     vsx_container_of (listener, hash_data, conversation_changed_listener);
   VsxConversation *conversation = data;
 
-  if (conversation->state != VSX_CONVERSATION_AWAITING_PARTNER)
+  if (conversation->state != VSX_CONVERSATION_AWAITING_START)
     /* This will also destroy the hash data */
     g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
 }

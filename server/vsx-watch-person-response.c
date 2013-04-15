@@ -59,15 +59,9 @@ header[] =
   "\r\n";
 
 static guint8
-start[] =
-  "1a\r\n"
-  "[\"state\", \"in-progress\"]\r\n"
-  "\r\n";
-
-static guint8
 end[] =
-  "13\r\n"
-  "[\"state\", \"done\"]\r\n"
+  "9\r\n"
+  "[\"end\"]\r\n"
   "\r\n"
   "0\r\n"
   "\r\n";
@@ -228,33 +222,11 @@ vsx_watch_person_response_add_data (VsxResponse *response,
           if (write_static_message (self, &message_data, header_end))
             {
               self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_START;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
           else
             goto done;
         }
-        break;
-
-      case VSX_WATCH_PERSON_RESPONSE_AWAITING_START:
-        {
-          VsxConversation *conversation = self->person->conversation;
-
-          if (conversation->state == VSX_CONVERSATION_AWAITING_PARTNER)
-            goto done;
-
-          self->message_pos = 0;
-          self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_START;
-        }
-        break;
-
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_START:
-        if (write_static_message (self, &message_data, start))
-          {
-            self->message_pos = 0;
-            self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
-          }
-        else
-          goto done;
         break;
 
       case VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA:
@@ -460,13 +432,6 @@ vsx_watch_person_response_has_data (VsxResponse *response)
     case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_END:
-      return TRUE;
-
-    case VSX_WATCH_PERSON_RESPONSE_AWAITING_START:
-      return (self->person->conversation->state
-              != VSX_CONVERSATION_AWAITING_PARTNER);
-
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_START:
       return TRUE;
 
     case VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA:

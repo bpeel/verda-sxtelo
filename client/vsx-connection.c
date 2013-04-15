@@ -325,12 +325,7 @@ vsx_connection_maybe_send_command (VsxConnection *connection)
 
   /* Wait until the conversation is in progress */
   if (priv->state != VSX_CONNECTION_STATE_IN_PROGRESS)
-    {
-      if (priv->state == VSX_CONNECTION_STATE_AWAITING_PARTNER)
-        vsx_connection_maybe_send_keep_alive (connection);
-
-      return;
-    }
+    return;
 
   if (g_queue_is_empty (&priv->command_queue))
     {
@@ -663,31 +658,8 @@ handle_message (VsxConnection *connection,
 
       priv->next_message_num++;
     }
-  else if (!strcmp (method_string, "state"))
-    {
-      JsonNode *state_node;
-      const char *state;
-
-      if (json_array_get_length (array) < 2)
-        goto bad_data;
-
-      state_node = json_array_get_element (array, 1);
-
-      if (json_node_get_node_type (state_node) != JSON_NODE_VALUE)
-        goto bad_data;
-
-      state = json_node_get_string (state_node);
-
-      if (!strcmp (state, "in-progress"))
-        vsx_connection_set_state (connection,
-                                  VSX_CONNECTION_STATE_IN_PROGRESS);
-      else if (!strcmp (state, "done"))
-        vsx_connection_set_state (connection,
-                                  VSX_CONNECTION_STATE_DONE);
-      else
-        vsx_connection_set_state (connection,
-                                  VSX_CONNECTION_STATE_AWAITING_PARTNER);
-    }
+  else if (!strcmp (method_string, "end"))
+    vsx_connection_set_state (connection, VSX_CONNECTION_STATE_DONE);
   else if (!strcmp (method_string, "typing"))
     vsx_connection_set_stranger_typing (connection, TRUE);
   else if (!strcmp (method_string, "not-typing"))
@@ -1084,7 +1056,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                              "State",
                              "State of the conversation",
                              VSX_TYPE_CONNECTION_STATE,
-                             VSX_CONNECTION_STATE_AWAITING_PARTNER,
+                             VSX_CONNECTION_STATE_IN_PROGRESS,
                              G_PARAM_READABLE
                              | G_PARAM_STATIC_NAME
                              | G_PARAM_STATIC_NICK

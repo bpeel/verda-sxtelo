@@ -178,6 +178,13 @@ is a javascript hash object containing the following fields:
   "typing": A boolean value to indicate whether the player is
   currently typing a message.
 
+* "end"
+
+This is sent when the player has left the game and no more messages
+will be sent. The client can use this to detect the difference between
+the connection randomly dropping (in which case it should reconnect)
+and the server finishing its data.
+
 == Timeouts ==
 
 If the server doesn't receive a request from a client after a long

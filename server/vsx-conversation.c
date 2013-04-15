@@ -79,7 +79,7 @@ vsx_conversation_player_changed (VsxConversation *conversation,
 void
 vsx_conversation_start (VsxConversation *conversation)
 {
-  if (conversation->state == VSX_CONVERSATION_AWAITING_PARTNER)
+  if (conversation->state == VSX_CONVERSATION_AWAITING_START)
     {
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
       vsx_conversation_changed (conversation);
@@ -102,14 +102,12 @@ vsx_conversation_add_message (VsxConversation *conversation,
                               unsigned int person_num,
                               const char *buffer,
                               unsigned int length)
-
 {
   VsxConversationMessage *message;
   GString *message_str;
 
-  /* Ignore attempts to add messages to a conversation that has not
-     yet started */
-  if (conversation->state != VSX_CONVERSATION_IN_PROGRESS)
+  /* Ignore attempts to add messages to a conversation that has finished */
+  if (conversation->state == VSX_CONVERSATION_FINISHED)
     return;
 
   g_array_set_size (conversation->messages,
@@ -195,7 +193,7 @@ vsx_conversation_new (void)
 
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 
-  self->state = VSX_CONVERSATION_AWAITING_PARTNER;
+  self->state = VSX_CONVERSATION_AWAITING_START;
 
   return self;
 }
