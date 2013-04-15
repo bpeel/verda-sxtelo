@@ -40,6 +40,9 @@ vsx_conversation_free (void *object)
       g_free (message->text);
     }
 
+  for (i = 0; i < self->n_players; i++)
+    vsx_player_free (self->players[i]);
+
   g_array_free (self->messages, TRUE);
 
   vsx_object_get_class ()->free (object);
