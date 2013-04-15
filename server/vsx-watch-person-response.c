@@ -78,12 +78,6 @@ static guint8
 header_end[] =
   "\"}]\r\n\r\n";
 
-/* We need at least this much space before we'll consider adding a
-   chunk to the buffer. The 8 is the length of 2³²-1 in hexadecimal,
-   the first 2 is for the chunk length terminator and the second two
-   is for the data terminator */
-#define CHUNK_LENGTH_SIZE (8 + 2 + 2)
-
 typedef struct
 {
   guint8 *data;
@@ -116,34 +110,53 @@ write_chunked_message (VsxWatchPersonResponse *self,
                        const guint8 *message,
                        unsigned int message_length)
 {
+  char length_buf[8 + 2 + 1];
   unsigned int to_write;
   int length_length;
 
-  /* If there's not enough space left in the buffer to write a large
-     chunk length then we'll wait until the next call to add any
-     data */
-  if (message_data->length <= CHUNK_LENGTH_SIZE)
-    return FALSE;
+  length_length = sprintf (length_buf, "%x\r\n", message_length);
 
-  to_write = MIN (message_data->length - CHUNK_LENGTH_SIZE,
-                  message_length - self->message_pos);
+  if (self->message_pos < length_length)
+    {
+      to_write = MIN (message_data->length, length_length - self->message_pos);
+      memcpy (message_data->data, length_buf + self->message_pos, to_write);
+      message_data->length -= to_write;
+      message_data->data += to_write;
+      self->message_pos += to_write;
 
-  length_length = sprintf ((char *) message_data->data,
-                           "%x\r\n", to_write);
+      if (message_data->length <= 0)
+        return FALSE;
+    }
 
-  message_data->length -= length_length;
-  message_data->data += length_length;
+  if (self->message_pos - length_length < message_length)
+    {
+      to_write = MIN (message_data->length,
+                      message_length + length_length - self->message_pos);
+
+      memcpy (message_data->data,
+              message + self->message_pos - length_length,
+              to_write);
+
+      message_data->length -= to_write;
+      message_data->data += to_write;
+      self->message_pos += to_write;
+
+      if (message_data->length <= 0)
+        return FALSE;
+    }
+
+  to_write = MIN (message_data->length,
+                  message_length + length_length + 2 - self->message_pos);
 
   memcpy (message_data->data,
-          message + self->message_pos, to_write);
-  memcpy (message_data->data + to_write, "\r\n", 2);
+          "\r\n" + self->message_pos - length_length - message_length,
+          to_write);
 
-  message_data->length -= to_write + 2;
-  message_data->data += to_write + 2;
-
+  message_data->length -= to_write;
+  message_data->data += to_write;
   self->message_pos += to_write;
 
-  return self->message_pos >= message_length;
+  return self->message_pos >= length_length + message_length + 2;
 }
 
 static gboolean
