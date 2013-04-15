@@ -34,6 +34,7 @@ typedef struct
   VsxObject parent;
 
   VsxSignal changed_signal;
+  VsxSignal player_changed_signal;
 
   enum
   {

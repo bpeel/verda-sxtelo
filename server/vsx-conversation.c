@@ -69,6 +69,13 @@ vsx_conversation_changed (VsxConversation *conversation)
   vsx_signal_emit (&conversation->changed_signal, conversation);
 }
 
+static void
+vsx_conversation_player_changed (VsxConversation *conversation,
+                                 VsxPlayer *player)
+{
+  vsx_signal_emit (&conversation->player_changed_signal, player);
+}
+
 void
 vsx_conversation_start (VsxConversation *conversation)
 {
@@ -171,6 +178,8 @@ vsx_conversation_add_player (VsxConversation *conversation,
   player = vsx_player_new (player_name, conversation->n_players);
   conversation->players[conversation->n_players++] = player;
 
+  vsx_conversation_player_changed (conversation, player);
+
   return player;
 }
 
@@ -182,6 +191,7 @@ vsx_conversation_new (void)
   vsx_object_init (self);
 
   vsx_signal_init (&self->changed_signal);
+  vsx_signal_init (&self->player_changed_signal);
 
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 
