@@ -125,6 +125,35 @@ vsx_watch_person_response_get_typing_state (VsxWatchPersonResponse *self)
   return !!(conversation->typing_mask & (1 << (person->player->num ^ 1)));
 }
 
+static gboolean
+has_pending_data (VsxWatchPersonResponse *self,
+                  VsxWatchPersonResponseState *new_state)
+{
+  gboolean typing_state;
+
+  if (self->message_num < self->person->conversation->messages->len)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
+      return TRUE;
+    }
+
+  if (self->person->conversation->state == VSX_CONVERSATION_FINISHED)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
+      return TRUE;
+    }
+
+  if ((typing_state = vsx_watch_person_response_get_typing_state (self))
+      != self->last_typing_state)
+    {
+      *new_state = (typing_state ? VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING
+                    : VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING);
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
 static unsigned int
 vsx_watch_person_response_add_data (VsxResponse *response,
                                     guint8 *data_in,
@@ -215,10 +244,60 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         if (write_static_message (self, &message_data, start))
           {
             self->message_pos = 0;
-            self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
+            self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
           }
         else
           goto done;
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA:
+        {
+          VsxWatchPersonResponseState new_state;
+
+          if (has_pending_data (self, &new_state))
+            {
+              self->message_pos = 0;
+              self->state = new_state;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
+        {
+          static const guint8 message[] =
+            "c\r\n"
+            "[\"typing\"]\r\n"
+            "\r\n";
+
+          if (write_static_message (self, &message_data, message))
+            {
+              self->message_pos = 0;
+              self->last_typing_state = TRUE;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
+        {
+          static const guint8 message[] =
+            "10\r\n"
+            "[\"not-typing\"]\r\n"
+            "\r\n";
+
+          if (write_static_message (self, &message_data, message))
+            {
+              self->message_pos = 0;
+              self->last_typing_state = FALSE;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+            }
+          else
+            goto done;
+        }
         break;
 
       case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
@@ -228,95 +307,42 @@ vsx_watch_person_response_add_data (VsxResponse *response,
           unsigned int to_write;
           int length_length;
 
-          if (self->message_num >= conversation->messages->len)
+          /* If there's not enough space left in the buffer to
+             write a large chunk length then we'll wait until the
+             next call to add any data */
+          if (message_data.length <= CHUNK_LENGTH_SIZE)
+            goto done;
+
+          message = &g_array_index (conversation->messages,
+                                    VsxConversationMessage,
+                                    self->message_num);
+
+          to_write = MIN (message_data.length - CHUNK_LENGTH_SIZE,
+                          message->length - self->message_pos);
+
+          length_length = sprintf ((char *) message_data.data,
+                                   "%x\r\n", to_write);
+
+          message_data.length -= length_length;
+          message_data.data += length_length;
+
+          memcpy (message_data.data,
+                  message->text + self->message_pos, to_write);
+          memcpy (message_data.data + to_write, "\r\n", 2);
+
+          message_data.length -= to_write + 2;
+          message_data.data += to_write + 2;
+
+          self->message_pos += to_write;
+
+          if (self->message_pos >= message->length)
             {
-              gboolean typing_state;
+              self->message_pos = 0;
+              self->message_num++;
 
-              if (conversation->state == VSX_CONVERSATION_FINISHED)
-                {
-                  self->message_pos = 0;
-                  self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
-                }
-              else if ((typing_state =
-                        vsx_watch_person_response_get_typing_state (self))
-                       != self->last_typing_state)
-                {
-                  static const guint8 typing_message[] =
-                    "c\r\n"
-                    "[\"typing\"]\r\n"
-                    "\r\n";
-                  static const guint8 not_typing_message[] =
-                    "10\r\n"
-                    "[\"not-typing\"]\r\n"
-                    "\r\n";
-
-                  if (typing_state)
-                    {
-                      /* Only add the typing mask if there's enough
-                         space in the buffer for the entire message so
-                         that we can't accidentally add it in the
-                         middle of sending a message */
-                      if (sizeof (typing_message) - 1 <= message_data.length)
-                        {
-                          write_static_message (self,
-                                                &message_data,
-                                                typing_message);
-                          self->message_pos = 0;
-                          self->last_typing_state = TRUE;
-                        }
-                      else
-                        goto done;
-                    }
-                  else if (sizeof (not_typing_message) - 1
-                           <= message_data.length)
-                    {
-                      write_static_message (self,
-                                            &message_data,
-                                            not_typing_message);
-                      self->message_pos = 0;
-                      self->last_typing_state = FALSE;
-                    }
-                  else
-                    goto done;
-                }
-              else
-                goto done;
-            }
-          else
-            {
-              /* If there's not enough space left in the buffer to
-                 write a large chunk length then we'll wait until the
-                 next call to add any data */
-              if (message_data.length <= CHUNK_LENGTH_SIZE)
-                goto done;
-
-              message = &g_array_index (conversation->messages,
-                                        VsxConversationMessage,
-                                        self->message_num);
-
-              to_write = MIN (message_data.length - CHUNK_LENGTH_SIZE,
-                              message->length - self->message_pos);
-
-              length_length = sprintf ((char *) message_data.data,
-                                       "%x\r\n", to_write);
-
-              message_data.length -= length_length;
-              message_data.data += length_length;
-
-              memcpy (message_data.data,
-                      message->text + self->message_pos, to_write);
-              memcpy (message_data.data + to_write, "\r\n", 2);
-
-              message_data.length -= to_write + 2;
-              message_data.data += to_write + 2;
-
-              self->message_pos += to_write;
-
-              if (self->message_pos >= message->length)
-                {
-                  self->message_pos = 0;
-                  self->message_num++;
-                }
+              if (self->message_num >=
+                  self->person->conversation->messages->len)
+                self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
         }
         break;
@@ -366,14 +392,16 @@ vsx_watch_person_response_has_data (VsxResponse *response)
     case VSX_WATCH_PERSON_RESPONSE_WRITING_START:
       return TRUE;
 
+    case VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA:
+      {
+        VsxWatchPersonResponseState new_state;
+
+        return has_pending_data (self, &new_state);
+      }
+
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
-      if (self->person->conversation->state == VSX_CONVERSATION_FINISHED)
-        return TRUE;
-
-      return (self->message_num < self->person->conversation->messages->len
-              || (self->last_typing_state
-                  != vsx_watch_person_response_get_typing_state (self)));
-
     case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
       return TRUE;
 
