@@ -129,15 +129,22 @@ static gboolean
 has_pending_data (VsxWatchPersonResponse *self,
                   VsxWatchPersonResponseState *new_state)
 {
+  VsxConversation *conversation = self->person->conversation;
   gboolean typing_state;
 
-  if (self->message_num < self->person->conversation->messages->len)
+  if (self->named_players < conversation->n_players)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START;
+      return TRUE;
+    }
+
+  if (self->message_num < conversation->messages->len)
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
       return TRUE;
     }
 
-  if (self->person->conversation->state == VSX_CONVERSATION_FINISHED)
+  if (conversation->state == VSX_CONVERSATION_FINISHED)
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
       return TRUE;
@@ -258,6 +265,76 @@ vsx_watch_person_response_add_data (VsxResponse *response,
             {
               self->message_pos = 0;
               self->state = new_state;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START:
+        {
+          VsxPlayer *player =
+            self->person->conversation->players[self->named_players];
+          char num_buf[10 + 1];
+          char start_buf[8 + 2 + 35 + 10 + 1];
+          int num_len, start_len;
+
+          num_len = g_snprintf (num_buf,
+                                sizeof (num_buf),
+                                "%i",
+                                self->named_players);
+
+          start_len = g_snprintf (start_buf,
+                                  sizeof (start_buf),
+                                  "%x\r\n"
+                                  "[\"player-name\", "
+                                  "{\"num\": %s, \"name\": \"",
+                                  (unsigned int)
+                                  (35 + num_len + 5 + player->escaped_name_len),
+                                  num_buf);
+
+          if (write_message (self,
+                             &message_data,
+                             (guint8 *) start_buf,
+                             start_len))
+            {
+              self->message_pos = 0;
+              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
+        {
+          VsxPlayer *player =
+            self->person->conversation->players[self->named_players];
+
+          if (write_message (self,
+                             &message_data,
+                             (const guint8 *) player->escaped_name,
+                             player->escaped_name_len))
+            {
+              self->message_pos = 0;
+              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END:
+        {
+          static const guint8 message[] = "\"}]\r\n\r\n";
+
+          if (write_static_message (self, &message_data, message))
+            {
+              self->message_pos = 0;
+              if (++self->named_players < self->person->conversation->n_players)
+                self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START;
+              else
+                self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
           else
             goto done;
@@ -399,6 +476,9 @@ vsx_watch_person_response_has_data (VsxResponse *response)
         return has_pending_data (self, &new_state);
       }
 
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:

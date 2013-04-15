@@ -156,14 +156,21 @@ javascript hash object containing the following fields:
   "text": This contains the text of the message as a javascript
   string.
 
+* "player-name"
+
+Sends the name of one of the players in the same game. The argument is
+a javascript hash object containing the following fields:
+
+  "num": The index number of this player.
+
+  "name": The name chosen for the player in the new_person command.
+
 * "player"
 
 Updates details of one of the players in the same game. The argument
 is a javascript hash object containing the following fields:
 
   "num": The index number of this player.
-
-  "name": The name chosen for the player in the new_person command.
 
   "connected": A boolean value which is initially true and switches to
   false once the player sends a leave command.

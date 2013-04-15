@@ -34,6 +34,10 @@ typedef enum
   VSX_WATCH_PERSON_RESPONSE_WRITING_START,
   VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA,
 
+  VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_START,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_NAME,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_NAME_END,
+
   VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING,
   VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING,
   VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES,
@@ -49,11 +53,15 @@ typedef struct
   VsxPerson *person;
 
   VsxListener conversation_changed_listener;
+  VsxListener player_changed_listener;
 
   VsxWatchPersonResponseState state;
 
   unsigned int message_num;
   unsigned int message_pos;
+
+  /* Number of players that we've sent a "player-name" event for */
+  unsigned int named_players;
 
   gboolean last_typing_state;
 } VsxWatchPersonResponse;
