@@ -158,6 +158,9 @@ print_state_message (VsxConnection *connection)
 {
   switch (vsx_connection_get_state (connection))
     {
+    case VSX_CONNECTION_STATE_AWAITING_HEADER:
+      break;
+
     case VSX_CONNECTION_STATE_IN_PROGRESS:
       format_print ("You are now in a conversation with a stranger. Say hi!\n");
       break;

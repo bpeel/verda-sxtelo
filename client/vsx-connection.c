@@ -626,6 +626,9 @@ handle_message (VsxConnection *connection,
 
       g_free (priv->person_id);
       priv->person_id = g_strdup (person_id);
+
+      if (priv->state == VSX_CONNECTION_STATE_AWAITING_HEADER)
+        vsx_connection_set_state (connection, VSX_CONNECTION_STATE_IN_PROGRESS);
     }
   else if (!strcmp (method_string, "message"))
     {
@@ -1056,7 +1059,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                              "State",
                              "State of the conversation",
                              VSX_TYPE_CONNECTION_STATE,
-                             VSX_CONNECTION_STATE_IN_PROGRESS,
+                             VSX_CONNECTION_STATE_AWAITING_HEADER,
                              G_PARAM_READABLE
                              | G_PARAM_STATIC_NAME
                              | G_PARAM_STATIC_NICK
