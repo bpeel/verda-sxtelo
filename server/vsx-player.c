@@ -44,6 +44,9 @@ vsx_player_new (const char *player_name,
   player->name = g_strdup (player_name);
   player->num = num;
 
+  player->typing = FALSE;
+  player->connected = TRUE;
+
   /* Encode the player name in a message so we can easily send it out
    * to clients */
   g_string_append_printf (buf,

@@ -9,6 +9,7 @@ source_h = \
 	$(srcdir)/vsx-chunked-iconv.h \
 	$(srcdir)/vsx-conversation.h \
 	$(srcdir)/vsx-conversation-set.h \
+	$(srcdir)/vsx-flags.h \
 	$(srcdir)/vsx-http-parser.h \
 	$(srcdir)/vsx-keep-alive-handler.h \
 	$(srcdir)/vsx-leave-handler.h \

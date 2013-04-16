@@ -68,6 +68,9 @@ vsx_person_make_noise (VsxPerson *person);
 gboolean
 vsx_person_is_silent (VsxPerson *person);
 
+void
+vsx_person_leave_conversation (VsxPerson *person);
+
 G_END_DECLS
 
 #endif /* __VSX_PERSON_H__ */

@@ -66,18 +66,6 @@ end[] =
   "0\r\n"
   "\r\n";
 
-static guint8
-header_first_person_start[] =
-  "32\r\n"
-  "[\"header\", {\"num\": 0, \"id\": \"";
-static guint8
-header_second_person_start[] =
-  "32\r\n"
-  "[\"header\", {\"num\": 1, \"id\": \"";
-static guint8
-header_end[] =
-  "\"}]\r\n\r\n";
-
 typedef struct
 {
   guint8 *data;
@@ -160,20 +148,11 @@ write_chunked_message (VsxWatchPersonResponse *self,
 }
 
 static gboolean
-vsx_watch_person_response_get_typing_state (VsxWatchPersonResponse *self)
-{
-  VsxPerson *person = self->person;
-  VsxConversation *conversation = person->conversation;
-
-  return !!(conversation->typing_mask & (1 << (person->player->num ^ 1)));
-}
-
-static gboolean
 has_pending_data (VsxWatchPersonResponse *self,
                   VsxWatchPersonResponseState *new_state)
 {
   VsxConversation *conversation = self->person->conversation;
-  gboolean typing_state;
+  int i;
 
   if (self->named_players < conversation->n_players)
     {
@@ -181,23 +160,22 @@ has_pending_data (VsxWatchPersonResponse *self,
       return TRUE;
     }
 
+  for (i = 0; i < G_N_ELEMENTS (self->dirty_players); i++)
+    if (self->dirty_players[i])
+      {
+        *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER;
+        return TRUE;
+      }
+
   if (self->message_num < conversation->messages->len)
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES;
       return TRUE;
     }
 
-  if (conversation->state == VSX_CONVERSATION_FINISHED)
+  if (!self->person->player->connected)
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
-      return TRUE;
-    }
-
-  if ((typing_state = vsx_watch_person_response_get_typing_state (self))
-      != self->last_typing_state)
-    {
-      *new_state = (typing_state ? VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING
-                    : VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING);
       return TRUE;
     }
 
@@ -223,52 +201,28 @@ vsx_watch_person_response_add_data (VsxResponse *response,
           if (write_static_message (self, &message_data, header))
             {
               self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START;
+              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER;
             }
           else
             goto done;
         }
         break;
 
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER:
         {
-          if (self->person->player->num == 0
-              ? write_static_message (self, &message_data,
-                                      header_first_person_start)
-              : write_static_message (self, &message_data,
-                                      header_second_person_start))
-            {
-              self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID;
-            }
-          else
-            goto done;
-        }
-        break;
+          char buf[60];
+          int length;
 
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID:
-        {
-          char id_buf[17];
+          length = sprintf (buf,
+                            "[\"header\", {\"num\": %i, "
+                            "\"id\": \"%016" G_GINT64_MODIFIER "X\"}]\r\n",
+                            self->person->player->num,
+                            self->person->id);
 
-          G_STATIC_ASSERT (sizeof (VsxPersonId) == sizeof (guint64));
-
-          g_snprintf (id_buf, sizeof (id_buf),
-                      "%016" G_GINT64_MODIFIER "X",
-                      self->person->id);
-
-          if (write_message (self, &message_data, (guint8 *) id_buf, 16))
-            {
-              self->message_pos = 0;
-              self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_END;
-            }
-          else
-            goto done;
-        }
-        break;
-
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_END:
-        {
-          if (write_static_message (self, &message_data, header_end))
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) buf,
+                                     length))
             {
               self->message_pos = 0;
               self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
@@ -312,35 +266,56 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         }
         break;
 
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER:
         {
-          static const guint8 message[] =
-            "c\r\n"
-            "[\"typing\"]\r\n"
-            "\r\n";
+          VsxPlayer *player;
+          char buf[71];
+          int length;
 
-          if (write_static_message (self, &message_data, message))
+          /* Decide which player to update if we haven't started
+           * writing yet */
+          if (self->message_pos == 0)
             {
-              self->message_pos = 0;
-              self->last_typing_state = TRUE;
-              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+              unsigned long *p;
+
+              /* Find the first set bit in the dirty players array */
+              for (p = self->dirty_players; *p == 0; p++);
+
+              self->current_dirty_player =
+                ffsl (*p) - 1 +
+                (p - self->dirty_players) * sizeof (unsigned long) * 8;
+
+              player =
+                self->person->conversation->players[self->current_dirty_player];
+              self->dirty_player_is_typing = player->typing;
+              self->dirty_player_is_connected = player->connected;
+
+              /* We want to immediately mark the player as not dirty
+               * so that it changes again while we are still in this
+               * state then we will end up sending another message
+               * with the new state */
+              if (message_data.length > 0)
+                  VSX_FLAGS_SET (self->dirty_players,
+                                 self->current_dirty_player,
+                                 FALSE);
             }
           else
-            goto done;
-        }
-        break;
+            player =
+              self->person->conversation->players[self->current_dirty_player];
 
-      case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
-        {
-          static const guint8 message[] =
-            "10\r\n"
-            "[\"not-typing\"]\r\n"
-            "\r\n";
+          length = sprintf (buf,
+                            "[\"player\", {\"num\": %u, "
+                            "\"connected\": %s, \"typing\": %s}]\r\n",
+                            self->current_dirty_player,
+                            self->dirty_player_is_connected ? "true" : "false",
+                            self->dirty_player_is_typing ? "true" : "false");
 
-          if (write_static_message (self, &message_data, message))
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) buf,
+                                     length))
             {
               self->message_pos = 0;
-              self->last_typing_state = FALSE;
               self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
             }
           else
@@ -407,9 +382,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
   switch (self->state)
     {
     case VSX_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_END:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER:
       return TRUE;
 
     case VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA:
@@ -419,9 +392,8 @@ vsx_watch_person_response_has_data (VsxResponse *response)
         return has_pending_data (self, &new_state);
       }
 
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING:
-    case VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
       return TRUE;
@@ -486,6 +458,9 @@ player_changed_cb (VsxListener *listener,
 {
   VsxWatchPersonResponse *response =
     vsx_container_of (listener, response, player_changed_listener);
+  VsxPlayer *player = data;
+
+  VSX_FLAGS_SET (response->dirty_players, player->num, TRUE);
 
   vsx_response_changed ((VsxResponse *) response);
 }
@@ -496,11 +471,15 @@ vsx_watch_person_response_new (VsxPerson *person,
 {
   VsxWatchPersonResponse *self =
     vsx_object_allocate (vsx_watch_person_response_get_class ());
+  int i;
 
   vsx_response_init (self);
 
   self->person = vsx_object_ref (person);
   self->message_num = last_message;
+
+  for (i = 0; i < person->conversation->n_players; i++)
+    VSX_FLAGS_SET (self->dirty_players, i, TRUE);
 
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,

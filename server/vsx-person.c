@@ -37,10 +37,9 @@ vsx_person_free (void *object)
 
   if (person->conversation)
     {
-      vsx_conversation_finish (person->conversation);
+      vsx_conversation_player_left (person->conversation,
+                                    person->player->num);
       vsx_object_unref (person->conversation);
-      person->conversation = NULL;
-      person->player = NULL;
     }
 
   vsx_object_get_class ()->free (object);
@@ -157,7 +156,8 @@ vsx_person_new (VsxPersonId id,
 void
 vsx_person_leave_conversation (VsxPerson *person)
 {
-  vsx_conversation_finish (person->conversation);
+  vsx_conversation_player_left (person->conversation,
+                                person->player->num);
 }
 
 void

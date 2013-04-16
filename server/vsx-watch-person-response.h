@@ -21,24 +21,20 @@
 
 #include "vsx-response.h"
 #include "vsx-person.h"
+#include "vsx-flags.h"
 
 G_BEGIN_DECLS
 
 typedef enum
 {
   VSX_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER,
-  VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_START,
-  VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_ID,
-  VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER_END,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER,
   VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA,
-
   VSX_WATCH_PERSON_RESPONSE_WRITING_NAME,
-
-  VSX_WATCH_PERSON_RESPONSE_WRITING_TYPING,
-  VSX_WATCH_PERSON_RESPONSE_WRITING_NOT_TYPING,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER,
   VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES,
-
   VSX_WATCH_PERSON_RESPONSE_WRITING_END,
+
   VSX_WATCH_PERSON_RESPONSE_DONE
 } VsxWatchPersonResponseState;
 
@@ -58,6 +54,15 @@ typedef struct
 
   /* Number of players that we've sent a "player-name" event for */
   unsigned int named_players;
+
+  /* Player number that we're currently updating */
+  unsigned int current_dirty_player;
+  /* The state that was current when we started sending the player state */
+  unsigned int dirty_player_is_typing : 1;
+  unsigned int dirty_player_is_connected : 1;
+  /* Bit mask of players whose state needs updating */
+  unsigned long dirty_players
+  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_CONVERSATION_MAX_PLAYERS)];
 
   gboolean last_typing_state;
 } VsxWatchPersonResponse;

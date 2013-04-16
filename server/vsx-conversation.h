@@ -39,14 +39,10 @@ typedef struct
   enum
   {
     VSX_CONVERSATION_AWAITING_START,
-    VSX_CONVERSATION_IN_PROGRESS,
-    VSX_CONVERSATION_FINISHED
+    VSX_CONVERSATION_IN_PROGRESS
   } state;
 
   GArray *messages;
-
-  /* Bitmask of people that are currently typing */
-  unsigned int typing_mask;
 
   int n_players;
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
@@ -65,18 +61,19 @@ void
 vsx_conversation_start (VsxConversation *conversation);
 
 void
-vsx_conversation_finish (VsxConversation *conversation);
-
-void
 vsx_conversation_add_message (VsxConversation *conversation,
-                              unsigned int person_num,
+                              unsigned int player_num,
                               const char *buffer,
                               unsigned int length);
 
 void
 vsx_conversation_set_typing (VsxConversation *conversation,
-                             unsigned int person_num,
+                             unsigned int player_num,
                              gboolean typing);
+
+void
+vsx_conversation_player_left (VsxConversation *conversation,
+                              unsigned int player_num);
 
 VsxPlayer *
 vsx_conversation_add_player (VsxConversation *conversation,

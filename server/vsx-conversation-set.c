@@ -138,13 +138,6 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
   else
     {
       conversation = vsx_object_ref (data->conversation);
-
-      /* We have a second person so the conversation has now
-         started. This should also end up removing the conversation
-         from the hash table because the state will change */
-      vsx_conversation_start (conversation);
-
-      vsx_log ("Conversation started in \"%s\"", room_name);
     }
 
   return conversation;

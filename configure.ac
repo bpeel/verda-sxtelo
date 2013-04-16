@@ -1,6 +1,7 @@
 AC_INIT([verda-sxtelo], 0.1)
 
 AM_CONFIG_HEADER([config.h])
+AC_GNU_SOURCE
 
 AM_INIT_AUTOMAKE([1.9])
 

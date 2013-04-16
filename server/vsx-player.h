@@ -33,6 +33,9 @@ typedef struct
 
   gsize name_message_len;
   char *name_message;
+
+  unsigned int typing : 1;
+  unsigned int connected : 1;
 } VsxPlayer;
 
 VsxPlayer *

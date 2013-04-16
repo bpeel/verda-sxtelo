@@ -87,27 +87,16 @@ vsx_conversation_start (VsxConversation *conversation)
 }
 
 void
-vsx_conversation_finish (VsxConversation *conversation)
-{
-  if (conversation->state != VSX_CONVERSATION_FINISHED)
-    {
-      vsx_log ("Conversation finished");
-      conversation->state = VSX_CONVERSATION_FINISHED;
-      vsx_conversation_changed (conversation);
-    }
-}
-
-void
 vsx_conversation_add_message (VsxConversation *conversation,
-                              unsigned int person_num,
+                              unsigned int player_num,
                               const char *buffer,
                               unsigned int length)
 {
   VsxConversationMessage *message;
   GString *message_str;
 
-  /* Ignore attempts to add messages to a conversation that has finished */
-  if (conversation->state == VSX_CONVERSATION_FINISHED)
+  /* Ignore attempts to add messages for a player that has left */
+  if (!conversation->players[player_num]->connected)
     return;
 
   g_array_set_size (conversation->messages,
@@ -121,7 +110,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
   g_string_append_printf (message_str,
                           "[\"message\", {\"person\": %u, "
                           "\"text\": \"",
-                          person_num);
+                          player_num);
   while (length-- > 0)
     {
       /* Replace any control characters or spaces with a space */
@@ -148,20 +137,33 @@ vsx_conversation_add_message (VsxConversation *conversation,
 
 void
 vsx_conversation_set_typing (VsxConversation *conversation,
-                             unsigned int person_num,
+                             unsigned int player_num,
                              gboolean typing)
 {
-  unsigned int new_mask = conversation->typing_mask;
+  VsxPlayer *player = conversation->players[player_num];
 
-  if (typing)
-    new_mask |= 1 << person_num;
-  else
-    new_mask &= ~(1 << person_num);
-
-  if (new_mask != conversation->typing_mask)
+  if (player->typing != typing)
     {
-      conversation->typing_mask = new_mask;
-      vsx_conversation_changed (conversation);
+      /* Ignore attempts to set typing state for a player that has left */
+      if (!player->connected)
+        return;
+
+      player->typing = typing;
+      vsx_conversation_player_changed (conversation, player);
+    }
+}
+
+void
+vsx_conversation_player_left (VsxConversation *conversation,
+                              unsigned int player_num)
+{
+  VsxPlayer *player = conversation->players[player_num];
+
+  if (player->connected)
+    {
+      player->typing = FALSE;
+      player->connected = FALSE;
+      vsx_conversation_player_changed (conversation, player);
     }
 }
 
@@ -177,6 +179,11 @@ vsx_conversation_add_player (VsxConversation *conversation,
   conversation->players[conversation->n_players++] = player;
 
   vsx_conversation_player_changed (conversation, player);
+
+  /* If we've reached the maximum number of players then we'll
+   * immediately start the game so that no more players will join */
+  if (conversation->n_players >= VSX_CONVERSATION_MAX_PLAYERS)
+    vsx_conversation_start (conversation);
 
   return player;
 }

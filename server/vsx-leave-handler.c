@@ -71,7 +71,7 @@ real_request_finished (VsxRequestHandler *handler)
   if (self->person)
     {
       if (self->person->conversation)
-        vsx_conversation_finish (self->person->conversation);
+        vsx_person_leave_conversation (self->person);
 
       return vsx_string_response_new (VSX_STRING_RESPONSE_OK);
     }

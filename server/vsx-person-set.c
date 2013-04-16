@@ -115,7 +115,7 @@ remove_silent_people_cb (gpointer key,
   if (vsx_person_is_silent (person))
     {
       if (person->conversation)
-        vsx_conversation_finish (person->conversation);
+        vsx_person_leave_conversation (person);
 
       return TRUE;
     }
