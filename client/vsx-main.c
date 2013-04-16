@@ -33,7 +33,7 @@ static void
 format_print (const char *format, ...);
 
 static char *option_server_base_url = "http://vs.busydoingnothing.co.uk:5142/";
-static char *option_room = "english";
+static char *option_room = "default";
 static char *option_player_name = NULL;
 static gboolean option_debug = FALSE;
 
