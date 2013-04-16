@@ -6,8 +6,7 @@ TRANSLATABLE_FILES = \
 
 LANGUAGES = \
 	en \
-	eo \
-	fr
+	eo
 
 LANGUAGE_STAMPS = \
 	$(LANGUAGES:%=%.language-stamp)
