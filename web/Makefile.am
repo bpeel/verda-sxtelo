@@ -1,8 +1,6 @@
 TRANSLATABLE_FILES = \
-	$(srcdir)/chat.html \
-	$(srcdir)/chat.js \
-	$(srcdir)/verda-sxtelo.js \
-	$(srcdir)/index.html
+	$(srcdir)/index.html \
+	$(srcdir)/verda-sxtelo.js
 
 LANGUAGES = \
 	en \
