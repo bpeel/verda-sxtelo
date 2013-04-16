@@ -95,7 +95,6 @@ ChatSession.prototype.setState = function (state)
   {
     $("#message-input-box").attr ("disabled", "disabled");
     $("#submit-message").attr ("disabled", "disabled");
-    $("#typing-note-text").hide ();
   }
 };
 
@@ -196,17 +195,6 @@ ChatSession.prototype.handleChatMessage = function (message)
   this.messageNumber++;
 };
 
-ChatSession.prototype.handleTyping = function ()
-{
-  if (this.state == "in-progress")
-    $("#typing-note-text").show ();
-};
-
-ChatSession.prototype.handleNotTyping = function ()
-{
-  $("#typing-note-text").hide ();
-};
-
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -225,14 +213,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "message":
     this.handleChatMessage (message[1]);
-    break;
-
-  case "typing":
-    this.handleTyping ();
-    break;
-
-  case "not-typing":
-    this.handleNotTyping ();
     break;
   }
 };
