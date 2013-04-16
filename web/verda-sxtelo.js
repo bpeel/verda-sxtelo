@@ -139,33 +139,17 @@ ChatSession.prototype.handleHeader = function (header)
   this.personNumber = header.num;
   this.personId = header.id;
 
-  $("#status-note").text ("@WAITING_FOR_SOMEONE@");
-  this.setState ("awaiting-partner");
+  $("#status-note").text ("@IN_CONVERSATION@");
+  this.setState ("in-progress");
 };
 
-ChatSession.prototype.handleStateChange = function (newState)
+ChatSession.prototype.handleEnd = function ()
 {
-  if (typeof (newState) != "string")
-    this.setError ("@BAD_DATA@");
-
-  switch (newState)
+  if (this.state == "in-progress")
   {
-  case "in-progress":
-    if (this.state == "awaiting-partner")
-    {
-      $("#status-note").text ("@IN_CONVERSATION@");
-      this.setState ("in-progress");
-    }
-    break;
-
-  case "done":
-    if (this.state == "in-progress")
-    {
-      $("#status-note").text ("@PERSON_LEFT@");
-      this.setState ("done");
-      $("#conversation-finished-note").show ();
-    }
-    break;
+    $("#status-note").text ("@PERSON_LEFT@");
+    this.setState ("done");
+    $("#conversation-finished-note").show ();
   }
 };
 
@@ -235,8 +219,8 @@ ChatSession.prototype.processMessage = function (message)
     this.handleHeader (message[1]);
     break;
 
-  case "state":
-    this.handleStateChange (message[1]);
+  case "end":
+    this.handleEnd ();
     break;
 
   case "message":
