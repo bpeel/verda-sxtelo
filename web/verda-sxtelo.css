@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,16 +19,6 @@
 body {
     background-color: rgb(128, 128, 255);
     font-family: sans-serif;
-}
-
-.logo-header {
-    text-align: center;
-}
-
-.logo-header img {
-    background-color: rgb(255, 255, 255);
-    padding: 8px;
-    border: 1px solid black;
 }
 
 .content {

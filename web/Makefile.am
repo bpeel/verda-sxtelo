@@ -14,13 +14,11 @@ LANGUAGE_FILES = \
 EXTRA_DIST = \
 	$(LANGUAGE_FILES) \
 	$(TRANSLATABLE_FILES) \
-	verda-sxtelo-logo.svg \
 	translate-file.pl
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
 	verda-sxtelo.css \
-	verda-sxtelo-logo.png \
 	jquery-1.6.1.js \
 	favicon.ico \
 	favicon.png \
