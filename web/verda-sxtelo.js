@@ -73,11 +73,13 @@ function ChatSession ()
   this.sentTypingState = false;
   this.unreadMessages = 0;
 
+  this.playerName = "ludanto";
+
   var search = window.location.search;
   if (search && search.match (/^\?[a-z]+$/))
-    this.langCode = search.substring (1);
+    this.roomName = search.substring (1);
   else
-    this.langCode = "@LANG_CODE@";
+    this.roomName = "default";
 }
 
 ChatSession.prototype.setState = function (state)
@@ -339,7 +341,8 @@ ChatSession.prototype.startWatchAjax = function ()
   if (this.personId)
     method = "watch_person?" + this.personId;
   else
-    method = "new_person?" + this.langCode;
+    method = ("new_person?" + encodeURIComponent (this.roomName) + "&" +
+              encodeURIComponent (this.playerName));
 
   this.clearWatchAjax ();
 
