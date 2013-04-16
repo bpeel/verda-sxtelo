@@ -138,7 +138,7 @@ ChatSession.prototype.handleHeader = function (header)
   this.personNumber = header.num;
   this.personId = header.id;
 
-  $("#status-note").text ("@IN_CONVERSATION@");
+  $("#status-note").text ("");
   this.setState ("in-progress");
 };
 
