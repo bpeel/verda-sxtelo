@@ -74,6 +74,7 @@ function ChatSession ()
   this.unreadMessages = 0;
   this.players = [];
   this.tiles = [];
+  this.dragTile = null;
 
   this.playerName = "ludanto";
 
@@ -225,6 +226,15 @@ ChatSession.prototype.handleChatMessage = function (message)
   this.messageNumber++;
 };
 
+ChatSession.prototype.raiseTile = function (tile)
+{
+  /* Reappend the tile to its parent so that it will appear above all
+   * other tiles */
+  var parent = tile.element.parentNode;
+  $(tile.element).remove ();
+  $(parent).append (tile.element);
+};
+
 ChatSession.prototype.handleTileMessage = function (data)
 {
   if (typeof (data) != "object")
@@ -250,7 +260,8 @@ ChatSession.prototype.handleTileMessage = function (data)
   }
   else
   {
-    if (data.x != tile.x || data.y != tile.y)
+    if (data.num != this.dragTile &&
+        (data.x != tile.x || data.y != tile.y))
     {
       var te = $(tile.element);
       var dx = tile.x - data.x;
@@ -258,6 +269,7 @@ ChatSession.prototype.handleTileMessage = function (data)
       var distance = Math.sqrt (dx * dx + dy * dy);
 
       te.stop ();
+      this.raiseTile (tile);
       te.animate ({ "left": new_x, "top": new_y },
                   distance * 2.0);
     }
@@ -529,6 +541,17 @@ ChatSession.prototype.sendNextMessage = function ()
                                             message[1]));
     this.sendMessageAjax.send ();
   }
+  else if (message[0] == "move-tile")
+  {
+    var x = Math.round (message[2] * 10.0);
+    var y = Math.round (message[3] * 10.0);
+    this.sendMessageAjax.open ("GET",
+                               this.getUrl ("move_tile?" + this.personId + "&" +
+                                            message[1] + "&" +
+                                            x + "&" +
+                                            y));
+    this.sendMessageAjax.send ();
+  }
 
   this.resetKeepAlive ();
 };
@@ -581,37 +604,117 @@ ChatSession.prototype.focusCb = function ()
   document.title = "Verda Ŝtelo";
 };
 
-ChatSession.prototype.boardClickCb = function (event)
+ChatSession.prototype.getTileNumForEvent = function (event)
+{
+  if ((event.target.className) != "tile")
+    return null;
+
+  var tileNum;
+
+  for (tileNum = 0; tileNum < this.tiles.length; tileNum++)
+  {
+    var tile = this.tiles[tileNum];
+    if (tile && tile.element == event.target)
+      return tileNum;
+  }
+
+  return null;
+};
+
+ChatSession.prototype.mouseDownCb = function (event)
+{
+  var tileNum;
+
+  if (event.button != 0)
+    return;
+
+  event.preventDefault ();
+
+  tileNum = this.getTileNumForEvent (event);
+  if (tileNum == null)
+    return;
+
+  var tile = this.tiles[tileNum];
+
+  var position = $(tile.element).position ();
+  this.dragOffsetX = event.pageX - position.left;
+  this.dragOffsetY = event.pageY - position.top;
+
+  this.dragTile = tileNum;
+  this.tileMoved = false;
+
+  $(tile.element).stop ();
+  this.raiseTile (tile);
+};
+
+ChatSession.prototype.mouseMoveCb = function (event)
+{
+  if (this.dragTile == null)
+    return;
+
+  var newX = (event.pageX - this.dragOffsetX) / this.pixelsPerEm;
+  var newY = (event.pageY - this.dragOffsetY) / this.pixelsPerEm;
+  var tile = this.tiles[this.dragTile];
+
+  this.tileMoved = true;
+  this.moveTile (this.dragTile, newX, newY);
+
+  tile.element.style.left = newX + "em";
+  tile.element.style.top = newY + "em";
+};
+
+ChatSession.prototype.flipTile = function (tileNum)
+{
+  var tile = this.tiles[tileNum];
+
+  if (tile.facingUp)
+    return;
+
+  /* Make sure that we haven't already queued this flip */
+  for (i = 0; i < this.messageQueue.length; i++)
+    if (this.messageQueue[i][0] == "flip-tile" &&
+        this.messageQueue[i][1] == tileNum)
+      return;
+
+  this.messageQueue.push (["flip-tile", tileNum]);
+  this.sendNextMessage ();
+};
+
+ChatSession.prototype.moveTile = function (tileNum, x, y)
+{
+  var tile = this.tiles[tileNum];
+
+  /* If we've already queued this flip then just update the position */
+  for (i = 0; i < this.messageQueue.length; i++)
+  {
+    if (this.messageQueue[i][0] == "move-tile" &&
+        this.messageQueue[i][1] == tileNum)
+    {
+      this.messageQueue[i][2] = x;
+      this.messageQueue[i][3] = y;
+      return;
+    }
+  }
+
+  this.messageQueue.push (["move-tile", tileNum, x, y]);
+  this.sendNextMessage ();
+};
+
+ChatSession.prototype.mouseUpCb = function (event)
 {
   if (event.button != 0)
     return;
 
   event.preventDefault ();
 
-  if ((event.target.className) == "tile")
+  if (this.dragTile != null)
   {
-    var i;
-    var tileNum;
-    var tile = null;
+    var tile = this.tiles[this.dragTile];
 
-    for (tileNum = 0; tileNum < this.tiles.length; tileNum++)
-    {
-      tile = this.tiles[tileNum];
-      if (tile && tile.element == event.target)
-        break;
-    }
+    if (!this.tileMoved && !tile.facingUp)
+      this.flipTile (this.dragTile);
 
-    if (tile == null || tile.facingUp)
-      return;
-
-    /* Make sure that we haven't already queued this flip */
-    for (i = 0; i < this.messageQueue.length; i++)
-      if (this.messageQueue[i][0] == "flip-tile" &&
-          this.messageQueue[i][1] == tileNum)
-        return;
-
-    this.messageQueue.push (["flip-tile", tileNum]);
-    this.sendNextMessage ();
+    this.dragTile = null;
   }
 };
 
@@ -625,17 +728,28 @@ ChatSession.prototype.loadCb = function ()
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
-  $("#board").bind ("click", this.boardClickCb.bind (this));
-
   /* Prevent default handling of mouse events on the board because
    * otherwise you can accidentally select the text in a tile */
   var preventDefaultCb = function (event) { event.preventDefault (); };
-  $("#board").mousedown (preventDefaultCb);
-  $("#board").mouseup (preventDefaultCb);
+  $("#board").click (preventDefaultCb);
+
+  $("#board").mousedown (this.mouseDownCb.bind (this));
+  $("#board").mousemove (this.mouseMoveCb.bind (this));
+  $("#board").mouseup (this.mouseUpCb.bind (this));
 
   $(window).focus (this.focusCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
+
+  /* Work out the scale from pixels to ems so that we can translate
+   * mouse positions to offsets in ems */
+  var dummyElem = document.createElement ("div");
+  dummyElem.style.width = "100em";
+  dummyElem.style.height = "100em";
+  dummyElem.style.position = "absolute";
+  $("#board").append (dummyElem);
+  this.pixelsPerEm = $(dummyElem).innerWidth () / 100.0;
+  $(dummyElem).remove ();
 };
 
 ChatSession.prototype.unloadCb = function ()
