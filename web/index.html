@@ -31,6 +31,26 @@
       <div id="status-note">
         @CONNECTING@
       </div>
+      <div id="board">
+        <div id="player-0-holder" class="player-holder">
+          <div id="player-0"></div>
+        </div>
+        <div id="player-1-holder" class="player-holder">
+          <div id="player-1"></div>
+        </div>
+        <div id="player-2-holder" class="player-holder">
+          <div id="player-2"></div>
+        </div>
+        <div id="player-3-holder" class="player-holder">
+          <div id="player-3"></div>
+        </div>
+        <div id="player-4-holder" class="player-holder">
+          <div id="player-4"></div>
+        </div>
+        <div id="player-5-holder" class="player-holder">
+          <div id="player-5"></div>
+        </div>
+      </div>
       <div id="messages-box">
         <div id="messages">
         </div>
@@ -43,8 +63,13 @@
           </button>
         </div>
       </div>
-      <input id="message-input-box" type="text">
-      <button id="submit-message">@SEND_BUTTON@</button>
+      <div id="message-input-container">
+        <input id="message-input-box" type="text">
+        <button id="submit-message">@SEND_BUTTON@</button>
+      </div>
+      <div id="other-players" style="display: none">
+        <div class="other-players-message">@OTHER_PLAYERS@</div>
+      </div>
     </div>
     <audio id="message-alert-sound">
       <source src="message-alert-sound.ogg" type="audio/ogg" />

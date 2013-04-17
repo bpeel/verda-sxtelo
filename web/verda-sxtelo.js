@@ -72,6 +72,7 @@ function ChatSession ()
   this.messageQueue = [];
   this.sentTypingState = false;
   this.unreadMessages = 0;
+  this.players = [];
 
   this.playerName = "ludanto";
 
@@ -142,6 +143,40 @@ ChatSession.prototype.handleHeader = function (header)
   this.setState ("in-progress");
 };
 
+ChatSession.prototype.handlePlayerName = function (data)
+{
+  if (typeof (data) != "object")
+    this.setError ("@BAD_DATA@");
+
+  if (this.state != "in-progress")
+    return;
+
+  var player = this.getPlayer (data.num);
+  player.name = data.name;
+  player.element.textContent = player.name;
+};
+
+ChatSession.prototype.handlePlayer = function (data)
+{
+  if (typeof (data) != "object")
+    this.setError ("@BAD_DATA@");
+
+  if (this.state != "in-progress")
+    return;
+
+  var player = this.getPlayer (data.num);
+  player.typing = data.typing;
+  player.connected = data.connected;
+
+  var className = "player";
+  if (data.typing)
+    className += " typing"
+  if (!data.connected)
+    className += " disconnected";
+
+  player.element.className = className;
+};
+
 ChatSession.prototype.handleEnd = function ()
 {
   if (this.state == "in-progress")
@@ -169,8 +204,7 @@ ChatSession.prototype.handleChatMessage = function (message)
 
     var span = $(document.createElement ("span"));
     div.append (span);
-    span.text (message.person == this.personNumber
-               ? "@YOU@:" : "@STRANGER@:");
+    span.text (this.getPlayer (message.person).name);
     span.addClass (message.person == this.personNumber
                    ? "message-you" : "message-stranger");
 
@@ -178,7 +212,8 @@ ChatSession.prototype.handleChatMessage = function (message)
 
     $("#messages").append (div);
 
-    window.scrollTo (0, document.body.scrollHeight);
+    var messagesBox = $("#messages-box");
+    messagesBox.scrollTop (messagesBox.prop("scrollHeight"));
 
     if (document.hasFocus && !document.hasFocus ())
     {
@@ -209,6 +244,14 @@ ChatSession.prototype.processMessage = function (message)
 
   case "end":
     this.handleEnd ();
+    break;
+
+  case "player-name":
+    this.handlePlayerName (message[1]);
+    break;
+
+  case "player":
+    this.handlePlayer (message[1]);
     break;
 
   case "message":
@@ -527,6 +570,30 @@ ChatSession.prototype.resetKeepAlive = function ()
   this.keepAliveTime = new Date ();
   this.keepAliveTimeout = setTimeout (this.sendNextMessage.bind (this),
                                       KEEP_ALIVE_TIME);
+};
+
+ChatSession.prototype.getPlayer = function (playerNum)
+{
+  var player;
+
+  if (!(player = this.players[playerNum]))
+  {
+    player = this.players[playerNum] = {};
+
+    player.typing = false;
+    player.connected = true;
+    player.name = "";
+
+    player.element = document.getElementById ("player-" + playerNum);
+    if (player.element == null)
+    {
+      player.element = document.createElement ("span");
+      $("#other-players").append (player.element);
+      $("#other-players").show ();
+    }
+  }
+
+  return player;
 };
 
 /* .bind is only implemented in recent browsers so this provides a
