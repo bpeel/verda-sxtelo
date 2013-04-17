@@ -651,19 +651,31 @@ ChatSession.prototype.mouseMoveCb = function (event)
   if (this.dragTile == null)
     return;
 
-  var newX = (event.pageX - this.dragOffsetX) / this.pixelsPerEm;
-  var newY = (event.pageY - this.dragOffsetY) / this.pixelsPerEm;
+  var newX = Math.round ((event.pageX - this.dragOffsetX) /
+                         this.pixelsPerEm * 10.0);
+  var newY = Math.round ((event.pageY - this.dragOffsetY) /
+                         this.pixelsPerEm * 10.0);
   var tile = this.tiles[this.dragTile];
+
+  /* Gives some resistance to the initial move of the tile */
+  if (!this.tileMoved &&
+      Math.abs (newX - tile.x) < 3 &&
+      Math.abs (newY - tile.y) < 3)
+    return;
+
+  if (newX == tile.y && newY == tile.y)
+    return;
 
   this.tileMoved = true;
   this.lastMovedTile = tile;
 
-  this.moveTile (this.dragTile,
-                 Math.round (newX * 10.0),
-                 Math.round (newY * 10.0));
+  this.moveTile (this.dragTile, newX, newY);
 
-  tile.element.style.left = newX + "em";
-  tile.element.style.top = newY + "em";
+  tile.x = newX;
+  tile.y = newY;
+
+  tile.element.style.left = (newX / 10.0) + "em";
+  tile.element.style.top = (newY / 10.0) + "em";
 };
 
 ChatSession.prototype.flipTile = function (tileNum)
