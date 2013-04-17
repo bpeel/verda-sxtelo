@@ -75,6 +75,7 @@ function ChatSession ()
   this.players = [];
   this.tiles = [];
   this.dragTile = null;
+  this.lastMovedTile = null;
 
   this.playerName = "ludanto";
 
@@ -543,13 +544,11 @@ ChatSession.prototype.sendNextMessage = function ()
   }
   else if (message[0] == "move-tile")
   {
-    var x = Math.round (message[2] * 10.0);
-    var y = Math.round (message[3] * 10.0);
     this.sendMessageAjax.open ("GET",
                                this.getUrl ("move_tile?" + this.personId + "&" +
                                             message[1] + "&" +
-                                            x + "&" +
-                                            y));
+                                            message[2] + "&" +
+                                            message[3]));
     this.sendMessageAjax.send ();
   }
 
@@ -657,7 +656,11 @@ ChatSession.prototype.mouseMoveCb = function (event)
   var tile = this.tiles[this.dragTile];
 
   this.tileMoved = true;
-  this.moveTile (this.dragTile, newX, newY);
+  this.lastMovedTile = tile;
+
+  this.moveTile (this.dragTile,
+                 Math.round (newX * 10.0),
+                 Math.round (newY * 10.0));
 
   tile.element.style.left = newX + "em";
   tile.element.style.top = newY + "em";
@@ -711,8 +714,25 @@ ChatSession.prototype.mouseUpCb = function (event)
   {
     var tile = this.tiles[this.dragTile];
 
-    if (!this.tileMoved && !tile.facingUp)
-      this.flipTile (this.dragTile);
+    if (!this.tileMoved)
+    {
+      if (tile.facingUp)
+      {
+        if (this.lastMovedTile && this.lastMovedTile != tile)
+        {
+          var newPos = this.lastMovedTile.x + 20;
+          var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
+                        10.0 - 20);
+          if (newPos < maxPos)
+          {
+            this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
+            this.lastMovedTile = tile;
+          }
+        }
+      }
+      else
+        this.flipTile (this.dragTile);
+    }
 
     this.dragTile = null;
   }
