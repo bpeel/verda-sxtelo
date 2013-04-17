@@ -68,7 +68,7 @@ function ChatSession ()
   this.terminatorRegexp = /\r\n/;
   this.personId = null;
   this.personNumber = null;
-  this.messagesAdded = 0;
+  this.messageNumber = 0;
   this.messageQueue = [];
   this.sentTypingState = false;
   this.unreadMessages = 0;
@@ -197,35 +197,29 @@ ChatSession.prototype.handleChatMessage = function (message)
   if (this.state != "in-progress")
     return;
 
-  /* Ignore messages that we've already got */
-  if (this.messagesAdded <= this.messageNumber)
+  var div = $(document.createElement ("div"));
+  div.addClass ("message");
+
+  var span = $(document.createElement ("span"));
+  div.append (span);
+  span.text (this.getPlayer (message.person).name);
+  span.addClass (message.person == this.personNumber
+                 ? "message-you" : "message-stranger");
+
+  div.append ($(document.createTextNode (" " + message.text)));
+
+  $("#messages").append (div);
+
+  var messagesBox = $("#messages-box");
+  messagesBox.scrollTop (messagesBox.prop("scrollHeight"));
+
+  if (document.hasFocus && !document.hasFocus ())
   {
-    var div = $(document.createElement ("div"));
-    div.addClass ("message");
-
-    var span = $(document.createElement ("span"));
-    div.append (span);
-    span.text (this.getPlayer (message.person).name);
-    span.addClass (message.person == this.personNumber
-                   ? "message-you" : "message-stranger");
-
-    div.append ($(document.createTextNode (" " + message.text)));
-
-    $("#messages").append (div);
-
-    var messagesBox = $("#messages-box");
-    messagesBox.scrollTop (messagesBox.prop("scrollHeight"));
-
-    if (document.hasFocus && !document.hasFocus ())
-    {
-      this.unreadMessages++;
-      document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
-      var messageAlertSound = document.getElementById ("message-alert-sound");
-      if (messageAlertSound && messageAlertSound.play)
-        messageAlertSound.play ();
-    }
-
-    this.messagesAdded++;
+    this.unreadMessages++;
+    document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
+    var messageAlertSound = document.getElementById ("message-alert-sound");
+    if (messageAlertSound && messageAlertSound.play)
+      messageAlertSound.play ();
   }
 
   this.messageNumber++;
@@ -399,7 +393,8 @@ ChatSession.prototype.startWatchAjax = function ()
   var method;
 
   if (this.personId)
-    method = "watch_person?" + this.personId;
+    method = "watch_person?" + this.personId + "&" + this.messageNumber;
+
   else
     method = ("new_person?" + encodeURIComponent (this.roomName) + "&" +
               encodeURIComponent (this.playerName));
@@ -407,7 +402,6 @@ ChatSession.prototype.startWatchAjax = function ()
   this.clearWatchAjax ();
 
   this.watchPosition = 0;
-  this.messageNumber = 0;
 
   this.watchAjax = getAjaxObject ();
 
