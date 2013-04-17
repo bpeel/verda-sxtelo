@@ -73,6 +73,7 @@ function ChatSession ()
   this.sentTypingState = false;
   this.unreadMessages = 0;
   this.players = [];
+  this.tiles = [];
 
   this.playerName = "ludanto";
 
@@ -230,6 +231,54 @@ ChatSession.prototype.handleChatMessage = function (message)
   this.messageNumber++;
 };
 
+ChatSession.prototype.handleTileMessage = function (data)
+{
+  if (typeof (data) != "object")
+    this.setError ("@BAD_DATA@");
+
+  if (this.state != "in-progress")
+    return;
+
+  var tile = this.tiles[data.num];
+
+  var new_x = (data.x / 10.0) + "em";
+  var new_y = (data.y / 10.0) + "em";
+
+  if (tile == null)
+  {
+    tile = this.tiles[data.num] = {};
+    tile.element = document.createElement ("div");
+    tile.element.className = "tile";
+    tile.element.style.left = new_x;
+    tile.element.style.top = new_y;
+    tile.facingUp = false;
+    $("#board").append (tile.element);
+  }
+  else
+  {
+    if (data.x != tile.x || data.y != tile.y)
+    {
+      var te = $(tile.element);
+      var dx = tile.x - data.x;
+      var dy = tile.y - data.y;
+      var distance = Math.sqrt (dx * dx + dy * dy);
+
+      te.stop ();
+      te.animate ({ "left": new_x, "top": new_y },
+                  distance * 2.0);
+    }
+  }
+
+  tile.x = data.x;
+  tile.y = data.y;
+
+  if (data["facing-up"] && !tile.facingUp)
+  {
+    tile.element.textContent = data.letter;
+    tile.facingUp = true;
+  }
+};
+
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -256,6 +305,10 @@ ChatSession.prototype.processMessage = function (message)
 
   case "message":
     this.handleChatMessage (message[1]);
+    break;
+
+  case "tile":
+    this.handleTileMessage (message[1]);
     break;
   }
 };

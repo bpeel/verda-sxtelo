@@ -165,3 +165,18 @@ span.player+span.player:before {
     top: 19em;
     line-height: 17em;
 }
+
+.tile {
+    position: absolute;
+    width: 1.8em;
+    height: 1.8em;
+    border-left: 0.1em solid rgb(255, 155, 26);
+    border-top: 0.1em solid rgb(255, 155, 26);
+    border-bottom: 0.1em solid rgb(167, 106, 28);
+    border-right: 0.1em solid rgb(167, 106, 28);
+    background-color: rgb(205, 122, 15);
+    text-align: center;
+    line-height: 1.8em;
+    font-size: 1em;
+    font-weight: bold;
+}
