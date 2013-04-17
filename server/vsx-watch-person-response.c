@@ -471,15 +471,14 @@ vsx_watch_person_response_new (VsxPerson *person,
 {
   VsxWatchPersonResponse *self =
     vsx_object_allocate (vsx_watch_person_response_get_class ());
-  int i;
 
   vsx_response_init (self);
 
   self->person = vsx_object_ref (person);
   self->message_num = last_message;
 
-  for (i = 0; i < person->conversation->n_players; i++)
-    VSX_FLAGS_SET (self->dirty_players, i, TRUE);
+  vsx_flags_set_range (self->dirty_players,
+                       person->conversation->n_players);
 
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,

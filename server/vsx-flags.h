@@ -73,6 +73,22 @@ G_BEGIN_DECLS
        ~VSX_FLAGS_GET_MASK (flag));             \
   } G_STMT_END
 
+static void inline
+vsx_flags_set_range (unsigned long *array,
+                     int range)
+{
+  int i;
+
+  for (i = 0; i < range / (sizeof (unsigned long) * 8); i++)
+    array[i] = ~0UL;
+
+  if (i * sizeof (unsigned long) * 8 < range)
+    {
+      int bits = range - i * sizeof (unsigned long) * 8;
+      array[i] |= (1UL << bits) - 1;
+    }
+}
+
 /* Macros to help iterate an array of flags. It should be used like
  * this:
  *
