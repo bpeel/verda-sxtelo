@@ -592,6 +592,8 @@ ChatSession.prototype.boardClickCb = function (event)
   if (event.button != 0)
     return;
 
+  event.preventDefault ();
+
   if ((event.target.className) == "tile")
   {
     var i;
@@ -630,6 +632,13 @@ ChatSession.prototype.loadCb = function ()
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
   $("#board").bind ("click", this.boardClickCb.bind (this));
+
+  /* Prevent default handling of mouse events on the board because
+   * otherwise you can accidentally select the text in a tile */
+  var preventDefaultCb = function (event) { event.preventDefault (); };
+  $("#board").mousedown (preventDefaultCb);
+  $("#board").mouseup (preventDefaultCb);
+
   $(window).focus (this.focusCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
