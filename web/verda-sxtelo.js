@@ -512,18 +512,29 @@ ChatSession.prototype.sendNextMessage = function ()
 
   var message = this.messageQueue.shift ();
 
-  /* The server assumes we've stopped typing whenever a message is
-   * sent */
-  this.sentTypingState = false;
-
   this.sendMessageAjax = getAjaxObject ();
   this.sendMessageAjax.onreadystatechange =
     this.sendMessageReadyStateChangeCb.bind (this);
-  this.sendMessageAjax.open ("POST",
-                             this.getUrl ("send_message?" + this.personId));
-  this.sendMessageAjax.setRequestHeader ("Content-Type",
-                                         "text/plain; charset=UTF-8");
-  this.sendMessageAjax.send (message);
+
+  if (message[0] == "message")
+  {
+    /* The server assumes we've stopped typing whenever a message is
+     * sent */
+    this.sentTypingState = false;
+
+    this.sendMessageAjax.open ("POST",
+                               this.getUrl ("send_message?" + this.personId));
+    this.sendMessageAjax.setRequestHeader ("Content-Type",
+                                           "text/plain; charset=UTF-8");
+    this.sendMessageAjax.send (message[1]);
+  }
+  else if (message[0] == "flip-tile")
+  {
+    this.sendMessageAjax.open ("GET",
+                               this.getUrl ("flip_tile?" + this.personId + "&" +
+                                            message[1]));
+    this.sendMessageAjax.send ();
+  }
 
   this.resetKeepAlive ();
 };
@@ -540,7 +551,7 @@ ChatSession.prototype.queueCurrentMessage = function ()
   if (message.length > 0)
   {
     $("#message-input-box").val ("");
-    this.messageQueue.push (message);
+    this.messageQueue.push (["message", message]);
     this.sendNextMessage ();
   }
 };
@@ -576,6 +587,38 @@ ChatSession.prototype.focusCb = function ()
   document.title = "Verda Ŝtelo";
 };
 
+ChatSession.prototype.boardClickCb = function (event)
+{
+  if (event.button != 0)
+    return;
+
+  if ((event.target.className) == "tile")
+  {
+    var i;
+    var tileNum;
+    var tile = null;
+
+    for (tileNum = 0; tileNum < this.tiles.length; tileNum++)
+    {
+      tile = this.tiles[tileNum];
+      if (tile && tile.element == event.target)
+        break;
+    }
+
+    if (tile == null || tile.facingUp)
+      return;
+
+    /* Make sure that we haven't already queued this flip */
+    for (i = 0; i < this.messageQueue.length; i++)
+      if (this.messageQueue[i][0] == "flip-tile" &&
+          this.messageQueue[i][1] == tileNum)
+        return;
+
+    this.messageQueue.push (["flip-tile", tileNum]);
+    this.sendNextMessage ();
+  }
+};
+
 ChatSession.prototype.loadCb = function ()
 {
   this.setState ("connecting");
@@ -586,6 +629,7 @@ ChatSession.prototype.loadCb = function ()
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
+  $("#board").bind ("click", this.boardClickCb.bind (this));
   $(window).focus (this.focusCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
