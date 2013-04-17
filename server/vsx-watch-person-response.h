@@ -32,6 +32,7 @@ typedef enum
   VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA,
   VSX_WATCH_PERSON_RESPONSE_WRITING_NAME,
   VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_TILE,
   VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES,
   VSX_WATCH_PERSON_RESPONSE_WRITING_END,
 
@@ -46,6 +47,7 @@ typedef struct
 
   VsxListener conversation_changed_listener;
   VsxListener player_changed_listener;
+  VsxListener tile_changed_listener;
 
   VsxWatchPersonResponseState state;
 
@@ -55,14 +57,33 @@ typedef struct
   /* Number of players that we've sent a "player-name" event for */
   unsigned int named_players;
 
-  /* Player number that we're currently updating */
-  unsigned int current_dirty_player;
-  /* The state that was current when we started sending the player state */
-  unsigned int dirty_player_is_typing : 1;
-  unsigned int dirty_player_is_connected : 1;
+  /* The player or tile number that we're currently updating */
+  unsigned int current_dirty_thing;
+  union
+  {
+    /* The state that was current when we started sending the player
+     * state */
+    struct
+    {
+      unsigned int is_typing : 1;
+      unsigned int is_connected : 1;
+    } player;
+
+    /* Same for the tile state */
+    struct
+    {
+      gint16 x, y;
+      guint8 facing_up;
+    } tile;
+  } dirty;
+
   /* Bit mask of players whose state needs updating */
   unsigned long dirty_players
   [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_CONVERSATION_MAX_PLAYERS)];
+
+  /* Bit mask of tiles that need updating */
+  unsigned long dirty_tiles
+  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
 
   gboolean last_typing_state;
 } VsxWatchPersonResponse;

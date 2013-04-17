@@ -24,6 +24,7 @@
 #include "vsx-player.h"
 #include "vsx-signal.h"
 #include "vsx-object.h"
+#include "vsx-tile-data.h"
 
 G_BEGIN_DECLS
 
@@ -35,6 +36,7 @@ typedef struct
 
   VsxSignal changed_signal;
   VsxSignal player_changed_signal;
+  VsxSignal tile_changed_signal;
 
   enum
   {
@@ -46,6 +48,8 @@ typedef struct
 
   int n_players;
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
+
+  VsxTile tiles[VSX_TILE_DATA_N_TILES];
 } VsxConversation;
 
 typedef struct
@@ -78,6 +82,16 @@ vsx_conversation_player_left (VsxConversation *conversation,
 VsxPlayer *
 vsx_conversation_add_player (VsxConversation *conversation,
                              const char *player_name);
+
+void
+vsx_conversation_flip_tile (VsxConversation *conversation,
+                            int tile_num);
+
+void
+vsx_conversation_move_tile (VsxConversation *conversation,
+                            int tile_num,
+                            int x,
+                            int y);
 
 G_END_DECLS
 

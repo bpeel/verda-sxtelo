@@ -23,6 +23,7 @@
 #define __VSX_FLAGS_H
 
 #include <glib.h>
+#include <string.h>
 
 G_BEGIN_DECLS
 
@@ -73,7 +74,7 @@ G_BEGIN_DECLS
        ~VSX_FLAGS_GET_MASK (flag));             \
   } G_STMT_END
 
-static void inline
+static inline void
 vsx_flags_set_range (unsigned long *array,
                      int range)
 {
@@ -87,6 +88,16 @@ vsx_flags_set_range (unsigned long *array,
       int bits = range - i * sizeof (unsigned long) * 8;
       array[i] |= (1UL << bits) - 1;
     }
+}
+
+static inline int
+vsx_flags_find_first_bit (const unsigned long *array)
+{
+  const unsigned long *p;
+
+  for (p = array; *p == 0; p++);
+
+  return ffsl (*p) - 1 + (p - array) * sizeof (unsigned long) * 8;
 }
 
 /* Macros to help iterate an array of flags. It should be used like

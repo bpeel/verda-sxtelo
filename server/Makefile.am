@@ -9,6 +9,7 @@ source_h = \
 	$(srcdir)/vsx-chunked-iconv.h \
 	$(srcdir)/vsx-conversation.h \
 	$(srcdir)/vsx-conversation-set.h \
+	$(srcdir)/vsx-flip-tile-handler.h \
 	$(srcdir)/vsx-flags.h \
 	$(srcdir)/vsx-http-parser.h \
 	$(srcdir)/vsx-keep-alive-handler.h \
@@ -16,6 +17,7 @@ source_h = \
 	$(srcdir)/vsx-list.h \
 	$(srcdir)/vsx-log.h \
 	$(srcdir)/vsx-main-context.h \
+	$(srcdir)/vsx-move-tile-handler.h \
 	$(srcdir)/vsx-new-person-handler.h \
 	$(srcdir)/vsx-object.h \
 	$(srcdir)/vsx-parse-content-type.h \
@@ -30,6 +32,8 @@ source_h = \
 	$(srcdir)/vsx-start-typing-handler.h \
 	$(srcdir)/vsx-stop-typing-handler.h \
 	$(srcdir)/vsx-string-response.h \
+	$(srcdir)/vsx-tile.h \
+	$(srcdir)/vsx-tile-data.h \
 	$(srcdir)/vsx-watch-person-handler.h \
 	$(srcdir)/vsx-watch-person-response.h
 
@@ -39,6 +43,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-chunked-iconv.c \
 	$(srcdir)/vsx-conversation.c \
 	$(srcdir)/vsx-conversation-set.c \
+	$(srcdir)/vsx-flip-tile-handler.c \
 	$(srcdir)/vsx-http-parser.c \
 	$(srcdir)/vsx-keep-alive-handler.c \
 	$(srcdir)/vsx-leave-handler.c \
@@ -46,6 +51,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-log.c \
 	$(srcdir)/vsx-main.c \
 	$(srcdir)/vsx-main-context.c \
+	$(srcdir)/vsx-move-tile-handler.c \
 	$(srcdir)/vsx-new-person-handler.c \
 	$(srcdir)/vsx-object.c \
 	$(srcdir)/vsx-parse-content-type.c\
@@ -59,6 +65,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-start-typing-handler.c \
 	$(srcdir)/vsx-stop-typing-handler.c \
 	$(srcdir)/vsx-string-response.c \
+	$(srcdir)/vsx-tile-data.c \
 	$(srcdir)/vsx-watch-person-handler.c \
 	$(srcdir)/vsx-watch-person-response.c
 

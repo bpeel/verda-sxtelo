@@ -32,30 +32,6 @@ header[] =
   VSX_RESPONSE_DISABLE_CACHE_HEADERS
   "Content-Type: text/plain; charset=UTF-8\r\n"
   "Transfer-Encoding: chunked\r\n"
-  "\r\n"
-  "fb\r\n"
-  "[\"padding\", \"This padding is here because it seems that for some reason "
-  "some browsers don't notify Javascript that there is a new chunk of data "
-  "until at least 1024 bytes of the response are received. Just think of all "
-  "those wasted bytes! It's sad.\"]\r\n"
-  "\r\n"
-  "fe\r\n"
-  "[\"padding\", \"Here's a joke to pass the while this padding is being "
-  "downloaded. Why is a giraffe never alone? Because it has a long neck. "
-  "It's not very funny. I apologise for that. Why are you reading this anyway? "
-  "Don't you have anything better to do?\"]\r\n"
-  "\r\n"
-  "ee\r\n"
-  "[\"padding\", \"Ĉi tiuj plenumiloj estas ĉi tie ĉar ŝajne ial iuj retumiloj "
-  "ne informas na Javascript ke nova datumoj alvenis ĝis almenaŭ 1024 bajtoj "
-  "da la respondo reciviĝas. Pensu pri tiu malŝparo de bajtoj! Tio estas "
-  "tristiga.\"]\r\n"
-  "\r\n"
-  "112\r\n"
-  "[\"padding\", \"Jen ŝerco por pasigi la tempon dum ĉi tiu malŝparo "
-  "elŝutas. Kial girafo neniam solas? Ĉar ĝi havas kolegon. Ĝi estas bona "
-  "ŝerco ĉu ne? Mi ŝatas ĝin ĉar ĝi ne havas sencon en la angla. Do jen la "
-  "fino kaj nun povas komenci la veraj datumoj. Ĝuu!\"]\r\n"
   "\r\n";
 
 static guint8
@@ -164,6 +140,13 @@ has_pending_data (VsxWatchPersonResponse *self,
     if (self->dirty_players[i])
       {
         *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER;
+        return TRUE;
+      }
+
+  for (i = 0; i < G_N_ELEMENTS (self->dirty_tiles); i++)
+    if (self->dirty_tiles[i])
+      {
+        *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_TILE;
         return TRUE;
       }
 
@@ -276,19 +259,13 @@ vsx_watch_person_response_add_data (VsxResponse *response,
            * writing yet */
           if (self->message_pos == 0)
             {
-              unsigned long *p;
-
-              /* Find the first set bit in the dirty players array */
-              for (p = self->dirty_players; *p == 0; p++);
-
-              self->current_dirty_player =
-                ffsl (*p) - 1 +
-                (p - self->dirty_players) * sizeof (unsigned long) * 8;
+              self->current_dirty_thing =
+                vsx_flags_find_first_bit (self->dirty_players);
 
               player =
-                self->person->conversation->players[self->current_dirty_player];
-              self->dirty_player_is_typing = player->typing;
-              self->dirty_player_is_connected = player->connected;
+                self->person->conversation->players[self->current_dirty_thing];
+              self->dirty.player.is_typing = player->typing;
+              self->dirty.player.is_connected = player->connected;
 
               /* We want to immediately mark the player as not dirty
                * so that it changes again while we are still in this
@@ -296,19 +273,80 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                * with the new state */
               if (message_data.length > 0)
                   VSX_FLAGS_SET (self->dirty_players,
-                                 self->current_dirty_player,
+                                 self->current_dirty_thing,
                                  FALSE);
             }
           else
             player =
-              self->person->conversation->players[self->current_dirty_player];
+              self->person->conversation->players[self->current_dirty_thing];
 
           length = sprintf (buf,
                             "[\"player\", {\"num\": %u, "
                             "\"connected\": %s, \"typing\": %s}]\r\n",
-                            self->current_dirty_player,
-                            self->dirty_player_is_connected ? "true" : "false",
-                            self->dirty_player_is_typing ? "true" : "false");
+                            self->current_dirty_thing,
+                            self->dirty.player.is_connected ? "true" : "false",
+                            self->dirty.player.is_typing ? "true" : "false");
+
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) buf,
+                                     length))
+            {
+              self->message_pos = 0;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+            }
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
+        {
+          const VsxTile *tile;
+          char buf[64 + 10 + 6 + 6 + 5 + VSX_TILE_MAX_LETTER_BYTES + 1];
+          int length;
+
+          /* Decide which tile to update if we haven't started
+           * writing yet */
+          if (self->message_pos == 0)
+            {
+              self->current_dirty_thing =
+                vsx_flags_find_first_bit (self->dirty_tiles);
+
+              tile =
+                self->person->conversation->tiles + self->current_dirty_thing;
+              self->dirty.tile.x = tile->x;
+              self->dirty.tile.y = tile->y;
+              self->dirty.tile.facing_up = tile->facing_up;
+
+              /* We want to immediately mark the tile as not dirty
+               * so that it changes again while we are still in this
+               * state then we will end up sending another message
+               * with the new state */
+              if (message_data.length > 0)
+                  VSX_FLAGS_SET (self->dirty_tiles,
+                                 self->current_dirty_thing,
+                                 FALSE);
+            }
+          else
+            tile =
+              self->person->conversation->tiles + self->current_dirty_thing;
+
+          length = sprintf (buf,
+                            "[\"tile\", {\"num\": %u, "
+                            "\"x\": %i, \"y\": %i, "
+                            "\"facing-up\": %s, "
+                            "\"letter\": \"%s\"}]\r\n",
+                            self->current_dirty_thing,
+                            self->dirty.tile.x,
+                            self->dirty.tile.y,
+                            self->dirty.tile.facing_up ? "true" : "false",
+                            /* We won't send the actual letter down
+                             * until the tile is facing up in case
+                             * someone makes a cheating client */
+                            self->dirty.tile.facing_up ?
+                            tile->letter :
+                            "");
 
           if (write_chunked_message (self,
                                      &message_data,
@@ -393,6 +431,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
       }
 
     case VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
@@ -416,6 +455,7 @@ vsx_watch_person_response_free (void *object)
     {
       vsx_list_remove (&self->conversation_changed_listener.link);
       vsx_list_remove (&self->player_changed_listener.link);
+      vsx_list_remove (&self->tile_changed_listener.link);
       vsx_object_unref (self->person);
     }
 
@@ -465,6 +505,21 @@ player_changed_cb (VsxListener *listener,
   vsx_response_changed ((VsxResponse *) response);
 }
 
+static void
+tile_changed_cb (VsxListener *listener,
+                 void *data)
+{
+  VsxWatchPersonResponse *response =
+    vsx_container_of (listener, response, tile_changed_listener);
+  VsxTile *tile = data;
+
+  VSX_FLAGS_SET (response->dirty_tiles,
+                 tile - response->person->conversation->tiles,
+                 TRUE);
+
+  vsx_response_changed ((VsxResponse *) response);
+}
+
 VsxResponse *
 vsx_watch_person_response_new (VsxPerson *person,
                                int last_message)
@@ -479,6 +534,8 @@ vsx_watch_person_response_new (VsxPerson *person,
 
   vsx_flags_set_range (self->dirty_players,
                        person->conversation->n_players);
+  vsx_flags_set_range (self->dirty_tiles,
+                       VSX_TILE_DATA_N_TILES);
 
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,
@@ -487,6 +544,10 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->player_changed_listener.notify = player_changed_cb;
   vsx_signal_add (&person->conversation->player_changed_signal,
                   &self->player_changed_listener);
+
+  self->tile_changed_listener.notify = tile_changed_cb;
+  vsx_signal_add (&person->conversation->tile_changed_signal,
+                  &self->tile_changed_listener);
 
   return (VsxResponse *) self;
 }

@@ -22,6 +22,8 @@
 
 #include <glib.h>
 
+#include <string.h>
+
 #include "vsx-conversation.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
@@ -74,6 +76,13 @@ vsx_conversation_player_changed (VsxConversation *conversation,
                                  VsxPlayer *player)
 {
   vsx_signal_emit (&conversation->player_changed_signal, player);
+}
+
+static void
+vsx_conversation_tile_changed (VsxConversation *conversation,
+                               VsxTile *tile)
+{
+  vsx_signal_emit (&conversation->tile_changed_signal, tile);
 }
 
 void
@@ -192,15 +201,65 @@ VsxConversation *
 vsx_conversation_new (void)
 {
   VsxConversation *self = vsx_object_allocate (vsx_conversation_get_class ());
+  int i;
 
   vsx_object_init (self);
 
   vsx_signal_init (&self->changed_signal);
   vsx_signal_init (&self->player_changed_signal);
+  vsx_signal_init (&self->tile_changed_signal);
 
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 
   self->state = VSX_CONVERSATION_AWAITING_START;
 
+  /* Initialise the tile data with the defaults */
+  memcpy (self->tiles, vsx_tile_data, sizeof (self->tiles));
+  /* Shuffle the letters without changing the positions */
+  for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
+    {
+      int swap_pos = g_random_int_range (0, VSX_TILE_DATA_N_TILES);
+      char temp[VSX_TILE_MAX_LETTER_BYTES + 1];
+
+      memcpy (temp, self->tiles[swap_pos].letter, sizeof (temp));
+      memcpy (self->tiles[swap_pos].letter,
+              self->tiles[i].letter,
+              sizeof (temp));
+      memcpy (self->tiles[i].letter, temp, sizeof (temp));
+    }
+
   return self;
+}
+
+void
+vsx_conversation_flip_tile (VsxConversation *conversation,
+                            int tile_num)
+{
+  VsxTile *tile = conversation->tiles + tile_num;
+
+  if (!tile->facing_up)
+    {
+      tile->facing_up = TRUE;
+
+      /* Once the first tile is flipped the game is considered to be
+       * started so no more players can join */
+      vsx_conversation_start (conversation);
+      vsx_conversation_tile_changed (conversation, tile);
+    }
+}
+
+void
+vsx_conversation_move_tile (VsxConversation *conversation,
+                            int tile_num,
+                            int x,
+                            int y)
+{
+  VsxTile *tile = conversation->tiles + tile_num;
+
+  if (tile->x != x || tile->y != y)
+    {
+      tile->x = x;
+      tile->y = y;
+      vsx_conversation_tile_changed (conversation, tile);
+    }
 }
