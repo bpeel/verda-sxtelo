@@ -179,4 +179,5 @@ span.player+span.player:before {
     line-height: 1.8em;
     font-size: 1em;
     font-weight: bold;
+    cursor: default;
 }
