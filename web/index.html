@@ -27,9 +27,27 @@
     <link rel="icon" type="image/png" href="favicon.png">
   </head>
   <body>
+    <div id="welcome-overlay">
+      <div id="welcome-box">
+        <div class="title">
+          @TITLE@
+        </div>
+        <p>
+          @BLURB@
+        </p>
+        <p>
+          @NAME_BOX@
+        </p>
+        <p>
+          <input type="text" id="namebox" />
+        </p>
+        <p>
+          <button id="playbutton" disabled>@PLAY@</button>
+        </p>
+      </div>
+    </div>
     <div class="content">
       <div id="status-note">
-        @CONNECTING@
       </div>
       <div id="board">
         <div id="player-0-holder" class="player-holder">

@@ -181,3 +181,45 @@ span.player+span.player:before {
     font-weight: bold;
     cursor: default;
 }
+
+#welcome-overlay {
+    width: 98%;
+    height: 98%;
+    position: absolute;
+    z-index: 1;
+}
+
+#welcome-box {
+    width: 40em;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 5em;
+    background-color: rgba(100, 255, 100, 0.9);
+    border-top: 2px solid rgba(200, 255, 200, 0.9);
+    border-left: 2px solid rgba(200, 255, 200, 0.9);
+    border-right: 2px solid rgba(80, 255, 80, 0.9);
+    border-bottom: 2px solid rgba(80, 255, 80, 0.9);
+}
+
+.title {
+    font-size: xx-large;
+    text-align: center;
+    margin: 1em;
+}
+
+#welcome-box p {
+    padding-left: 2em;
+    padding-right: 2em;
+}
+
+#welcome-box input {
+    width: 100%;
+}
+
+#welcome-box button {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: x-large;
+    font-weight: bold;
+}

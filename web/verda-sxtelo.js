@@ -63,7 +63,7 @@ function getAjaxObject ()
     return new XMLHttpRequest ();
 }
 
-function ChatSession ()
+function ChatSession (playerName)
 {
   this.terminatorRegexp = /\r\n/;
   this.personId = null;
@@ -77,7 +77,7 @@ function ChatSession ()
   this.dragTile = null;
   this.lastMovedTile = null;
 
-  this.playerName = "ludanto";
+  this.playerName = playerName || "ludanto";
 
   var search = window.location.search;
   if (search && search.match (/^\?[a-z]+$/))
@@ -750,8 +750,9 @@ ChatSession.prototype.mouseUpCb = function (event)
   }
 };
 
-ChatSession.prototype.loadCb = function ()
+ChatSession.prototype.start = function ()
 {
+  $("#status-note").text ("@CONNECTING@");
   this.setState ("connecting");
   this.startWatchAjax ();
 
@@ -858,6 +859,38 @@ if (!Function.prototype.bind)
 
 (function ()
 {
-  var cs = new ChatSession ();
-  $(window).load (cs.loadCb.bind (cs));
+  function updatePlayButton ()
+  {
+    $("#playbutton")[0].disabled = ($("#namebox").val ().match (/\S/) == null);
+  }
+
+  function start ()
+  {
+    var cs = new ChatSession ($("#namebox").val ());
+    $("#welcome-overlay").remove ();
+    cs.start ();
+  }
+
+  function keyDownCb (event)
+  {
+    if ((event.which == 10 || event.which == 13) &&
+        !$("#playbutton")[0].disabled)
+      start ();
+  }
+
+  function inputCb ()
+  {
+    updatePlayButton ();
+  }
+
+  function loadCb ()
+  {
+    $("#namebox").bind ("keydown", keyDownCb);
+    $("#namebox").bind ("input", inputCb);
+    $("#playbutton").click (start);
+
+    updatePlayButton ();
+  }
+
+  $(window).load (loadCb);
 }) ();
