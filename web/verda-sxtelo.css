@@ -84,6 +84,10 @@ body {
     content: "⌨";
 }
 
+.player.shouting {
+    background-color: rgb(240, 100, 100);
+}
+
 #board {
     background-color: rgb(220, 220, 255);
     border: 2px solid rgb(128, 128, 128);
@@ -181,6 +185,17 @@ span.player+span.player:before {
     font-size: 1em;
     font-weight: bold;
     cursor: default;
+}
+
+#shout-message {
+    font-size: 8em;
+    font-weight: bold;
+    text-align: center;
+    z-index: 1;
+    position: absolute;
+    width: 100%;
+    line-height: 4.375em;
+    pointer-events: none;
 }
 
 #welcome-overlay {

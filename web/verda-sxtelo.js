@@ -17,6 +17,7 @@
  */
 
 var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
+var SHOUT_TIME = 10 * 1000;
 
 function getAjaxObject ()
 {
@@ -86,6 +87,14 @@ function ChatSession (playerName)
     this.roomName = "default";
 }
 
+ChatSession.prototype.updateShoutButton = function ()
+{
+  if (this.state == "in-progress" && this.shoutingPlayer == null)
+    $("#shout-button").removeAttr ("disabled");
+  else
+    $("#shout-button").attr ("disabled", "disabled");
+};
+
 ChatSession.prototype.setState = function (state)
 {
   this.state = state;
@@ -100,6 +109,8 @@ ChatSession.prototype.setState = function (state)
     $("#message-input-box").attr ("disabled", "disabled");
     $("#submit-message").attr ("disabled", "disabled");
   }
+
+  this.updateShoutButton ();
 };
 
 ChatSession.prototype.getUrl = function (method)
@@ -159,6 +170,19 @@ ChatSession.prototype.handlePlayerName = function (data)
   player.element.textContent = player.name;
 };
 
+ChatSession.prototype.updatePlayerClass = function (player)
+{
+  var className = "player";
+  if (player.typing)
+    className += " typing"
+  if (!player.connected)
+    className += " disconnected";
+  if (this.shoutingPlayer == player)
+    className += " shouting";
+
+  player.element.className = className;
+};
+
 ChatSession.prototype.handlePlayer = function (data)
 {
   if (typeof (data) != "object")
@@ -171,13 +195,7 @@ ChatSession.prototype.handlePlayer = function (data)
   player.typing = data.typing;
   player.connected = data.connected;
 
-  var className = "player";
-  if (data.typing)
-    className += " typing"
-  if (!data.connected)
-    className += " disconnected";
-
-  player.element.className = className;
+  this.updatePlayerClass (player);
 };
 
 ChatSession.prototype.handleEnd = function ()
@@ -286,6 +304,44 @@ ChatSession.prototype.handleTile = function (data)
   }
 };
 
+ChatSession.prototype.stopShout = function ()
+{
+  if (this.shoutingPlayer)
+  {
+    var player = this.shoutingPlayer;
+    clearTimeout (this.shoutTimeout);
+    this.shoutTimeout = null;
+    this.shoutingPlayer = null;
+    this.updateShoutButton ();
+    this.updatePlayerClass (player);
+    $("#shout-message").hide ();
+  }
+};
+
+ChatSession.prototype.handleShout = function (data)
+{
+  if (typeof (data) != "number")
+    this.setError ("@BAD_DATA@");
+
+  if (this.state != "in-progress")
+    return;
+
+  this.stopShout ();
+
+  this.shoutingPlayer = this.getPlayer (data);
+
+  this.updatePlayerClass (this.shoutingPlayer);
+  this.updateShoutButton ();
+
+  var sm = $("#shout-message");
+  sm.show ();
+  sm.text (this.shoutingPlayer.name);
+  sm.fadeOut (3000);
+
+  this.shoutTimeout = setTimeout (this.stopShout.bind (this),
+                                  SHOUT_TIME);
+};
+
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -316,6 +372,10 @@ ChatSession.prototype.processMessage = function (message)
 
   case "tile":
     this.handleTile (message[1]);
+    break;
+
+  case "shout":
+    this.handleShout (message[1]);
     break;
   }
 };
@@ -551,6 +611,11 @@ ChatSession.prototype.sendNextMessage = function ()
                                             message[3]));
     this.sendMessageAjax.send ();
   }
+  else if (message[0] == "shout")
+  {
+    this.sendMessageAjax.open ("GET", this.getUrl ("shout?" + this.personId));
+    this.sendMessageAjax.send ();
+  }
 
   this.resetKeepAlive ();
 };
@@ -570,6 +635,17 @@ ChatSession.prototype.queueCurrentMessage = function ()
     this.messageQueue.push (["message", message]);
     this.sendNextMessage ();
   }
+};
+
+ChatSession.prototype.shoutButtonClickCb = function ()
+{
+  /* Make sure that we haven't already queued this flip */
+  for (i = 0; i < this.messageQueue.length; i++)
+    if (this.messageQueue[i][0] == "shout")
+      return;
+
+  this.messageQueue.push (["shout"]);
+  this.sendNextMessage ();
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
@@ -756,6 +832,7 @@ ChatSession.prototype.start = function ()
   this.setState ("connecting");
   this.startWatchAjax ();
 
+  $("#shout-button").bind ("click", this.shoutButtonClickCb.bind (this));
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-input-box").bind ("keydown", this.keyDownCb.bind (this));
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
