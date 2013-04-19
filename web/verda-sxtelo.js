@@ -236,7 +236,7 @@ ChatSession.prototype.raiseTile = function (tile)
   $(parent).append (tile.element);
 };
 
-ChatSession.prototype.handleTileMessage = function (data)
+ChatSession.prototype.handleTile = function (data)
 {
   if (typeof (data) != "object")
     this.setError ("@BAD_DATA@");
@@ -315,7 +315,7 @@ ChatSession.prototype.processMessage = function (message)
     break;
 
   case "tile":
-    this.handleTileMessage (message[1]);
+    this.handleTile (message[1]);
     break;
   }
 };
