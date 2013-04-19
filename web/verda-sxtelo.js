@@ -640,6 +640,17 @@ ChatSession.prototype.queueCurrentMessage = function ()
 
 ChatSession.prototype.shoutButtonClickCb = function ()
 {
+  this.shout ();
+  $("#message-input-box")[0].focus ();
+};
+
+ChatSession.prototype.shout = function ()
+{
+  var i;
+
+  if (this.shoutingPlayer || this.state != "in-progress")
+    return;
+
   /* Make sure that we haven't already queued this flip */
   for (i = 0; i < this.messageQueue.length; i++)
     if (this.messageQueue[i][0] == "shout")
@@ -647,7 +658,6 @@ ChatSession.prototype.shoutButtonClickCb = function ()
 
   this.messageQueue.push (["shout"]);
   this.sendNextMessage ();
-  $("#message-input-box")[0].focus ();
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
@@ -655,12 +665,25 @@ ChatSession.prototype.submitMessageClickCb = function ()
   this.queueCurrentMessage ();
 };
 
-ChatSession.prototype.keyDownCb = function (event)
+ChatSession.prototype.messageKeyDownCb = function (event)
 {
-  if (event.which == 10 || event.which == 13)
+  if ((event.which == 10 || event.which == 13) &&
+      $("#message-input-box").val ().length > 0)
   {
     event.preventDefault ();
+    event.stopPropagation ();
     this.queueCurrentMessage ();
+  }
+};
+
+ChatSession.prototype.documentKeyDownCb = function (event)
+{
+  if ((event.which == 10 || event.which == 13) &&
+      $("#message-input-box").val ().length == 0)
+  {
+    event.preventDefault ();
+    event.stopPropagation ();
+    this.shout ();
   }
 };
 
@@ -836,7 +859,7 @@ ChatSession.prototype.start = function ()
 
   $("#shout-button").bind ("click", this.shoutButtonClickCb.bind (this));
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
-  $("#message-input-box").bind ("keydown", this.keyDownCb.bind (this));
+  $("#message-input-box").bind ("keydown", this.messageKeyDownCb.bind (this));
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
   $("#new-conversation-button").bind ("click",
                                       this.newConversationCb.bind (this));
@@ -848,6 +871,8 @@ ChatSession.prototype.start = function ()
   $("#board").mousedown (this.mouseDownCb.bind (this));
   $("#board").mousemove (this.mouseMoveCb.bind (this));
   $("#board").mouseup (this.mouseUpCb.bind (this));
+
+  $(document).keydown (this.documentKeyDownCb.bind (this));
 
   $(window).focus (this.focusCb.bind (this));
 
