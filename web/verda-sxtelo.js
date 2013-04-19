@@ -140,6 +140,10 @@ ChatSession.prototype.setError = function (msg)
 
   $("#status-note").text (msg);
   this.setState ("error");
+
+  /* Throw an exception so that we won't continue processing messages
+   * or restart the check data interval */
+  throw msg;
 };
 
 ChatSession.prototype.handleHeader = function (header)
