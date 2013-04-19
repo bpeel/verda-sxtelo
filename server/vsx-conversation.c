@@ -66,23 +66,41 @@ vsx_conversation_get_class (void)
 }
 
 static void
-vsx_conversation_changed (VsxConversation *conversation)
+vsx_conversation_changed (VsxConversation *conversation,
+                          VsxConversationChangedType type)
 {
-  vsx_signal_emit (&conversation->changed_signal, conversation);
+  VsxConversationChangedData data;
+
+  data.conversation = conversation;
+  data.type = type;
+
+  vsx_signal_emit (&conversation->changed_signal, &data);
 }
 
 static void
 vsx_conversation_player_changed (VsxConversation *conversation,
                                  VsxPlayer *player)
 {
-  vsx_signal_emit (&conversation->player_changed_signal, player);
+  VsxConversationChangedData data;
+
+  data.conversation = conversation;
+  data.type = VSX_CONVERSATION_PLAYER_CHANGED;
+  data.num = player->num;
+
+  vsx_signal_emit (&conversation->changed_signal, &data);
 }
 
 static void
 vsx_conversation_tile_changed (VsxConversation *conversation,
                                VsxTile *tile)
 {
-  vsx_signal_emit (&conversation->tile_changed_signal, tile);
+  VsxConversationChangedData data;
+
+  data.conversation = conversation;
+  data.type = VSX_CONVERSATION_TILE_CHANGED;
+  data.num = tile - conversation->tiles;
+
+  vsx_signal_emit (&conversation->changed_signal, &data);
 }
 
 void
@@ -91,7 +109,8 @@ vsx_conversation_start (VsxConversation *conversation)
   if (conversation->state == VSX_CONVERSATION_AWAITING_START)
     {
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
-      vsx_conversation_changed (conversation);
+      vsx_conversation_changed (conversation,
+                                VSX_CONVERSATION_STATE_CHANGED);
     }
 }
 
@@ -141,7 +160,8 @@ vsx_conversation_add_message (VsxConversation *conversation,
   message->length = message_str->len;
   message->text = g_string_free (message_str, FALSE);
 
-  vsx_conversation_changed (conversation);
+  vsx_conversation_changed (conversation,
+                            VSX_CONVERSATION_MESSAGE_ADDED);
 }
 
 void
@@ -206,8 +226,6 @@ vsx_conversation_new (void)
   vsx_object_init (self);
 
   vsx_signal_init (&self->changed_signal);
-  vsx_signal_init (&self->player_changed_signal);
-  vsx_signal_init (&self->tile_changed_signal);
 
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 

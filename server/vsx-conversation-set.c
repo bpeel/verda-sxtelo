@@ -31,54 +31,47 @@ typedef struct
   VsxConversationSet *set;
   VsxConversation *conversation;
   VsxListener conversation_changed_listener;
-  VsxListener player_changed_listener;
 } VsxConversationSetHashData;
 
 static void
 free_hash_data (VsxConversationSetHashData *data)
 {
   vsx_list_remove (&data->conversation_changed_listener.link);
-  vsx_list_remove (&data->player_changed_listener.link);
   vsx_object_unref (data->conversation);
   g_free (data->room_name);
   g_slice_free (VsxConversationSetHashData, data);
 }
 
-static void
-conversation_changed_cb (VsxListener *listener,
-                         void *data)
+static gboolean
+conversation_is_empty (VsxConversation *conversation)
 {
-  VsxConversationSetHashData *hash_data =
-    vsx_container_of (listener, hash_data, conversation_changed_listener);
-  VsxConversation *conversation = data;
+  int i;
 
-  if (conversation->state != VSX_CONVERSATION_AWAITING_START)
-    /* This will also destroy the hash data */
-    g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
+  for (i = 0; i < conversation->n_players; i++)
+    if (conversation->players[i]->connected)
+      return FALSE;
+
+  return TRUE;
 }
 
 static void
-player_changed_cb (VsxListener *listener,
-                   void *data)
+conversation_changed_cb (VsxListener *listener,
+                         void *user_data)
 {
   VsxConversationSetHashData *hash_data =
-    vsx_container_of (listener, hash_data, player_changed_listener);
-  VsxConversation *conversation = hash_data->conversation;
-  int i;
+    vsx_container_of (listener, hash_data, conversation_changed_listener);
+  VsxConversationChangedData *data = user_data;
 
-  /* If everyone leaves the room then the conversation then we'll
-   * remove the conversation because it would be a bit rubbish to join
-   * a game where everyone has already left. If we don't do this then
-   * conversations that never start would end up leaking */
-  for (i = 0; i < conversation->n_players; i++)
-    if (conversation->players[i]->connected)
-      goto have_player;
-
-  /* This will also destroy the hash data */
-  g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
-
- have_player:
-  return;
+  /* If the conversation has started then we'll remove it so that no
+   * new players can join. We'll also do this if everyone leaves the
+   * room because it would be a bit rubbish to join a game where
+   * everyone has already left. If we don't do this then conversations
+   * that never start would end up leaking */
+  if (data->conversation->state != VSX_CONVERSATION_AWAITING_START ||
+      (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
+       conversation_is_empty (data->conversation)))
+    /* This will also destroy the hash data */
+    g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
 }
 
 static void
@@ -150,13 +143,6 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
         conversation_changed_cb;
       vsx_signal_add (&conversation->changed_signal,
                       &data->conversation_changed_listener);
-
-      /* Also listen for the player changed signal so we can remove
-         the conversation from the hash table if it becomes empty */
-      data->player_changed_listener.notify =
-        player_changed_cb;
-      vsx_signal_add (&conversation->player_changed_signal,
-                      &data->player_changed_listener);
 
       /* Take a reference for the hash table */
       vsx_object_ref (conversation);

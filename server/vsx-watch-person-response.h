@@ -46,8 +46,6 @@ typedef struct
   VsxPerson *person;
 
   VsxListener conversation_changed_listener;
-  VsxListener player_changed_listener;
-  VsxListener tile_changed_listener;
 
   VsxWatchPersonResponseState state;
 

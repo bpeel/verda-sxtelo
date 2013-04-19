@@ -454,8 +454,6 @@ vsx_watch_person_response_free (void *object)
   if (self->person)
     {
       vsx_list_remove (&self->conversation_changed_listener.link);
-      vsx_list_remove (&self->player_changed_listener.link);
-      vsx_list_remove (&self->tile_changed_listener.link);
       vsx_object_unref (self->person);
     }
 
@@ -484,38 +482,26 @@ vsx_watch_person_response_get_class (void)
 
 static void
 conversation_changed_cb (VsxListener *listener,
-                         void *data)
+                         void *user_data)
 {
   VsxWatchPersonResponse *response =
     vsx_container_of (listener, response, conversation_changed_listener);
+  VsxConversationChangedData *data = user_data;
 
-  vsx_response_changed ((VsxResponse *) response);
-}
+  switch (data->type)
+    {
+    case VSX_CONVERSATION_PLAYER_CHANGED:
+      VSX_FLAGS_SET (response->dirty_players, data->num, TRUE);
+      break;
 
-static void
-player_changed_cb (VsxListener *listener,
-                   void *data)
-{
-  VsxWatchPersonResponse *response =
-    vsx_container_of (listener, response, player_changed_listener);
-  VsxPlayer *player = data;
+    case VSX_CONVERSATION_TILE_CHANGED:
+      VSX_FLAGS_SET (response->dirty_tiles, data->num, TRUE);
+      break;
 
-  VSX_FLAGS_SET (response->dirty_players, player->num, TRUE);
-
-  vsx_response_changed ((VsxResponse *) response);
-}
-
-static void
-tile_changed_cb (VsxListener *listener,
-                 void *data)
-{
-  VsxWatchPersonResponse *response =
-    vsx_container_of (listener, response, tile_changed_listener);
-  VsxTile *tile = data;
-
-  VSX_FLAGS_SET (response->dirty_tiles,
-                 tile - response->person->conversation->tiles,
-                 TRUE);
+    case VSX_CONVERSATION_STATE_CHANGED:
+    case VSX_CONVERSATION_MESSAGE_ADDED:
+      break;
+    }
 
   vsx_response_changed ((VsxResponse *) response);
 }
@@ -540,14 +526,6 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,
                   &self->conversation_changed_listener);
-
-  self->player_changed_listener.notify = player_changed_cb;
-  vsx_signal_add (&person->conversation->player_changed_signal,
-                  &self->player_changed_listener);
-
-  self->tile_changed_listener.notify = tile_changed_cb;
-  vsx_signal_add (&person->conversation->tile_changed_signal,
-                  &self->tile_changed_listener);
 
   return (VsxResponse *) self;
 }

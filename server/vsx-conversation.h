@@ -35,8 +35,6 @@ typedef struct
   VsxObject parent;
 
   VsxSignal changed_signal;
-  VsxSignal player_changed_signal;
-  VsxSignal tile_changed_signal;
 
   enum
   {
@@ -57,6 +55,21 @@ typedef struct
   unsigned int length;
   char *text;
 } VsxConversationMessage;
+
+typedef enum
+{
+  VSX_CONVERSATION_STATE_CHANGED,
+  VSX_CONVERSATION_MESSAGE_ADDED,
+  VSX_CONVERSATION_PLAYER_CHANGED,
+  VSX_CONVERSATION_TILE_CHANGED
+} VsxConversationChangedType;
+
+typedef struct
+{
+  VsxConversation *conversation;
+  VsxConversationChangedType type;
+  int num;
+} VsxConversationChangedData;
 
 VsxConversation *
 vsx_conversation_new (void);
