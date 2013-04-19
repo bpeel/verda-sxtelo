@@ -103,6 +103,7 @@ ChatSession.prototype.setState = function (state)
   {
     $("#message-input-box").removeAttr ("disabled");
     $("#submit-message").removeAttr ("disabled");
+    $("#message-input-box")[0].focus ();
   }
   else
   {
@@ -646,6 +647,7 @@ ChatSession.prototype.shoutButtonClickCb = function ()
 
   this.messageQueue.push (["shout"]);
   this.sendNextMessage ();
+  $("#message-input-box")[0].focus ();
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
@@ -964,6 +966,7 @@ if (!Function.prototype.bind)
   {
     $("#namebox").bind ("keydown", keyDownCb);
     $("#namebox").bind ("input", inputCb);
+    $("#namebox")[0].focus ();
     $("#playbutton").click (start);
 
     updatePlayButton ();
