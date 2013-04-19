@@ -112,6 +112,7 @@ span.player+span.player:before {
 .player-holder {
     position: absolute;
     background-color: white;
+    overflow: hidden;
 }
 
 .player {
