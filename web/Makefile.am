@@ -19,7 +19,7 @@ EXTRA_DIST = \
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
 	verda-sxtelo.css \
-	jquery-1.9.1.js \
+	jquery-1.9.1.min.js \
 	favicon.ico \
 	favicon.png \
 	help.html \
