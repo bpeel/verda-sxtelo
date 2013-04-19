@@ -22,6 +22,7 @@ dist_webfiles_DATA = \
 	jquery-1.6.1.js \
 	favicon.ico \
 	favicon.png \
+	help.html \
 	message-alert-sound.ogg \
 	message-alert-sound.mp3
 

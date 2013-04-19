@@ -52,7 +52,7 @@ body {
 }
 
 #message-input-box {
-    width: 55em;
+    width: 45em;
 }
 
 .message-stranger {
@@ -238,4 +238,12 @@ span.player+span.player:before {
     margin-right: auto;
     font-size: x-large;
     font-weight: bold;
+}
+
+#help-box {
+    float: right;
+}
+
+a {
+    text-decoration: none;
 }
