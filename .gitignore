@@ -31,8 +31,6 @@
 /client/stamp-marshal
 /web/Makefile
 /web/Makefile.in
-/web/chat.*.html
-/web/chat.*.js
 /web/verda-sxtelo.*.js
 /web/index.*.html
 /web/index.html.var
