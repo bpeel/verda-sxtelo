@@ -201,12 +201,10 @@ ChatSession.prototype.handlePlayer = function (data)
 
 ChatSession.prototype.handleEnd = function ()
 {
-  if (this.state == "in-progress")
-  {
-    $("#status-note").text ("@PERSON_LEFT@");
-    this.setState ("done");
-    $("#conversation-finished-note").show ();
-  }
+  /* This should only happen if we've left the conversation, but that
+   * shouldn't be possible without leaving the page so something has
+   * gone wrong */
+  this.setError ();
 };
 
 ChatSession.prototype.handleChatMessage = function (message)
