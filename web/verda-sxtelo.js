@@ -25,7 +25,9 @@ function getAjaxObject ()
    * XMLHttpRequest object */
   if (window["XDomainRequest"])
     {
-      var obj = {};
+      /** constructor */
+      function Wrapper () { }
+      var obj = new Wrapper ();
       obj.xdr = new XDomainRequest ();
 
       obj.xdr.onprogress = function ()
@@ -54,8 +56,11 @@ function getAjaxObject ()
 
       obj.setRequestHeader = function () { };
 
+      /** @this {Wrapper} */
       obj.abort = function () { this.xdr.abort (); };
+      /** @this {Wrapper} */
       obj.open = function () { this.xdr.open.apply (this.xdr, arguments); };
+      /** @this {Wrapper} */
       obj.send = function () { this.xdr.send.apply (this.xdr, arguments); };
 
       return obj;
@@ -64,6 +69,7 @@ function getAjaxObject ()
     return new XMLHttpRequest ();
 }
 
+/**@constructor*/
 function ChatSession (playerName)
 {
   this.terminatorRegexp = /\r\n/;
