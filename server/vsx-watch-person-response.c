@@ -143,6 +143,12 @@ has_pending_data (VsxWatchPersonResponse *self,
         return TRUE;
       }
 
+  if (self->pending_shout != -1)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT;
+      return TRUE;
+    }
+
   for (i = 0; i < G_N_ELEMENTS (self->dirty_tiles); i++)
     if (self->dirty_tiles[i])
       {
@@ -300,6 +306,29 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         }
         break;
 
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT:
+        {
+          char buf[24];
+          int length;
+
+          length = sprintf (buf,
+                            "[\"shout\", %u]\r\n",
+                            self->pending_shout);
+
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) buf,
+                                     length))
+            {
+              self->message_pos = 0;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+              self->pending_shout = -1;
+            }
+          else
+            goto done;
+        }
+        break;
+
       case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
         {
           const VsxTile *tile;
@@ -431,6 +460,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
       }
 
     case VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
@@ -501,6 +531,12 @@ conversation_changed_cb (VsxListener *listener,
     case VSX_CONVERSATION_STATE_CHANGED:
     case VSX_CONVERSATION_MESSAGE_ADDED:
       break;
+
+    case VSX_CONVERSATION_SHOUTED:
+      if (response->state == VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT)
+        return;
+      response->pending_shout = data->num;
+      break;
     }
 
   vsx_response_changed ((VsxResponse *) response);
@@ -517,6 +553,7 @@ vsx_watch_person_response_new (VsxPerson *person,
 
   self->person = vsx_object_ref (person);
   self->message_num = last_message;
+  self->pending_shout = -1;
 
   vsx_flags_set_range (self->dirty_players,
                        person->conversation->n_players);

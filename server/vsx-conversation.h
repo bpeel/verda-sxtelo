@@ -30,6 +30,10 @@ G_BEGIN_DECLS
 
 #define VSX_CONVERSATION_MAX_PLAYERS 32
 
+/* Time in microseconds after someone shouts before someone is allowed
+ * to shout again */
+#define VSX_CONVERSATION_SHOUT_TIME (10 * G_USEC_PER_SEC)
+
 typedef struct
 {
   VsxObject parent;
@@ -48,6 +52,8 @@ typedef struct
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
 
   VsxTile tiles[VSX_TILE_DATA_N_TILES];
+
+  gint64 last_shout_time;
 } VsxConversation;
 
 typedef struct
@@ -61,7 +67,8 @@ typedef enum
   VSX_CONVERSATION_STATE_CHANGED,
   VSX_CONVERSATION_MESSAGE_ADDED,
   VSX_CONVERSATION_PLAYER_CHANGED,
-  VSX_CONVERSATION_TILE_CHANGED
+  VSX_CONVERSATION_TILE_CHANGED,
+  VSX_CONVERSATION_SHOUTED
 } VsxConversationChangedType;
 
 typedef struct
@@ -105,6 +112,10 @@ vsx_conversation_move_tile (VsxConversation *conversation,
                             int tile_num,
                             int x,
                             int y);
+
+void
+vsx_conversation_shout (VsxConversation *conversation,
+                        unsigned int player_num);
 
 G_END_DECLS
 

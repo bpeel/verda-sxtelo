@@ -281,3 +281,30 @@ vsx_conversation_move_tile (VsxConversation *conversation,
       vsx_conversation_tile_changed (conversation, tile);
     }
 }
+
+void
+vsx_conversation_shout (VsxConversation *conversation,
+                        unsigned int player_num)
+{
+  VsxPlayer *player = conversation->players[player_num];
+  VsxConversationChangedData data;
+  gint64 now;
+
+  /* Ignore attempts to shout for a player that has left */
+  if (!player->connected)
+    return;
+
+  now = vsx_main_context_get_monotonic_clock (NULL);
+
+  /* Don't let shouts come too often */
+  if (now - conversation->last_shout_time < VSX_CONVERSATION_SHOUT_TIME)
+    return;
+
+  conversation->last_shout_time = now;
+
+  data.conversation = conversation;
+  data.type = VSX_CONVERSATION_SHOUTED;
+  data.num = player_num;
+
+  vsx_signal_emit (&conversation->changed_signal, &data);
+}

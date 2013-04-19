@@ -82,6 +82,14 @@ Requests that the given tile be flipped so that it is facing up. The
 first time this command is received the game is also started which
 means that no new players will join.
 
+* GET /shout?<person_id>
+
+When this is sent by the client, everyone in the same game we receive
+a "shout" message for the corresponding player number. This can be
+used to alert all of the players that this player has found a word and
+is about to take it. Any further attempts to shout by anyone in the
+same game will be ignored for 10 seconds.
+
 * GET /keep_alive?<person_id>
 
 This should be sent by the client at least every 2.5 minutes if no
@@ -177,6 +185,11 @@ is a javascript hash object containing the following fields:
 
   "typing": A boolean value to indicate whether the player is
   currently typing a message.
+
+* "shout"
+
+Reports that a player in the game has succesfully made a shout. The
+argument is a single integer represent the player number.
 
 * "end"
 
