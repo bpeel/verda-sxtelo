@@ -30,6 +30,7 @@ source_h = \
 	$(srcdir)/vsx-server.h \
 	$(srcdir)/vsx-shout-handler.h \
 	$(srcdir)/vsx-signal.h \
+	$(srcdir)/vsx-simple-handler.h \
 	$(srcdir)/vsx-start-typing-handler.h \
 	$(srcdir)/vsx-stop-typing-handler.h \
 	$(srcdir)/vsx-string-response.h \
@@ -63,6 +64,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-response.c \
 	$(srcdir)/vsx-send-message-handler.c \
 	$(srcdir)/vsx-server.c \
+	$(srcdir)/vsx-simple-handler.c \
 	$(srcdir)/vsx-shout-handler.c \
 	$(srcdir)/vsx-start-typing-handler.c \
 	$(srcdir)/vsx-stop-typing-handler.c \

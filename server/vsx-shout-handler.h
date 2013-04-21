@@ -20,19 +20,10 @@
 #define __VSX_SHOUT_HANDLER_H__
 
 #include <glib.h>
-#include "vsx-request-handler.h"
-#include "vsx-person-set.h"
+
+#include "vsx-simple-handler.h"
 
 G_BEGIN_DECLS
-
-typedef struct
-{
-  VsxRequestHandler parent;
-
-  VsxPerson *person;
-
-  VsxResponse *response;
-} VsxShoutHandler;
 
 VsxRequestHandler *
 vsx_shout_handler_new (void);

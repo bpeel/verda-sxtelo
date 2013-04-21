@@ -20,20 +20,9 @@
 #define __VSX_LEAVE_HANDLER_H__
 
 #include <glib.h>
-#include <gio/gio.h>
-#include "vsx-request-handler.h"
-#include "vsx-person-set.h"
+#include "vsx-simple-handler.h"
 
 G_BEGIN_DECLS
-
-typedef struct
-{
-  VsxRequestHandler parent;
-
-  VsxPerson *person;
-
-  VsxResponse *response;
-} VsxLeaveHandler;
 
 VsxRequestHandler *
 vsx_leave_handler_new (void);

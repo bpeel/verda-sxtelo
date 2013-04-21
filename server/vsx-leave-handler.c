@@ -23,81 +23,24 @@
 #include <glib.h>
 
 #include "vsx-leave-handler.h"
-#include "vsx-string-response.h"
-#include "vsx-arguments.h"
 
 static void
-real_free (void *object)
+real_do_request (VsxSimpleHandler *handler,
+                 VsxPerson *person)
 {
-  VsxLeaveHandler *handler = object;
-
-  if (handler->person)
-    vsx_object_unref (handler->person);
-
-  if (handler->response)
-    vsx_object_unref (handler->response);
-
-  vsx_request_handler_get_class ()->parent_class.free (object);
+  vsx_person_leave_conversation (person);
 }
 
-static void
-real_request_line_received (VsxRequestHandler *handler,
-                            VsxRequestMethod method,
-                            const char *query_string)
-{
-  VsxLeaveHandler *self = (VsxLeaveHandler *) handler;
-  VsxPersonId id;
-
-  if (method == VSX_REQUEST_METHOD_GET
-      && vsx_arguments_parse ("p", query_string, &id))
-    {
-      self->person = vsx_person_set_activate_person (handler->person_set, id);
-
-      if (self->person == NULL)
-        self->response =
-          vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
-      else
-        vsx_object_ref (self->person);
-    }
-  else
-    self->response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
-}
-
-static VsxResponse *
-real_request_finished (VsxRequestHandler *handler)
-{
-  VsxLeaveHandler *self = (VsxLeaveHandler *) handler;
-
-  if (self->person)
-    {
-      if (self->person->conversation)
-        vsx_person_leave_conversation (self->person);
-
-      return vsx_string_response_new (VSX_STRING_RESPONSE_OK);
-    }
-  else if (self->response)
-    return vsx_object_ref (self->response);
-  else
-    {
-      g_warn_if_reached ();
-
-      return vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
-    }
-}
-
-static const VsxRequestHandlerClass *
+static const VsxSimpleHandlerClass *
 vsx_leave_handler_get_class (void)
 {
-  static VsxRequestHandlerClass klass;
+  static VsxSimpleHandlerClass klass;
 
-  if (klass.parent_class.free == NULL)
+  if (((VsxObjectClass *) &klass)->free == NULL)
     {
-      klass = *vsx_request_handler_get_class ();
-      klass.parent_class.instance_size = sizeof (VsxLeaveHandler);
-      klass.parent_class.free = real_free;
+      klass = *vsx_simple_handler_get_class ();
 
-      klass.request_line_received = real_request_line_received;
-      klass.request_finished = real_request_finished;
+      klass.do_request = real_do_request;
     }
 
   return &klass;
@@ -109,7 +52,7 @@ vsx_leave_handler_new (void)
   VsxRequestHandler *handler =
     vsx_object_allocate (vsx_leave_handler_get_class ());
 
-  vsx_request_handler_init (handler);
+  vsx_simple_handler_init (handler);
 
   return handler;
 }

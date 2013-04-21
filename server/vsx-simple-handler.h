@@ -16,18 +16,39 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_START_TYPING_HANDLER_H__
-#define __VSX_START_TYPING_HANDLER_H__
+#ifndef __VSX_SIMPLE_HANDLER_H__
+
+#define __VSX_SIMPLE_HANDLER_H__
 
 #include <glib.h>
-
-#include "vsx-simple-handler.h"
+#include "vsx-request-handler.h"
 
 G_BEGIN_DECLS
 
-VsxRequestHandler *
-vsx_start_typing_handler_new (void);
+typedef struct
+{
+  VsxRequestHandler parent;
+
+  VsxPerson *person;
+
+  VsxResponse *response;
+} VsxSimpleHandler;
+
+typedef struct
+{
+  VsxRequestHandlerClass parent_class;
+
+  void
+  (* do_request) (VsxSimpleHandler *simple_handler,
+                  VsxPerson *person);
+} VsxSimpleHandlerClass;
+
+const VsxSimpleHandlerClass *
+vsx_simple_handler_get_class (void) G_GNUC_CONST;
+
+void
+vsx_simple_handler_init (void *object);
 
 G_END_DECLS
 
-#endif /* __VSX_START_TYPING_HANDLER_H__ */
+#endif /* __VSX_SIMPLE_HANDLER_H__ */
