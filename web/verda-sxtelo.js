@@ -18,6 +18,7 @@
 
 var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
 var SHOUT_TIME = 10 * 1000;
+var CONNECT_RETRY_TIME = 5 * 1000;
 
 function getAjaxObject ()
 {
@@ -83,6 +84,8 @@ function ChatSession (playerName)
   this.tiles = [];
   this.dragTile = null;
   this.lastMovedTile = null;
+  this.retryCount = 0;
+  this.pendingTimeouts = [];
 
   this.playerName = playerName || "ludanto";
 
@@ -138,8 +141,14 @@ ChatSession.prototype.clearWatchAjax = function ()
 
 ChatSession.prototype.setError = function (msg)
 {
+  var i;
+
   if (!msg)
     msg = "@ERROR_OCCURRED@";
+
+  for (i = 0; i < this.pendingTimeouts.length; i++)
+    clearTimeout (this.pendingTimeouts[i]);
+  this.pendingTimeouts.splice (0, this.pendingTimeouts.length);
 
   this.clearWatchAjax ();
   this.clearCheckDataInterval ();
@@ -160,6 +169,10 @@ ChatSession.prototype.handleHeader = function (header)
   /* Ignore the header if we've already got further than this state */
   if (this.state != "connecting")
     return;
+
+  /* If we've successfully got the header then we've succesfully
+   * connected so we can reset the count */
+  this.retryCount = 0;
 
   this.personNumber = header.num;
   this.personId = header.id;
@@ -433,6 +446,31 @@ ChatSession.prototype.resetCheckDataInterval = function ()
   this.checkDataInterval = setInterval (this.checkData.bind (this), 3000);
 };
 
+ChatSession.prototype.addTimeout = function (func, interval)
+{
+  /* This is a wrapper around window.setTimeout except that it adds
+   * the timeoutID to a list so that we can cancel it if an error
+   * occurs */
+  var timeout;
+  var wrapperFunc = (function () {
+    var i;
+
+    for (i = 0; i < this.pendingTimeouts.length; i++)
+    {
+      if (this.pendingTimeouts[i] == timeout)
+      {
+        this.pendingTimeouts.splice (i, 1);
+        break;
+      }
+    }
+
+    func ();
+  }).bind (this);
+
+  timeout = window.setTimeout (wrapperFunc, interval);
+  this.pendingTimeouts.push (timeout);
+}
+
 ChatSession.prototype.watchReadyStateChangeCb = function ()
 {
   if (!this.watchAjax)
@@ -451,22 +489,14 @@ ChatSession.prototype.watchReadyStateChangeCb = function ()
   }
   else if (this.watchAjax.readyState == 4)
   {
-    if (this.watchAjax.status == 200)
-    {
-      this.checkData ();
-      this.watchAjax = null;
-      this.clearCheckDataInterval ();
+    this.checkData ();
+    this.watchAjax = null;
+    this.clearCheckDataInterval ();
 
-      /* If we didn't get a complete conversation then restart the
-       * query */
-      if (this.state != "done")
-        this.startWatchAjax ();
-    }
+    if (this.retryCount++ < 10)
+      this.addTimeout (this.startWatchAjax.bind (this), CONNECT_RETRY_TIME);
     else
-    {
-      this.watchAjax = null;
       this.setError ();
-    }
   }
 };
 
@@ -494,28 +524,6 @@ ChatSession.prototype.startWatchAjax = function ()
 
   this.resetCheckDataInterval ();
   this.resetKeepAlive ();
-};
-
-ChatSession.prototype.watchCompleteCb = function (xhr, status)
-{
-  if (!this.watchAjax)
-    return;
-
-  if (status == "success")
-  {
-    this.checkData ();
-    this.clearCheckDataInterval ();
-    this.clearWatchAjax ();
-
-    /* If we didn't get a complete conversation then restart the
-     * query */
-    if (this.state != "done")
-      this.startWatchAjax ();
-  }
-  else
-  {
-    this.setError ();
-  }
 };
 
 ChatSession.prototype.sendMessageReadyStateChangeCb = function ()
