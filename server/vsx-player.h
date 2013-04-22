@@ -56,6 +56,12 @@ vsx_player_is_typing (const VsxPlayer *player)
   return !!(player->flags & VSX_PLAYER_TYPING);
 }
 
+static inline gboolean
+vsx_player_has_next_turn (const VsxPlayer *player)
+{
+  return !!(player->flags & VSX_PLAYER_NEXT_TURN);
+}
+
 VsxPlayer *
 vsx_player_new (const char *player_name,
                 unsigned int num);

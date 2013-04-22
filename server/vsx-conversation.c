@@ -212,13 +212,54 @@ vsx_conversation_set_typing (VsxConversation *conversation,
                              typing);
 }
 
+static void
+set_next_player (VsxConversation *conversation,
+                 unsigned int old_player)
+{
+  /* Find the next player that is connected */
+  unsigned int next_turn_player = old_player;
+
+  while (TRUE)
+    {
+      next_turn_player = (next_turn_player + 1) % conversation->n_players;
+
+      /* If we make it back to the same player then he or she is the
+       * only one left connected so we'll just leave them with the
+       * next turn flag */
+      if (next_turn_player == old_player)
+        break;
+
+      /* If we find a connected player then transfer the flag to them */
+      if (vsx_player_is_connected (conversation->players[next_turn_player]))
+        {
+          vsx_conversation_set_flag (conversation,
+                                     conversation->players[old_player],
+                                     VSX_PLAYER_NEXT_TURN,
+                                     FALSE);
+          vsx_conversation_set_flag (conversation,
+                                     conversation->players[next_turn_player],
+                                     VSX_PLAYER_NEXT_TURN,
+                                     TRUE);
+          break;
+        }
+    }
+}
+
 void
 vsx_conversation_player_left (VsxConversation *conversation,
                               unsigned int player_num)
 {
   VsxPlayer *player = conversation->players[player_num];
+  gboolean had_next_turn;
 
+  had_next_turn = vsx_player_has_next_turn (player);
+
+  /* Set the flags before moving the turn so that it will generate
+   * only one callback */
   vsx_conversation_set_flags (conversation, player, 0);
+
+  if (had_next_turn)
+    set_next_player (conversation, player_num);
 }
 
 VsxPlayer *
@@ -324,17 +365,34 @@ find_free_location (VsxConversation *conversation,
       }
 }
 
+static gboolean
+is_shouting (VsxConversation *conversation)
+{
+  return (vsx_main_context_get_monotonic_clock (NULL) -
+          conversation->last_shout_time <
+          VSX_CONVERSATION_SHOUT_TIME);
+}
+
 void
 vsx_conversation_turn (VsxConversation *conversation,
                        unsigned int player_num)
 {
   VsxPlayer *player = conversation->players[player_num];
-  unsigned int next_turn_player;
+  gboolean is_first_turn =
+    conversation->state == VSX_CONVERSATION_AWAITING_START;
   VsxTile *tile;
-  int i;
 
   /* Ignore attempts to shout for a player that has left */
   if (!vsx_player_is_connected (player))
+    return;
+
+  /* Don't allow turns for players that don't have the next turn,
+   * except for the first turn which is a free for all */
+  if (!is_first_turn && !vsx_player_has_next_turn (player))
+    return;
+
+  /* Don't allow a turn to be taken while someone is shouting */
+  if (is_shouting (conversation))
     return;
 
   /* Ignore turns if all of the tiles are already in */
@@ -352,19 +410,16 @@ vsx_conversation_turn (VsxConversation *conversation,
   vsx_conversation_start (conversation);
   vsx_conversation_tile_changed (conversation, tile);
 
-  /* Find the next player that is connected */
-  next_turn_player = player_num;
-  do
-    next_turn_player = (next_turn_player + 1) % conversation->n_players;
-  while (!vsx_player_is_connected (conversation->players[next_turn_player]));
-
-  /* Mark that the next player has the next turn, and unmark all other
-   * players */
-  for (i = 0; i < conversation->n_players; i++)
+  /* As a special case, if there is only one player and it is the
+   * first turn then set_next_player won't work because it will leave
+   * the player flags as they are when there is only one player */
+  if (is_first_turn && conversation->n_players == 1)
     vsx_conversation_set_flag (conversation,
-                               conversation->players[i],
+                               player,
                                VSX_PLAYER_NEXT_TURN,
-                               i == next_turn_player);
+                               TRUE);
+  else
+    set_next_player (conversation, player_num);
 }
 
 void
@@ -389,19 +444,16 @@ vsx_conversation_shout (VsxConversation *conversation,
 {
   VsxPlayer *player = conversation->players[player_num];
   VsxConversationChangedData data;
-  gint64 now;
 
   /* Ignore attempts to shout for a player that has left */
   if (!vsx_player_is_connected (player))
     return;
 
-  now = vsx_main_context_get_monotonic_clock (NULL);
-
   /* Don't let shouts come too often */
-  if (now - conversation->last_shout_time < VSX_CONVERSATION_SHOUT_TIME)
+  if (is_shouting (conversation))
     return;
 
-  conversation->last_shout_time = now;
+  conversation->last_shout_time = vsx_main_context_get_monotonic_clock (NULL);
 
   data.conversation = conversation;
   data.type = VSX_CONVERSATION_SHOUTED;
