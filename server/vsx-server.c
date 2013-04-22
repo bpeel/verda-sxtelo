@@ -32,8 +32,8 @@
 #include "vsx-string-response.h"
 #include "vsx-conversation.h"
 #include "vsx-conversation-set.h"
-#include "vsx-flip-tile-handler.h"
 #include "vsx-move-tile-handler.h"
+#include "vsx-turn-handler.h"
 #include "vsx-new-person-handler.h"
 #include "vsx-leave-handler.h"
 #include "vsx-shout-handler.h"
@@ -136,7 +136,7 @@ requests[] =
   {
     { "/keep_alive", vsx_keep_alive_handler_new },
     { "/move_tile", vsx_move_tile_handler_new },
-    { "/flip_tile", vsx_flip_tile_handler_new },
+    { "/turn", vsx_turn_handler_new },
     { "/start_typing", vsx_start_typing_handler_new },
     { "/stop_typing", vsx_stop_typing_handler_new },
     { "/send_message", vsx_send_message_handler_new },

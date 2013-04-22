@@ -26,11 +26,15 @@ G_BEGIN_DECLS
 /* Enough space for any unicode character in UTF-8 */
 #define VSX_TILE_MAX_LETTER_BYTES 6
 
+/* Size of a tile in tenths of an em */
+#define VSX_TILE_SIZE 20
+/* Gap to leave around each tile */
+#define VSX_TILE_GAP 1
+
 typedef struct
 {
   gint16 x, y;
   char letter[VSX_TILE_MAX_LETTER_BYTES + 1];
-  guint8 facing_up;
 } VsxTile;
 
 G_END_DECLS

@@ -28,6 +28,9 @@
 #include "vsx-main-context.h"
 #include "vsx-log.h"
 
+#define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
+#define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
+
 static void
 vsx_conversation_free (void *object)
 {
@@ -233,37 +236,97 @@ vsx_conversation_new (void)
 
   /* Initialise the tile data with the defaults */
   memcpy (self->tiles, vsx_tile_data, sizeof (self->tiles));
-  /* Shuffle the letters without changing the positions */
+  /* Shuffle the tiles. The positions are irrelevant */
   for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
     {
       int swap_pos = g_random_int_range (0, VSX_TILE_DATA_N_TILES);
-      char temp[VSX_TILE_MAX_LETTER_BYTES + 1];
+      VsxTile temp;
 
-      memcpy (temp, self->tiles[swap_pos].letter, sizeof (temp));
-      memcpy (self->tiles[swap_pos].letter,
-              self->tiles[i].letter,
-              sizeof (temp));
-      memcpy (self->tiles[i].letter, temp, sizeof (temp));
+      temp = self->tiles[swap_pos];
+      self->tiles[swap_pos] = self->tiles[i];
+      self->tiles[i] = temp;
     }
 
   return self;
 }
 
-void
-vsx_conversation_flip_tile (VsxConversation *conversation,
-                            int tile_num)
+static gboolean
+try_location (VsxConversation *conversation,
+              int x,
+              int y)
 {
-  VsxTile *tile = conversation->tiles + tile_num;
+  int i;
 
-  if (!tile->facing_up)
+  /* Check if this position would overlap any existing tiles */
+  for (i = 0; i < conversation->n_tiles; i++)
     {
-      tile->facing_up = TRUE;
+      const VsxTile *tile = conversation->tiles + i;
 
-      /* Once the first tile is flipped the game is considered to be
-       * started so no more players can join */
-      vsx_conversation_start (conversation);
-      vsx_conversation_tile_changed (conversation, tile);
+      if (x + VSX_TILE_SIZE > tile->x &&
+          x < tile->x + VSX_TILE_SIZE &&
+          y + VSX_TILE_SIZE > tile->y &&
+          y < tile->y + VSX_TILE_SIZE)
+        return FALSE;
     }
+
+  return TRUE;
+}
+
+static void
+find_free_location (VsxConversation *conversation,
+                    gint16 *x_out,
+                    gint16 *y_out)
+{
+  int x, y;
+
+  for (y = 0; ; y++)
+    for (x = 0; x < 9; x++)
+      {
+        int sign_x, sign_y;
+
+        for (sign_x = -1; sign_x <= 1; sign_x += 2)
+          for (sign_y = -1; sign_y <= 1; sign_y += 2)
+            {
+              int try_x = (x * sign_x * (VSX_TILE_SIZE + VSX_TILE_GAP) +
+                           VSX_CONVERSATION_CENTER_X);
+              int try_y = (y * sign_y * (VSX_TILE_SIZE + VSX_TILE_GAP) +
+                           VSX_CONVERSATION_CENTER_Y);
+
+              if (try_location (conversation, try_x, try_y))
+                {
+                  *x_out = try_x;
+                  *y_out = try_y;
+                  return;
+                }
+            }
+      }
+}
+
+void
+vsx_conversation_turn (VsxConversation *conversation,
+                       unsigned int player_num)
+{
+  VsxPlayer *player = conversation->players[player_num];
+  VsxTile *tile;
+
+  /* Ignore attempts to shout for a player that has left */
+  if (!player->connected)
+    return;
+
+  /* Ignore turns if all of the tiles are already in */
+  if (conversation->n_tiles >= VSX_TILE_DATA_N_TILES)
+    return;
+
+  tile = conversation->tiles + conversation->n_tiles;
+
+  find_free_location (conversation, &tile->x, &tile->y);
+
+  conversation->n_tiles++;
+
+  /* Once the first tile is flipped the game is considered to be
+   * started so no more players can join */
+  vsx_conversation_start (conversation);
+  vsx_conversation_tile_changed (conversation, tile);
 }
 
 void

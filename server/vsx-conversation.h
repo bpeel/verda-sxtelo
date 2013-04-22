@@ -51,6 +51,8 @@ typedef struct
   int n_players;
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
 
+  /* Number of tiles that have been added to the game */
+  int n_tiles;
   VsxTile tiles[VSX_TILE_DATA_N_TILES];
 
   gint64 last_shout_time;
@@ -104,10 +106,6 @@ vsx_conversation_add_player (VsxConversation *conversation,
                              const char *player_name);
 
 void
-vsx_conversation_flip_tile (VsxConversation *conversation,
-                            int tile_num);
-
-void
 vsx_conversation_move_tile (VsxConversation *conversation,
                             int tile_num,
                             int x,
@@ -116,6 +114,10 @@ vsx_conversation_move_tile (VsxConversation *conversation,
 void
 vsx_conversation_shout (VsxConversation *conversation,
                         unsigned int player_num);
+
+void
+vsx_conversation_turn (VsxConversation *conversation,
+                       unsigned int player_num);
 
 G_END_DECLS
 

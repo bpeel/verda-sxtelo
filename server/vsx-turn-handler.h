@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2013  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,29 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_FLIP_TILE_HANDLER_H__
-#define __VSX_FLIP_TILE_HANDLER_H__
+#ifndef __VSX_TURN_HANDLER_H__
+#define __VSX_TURN_HANDLER_H__
 
 #include <glib.h>
-
-#include "vsx-request-handler.h"
-#include "vsx-person.h"
+#include "vsx-simple-handler.h"
 
 G_BEGIN_DECLS
 
-typedef struct
-{
-  VsxRequestHandler parent;
-
-  VsxPerson *person;
-  int tile_num;
-
-  VsxResponse *response;
-} VsxFlipTileHandler;
-
 VsxRequestHandler *
-vsx_flip_tile_handler_new (void);
+vsx_turn_handler_new (void);
 
 G_END_DECLS
 
-#endif /* __VSX_FLIP_TILE_HANDLER_H__ */
+#endif /* __VSX_TURN_HANDLER_H__ */

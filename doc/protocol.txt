@@ -76,11 +76,12 @@ check.
 Requests that the given tile move to the given coordinates. The
 response will be a dummy plain text.
 
-* GET /flip_tile?<person_id>&<tile_num>
+* GET /turn?<person_id>
 
-Requests that the given tile be flipped so that it is facing up. The
-first time this command is received the game is also started which
-means that no new players will join.
+Requests that a new tile be added to the game. If there are less than
+the maximum number of tiles in the game already, then this will cause
+a new “tile” message to be sent with the position and letter of the
+new tile. The current turn will be moved to the next player.
 
 * GET /shout?<person_id>
 
@@ -145,11 +146,11 @@ object containing the following keys:
 
   "y": The new y position of the tile as an integer in pixels.
 
-  "facing-up": A boolean value to specify whether the tile is facing
-  up or down.
-
   "letter": An integer value representing the Unicode character that
   should be displayed on the top of this tile.
+
+Initially there will be no tiles so none of these messages will be
+sent for a new game. New tiles are added after a /turn request.
 
 * "message"
 
@@ -215,8 +216,8 @@ this:
 ["player-name", {"num": 1, "name": "bob"}]
 ["player", {"num": 0, "connected": true, "typing": false}]
 ["player", {"num": 1, "connected": true, "typing": false}]
-["tile", {"num": 0, "x": 99, "y": 92, "facing-up": false, "letter": "J"}]
-["tile", {"num": 1, "x": 122, "y": 92, "facing-up": false, "letter": "Q"}]
+["tile", {"num": 0, "x": 99, "y": 92, "letter": "J"}]
+["tile", {"num": 1, "x": 122, "y": 92, "letter": "Q"}]
 ["player", {"num": 1, "connected": true, "typing": true}]
 ["message", {"person": 1, "text": "hi"}]
 ["player", {"num": 0, "connected": true, "typing": true}]

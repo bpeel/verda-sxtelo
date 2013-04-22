@@ -346,7 +346,6 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                 self->person->conversation->tiles + self->current_dirty_thing;
               self->dirty.tile.x = tile->x;
               self->dirty.tile.y = tile->y;
-              self->dirty.tile.facing_up = tile->facing_up;
 
               /* We want to immediately mark the tile as not dirty
                * so that it changes again while we are still in this
@@ -364,18 +363,11 @@ vsx_watch_person_response_add_data (VsxResponse *response,
           length = sprintf (buf,
                             "[\"tile\", {\"num\": %u, "
                             "\"x\": %i, \"y\": %i, "
-                            "\"facing-up\": %s, "
                             "\"letter\": \"%s\"}]\r\n",
                             self->current_dirty_thing,
                             self->dirty.tile.x,
                             self->dirty.tile.y,
-                            self->dirty.tile.facing_up ? "true" : "false",
-                            /* We won't send the actual letter down
-                             * until the tile is facing up in case
-                             * someone makes a cheating client */
-                            self->dirty.tile.facing_up ?
-                            tile->letter :
-                            "");
+                            tile->letter);
 
           if (write_chunked_message (self,
                                      &message_data,
@@ -558,7 +550,7 @@ vsx_watch_person_response_new (VsxPerson *person,
   vsx_flags_set_range (self->dirty_players,
                        person->conversation->n_players);
   vsx_flags_set_range (self->dirty_tiles,
-                       VSX_TILE_DATA_N_TILES);
+                       person->conversation->n_tiles);
 
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,

@@ -72,7 +72,6 @@ typedef struct
     struct
     {
       gint16 x, y;
-      guint8 facing_up;
     } tile;
   } dirty;
 
