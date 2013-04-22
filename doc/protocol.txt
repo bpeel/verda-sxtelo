@@ -184,6 +184,7 @@ is a javascript hash object containing the following fields:
   "flags": An integer containing a set of flags. These are:
      0: Set if the player is connected
      1: Set if the player is typing
+     2: Set if it is this player's turn
 
 * "shout"
 

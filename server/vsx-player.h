@@ -26,7 +26,8 @@ G_BEGIN_DECLS
 typedef enum
 {
   VSX_PLAYER_CONNECTED = (1 << 0),
-  VSX_PLAYER_TYPING = (1 << 1)
+  VSX_PLAYER_TYPING = (1 << 1),
+  VSX_PLAYER_NEXT_TURN = (1 << 2)
 } VsxPlayerFlags;
 
 typedef struct

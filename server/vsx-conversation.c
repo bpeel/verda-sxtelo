@@ -329,7 +329,9 @@ vsx_conversation_turn (VsxConversation *conversation,
                        unsigned int player_num)
 {
   VsxPlayer *player = conversation->players[player_num];
+  unsigned int next_turn_player;
   VsxTile *tile;
+  int i;
 
   /* Ignore attempts to shout for a player that has left */
   if (!vsx_player_is_connected (player))
@@ -349,6 +351,20 @@ vsx_conversation_turn (VsxConversation *conversation,
    * started so no more players can join */
   vsx_conversation_start (conversation);
   vsx_conversation_tile_changed (conversation, tile);
+
+  /* Find the next player that is connected */
+  next_turn_player = player_num;
+  do
+    next_turn_player = (next_turn_player + 1) % conversation->n_players;
+  while (!vsx_player_is_connected (conversation->players[next_turn_player]));
+
+  /* Mark that the next player has the next turn, and unmark all other
+   * players */
+  for (i = 0; i < conversation->n_players; i++)
+    vsx_conversation_set_flag (conversation,
+                               conversation->players[i],
+                               VSX_PLAYER_NEXT_TURN,
+                               i == next_turn_player);
 }
 
 void
