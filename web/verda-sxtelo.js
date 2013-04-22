@@ -102,12 +102,38 @@ function ChatSession (playerName)
     this.roomName = "default";
 }
 
+ChatSession.prototype.canTurn = function ()
+{
+  if (this.shoutingPlayer != null)
+    return false;
+
+  if (this.tiles.length >= N_TILES)
+    return false;
+
+  if (this.tiles.length == 0)
+    return true;
+
+  var player = this.getPlayer (this.personNumber);
+
+  return (player.flags & PLAYER_NEXT_TURN) != 0;
+};
+
+ChatSession.prototype.updateTurnButton = function ()
+{
+  if (this.canTurn ())
+    $("#turn-button").removeAttr ("disabled");
+  else
+    $("#turn-button").attr ("disabled", "disabled");
+};
+
 ChatSession.prototype.updateShoutButton = function ()
 {
   if (this.state == "in-progress" && this.shoutingPlayer == null)
     $("#shout-button").removeAttr ("disabled");
   else
     $("#shout-button").attr ("disabled", "disabled");
+
+  this.updateTurnButton ();
 };
 
 ChatSession.prototype.updateRemainingTiles = function ()
@@ -117,7 +143,7 @@ ChatSession.prototype.updateRemainingTiles = function ()
 
 ChatSession.prototype.setState = function (state)
 {
-  var controls = [ "#message-input-box", "#submit-message", "#turn-button" ];
+  var controls = [ "#message-input-box", "#submit-message" ];
   var i;
 
   this.state = state;
@@ -234,6 +260,7 @@ ChatSession.prototype.handlePlayer = function (data)
   player.flags = data.flags;
 
   this.updatePlayerClass (player);
+  this.updateTurnButton ();
 };
 
 ChatSession.prototype.handleEnd = function ()
@@ -312,6 +339,7 @@ ChatSession.prototype.handleTile = function (data)
     $("#board").append (tile.element);
 
     this.updateRemainingTiles ();
+    this.updateTurnButton ();
   }
 
   if (data.num != this.dragTile &&
@@ -698,7 +726,8 @@ ChatSession.prototype.turnButtonClickCb = function ()
 
 ChatSession.prototype.turn = function ()
 {
-  this.queueSimpleMessage ("turn");
+  if (this.canTurn ())
+    this.queueSimpleMessage ("turn");
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
