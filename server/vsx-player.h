@@ -23,6 +23,12 @@
 
 G_BEGIN_DECLS
 
+typedef enum
+{
+  VSX_PLAYER_CONNECTED = (1 << 0),
+  VSX_PLAYER_TYPING = (1 << 1)
+} VsxPlayerFlags;
+
 typedef struct
 {
   /* First person to join a conversation gets the number 0, the second
@@ -34,9 +40,20 @@ typedef struct
   gsize name_message_len;
   char *name_message;
 
-  unsigned int typing : 1;
-  unsigned int connected : 1;
+  VsxPlayerFlags flags;
 } VsxPlayer;
+
+static inline gboolean
+vsx_player_is_connected (const VsxPlayer *player)
+{
+  return !!(player->flags & VSX_PLAYER_CONNECTED);
+}
+
+static inline gboolean
+vsx_player_is_typing (const VsxPlayer *player)
+{
+  return !!(player->flags & VSX_PLAYER_TYPING);
+}
 
 VsxPlayer *
 vsx_player_new (const char *player_name,

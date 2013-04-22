@@ -64,8 +64,7 @@ typedef struct
      * state */
     struct
     {
-      unsigned int is_typing : 1;
-      unsigned int is_connected : 1;
+      VsxPlayerFlags flags;
     } player;
 
     /* Same for the tile state */

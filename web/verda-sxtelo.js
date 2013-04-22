@@ -22,6 +22,9 @@ var CONNECT_RETRY_TIME = 5 * 1000;
 var TILE_SIZE = 20;
 var N_TILES = 122;
 
+var PLAYER_CONNECTED = (1 << 0);
+var PLAYER_TYPING = (1 << 1);
+
 function getAjaxObject ()
 {
   /* On IE we'll use XDomainRequest but make it look like an
@@ -206,9 +209,9 @@ ChatSession.prototype.handlePlayerName = function (data)
 ChatSession.prototype.updatePlayerClass = function (player)
 {
   var className = "player";
-  if (player.typing)
+  if ((player.flags & PLAYER_TYPING))
     className += " typing"
-  if (!player.connected)
+  if ((player.flags & PLAYER_CONNECTED) == 0)
     className += " disconnected";
   if (this.shoutingPlayer == player)
     className += " shouting";
@@ -225,8 +228,7 @@ ChatSession.prototype.handlePlayer = function (data)
     return;
 
   var player = this.getPlayer (data.num);
-  player.typing = data.typing;
-  player.connected = data.connected;
+  player.flags = data.flags;
 
   this.updatePlayerClass (player);
 };
@@ -955,8 +957,7 @@ ChatSession.prototype.getPlayer = function (playerNum)
   {
     player = this.players[playerNum] = {};
 
-    player.typing = false;
-    player.connected = true;
+    player.flags = PLAYER_CONNECTED;
     player.name = "";
 
     player.element = document.getElementById ("player-" + playerNum);

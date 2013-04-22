@@ -162,7 +162,7 @@ has_pending_data (VsxWatchPersonResponse *self,
       return TRUE;
     }
 
-  if (!self->person->player->connected)
+  if (!vsx_player_is_connected (self->person->player))
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
       return TRUE;
@@ -270,8 +270,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
               player =
                 self->person->conversation->players[self->current_dirty_thing];
-              self->dirty.player.is_typing = player->typing;
-              self->dirty.player.is_connected = player->connected;
+              self->dirty.player.flags = player->flags;
 
               /* We want to immediately mark the player as not dirty
                * so that it changes again while we are still in this
@@ -287,11 +286,9 @@ vsx_watch_person_response_add_data (VsxResponse *response,
               self->person->conversation->players[self->current_dirty_thing];
 
           length = sprintf (buf,
-                            "[\"player\", {\"num\": %u, "
-                            "\"connected\": %s, \"typing\": %s}]\r\n",
+                            "[\"player\", {\"num\": %u, \"flags\": %i}]\r\n",
                             self->current_dirty_thing,
-                            self->dirty.player.is_connected ? "true" : "false",
-                            self->dirty.player.is_typing ? "true" : "false");
+                            self->dirty.player.flags);
 
           if (write_chunked_message (self,
                                      &message_data,

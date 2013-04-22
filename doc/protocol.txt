@@ -181,11 +181,9 @@ is a javascript hash object containing the following fields:
 
   "num": The index number of this player.
 
-  "connected": A boolean value which is initially true and switches to
-  false once the player sends a leave command.
-
-  "typing": A boolean value to indicate whether the player is
-  currently typing a message.
+  "flags": An integer containing a set of flags. These are:
+     0: Set if the player is connected
+     1: Set if the player is typing
 
 * "shout"
 
@@ -214,13 +212,15 @@ this:
 ["header", {"num": 0, "id": "76416A153385569B"}]
 ["player-name", {"num": 0, "name": "alice"}]
 ["player-name", {"num": 1, "name": "bob"}]
-["player", {"num": 0, "connected": true, "typing": false}]
-["player", {"num": 1, "connected": true, "typing": false}]
+["player", {"num": 0, "flags": 1}]
+["player", {"num": 1, "flags": 1}]
 ["tile", {"num": 0, "x": 99, "y": 92, "letter": "J"}]
 ["tile", {"num": 1, "x": 122, "y": 92, "letter": "Q"}]
-["player", {"num": 1, "connected": true, "typing": true}]
+["player", {"num": 1, "flags": 3}]
+["player", {"num": 1, "flags": 1}]
 ["message", {"person": 1, "text": "hi"}]
-["player", {"num": 0, "connected": true, "typing": true}]
+["player", {"num": 0, "flags": 3}]
+["player", {"num": 0, "flags": 1}]
 ["message", {"person": 0, "text": "good bye!"}]
-["player", {"num": 0, "connected": false, "typing": false}]
+["player", {"num": 0, "flags": 0}]
 ["end"]

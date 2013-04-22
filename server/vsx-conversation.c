@@ -127,7 +127,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
   GString *message_str;
 
   /* Ignore attempts to add messages for a player that has left */
-  if (!conversation->players[player_num]->connected)
+  if (!vsx_player_is_connected (conversation->players[player_num]))
     return;
 
   g_array_set_size (conversation->messages,
@@ -167,6 +167,34 @@ vsx_conversation_add_message (VsxConversation *conversation,
                             VSX_CONVERSATION_MESSAGE_ADDED);
 }
 
+static void
+vsx_conversation_set_flags (VsxConversation *conversation,
+                            VsxPlayer *player,
+                            VsxPlayerFlags flags)
+{
+  if (player->flags != flags)
+    {
+      player->flags = flags;
+      vsx_conversation_player_changed (conversation, player);
+    }
+}
+
+static void
+vsx_conversation_set_flag (VsxConversation *conversation,
+                           VsxPlayer *player,
+                           VsxPlayerFlags flag,
+                           gboolean value)
+{
+  VsxPlayerFlags flags;
+
+  if (value)
+    flags = player->flags | flag;
+  else
+    flags = player->flags & ~flag;
+
+  vsx_conversation_set_flags (conversation, player, flags);
+}
+
 void
 vsx_conversation_set_typing (VsxConversation *conversation,
                              unsigned int player_num,
@@ -174,15 +202,14 @@ vsx_conversation_set_typing (VsxConversation *conversation,
 {
   VsxPlayer *player = conversation->players[player_num];
 
-  if (player->typing != typing)
-    {
-      /* Ignore attempts to set typing state for a player that has left */
-      if (!player->connected)
-        return;
+  /* Ignore attempts to set typing state for a player that has left */
+  if (!vsx_player_is_connected (player))
+    return;
 
-      player->typing = typing;
-      vsx_conversation_player_changed (conversation, player);
-    }
+  vsx_conversation_set_flag (conversation,
+                             player,
+                             VSX_PLAYER_TYPING,
+                             typing);
 }
 
 void
@@ -191,12 +218,7 @@ vsx_conversation_player_left (VsxConversation *conversation,
 {
   VsxPlayer *player = conversation->players[player_num];
 
-  if (player->connected)
-    {
-      player->typing = FALSE;
-      player->connected = FALSE;
-      vsx_conversation_player_changed (conversation, player);
-    }
+  vsx_conversation_set_flags (conversation, player, 0);
 }
 
 VsxPlayer *
@@ -310,7 +332,7 @@ vsx_conversation_turn (VsxConversation *conversation,
   VsxTile *tile;
 
   /* Ignore attempts to shout for a player that has left */
-  if (!player->connected)
+  if (!vsx_player_is_connected (player))
     return;
 
   /* Ignore turns if all of the tiles are already in */
@@ -354,7 +376,7 @@ vsx_conversation_shout (VsxConversation *conversation,
   gint64 now;
 
   /* Ignore attempts to shout for a player that has left */
-  if (!player->connected)
+  if (!vsx_player_is_connected (player))
     return;
 
   now = vsx_main_context_get_monotonic_clock (NULL);

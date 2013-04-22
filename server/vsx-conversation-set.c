@@ -48,7 +48,7 @@ conversation_is_empty (VsxConversation *conversation)
   int i;
 
   for (i = 0; i < conversation->n_players; i++)
-    if (conversation->players[i]->connected)
+    if (vsx_player_is_connected (conversation->players[i]))
       return FALSE;
 
   return TRUE;
