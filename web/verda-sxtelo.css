@@ -85,7 +85,11 @@ body {
 }
 
 .player.shouting {
-    background-color: rgb(240, 100, 100);
+    background-color: rgb(240, 100, 100) !important;
+}
+
+.player.next-turn {
+    background-color: rgb(190, 255, 190);
 }
 
 #board {

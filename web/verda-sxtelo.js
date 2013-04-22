@@ -24,6 +24,7 @@ var N_TILES = 122;
 
 var PLAYER_CONNECTED = (1 << 0);
 var PLAYER_TYPING = (1 << 1);
+var PLAYER_NEXT_TURN = (1 << 2);
 
 function getAjaxObject ()
 {
@@ -215,6 +216,8 @@ ChatSession.prototype.updatePlayerClass = function (player)
     className += " disconnected";
   if (this.shoutingPlayer == player)
     className += " shouting";
+  if ((player.flags & PLAYER_NEXT_TURN))
+    className += " next-turn";
 
   player.element.className = className;
 };
