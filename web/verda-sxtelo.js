@@ -19,6 +19,8 @@
 var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
 var SHOUT_TIME = 10 * 1000;
 var CONNECT_RETRY_TIME = 5 * 1000;
+var TILE_SIZE = 20;
+var N_TILES = 122;
 
 function getAjaxObject ()
 {
@@ -104,20 +106,27 @@ ChatSession.prototype.updateShoutButton = function ()
     $("#shout-button").attr ("disabled", "disabled");
 };
 
+ChatSession.prototype.updateRemainingTiles = function ()
+{
+  $("#num-tiles").text (N_TILES - this.tiles.length);
+};
+
 ChatSession.prototype.setState = function (state)
 {
+  var controls = [ "#message-input-box", "#submit-message", "#turn-button" ];
+  var i;
+
   this.state = state;
 
   if (state == "in-progress")
   {
-    $("#message-input-box").removeAttr ("disabled");
-    $("#submit-message").removeAttr ("disabled");
-    $("#message-input-box")[0].focus ();
+    for (i = 0; i < controls.length; i++)
+      $(controls[i]).removeAttr ("disabled");
   }
   else
   {
-    $("#message-input-box").attr ("disabled", "disabled");
-    $("#submit-message").attr ("disabled", "disabled");
+    for (i = 0; i < controls.length; i++)
+      $(controls[i]).attr ("disabled", "disabled");
   }
 
   this.updateShoutButton ();
@@ -286,44 +295,38 @@ ChatSession.prototype.handleTile = function (data)
 
   var tile = this.tiles[data.num];
 
-  var new_x = (data.x / 10.0) + "em";
-  var new_y = (data.y / 10.0) + "em";
-
   if (tile == null)
   {
     tile = this.tiles[data.num] = {};
     tile.element = document.createElement ("div");
     tile.element.className = "tile";
-    tile.element.style.left = new_x;
-    tile.element.style.top = new_y;
-    tile.facingUp = false;
+    tile.element.style.left = (-TILE_SIZE / 10.0) + "em";
+    tile.element.style.top = (-TILE_SIZE / 10.0) + "em";
+    tile.element.textContent = data.letter;
+    tile.x = tile.y = -TILE_SIZE;
     $("#board").append (tile.element);
-  }
-  else
-  {
-    if (data.num != this.dragTile &&
-        (data.x != tile.x || data.y != tile.y))
-    {
-      var te = $(tile.element);
-      var dx = tile.x - data.x;
-      var dy = tile.y - data.y;
-      var distance = Math.sqrt (dx * dx + dy * dy);
 
-      te.stop ();
-      this.raiseTile (tile);
-      te.animate ({ "left": new_x, "top": new_y },
-                  distance * 2.0);
-    }
+    this.updateRemainingTiles ();
+  }
+
+  if (data.num != this.dragTile &&
+      (data.x != tile.x || data.y != tile.y))
+  {
+    var te = $(tile.element);
+    var dx = tile.x - data.x;
+    var dy = tile.y - data.y;
+    var distance = Math.sqrt (dx * dx + dy * dy);
+    var new_x = (data.x / 10.0) + "em";
+    var new_y = (data.y / 10.0) + "em";
+
+    te.stop ();
+    this.raiseTile (tile);
+    te.animate ({ "left": new_x, "top": new_y },
+                distance * 2.0);
   }
 
   tile.x = data.x;
   tile.y = data.y;
-
-  if (data["facing-up"] && !tile.facingUp)
-  {
-    tile.element.textContent = data.letter;
-    tile.facingUp = true;
-  }
 };
 
 ChatSession.prototype.stopShout = function ()
@@ -612,13 +615,6 @@ ChatSession.prototype.sendNextMessage = function ()
                                            "text/plain; charset=UTF-8");
     this.sendMessageAjax.send (message[1]);
   }
-  else if (message[0] == "flip-tile")
-  {
-    this.sendMessageAjax.open ("GET",
-                               this.getUrl ("flip_tile?" + this.personId + "&" +
-                                            message[1]));
-    this.sendMessageAjax.send ();
-  }
   else if (message[0] == "move-tile")
   {
     this.sendMessageAjax.open ("GET",
@@ -631,6 +627,11 @@ ChatSession.prototype.sendNextMessage = function ()
   else if (message[0] == "shout")
   {
     this.sendMessageAjax.open ("GET", this.getUrl ("shout?" + this.personId));
+    this.sendMessageAjax.send ();
+  }
+  else if (message[0] == "turn")
+  {
+    this.sendMessageAjax.open ("GET", this.getUrl ("turn?" + this.personId));
     this.sendMessageAjax.send ();
   }
 
@@ -660,20 +661,39 @@ ChatSession.prototype.shoutButtonClickCb = function ()
   $("#message-input-box")[0].focus ();
 };
 
-ChatSession.prototype.shout = function ()
+ChatSession.prototype.queueSimpleMessage = function (message)
 {
   var i;
 
-  if (this.shoutingPlayer || this.state != "in-progress")
+  if (this.state != "in-progress")
     return;
 
-  /* Make sure that we haven't already queued this flip */
+  /* Make sure that we haven't already queued the same message */
   for (i = 0; i < this.messageQueue.length; i++)
-    if (this.messageQueue[i][0] == "shout")
+    if (this.messageQueue[i][0] == message)
       return;
 
-  this.messageQueue.push (["shout"]);
+  this.messageQueue.push ([message]);
   this.sendNextMessage ();
+}
+
+ChatSession.prototype.shout = function ()
+{
+  if (this.shoutingPlayer)
+    return;
+
+  this.queueSimpleMessage ("shout");
+};
+
+ChatSession.prototype.turnButtonClickCb = function ()
+{
+  this.turn ();
+  $("#message-input-box")[0].focus ();
+};
+
+ChatSession.prototype.turn = function ()
+{
+  this.queueSimpleMessage ("turn");
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
@@ -694,12 +714,20 @@ ChatSession.prototype.messageKeyDownCb = function (event)
 
 ChatSession.prototype.documentKeyDownCb = function (event)
 {
-  if ((event.which == 10 || event.which == 13) &&
-      $("#message-input-box").val ().length == 0)
+  if ($("#message-input-box").val ().length == 0)
   {
-    event.preventDefault ();
-    event.stopPropagation ();
-    this.shout ();
+    if (event.which == 10 || event.which == 13)
+    {
+      event.preventDefault ();
+      event.stopPropagation ();
+      this.shout ();
+    }
+    else if (event.which == 32)
+    {
+      event.preventDefault ();
+      event.stopPropagation ();
+      this.turn ();
+    }
   }
 };
 
@@ -795,28 +823,11 @@ ChatSession.prototype.mouseMoveCb = function (event)
   tile.element.style.top = (newY / 10.0) + "em";
 };
 
-ChatSession.prototype.flipTile = function (tileNum)
-{
-  var tile = this.tiles[tileNum];
-
-  if (tile.facingUp)
-    return;
-
-  /* Make sure that we haven't already queued this flip */
-  for (i = 0; i < this.messageQueue.length; i++)
-    if (this.messageQueue[i][0] == "flip-tile" &&
-        this.messageQueue[i][1] == tileNum)
-      return;
-
-  this.messageQueue.push (["flip-tile", tileNum]);
-  this.sendNextMessage ();
-};
-
 ChatSession.prototype.moveTile = function (tileNum, x, y)
 {
   var tile = this.tiles[tileNum];
 
-  /* If we've already queued this flip then just update the position */
+  /* If we've already queued this move then just update the position */
   for (i = 0; i < this.messageQueue.length; i++)
   {
     if (this.messageQueue[i][0] == "move-tile" &&
@@ -843,24 +854,18 @@ ChatSession.prototype.mouseUpCb = function (event)
   {
     var tile = this.tiles[this.dragTile];
 
-    if (!this.tileMoved)
+    if (!this.tileMoved &&
+        this.lastMovedTile &&
+        this.lastMovedTile != tile)
     {
-      if (tile.facingUp)
+      var newPos = this.lastMovedTile.x + 20;
+      var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
+                    10.0 - 20);
+      if (newPos < maxPos)
       {
-        if (this.lastMovedTile && this.lastMovedTile != tile)
-        {
-          var newPos = this.lastMovedTile.x + 20;
-          var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
-                        10.0 - 20);
-          if (newPos < maxPos)
-          {
-            this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
-            this.lastMovedTile = tile;
-          }
-        }
+        this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
+        this.lastMovedTile = tile;
       }
-      else
-        this.flipTile (this.dragTile);
     }
 
     this.dragTile = null;
@@ -874,6 +879,7 @@ ChatSession.prototype.start = function ()
   this.startWatchAjax ();
 
   $("#shout-button").bind ("click", this.shoutButtonClickCb.bind (this));
+  $("#turn-button").bind ("click", this.turnButtonClickCb.bind (this));
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-input-box").bind ("keydown", this.messageKeyDownCb.bind (this));
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
@@ -893,6 +899,8 @@ ChatSession.prototype.start = function ()
   $(window).focus (this.focusCb.bind (this));
 
   $(window).unload (this.unloadCb.bind (this));
+
+  this.updateRemainingTiles ();
 
   /* Work out the scale from pixels to ems so that we can translate
    * mouse positions to offsets in ems */

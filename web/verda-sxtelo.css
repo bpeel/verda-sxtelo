@@ -52,7 +52,7 @@ body {
 }
 
 #message-input-box {
-    width: 45em;
+    width: 38em;
 }
 
 .message-stranger {
@@ -240,7 +240,7 @@ span.player+span.player:before {
     font-weight: bold;
 }
 
-#help-box {
+#side-box {
     float: right;
 }
 

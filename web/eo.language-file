@@ -20,8 +20,17 @@ Ludu!
 @CONNECTING@
 Konektante...
 
+@NUM_TILES@
+Restantaj:
+
+@HELP@
+Helpo
+
 @SHOUT_BUTTON@
 Kriu!
+
+@TURN_BUTTON@
+Turnu
 
 @SEND_BUTTON@
 Sendu!
