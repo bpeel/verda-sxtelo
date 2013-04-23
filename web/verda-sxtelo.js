@@ -609,23 +609,6 @@ ChatSession.prototype.sendNextMessage = function ()
 
       this.resetKeepAlive ();
     }
-    else if ((this.state == "in-progress" ||
-              this.state == "awaiting-partner") &&
-             ((new Date ()).getTime () -
-              this.keepAliveTime.getTime () >=
-              KEEP_ALIVE_TIME))
-    {
-      this.sendMessageAjax = getAjaxObject ();
-      this.sendMessageAjax.onreadystatechange =
-        this.sendMessageReadyStateChangeCb.bind (this);
-      this.sendMessageAjax.open ("GET",
-                                 this.getUrl ("keep_alive?" + this.personId));
-      this.sendMessageAjax.setRequestHeader ("Content-Type",
-                                             "text/plain; charset=UTF-8");
-      this.sendMessageAjax.send (message);
-
-      this.resetKeepAlive ();
-    }
 
     return;
   }
@@ -657,14 +640,10 @@ ChatSession.prototype.sendNextMessage = function ()
                                             message[3]));
     this.sendMessageAjax.send ();
   }
-  else if (message[0] == "shout")
+  else
   {
-    this.sendMessageAjax.open ("GET", this.getUrl ("shout?" + this.personId));
-    this.sendMessageAjax.send ();
-  }
-  else if (message[0] == "turn")
-  {
-    this.sendMessageAjax.open ("GET", this.getUrl ("turn?" + this.personId));
+    this.sendMessageAjax.open ("GET",
+                               this.getUrl (message[0] + "?" + this.personId));
     this.sendMessageAjax.send ();
   }
 
@@ -977,8 +956,15 @@ ChatSession.prototype.resetKeepAlive = function ()
   if (this.keepAliveTimeout)
     clearTimeout (this.keepAliveTimeout);
   this.keepAliveTime = new Date ();
-  this.keepAliveTimeout = setTimeout (this.sendNextMessage.bind (this),
-                                      KEEP_ALIVE_TIME);
+  var cs = this;
+
+  function callback ()
+  {
+    cs.keepAliveTimeout = null;
+    cs.queueSimpleMessage ("keep_alive");
+  }
+
+  this.keepAliveTimeout = setTimeout (callback, KEEP_ALIVE_TIME);
 };
 
 ChatSession.prototype.getPlayer = function (playerNum)
