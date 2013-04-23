@@ -96,8 +96,8 @@ function ChatSession (playerName)
   this.playerName = playerName || "ludanto";
 
   var search = window.location.search;
-  if (search && search.match (/^\?[a-z]+$/))
-    this.roomName = search.substring (1);
+  if (search && search.match (/^\?.+$/))
+    this.roomName = decodeURIComponent (search.substring (1));
   else
     this.roomName = "default";
 }
