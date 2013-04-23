@@ -210,10 +210,13 @@ span.player+span.player:before {
 }
 
 #welcome-box {
+    margin-top: 5em;
     width: 40em;
+}
+
+#welcome-box, #start-note {
     margin-left: auto;
     margin-right: auto;
-    margin-top: 5em;
     background-color: rgba(100, 255, 100, 0.9);
     border-top: 2px solid rgba(200, 255, 200, 0.9);
     border-left: 2px solid rgba(200, 255, 200, 0.9);
@@ -242,6 +245,25 @@ span.player+span.player:before {
     margin-right: auto;
     font-size: x-large;
     font-weight: bold;
+}
+
+#start-note {
+    position: relative;
+    top: 13em;
+    width: 30em;
+    height: 10em;
+    font-style: italic;
+    display: table;
+}
+
+#start-note div {
+    display: table-cell;
+    vertical-align: middle;
+    text-align: center;
+    margin-top: auto;
+    margin-bottom: auto;
+    padding-left: 1em;
+    padding-right: 1em;
 }
 
 #side-box {

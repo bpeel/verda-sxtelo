@@ -340,6 +340,8 @@ ChatSession.prototype.handleTile = function (data)
 
     this.updateRemainingTiles ();
     this.updateTurnButton ();
+
+    $("#start-note").remove ();
   }
 
   if (data.num != this.dragTile &&
@@ -914,6 +916,8 @@ ChatSession.prototype.start = function ()
   $(window).unload (this.unloadCb.bind (this));
 
   this.updateRemainingTiles ();
+
+  $("#start-note").show ();
 
   /* Work out the scale from pixels to ems so that we can translate
    * mouse positions to offsets in ems */
