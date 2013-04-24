@@ -23,7 +23,6 @@
 #include <glib.h>
 
 #include "vsx-conversation-set.h"
-#include "vsx-log.h"
 
 typedef struct
 {
@@ -150,8 +149,6 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
       g_hash_table_insert (set->hash_table,
                            data->room_name,
                            data);
-
-      vsx_log ("New conversation pending in \"%s\"", room_name);
     }
   else
     {

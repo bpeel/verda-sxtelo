@@ -111,6 +111,10 @@ vsx_conversation_start (VsxConversation *conversation)
 {
   if (conversation->state == VSX_CONVERSATION_AWAITING_START)
     {
+      vsx_log (conversation->n_players == 1 ?
+               "Game started with %i player" :
+               "Game started with %i players",
+               conversation->n_players);
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
       vsx_conversation_changed (conversation,
                                 VSX_CONVERSATION_STATE_CHANGED);
