@@ -379,7 +379,7 @@ vsx_conversation_turn (VsxConversation *conversation,
 {
   VsxPlayer *player = conversation->players[player_num];
   gboolean is_first_turn =
-    conversation->state == VSX_CONVERSATION_AWAITING_START;
+    conversation->n_tiles == 0;
   VsxTile *tile;
 
   /* Ignore attempts to shout for a player that has left */
