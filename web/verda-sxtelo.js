@@ -1038,6 +1038,7 @@ if (!Function.prototype.bind)
   {
     $("#namebox").bind ("keydown", keyDownCb);
     $("#namebox").bind ("input", inputCb);
+    $("#namebox").bind ("propertychange", inputCb);
     $("#namebox")[0].focus ();
     $("#playbutton").click (start);
 
