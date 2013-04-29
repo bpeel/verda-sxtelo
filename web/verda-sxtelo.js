@@ -784,7 +784,7 @@ ChatSession.prototype.mouseDownCb = function (event)
 {
   var tileNum;
 
-  if (event.button != 0)
+  if (event.which != 1)
     return;
 
   event.preventDefault ();
@@ -860,7 +860,7 @@ ChatSession.prototype.moveTile = function (tileNum, x, y)
 
 ChatSession.prototype.mouseUpCb = function (event)
 {
-  if (event.button != 0)
+  if (event.which != 1)
     return;
 
   event.preventDefault ();
