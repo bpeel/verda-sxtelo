@@ -230,7 +230,7 @@ ChatSession.prototype.handlePlayerName = function (data)
 
   var player = this.getPlayer (data.num);
   player.name = data.name;
-  player.element.textContent = player.name;
+  $(player.element).text (player.name);
 };
 
 ChatSession.prototype.updatePlayerClass = function (player)
@@ -334,7 +334,7 @@ ChatSession.prototype.handleTile = function (data)
     tile.element.className = "tile";
     tile.element.style.left = (-TILE_SIZE / 10.0) + "em";
     tile.element.style.top = (-TILE_SIZE / 10.0) + "em";
-    tile.element.textContent = data.letter;
+    $(tile.element).text (data.letter);
     tile.x = tile.y = -TILE_SIZE;
     $("#board").append (tile.element);
 
