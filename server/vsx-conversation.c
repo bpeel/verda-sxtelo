@@ -111,10 +111,10 @@ vsx_conversation_start (VsxConversation *conversation)
 {
   if (conversation->state == VSX_CONVERSATION_AWAITING_START)
     {
-      vsx_log (conversation->n_players == 1 ?
+      vsx_log (conversation->n_connected_players == 1 ?
                "Game started with %i player" :
                "Game started with %i players",
-               conversation->n_players);
+               conversation->n_connected_players);
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
       vsx_conversation_changed (conversation,
                                 VSX_CONVERSATION_STATE_CHANGED);
@@ -256,6 +256,9 @@ vsx_conversation_player_left (VsxConversation *conversation,
   VsxPlayer *player = conversation->players[player_num];
   gboolean had_next_turn;
 
+  if (!vsx_player_is_connected (player))
+    return;
+
   had_next_turn = vsx_player_has_next_turn (player);
 
   /* Set the flags before moving the turn so that it will generate
@@ -264,6 +267,8 @@ vsx_conversation_player_left (VsxConversation *conversation,
 
   if (had_next_turn)
     set_next_player (conversation, player_num);
+
+  conversation->n_connected_players--;
 }
 
 VsxPlayer *
@@ -275,7 +280,10 @@ vsx_conversation_add_player (VsxConversation *conversation,
   g_assert_cmpint (conversation->n_players, <, VSX_CONVERSATION_MAX_PLAYERS);
 
   player = vsx_player_new (player_name, conversation->n_players);
-  conversation->players[conversation->n_players++] = player;
+  conversation->players[conversation->n_players] = player;
+
+  conversation->n_players++;
+  conversation->n_connected_players++;
 
   vsx_conversation_player_changed (conversation, player);
 
@@ -417,7 +425,7 @@ vsx_conversation_turn (VsxConversation *conversation,
   /* As a special case, if there is only one player and it is the
    * first turn then set_next_player won't work because it will leave
    * the player flags as they are when there is only one player */
-  if (is_first_turn && conversation->n_players == 1)
+  if (is_first_turn && conversation->n_connected_players == 1)
     vsx_conversation_set_flag (conversation,
                                player,
                                VSX_PLAYER_NEXT_TURN,

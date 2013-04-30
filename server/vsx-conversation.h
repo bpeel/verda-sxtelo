@@ -49,6 +49,7 @@ typedef struct
   GArray *messages;
 
   int n_players;
+  int n_connected_players;
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
 
   /* Number of tiles that have been added to the game */
