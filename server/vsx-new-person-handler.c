@@ -26,6 +26,7 @@
 #include "vsx-string-response.h"
 #include "vsx-watch-person-response.h"
 #include "vsx-arguments.h"
+#include "vsx-log.h"
 
 static void
 real_free (void *object)
