@@ -17,28 +17,34 @@
  */
 
 body {
-    background-color: rgb(128, 128, 255);
+    background-color: rgb(20, 40, 73);
+    background-image: radial-gradient(circle, rgb(22, 83, 135), rgb(20, 40, 73));
+	background-repeat: no-repeat;
     font-family: sans-serif;
 }
 
 .content {
-    background-color: rgb(255, 255, 255);
     width: 62em;
-    border: 1px solid black;
     margin-left: auto;
     margin-right: auto;
     padding: 1em;
+	background-color: rgba(245, 245, 245, 0.7);
+	border-radius: 4px;
+	box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5), 0px 1px 0px rgba(255, 255, 255, 0.5) inset;
 }
 
 #messages-box {
     border: 2px solid rgb(128, 128, 128);
+	background-color: rgba(245, 245, 245, 0.7);
+	border-radius: 4px;
     margin-bottom: 8px;
     margin-top: 8px;
     height: 5em;
-    width: 60em;
+    width: 59.4em;
     margin-left: auto;
     margin-right: auto;
     overflow: auto;
+	padding: 0.3em;
 }
 
 #status-note {
@@ -101,6 +107,8 @@ body {
     position: relative;
     margin-left: auto;
     margin-right: auto;
+	border-radius: 4px;
+	box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5), 0px 1px 0px rgba(255, 255, 255, 0.9) inset;
 }
 
 span.player+span.player:before {
@@ -133,6 +141,7 @@ span.player+span.player:before {
     left: 21.5em;
     top: 0em;
     line-height: 9em;
+	border-radius: 0 0 14px 14px;
 }
 
 #player-1-holder {
@@ -141,6 +150,7 @@ span.player+span.player:before {
     left: 21.5em;
     top: 27em;
     line-height: 9em;
+	border-radius: 14px 14px 0 0;
 }
 
 #player-2-holder {
@@ -149,6 +159,7 @@ span.player+span.player:before {
     left: 0em;
     top: 0em;
     line-height: 17em;
+	border-radius: 0 0 14px 0;
 }
 
 #player-3-holder {
@@ -157,6 +168,7 @@ span.player+span.player:before {
     left: 51em;
     top: 0em;
     line-height: 17em;
+	border-radius: 0 0 0 14px;
 }
 
 #player-4-holder {
@@ -165,6 +177,7 @@ span.player+span.player:before {
     left: 0em;
     top: 19em;
     line-height: 17em;
+	border-radius: 0 14px 0 0;	
 }
 
 #player-5-holder {
@@ -173,22 +186,32 @@ span.player+span.player:before {
     left: 51em;
     top: 19em;
     line-height: 17em;
+	border-radius: 14px 0 0 0;
 }
 
 .tile {
     position: absolute;
     width: 1.8em;
     height: 1.8em;
-    border-left: 0.1em solid rgb(255, 155, 26);
-    border-top: 0.1em solid rgb(255, 155, 26);
-    border-bottom: 0.1em solid rgb(167, 106, 28);
-    border-right: 0.1em solid rgb(167, 106, 28);
-    background-color: rgb(205, 122, 15);
+    border-left: 0.1em solid rgb(206, 213, 224);
+    border-top: 0.1em solid rgb(206, 213, 224);
+    border-bottom: 0.1em solid rgb(179, 190, 173);
+    border-right: 0.1em solid rgb(179, 190, 173);
     text-align: center;
+	text-shadow:.05em .05em rgb(179, 190, 173);
     line-height: 1.8em;
     font-size: 1em;
     font-weight: bold;
     cursor: default;
+	box-shadow: 0 0.09em .2em rgba(0, 0, 0, 0.5), 0 .2em 0 rgba(255, 255, 255, 0.9) inset;
+	background: rgb(255,255,255); /* Old browsers */
+	background: -moz-linear-gradient(top, rgb(255,255,255) 0%, rgb(246,246,246) 47%, rgb(237,237,237) 100%); /* FF3.6+ */
+	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgb(255,255,255)), color-stop(47%,rgb(246,246,246)), color-stop(100%,rgb(237,237,237))); /* Chrome,Safari4+ */
+	background: -webkit-linear-gradient(top, rgb(255,255,255) 0%,rgb(246,246,246) 47%,rgb(237,237,237) 100%); /* Chrome10+,Safari5.1+ */
+	background: -o-linear-gradient(top, rgb(255,255,255) 0%,rgb(246,246,246) 47%,rgb(237,237,237) 100%); /* Opera 11.10+ */
+	background: -ms-linear-gradient(top, rgb(255,255,255) 0%,rgb(246,246,246) 47%,rgb(237,237,237) 100%); /* IE10+ */
+	background: linear-gradient(to bottom, rgb(255,255,255) 0%,rgb(246,246,246) 47%,rgb(237,237,237) 100%); /* W3C */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
 }
 
 #shout-message {
@@ -211,17 +234,16 @@ span.player+span.player:before {
 
 #welcome-box {
     margin-top: 5em;
-    width: 40em;
+    width: 30em;
 }
 
 #welcome-box, #start-note {
     margin-left: auto;
     margin-right: auto;
-    background-color: rgb(100, 255, 100);
-    border-top: 2px solid rgb(200, 255, 200);
-    border-left: 2px solid rgb(200, 255, 200);
-    border-right: 2px solid rgb(80, 255, 80);
-    border-bottom: 2px solid rgb(80, 255, 80);
+    border: 1px solid rgb(227, 227, 227);
+	background-color: rgb(245, 245, 245);
+	border-radius: 4px;
+	box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5), 0px 1px 0px rgba(255, 255, 255, 0.9) inset;
 }
 
 .title {
@@ -245,6 +267,13 @@ span.player+span.player:before {
     margin-right: auto;
     font-size: x-large;
     font-weight: bold;
+	/*background-image: linear-gradient(to bottom, rgb(35, 132, 211), rgb(21, 73, 124));
+	background-repeat: repeat-x*/
+	border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);
+	border-radius: 4px;
+	text-align: center;
+	vertical-align: middle;
+	cursor: pointer;
 }
 
 #start-note {
