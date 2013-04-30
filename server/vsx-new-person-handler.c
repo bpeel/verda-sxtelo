@@ -79,13 +79,14 @@ real_request_finished (VsxRequestHandler *handler)
                                                conversation);
 
       if (conversation->n_players == 1)
-        vsx_log ("New player “%s” created new game in “%s”",
+        vsx_log ("New player “%s” created game %i in “%s”",
                  self->player_name,
+                 conversation->id,
                  self->room_name);
       else
-        vsx_log ("New player “%s” joined game in “%s”",
+        vsx_log ("New player “%s” joined game %i",
                  self->player_name,
-                 self->room_name);
+                 conversation->id);
 
       response = vsx_watch_person_response_new (person, 0);
 

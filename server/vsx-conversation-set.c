@@ -23,6 +23,7 @@
 #include <glib.h>
 
 #include "vsx-conversation-set.h"
+#include "vsx-log.h"
 
 typedef struct
 {
@@ -54,6 +55,13 @@ conversation_is_empty (VsxConversation *conversation)
 }
 
 static void
+remove_conversation (VsxConversationSetHashData *hash_data)
+{
+  /* This will also destroy the hash data */
+  g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
+}
+
+static void
 conversation_changed_cb (VsxListener *listener,
                          void *user_data)
 {
@@ -62,15 +70,21 @@ conversation_changed_cb (VsxListener *listener,
   VsxConversationChangedData *data = user_data;
 
   /* If the conversation has started then we'll remove it so that no
-   * new players can join. We'll also do this if everyone leaves the
-   * room because it would be a bit rubbish to join a game where
-   * everyone has already left. If we don't do this then conversations
-   * that never start would end up leaking */
-  if (data->conversation->state != VSX_CONVERSATION_AWAITING_START ||
-      (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
-       conversation_is_empty (data->conversation)))
-    /* This will also destroy the hash data */
-    g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
+   * new players can join. */
+  if (data->conversation->state != VSX_CONVERSATION_AWAITING_START)
+    remove_conversation (hash_data);
+  else if (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
+           conversation_is_empty (data->conversation))
+    {
+      /* We'll also do this if everyone leaves the room because it
+       * would be a bit rubbish to join a game where everyone has
+       * already left. If we don't do this then conversations that
+       * never start would end up leaking */
+      vsx_log ("Game %i abandoned without starting",
+               data->conversation->id);
+
+      remove_conversation (hash_data);
+    }
 }
 
 static void

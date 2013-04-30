@@ -31,11 +31,15 @@
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
 
+static guint16 next_id = 0;
+
 static void
 vsx_conversation_free (void *object)
 {
   VsxConversation *self = object;
   int i;
+
+  vsx_log ("Game %i destroyed", self->id);
 
   for (i = 0; i < self->messages->len; i++)
     {
@@ -112,8 +116,9 @@ vsx_conversation_start (VsxConversation *conversation)
   if (conversation->state == VSX_CONVERSATION_AWAITING_START)
     {
       vsx_log (conversation->n_connected_players == 1 ?
-               "Game started with %i player" :
-               "Game started with %i players",
+               "Game %i started with %i player" :
+               "Game %i started with %i players",
+               conversation->id,
                conversation->n_connected_players);
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
       vsx_conversation_changed (conversation,
@@ -259,6 +264,10 @@ vsx_conversation_player_left (VsxConversation *conversation,
   if (!vsx_player_is_connected (player))
     return;
 
+  vsx_log ("Player “%s” left game %i",
+           player->name,
+           conversation->id);
+
   had_next_turn = vsx_player_has_next_turn (player);
 
   /* Set the flags before moving the turn so that it will generate
@@ -302,6 +311,8 @@ vsx_conversation_new (void)
   int i;
 
   vsx_object_init (self);
+
+  self->id = next_id++;
 
   vsx_signal_init (&self->changed_signal);
 
