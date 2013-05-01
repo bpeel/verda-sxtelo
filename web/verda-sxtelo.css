@@ -193,6 +193,7 @@ span.player+span.player:before {
     position: absolute;
     width: 1.8em;
     height: 1.8em;
+    z-index: 2;
     border-left: 0.1em solid rgb(206, 213, 224);
     border-top: 0.1em solid rgb(206, 213, 224);
     border-bottom: 0.1em solid rgb(179, 190, 173);
@@ -221,7 +222,7 @@ span.player+span.player:before {
     z-index: 1;
     position: absolute;
     width: 100%;
-    line-height: 4.375em;
+    top: 2.375em;
     pointer-events: none;
 }
 
@@ -229,7 +230,7 @@ span.player+span.player:before {
     width: 98%;
     height: 98%;
     position: absolute;
-    z-index: 1;
+    z-index: 3;
 }
 
 #welcome-box {
