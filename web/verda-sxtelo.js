@@ -100,7 +100,50 @@ function ChatSession (playerName)
     this.roomName = decodeURIComponent (search.substring (1));
   else
     this.roomName = "default";
+
+  this.handleResize ();
+  $(window).resize (this.handleResize.bind (this));
 }
+
+ChatSession.prototype.handleResize = function ()
+{
+  var board = $("#board");
+  var mb = $("#messages-box");
+  var winHeight = $(window).height ();
+  var content = $(".content");
+
+  /* Reset the heights back to the default */
+  board.css ("font-size", "1.0em");
+  mb.css ("height", "");
+
+  var contentOffset = content.offset ();
+  var contentBottom = contentOffset.top + content.outerHeight () + 3;
+
+  if (contentBottom > winHeight)
+  {
+    /* Scale the board so that the contents will exactly fit */
+    var boardHeight = board.outerHeight ();
+
+    if (contentBottom - winHeight < boardHeight)
+      board.css ("font-size",
+                 (1.0 - (contentBottom - winHeight) / boardHeight) + "em");
+  }
+  else
+  {
+    /* Give the extra space to the message box */
+    mb.css ("height", (mb.height () + (winHeight - contentBottom)) + "px");
+  }
+
+  /* Work out the scale from pixels to ems so that we can translate
+   * mouse positions to offsets in ems */
+  var dummyElem = document.createElement ("div");
+  dummyElem.style.width = "100em";
+  dummyElem.style.height = "100em";
+  dummyElem.style.position = "absolute";
+  board.append (dummyElem);
+  this.pixelsPerEm = $(dummyElem).innerWidth () / 100.0;
+  $(dummyElem).remove ();
+};
 
 ChatSession.prototype.canTurn = function ()
 {
@@ -918,16 +961,6 @@ ChatSession.prototype.start = function ()
   this.updateRemainingTiles ();
 
   $("#start-note").show ();
-
-  /* Work out the scale from pixels to ems so that we can translate
-   * mouse positions to offsets in ems */
-  var dummyElem = document.createElement ("div");
-  dummyElem.style.width = "100em";
-  dummyElem.style.height = "100em";
-  dummyElem.style.position = "absolute";
-  $("#board").append (dummyElem);
-  this.pixelsPerEm = $(dummyElem).innerWidth () / 100.0;
-  $(dummyElem).remove ();
 };
 
 ChatSession.prototype.unloadCb = function ()
@@ -1010,6 +1043,8 @@ if (!Function.prototype.bind)
 
 (function ()
 {
+  var cs;
+
   function updatePlayButton ()
   {
     $("#playbutton")[0].disabled = ($("#namebox").val ().match (/\S/) == null);
@@ -1017,7 +1052,7 @@ if (!Function.prototype.bind)
 
   function start ()
   {
-    var cs = new ChatSession ($("#namebox").val ());
+    cs.playerName = $("#namebox").val ();
     $("#welcome-overlay").remove ();
     cs.start ();
   }
@@ -1036,6 +1071,8 @@ if (!Function.prototype.bind)
 
   function loadCb ()
   {
+    cs = new ChatSession ();
+
     $("#namebox").bind ("keydown", keyDownCb);
     $("#namebox").bind ("input", inputCb);
     $("#namebox").bind ("propertychange", inputCb);

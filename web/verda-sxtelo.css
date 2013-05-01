@@ -23,6 +23,10 @@ body {
     font-family: sans-serif;
 }
 
+.game-body {
+    overflow: hidden;
+}
+
 .content {
     width: 62em;
     margin-left: auto;
