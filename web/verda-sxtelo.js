@@ -712,10 +712,15 @@ ChatSession.prototype.queueCurrentMessage = function ()
   }
 };
 
+ChatSession.prototype.focusMessageBox = function ()
+{
+  $("#message-input-box")[0].focus ();
+};
+
 ChatSession.prototype.shoutButtonClickCb = function ()
 {
   this.shout ();
-  $("#message-input-box")[0].focus ();
+  this.focusMessageBox ();
 };
 
 ChatSession.prototype.queueSimpleMessage = function (message)
@@ -757,6 +762,7 @@ ChatSession.prototype.turn = function ()
 ChatSession.prototype.submitMessageClickCb = function ()
 {
   this.queueCurrentMessage ();
+  this.focusMessageBox ();
 };
 
 ChatSession.prototype.messageKeyDownCb = function (event)
@@ -779,12 +785,14 @@ ChatSession.prototype.documentKeyDownCb = function (event)
       event.preventDefault ();
       event.stopPropagation ();
       this.shout ();
+      this.focusMessageBox ();
     }
     else if (event.which == 32)
     {
       event.preventDefault ();
       event.stopPropagation ();
       this.turn ();
+      this.focusMessageBox ();
     }
   }
 };
