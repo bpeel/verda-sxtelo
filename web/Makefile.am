@@ -14,7 +14,8 @@ LANGUAGE_FILES = \
 EXTRA_DIST = \
 	$(LANGUAGE_FILES) \
 	$(TRANSLATABLE_FILES) \
-	translate-file.pl
+	translate-file.pl \
+	sound.svg
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
@@ -24,7 +25,9 @@ dist_webfiles_DATA = \
 	favicon.png \
 	help.html \
 	message-alert-sound.ogg \
-	message-alert-sound.mp3
+	message-alert-sound.mp3 \
+	sound-on.png \
+	sound-off.png
 
 webfiles_DATA = \
 	index.html.var

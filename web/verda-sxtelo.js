@@ -92,6 +92,7 @@ function ChatSession (playerName)
   this.lastMovedTile = null;
   this.retryCount = 0;
   this.pendingTimeouts = [];
+  this.soundOn = true;
 
   this.playerName = playerName || "ludanto";
 
@@ -314,6 +315,41 @@ ChatSession.prototype.handleEnd = function ()
   this.setError ();
 };
 
+ChatSession.prototype.playSound = function (name)
+{
+  if (!this.soundOn)
+    return;
+
+  var sound = document.getElementById (name);
+  if (sound && sound.play && sound.readyState > 0)
+  {
+    sound.currentTime = 0;
+    sound.play ();
+  }
+};
+
+ChatSession.prototype.soundToggleClickCb = function ()
+{
+  this.soundOn = !this.soundOn;
+
+  if (this.soundOn)
+  {
+    $("#sound-on").show ();
+    $("#sound-off").hide ();
+  }
+  else
+  {
+    $("#sound-on").hide ();
+    $("#sound-off").show ();
+
+    /* Stop any running sounds */
+    $("audio").each (function (a) {
+      if (this.pause)
+        this.pause ();
+    });
+  }
+};
+
 ChatSession.prototype.handleChatMessage = function (message)
 {
   if (typeof (message) != "object")
@@ -343,9 +379,7 @@ ChatSession.prototype.handleChatMessage = function (message)
   {
     this.unreadMessages++;
     document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
-    var messageAlertSound = document.getElementById ("message-alert-sound");
-    if (messageAlertSound && messageAlertSound.play)
-      messageAlertSound.play ();
+    this.playSound ("message-alert-sound");
   }
 
   this.messageNumber++;
@@ -959,6 +993,8 @@ ChatSession.prototype.start = function ()
   $("#board").mousedown (this.mouseDownCb.bind (this));
   $("#board").mousemove (this.mouseMoveCb.bind (this));
   $("#board").mouseup (this.mouseUpCb.bind (this));
+
+  $("#sound-toggle").bind ("click", this.soundToggleClickCb.bind (this));
 
   $(document).keydown (this.documentKeyDownCb.bind (this));
 
