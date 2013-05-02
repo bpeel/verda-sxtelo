@@ -419,6 +419,8 @@ ChatSession.prototype.handleTile = function (data)
     this.updateTurnButton ();
 
     $("#start-note").remove ();
+
+    this.playSound ("turn-sound");
   }
 
   if (data.num != this.dragTile &&
@@ -477,6 +479,8 @@ ChatSession.prototype.handleShout = function (data)
 
   this.shoutTimeout = setTimeout (this.stopShout.bind (this),
                                   SHOUT_TIME);
+
+  this.playSound ("shout-sound");
 };
 
 ChatSession.prototype.processMessage = function (message)

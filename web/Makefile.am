@@ -26,6 +26,10 @@ dist_webfiles_DATA = \
 	help.html \
 	message-alert-sound.ogg \
 	message-alert-sound.mp3 \
+	shout-sound.ogg \
+	shout-sound.mp3 \
+	turn-sound.ogg \
+	turn-sound.mp3 \
 	sound-on.png \
 	sound-off.png
 
