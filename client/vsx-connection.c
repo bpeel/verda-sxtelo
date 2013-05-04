@@ -127,16 +127,33 @@ struct _VsxConnectionPrivate
 typedef enum
 {
   VSX_CONNECTION_COMMAND_MESSAGE,
-  VSX_CONNECTION_COMMAND_LEAVE
+  VSX_CONNECTION_COMMAND_LEAVE,
+  VSX_CONNECTION_COMMAND_SHOUT,
+  VSX_CONNECTION_COMMAND_TURN,
+  VSX_CONNECTION_COMMAND_MOVE_TILE
 } VsxConnectionCommandType;
 
 typedef struct
 {
   VsxConnectionCommandType type;
   GList node;
+} VsxConnectionCommand;
+
+typedef struct
+{
+  VsxConnectionCommand parent;
+
   /* Over-allocated */
   char text[1];
-} VsxConnectionCommand;
+} VsxConnectionMessageCommand;
+
+typedef struct
+{
+  VsxConnectionCommand parent;
+
+  int tile_num;
+  int x, y;
+} VsxConnectionMoveTileCommand;
 
 static gboolean
 vsx_connection_keep_alive_cb (void *data)
@@ -364,22 +381,27 @@ vsx_connection_maybe_send_command (VsxConnection *connection)
       switch (cmd->type)
         {
         case VSX_CONNECTION_COMMAND_MESSAGE:
-          priv->command_message
-            = vsx_connection_make_message (connection,
-                                           "POST",
-                                           "send_message",
-                                           "s",
-                                           priv->person_id);
+          {
+            VsxConnectionMessageCommand *msg_cmd =
+              (VsxConnectionMessageCommand *) cmd;
 
-          soup_message_set_request (priv->command_message,
-                                    "text/plain; charset=utf-8",
-                                    SOUP_MEMORY_COPY,
-                                    cmd->text,
-                                    strlen (cmd->text));
+            priv->command_message
+              = vsx_connection_make_message (connection,
+                                             "POST",
+                                             "send_message",
+                                             "s",
+                                             priv->person_id);
 
-          /* The server automatically assumes we're not typing anymore
-             when the client sends a message */
-          priv->sent_typing_state = FALSE;
+            soup_message_set_request (priv->command_message,
+                                      "text/plain; charset=utf-8",
+                                      SOUP_MEMORY_COPY,
+                                      msg_cmd->text,
+                                      strlen (msg_cmd->text));
+
+            /* The server automatically assumes we're not typing anymore
+               when the client sends a message */
+            priv->sent_typing_state = FALSE;
+          }
           break;
 
         case VSX_CONNECTION_COMMAND_LEAVE:
@@ -390,6 +412,41 @@ vsx_connection_maybe_send_command (VsxConnection *connection)
                                            "s",
                                            priv->person_id);
           break;
+
+        case VSX_CONNECTION_COMMAND_SHOUT:
+          priv->command_message
+            = vsx_connection_make_message (connection,
+                                           "GET",
+                                           "shout",
+                                           "s",
+                                           priv->person_id);
+          break;
+
+        case VSX_CONNECTION_COMMAND_TURN:
+          priv->command_message
+            = vsx_connection_make_message (connection,
+                                           "GET",
+                                           "turn",
+                                           "s",
+                                           priv->person_id);
+          break;
+
+        case VSX_CONNECTION_COMMAND_MOVE_TILE:
+          {
+            VsxConnectionMoveTileCommand *move_cmd =
+              (VsxConnectionMoveTileCommand *) cmd;
+
+            priv->command_message
+              = vsx_connection_make_message (connection,
+                                             "GET",
+                                             "move_tile",
+                                             "siii",
+                                             priv->person_id,
+                                             move_cmd->tile_num,
+                                             move_cmd->x,
+                                             move_cmd->y);
+            break;
+          }
         }
 
       vsx_connection_command_free (cmd);
@@ -405,30 +462,41 @@ vsx_connection_maybe_send_command (VsxConnection *connection)
 
 static void
 vsx_connection_add_command (VsxConnection *connection,
-                            VsxConnectionCommandType type,
-                            const char *text)
+                            VsxConnectionCommand *cmd)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  VsxConnectionCommand *cmd;
-  int text_len;
 
-  if (text == NULL)
-    text_len = 0;
-  else
-    text_len = strlen (text);
-
-  cmd = g_malloc (sizeof (VsxConnectionCommand) + text_len);
-
-  cmd->type = type;
   cmd->node.data = cmd;
-  cmd->node.prev = NULL;
   cmd->node.next = NULL;
-  memcpy (cmd->text, text, text_len);
-  cmd->text[text_len] = '\0';
+  cmd->node.prev = NULL;
 
   g_queue_push_tail_link (&priv->command_queue, &cmd->node);
 
   vsx_connection_maybe_send_command (connection);
+}
+
+static void
+vsx_connection_add_simple_command (VsxConnection *connection,
+                                   VsxConnectionCommandType type)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  VsxConnectionCommand *cmd;
+  GList *l;
+
+  /* Don't add the command if it's already in the queue */
+  for (l = priv->command_queue.head; l; l = l->next)
+    {
+      cmd = l->data;
+
+      if (cmd->type == type)
+        return;
+    }
+
+  cmd = g_malloc (sizeof (VsxConnectionCommand));
+
+  cmd->type = type;
+
+  vsx_connection_add_command (connection, cmd);
 }
 
 static void
@@ -555,6 +623,39 @@ vsx_connection_set_typing (VsxConnection *connection,
       vsx_connection_maybe_send_command (connection);
       g_object_notify (G_OBJECT (connection), "typing");
     }
+}
+
+void
+vsx_connection_shout (VsxConnection *connection)
+{
+  vsx_connection_add_simple_command (connection,
+                                     VSX_CONNECTION_COMMAND_SHOUT);
+}
+
+void
+vsx_connection_turn (VsxConnection *connection)
+{
+  vsx_connection_add_simple_command (connection,
+                                     VSX_CONNECTION_COMMAND_TURN);
+}
+
+void
+vsx_connection_move_tile (VsxConnection *connection,
+                          int tile_num,
+                          int x,
+                          int y)
+{
+  VsxConnectionMoveTileCommand *cmd;
+
+  cmd = g_malloc (sizeof (VsxConnectionMoveTileCommand));
+
+  cmd->parent.type = VSX_CONNECTION_COMMAND_MOVE_TILE;
+
+  cmd->tile_num = tile_num;
+  cmd->x = x;
+  cmd->y = y;
+
+  vsx_connection_add_command (connection, &cmd->parent);
 }
 
 static void
@@ -1392,17 +1493,24 @@ void
 vsx_connection_send_message (VsxConnection *connection,
                              const char *message)
 {
-  vsx_connection_add_command (connection,
-                              VSX_CONNECTION_COMMAND_MESSAGE,
-                              message);
+  VsxConnectionMessageCommand *cmd;
+  int text_len = strlen (message);
+
+  cmd = g_malloc (sizeof (VsxConnectionMessageCommand) + text_len);
+
+  cmd->parent.type = VSX_CONNECTION_COMMAND_MESSAGE;
+
+  memcpy (cmd->text, message, text_len);
+  cmd->text[text_len] = '\0';
+
+  vsx_connection_add_command (connection, &cmd->parent);
 }
 
 void
 vsx_connection_leave (VsxConnection *connection)
 {
-  vsx_connection_add_command (connection,
-                              VSX_CONNECTION_COMMAND_LEAVE,
-                              NULL);
+  vsx_connection_add_simple_command (connection,
+                                     VSX_CONNECTION_COMMAND_LEAVE);
 }
 
 const VsxPlayer *

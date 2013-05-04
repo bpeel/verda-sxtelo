@@ -272,7 +272,15 @@ newline_cb (int count, int key)
 {
   if (*rl_line_buffer)
     {
-      vsx_connection_send_message (connection, rl_line_buffer);
+      if (!strcmp (rl_line_buffer, "s"))
+        vsx_connection_shout (connection);
+      else if (!strcmp (rl_line_buffer, "t"))
+        vsx_connection_turn (connection);
+      else if (!strcmp (rl_line_buffer, "m"))
+        vsx_connection_move_tile (connection, 0, 10, 20);
+      else
+        vsx_connection_send_message (connection, rl_line_buffer);
+
       rl_replace_line ("", TRUE);
     }
 

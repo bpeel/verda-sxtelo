@@ -124,6 +124,18 @@ void
 vsx_connection_set_typing (VsxConnection *connection,
                            gboolean typing);
 
+void
+vsx_connection_shout (VsxConnection *connection);
+
+void
+vsx_connection_turn (VsxConnection *connection);
+
+void
+vsx_connection_move_tile (VsxConnection *connection,
+                          int tile_num,
+                          int x,
+                          int y);
+
 VsxConnectionState
 vsx_connection_get_state (VsxConnection *connection);
 
