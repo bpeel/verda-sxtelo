@@ -55,12 +55,6 @@ typedef struct _VsxConnectionPrivate VsxConnectionPrivate;
 
 typedef enum
 {
-  VSX_CONNECTION_PERSON_YOU,
-  VSX_CONNECTION_PERSON_STRANGER
-} VsxConnectionPerson;
-
-typedef enum
-{
   VSX_CONNECTION_STATE_AWAITING_HEADER,
   VSX_CONNECTION_STATE_IN_PROGRESS,
   VSX_CONNECTION_STATE_DONE
@@ -80,7 +74,7 @@ struct _VsxConnectionClass
                       GError *error);
 
   void (* message) (VsxConnection *connection,
-                    VsxConnectionPerson person,
+                    const VsxPlayer *player,
                     const char *message);
 
   /* Omitted whenever the details of a player have changed or a new

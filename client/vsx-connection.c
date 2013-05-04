@@ -105,7 +105,7 @@ struct _VsxConnectionPrivate
   JsonParser *json_parser;
   guint reconnect_timeout;
   guint reconnect_handler;
-  gint64 num;
+  VsxPlayer *self;
   char *person_id;
   VsxConnectionRunningState running_state;
   VsxConnectionState state;
@@ -710,6 +710,7 @@ handle_message (VsxConnection *connection,
       JsonNode *header_node;
       JsonObject *header_object;
       const char *person_id;
+      gint64 self_num;
 
       if (json_array_get_length (array) < 2)
         goto bad_data;
@@ -721,9 +722,11 @@ handle_message (VsxConnection *connection,
 
       header_object = json_node_get_object (header_node);
 
-      if (!get_object_int_member (header_object, "num", &priv->num)
+      if (!get_object_int_member (header_object, "num", &self_num)
           || !get_object_string_member (header_object, "id", &person_id))
         goto bad_data;
+
+      priv->self = get_or_create_player (connection, self_num);
 
       g_free (priv->person_id);
       priv->person_id = g_strdup (person_id);
@@ -748,16 +751,15 @@ handle_message (VsxConnection *connection,
 
       message_object = json_node_get_object (message_node);
 
-      if (!get_object_int_member (message_object, "person", &num)
-          || !get_object_string_member (message_object, "text", &text))
+      if (!get_object_int_member (message_object, "person", &num) ||
+          num < 0 || num > G_MAXINT ||
+          !get_object_string_member (message_object, "text", &text))
         goto bad_data;
 
       g_signal_emit (connection,
                      signals[SIGNAL_MESSAGE],
                      0, /* detail */
-                     num == priv->num
-                     ? VSX_CONNECTION_PERSON_YOU
-                     : VSX_CONNECTION_PERSON_STRANGER,
+                     get_or_create_player (connection, num),
                      text);
 
       priv->next_message_num++;
@@ -1196,10 +1198,10 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   G_STRUCT_OFFSET (VsxConnectionClass, message),
                   NULL, /* accumulator */
                   NULL, /* accumulator data */
-                  vsx_marshal_VOID__ENUM_STRING,
+                  vsx_marshal_VOID__POINTER_STRING,
                   G_TYPE_NONE,
                   2, /* num arguments */
-                  VSX_TYPE_CONNECTION_PERSON,
+                  G_TYPE_POINTER,
                   G_TYPE_STRING);
 
   signals[SIGNAL_PLAYER_CHANGED] =
@@ -1401,7 +1403,7 @@ vsx_connection_get_self (VsxConnection *connection)
 {
   VsxConnectionPrivate *priv = connection->priv;
 
-  return get_or_create_player (connection, priv->num);
+  return priv->self;
 }
 
 GQuark

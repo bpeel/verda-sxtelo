@@ -112,11 +112,11 @@ running_cb (VsxConnection *connection,
 
 static void
 message_cb (VsxConnection *connection,
-            VsxConnectionPerson person,
+            const VsxPlayer *player,
             const char *message)
 {
   format_print ("%s: %s\n",
-                person == VSX_CONNECTION_PERSON_YOU ? "you" : "stranger",
+                vsx_player_get_name (player),
                 message);
 }
 
