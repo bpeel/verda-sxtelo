@@ -170,6 +170,14 @@ player_changed_cb (VsxConnection *connection,
 }
 
 static void
+player_shouted_cb (VsxConnection *connection,
+                   const VsxPlayer *player)
+{
+  format_print ("** %s SHOUTS\n",
+                vsx_player_get_name (player));
+}
+
+static void
 tile_changed_cb (VsxConnection *connection,
                  gboolean is_new,
                  const VsxTile *tile)
@@ -390,6 +398,10 @@ main (int argc, char **argv)
   g_signal_connect (connection,
                     "player-changed",
                     G_CALLBACK (player_changed_cb),
+                    NULL);
+  g_signal_connect (connection,
+                    "player-shouted",
+                    G_CALLBACK (player_shouted_cb),
                     NULL);
   g_signal_connect (connection,
                     "tile-changed",

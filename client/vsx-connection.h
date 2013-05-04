@@ -83,6 +83,9 @@ struct _VsxConnectionClass
   void (* player_changed) (VsxConnection *connection,
                            const VsxPlayer *player);
 
+  void (* player_shouted) (VsxConnection *connection,
+                           const VsxPlayer *player);
+
   void (* tile_changed) (VsxConnection *connection,
                          gboolean new_tile,
                          const VsxTile *tile);

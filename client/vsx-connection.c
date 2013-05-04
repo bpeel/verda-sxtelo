@@ -50,6 +50,7 @@ enum
   SIGNAL_GOT_ERROR,
   SIGNAL_MESSAGE,
   SIGNAL_PLAYER_CHANGED,
+  SIGNAL_PLAYER_SHOUTED,
   SIGNAL_TILE_CHANGED,
 
   LAST_SIGNAL
@@ -826,6 +827,37 @@ handle_tile (VsxConnection *connection,
 }
 
 static gboolean
+handle_shout (VsxConnection *connection,
+              JsonArray *array)
+{
+  JsonNode *num_node;
+  gint64 num;
+  VsxPlayer *player;
+
+  if (json_array_get_length (array) < 2)
+    return FALSE;
+
+  num_node = json_array_get_element (array, 1);
+
+  if (json_node_get_node_type (num_node) != JSON_NODE_VALUE)
+    return FALSE;
+
+  num = json_node_get_int (num_node);
+
+  if (num < 0 || num > G_MAXINT)
+    return FALSE;
+
+  player = get_or_create_player (connection, num);
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_PLAYER_SHOUTED],
+                 0, /* detail */
+                 player);
+
+  return TRUE;
+}
+
+static gboolean
 handle_message (VsxConnection *connection,
                 JsonNode *object,
                 GError **error)
@@ -907,6 +939,11 @@ handle_message (VsxConnection *connection,
   else if (!strcmp (method_string, "tile"))
     {
       if (!handle_tile (connection, array))
+        goto bad_data;
+    }
+  else if (!strcmp (method_string, "shout"))
+    {
+      if (!handle_shout (connection, array))
         goto bad_data;
     }
   else if (!strcmp (method_string, "end"))
@@ -1357,6 +1394,18 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   G_TYPE_NONE,
                   2, /* num arguments */
                   G_TYPE_BOOLEAN,
+                  G_TYPE_POINTER);
+
+  signals[SIGNAL_PLAYER_SHOUTED] =
+    g_signal_new ("player-shouted",
+                  G_TYPE_FROM_CLASS (gobject_class),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (VsxConnectionClass, player_shouted),
+                  NULL, /* accumulator */
+                  NULL, /* accumulator data */
+                  vsx_marshal_VOID__POINTER,
+                  G_TYPE_NONE,
+                  1, /* num arguments */
                   G_TYPE_POINTER);
 
   g_type_class_add_private (klass, sizeof (VsxConnectionPrivate));
