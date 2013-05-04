@@ -22,6 +22,8 @@
 #include <glib-object.h>
 #include <libsoup/soup.h>
 
+#include "vsx-player.h"
+
 G_BEGIN_DECLS
 
 #define VSX_TYPE_CONNECTION                                             \
@@ -80,6 +82,11 @@ struct _VsxConnectionClass
   void (* message) (VsxConnection *connection,
                     VsxConnectionPerson person,
                     const char *message);
+
+  /* Omitted whenever the details of a player have changed or a new
+   * player has been created */
+  void (* player_changed) (VsxConnection *connection,
+                           const VsxPlayer *player);
 };
 
 struct _VsxConnection
@@ -130,6 +137,22 @@ vsx_connection_send_message (VsxConnection *connection,
 
 void
 vsx_connection_leave (VsxConnection *connection);
+
+const VsxPlayer *
+vsx_connection_get_player (VsxConnection *connection,
+                           int player_num);
+
+typedef void
+(* VsxConnectionForeachPlayerCallback) (const VsxPlayer *player,
+                                        void *user_data);
+
+void
+vsx_connection_foreach_player (VsxConnection *connection,
+                               VsxConnectionForeachPlayerCallback callback,
+                               void *user_data);
+
+const VsxPlayer *
+vsx_connection_get_self (VsxConnection *connection);
 
 GQuark
 vsx_connection_error_quark (void);

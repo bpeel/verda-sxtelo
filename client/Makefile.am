@@ -6,14 +6,19 @@ INCLUDES = \
 	$(JSON_GLIB_CFLAGS)
 
 source_h = \
-	$(srcdir)/vsx-connection.h
+	$(srcdir)/vsx-connection.h \
+	$(srcdir)/vsx-player.h \
+	$(NULL)
 
 verda_sxtelo_client_SOURCES = \
 	$(source_h) \
 	$(srcdir)/vsx-connection.c \
 	$(srcdir)/vsx-enum-types.c \
 	$(srcdir)/vsx-main.c \
-	$(srcdir)/vsx-marshal.c
+	$(srcdir)/vsx-marshal.c \
+	$(srcdir)/vsx-player.c \
+	$(srcdir)/vsx-player-private.h \
+	$(NULL)
 
 verda_sxtelo_client_LDFLAGS = \
 	$(GLIB_LIBS) \

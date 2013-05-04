@@ -137,19 +137,35 @@ clear_line (void)
   output_ti ("dl1");
 }
 
-static void
-stranger_typing_cb (GObject *object,
-                    GParamSpec *pspec)
+typedef struct
 {
-  VsxConnection *connection = VSX_CONNECTION (object);
+  const VsxPlayer *self;
+  gboolean is_typing;
+} CheckTypingData;
+
+static void
+check_typing_cb (const VsxPlayer *player,
+                 void *user_data)
+{
+  CheckTypingData *data = user_data;
+
+  if (player != data->self && vsx_player_is_typing (player))
+    data->is_typing = TRUE;
+}
+
+static void
+player_changed_cb (VsxConnection *connection,
+                   const VsxPlayer *player)
+{
+  CheckTypingData data;
+
+  data.self = vsx_connection_get_self (connection);
+  data.is_typing = FALSE;
+
+  vsx_connection_foreach_player (connection, check_typing_cb, &data);
 
   clear_line ();
-
-  if (vsx_connection_get_stranger_typing (connection))
-    rl_set_prompt (typing_prompt);
-  else
-    rl_set_prompt (not_typing_prompt);
-
+  rl_set_prompt (data.is_typing ? typing_prompt : not_typing_prompt);
   rl_forced_update_display ();
 }
 
@@ -345,8 +361,8 @@ main (int argc, char **argv)
                     G_CALLBACK (message_cb),
                     NULL);
   g_signal_connect (connection,
-                    "notify::stranger-typing",
-                    G_CALLBACK (stranger_typing_cb),
+                    "player-changed",
+                    G_CALLBACK (player_changed_cb),
                     NULL);
   g_signal_connect (connection,
                     "notify::state",

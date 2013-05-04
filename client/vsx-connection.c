@@ -29,6 +29,7 @@
 #include "vsx-connection.h"
 #include "vsx-marshal.h"
 #include "vsx-enum-types.h"
+#include "vsx-player-private.h"
 
 enum
 {
@@ -48,6 +49,7 @@ enum
 {
   SIGNAL_GOT_ERROR,
   SIGNAL_MESSAGE,
+  SIGNAL_PLAYER_CHANGED,
 
   LAST_SIGNAL
 };
@@ -113,6 +115,8 @@ struct _VsxConnectionPrivate
   int next_message_num;
   GQueue command_queue;
   SoupMessage *command_message;
+
+  GHashTable *players;
 
   /* A timeout for sending a keep alive message */
   guint keep_alive_timeout;
@@ -584,6 +588,103 @@ vsx_connection_set_state (VsxConnection *connection,
     }
 }
 
+static VsxPlayer *
+get_or_create_player (VsxConnection *connection,
+                      int player_num)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  VsxPlayer *player =
+    g_hash_table_lookup (priv->players, GINT_TO_POINTER (player_num));
+
+  if (player == NULL)
+    {
+      player = g_slice_new0 (VsxPlayer);
+
+      player->num = player_num;
+
+      g_hash_table_insert (priv->players,
+                           GINT_TO_POINTER (player_num),
+                           player);
+    }
+
+  return player;
+}
+
+static gboolean
+handle_player_name (VsxConnection *connection,
+                    JsonArray *array)
+{
+  JsonNode *message_node;
+  JsonObject *message_object;
+  gint64 num;
+  const char *text;
+  VsxPlayer *player;
+
+  if (json_array_get_length (array) < 2)
+    return FALSE;
+
+  message_node = json_array_get_element (array, 1);
+
+  if (json_node_get_node_type (message_node) != JSON_NODE_OBJECT)
+    return FALSE;
+
+  message_object = json_node_get_object (message_node);
+
+  if (!get_object_int_member (message_object, "num", &num) ||
+      num < 0 || num > G_MAXINT ||
+      !get_object_string_member (message_object, "name", &text))
+    return FALSE;
+
+  player = get_or_create_player (connection, num);
+
+  g_free (player->name);
+  player->name = g_strdup (text);
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_PLAYER_CHANGED],
+                 0, /* detail */
+                 player);
+
+  return TRUE;
+}
+
+static gboolean
+handle_player (VsxConnection *connection,
+               JsonArray *array)
+{
+  JsonNode *message_node;
+  JsonObject *message_object;
+  gint64 num, flags;
+  VsxPlayer *player;
+
+  if (json_array_get_length (array) < 2)
+    return FALSE;
+
+  message_node = json_array_get_element (array, 1);
+
+  if (json_node_get_node_type (message_node) != JSON_NODE_OBJECT)
+    return FALSE;
+
+  message_object = json_node_get_object (message_node);
+
+  if (!get_object_int_member (message_object, "num", &num) ||
+      num < 0 || num > G_MAXINT ||
+      !get_object_int_member (message_object, "flags", &flags) ||
+      flags < 0 || flags > G_MAXINT)
+    return FALSE;
+
+  player = get_or_create_player (connection, num);
+
+  player->flags = flags;
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_PLAYER_CHANGED],
+                 0, /* detail */
+                 player);
+
+  return TRUE;
+}
+
 static gboolean
 handle_message (VsxConnection *connection,
                 JsonNode *object,
@@ -663,6 +764,16 @@ handle_message (VsxConnection *connection,
     }
   else if (!strcmp (method_string, "end"))
     vsx_connection_set_state (connection, VSX_CONNECTION_STATE_DONE);
+  else if (!strcmp (method_string, "player-name"))
+    {
+      if (!handle_player_name (connection, array))
+        goto bad_data;
+    }
+  else if (!strcmp (method_string, "player"))
+    {
+      if (!handle_player (connection, array))
+        goto bad_data;
+    }
   else if (!strcmp (method_string, "typing"))
     vsx_connection_set_stranger_typing (connection, TRUE);
   else if (!strcmp (method_string, "not-typing"))
@@ -1091,7 +1202,28 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   VSX_TYPE_CONNECTION_PERSON,
                   G_TYPE_STRING);
 
+  signals[SIGNAL_PLAYER_CHANGED] =
+    g_signal_new ("player-changed",
+                  G_TYPE_FROM_CLASS (gobject_class),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (VsxConnectionClass, player_changed),
+                  NULL, /* accumulator */
+                  NULL, /* accumulator data */
+                  vsx_marshal_VOID__POINTER,
+                  G_TYPE_NONE,
+                  1, /* num arguments */
+                  G_TYPE_POINTER);
+
   g_type_class_add_private (klass, sizeof (VsxConnectionPrivate));
+}
+
+static void
+free_player_cb (void *data)
+{
+  VsxPlayer *player = data;
+
+  g_free (player->name);
+  g_slice_free (VsxPlayer, player);
 }
 
 static void
@@ -1106,6 +1238,11 @@ vsx_connection_init (VsxConnection *self)
   g_queue_init (&priv->command_queue);
 
   priv->keep_alive_time = g_timer_new ();
+
+  priv->players = g_hash_table_new_full (g_direct_hash,
+                                         g_direct_equal,
+                                         NULL, /* key_destroy */
+                                         free_player_cb);
 }
 
 static void
@@ -1156,6 +1293,8 @@ vsx_connection_finalize (GObject *object)
   g_string_free (priv->line_buffer, TRUE);
 
   g_timer_destroy (priv->keep_alive_time);
+
+  g_hash_table_destroy (priv->players);
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->finalize (object);
 }
@@ -1215,6 +1354,54 @@ vsx_connection_leave (VsxConnection *connection)
   vsx_connection_add_command (connection,
                               VSX_CONNECTION_COMMAND_LEAVE,
                               NULL);
+}
+
+const VsxPlayer *
+vsx_connection_get_player (VsxConnection *connection,
+                           int player_num)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  return g_hash_table_lookup (priv->players,
+                              GINT_TO_POINTER (player_num));
+}
+
+typedef struct
+{
+  VsxConnectionForeachPlayerCallback callback;
+  void *user_data;
+} ForeachPlayerData;
+
+static void
+foreach_player_cb (void *key,
+                   void *value,
+                   void *user_data)
+{
+  ForeachPlayerData *data = user_data;
+
+  data->callback (value, data->user_data);
+}
+
+void
+vsx_connection_foreach_player (VsxConnection *connection,
+                               VsxConnectionForeachPlayerCallback callback,
+                               void *user_data)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  ForeachPlayerData data;
+
+  data.callback = callback;
+  data.user_data = user_data;
+
+  g_hash_table_foreach (priv->players, foreach_player_cb, &data);
+}
+
+const VsxPlayer *
+vsx_connection_get_self (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  return get_or_create_player (connection, priv->num);
 }
 
 GQuark
