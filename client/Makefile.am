@@ -8,6 +8,7 @@ INCLUDES = \
 source_h = \
 	$(srcdir)/vsx-connection.h \
 	$(srcdir)/vsx-player.h \
+	$(srcdir)/vsx-tile.h \
 	$(NULL)
 
 verda_sxtelo_client_SOURCES = \
@@ -18,6 +19,8 @@ verda_sxtelo_client_SOURCES = \
 	$(srcdir)/vsx-marshal.c \
 	$(srcdir)/vsx-player.c \
 	$(srcdir)/vsx-player-private.h \
+	$(srcdir)/vsx-tile.c \
+	$(srcdir)/vsx-tile-private.h \
 	$(NULL)
 
 verda_sxtelo_client_LDFLAGS = \

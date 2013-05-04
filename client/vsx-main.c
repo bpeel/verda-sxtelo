@@ -170,6 +170,25 @@ player_changed_cb (VsxConnection *connection,
 }
 
 static void
+tile_changed_cb (VsxConnection *connection,
+                 gboolean is_new,
+                 const VsxTile *tile)
+{
+  char letter[7];
+  int letter_len;
+
+  letter_len = g_unichar_to_utf8 (vsx_tile_get_letter (tile), letter);
+  letter[letter_len] = '\0';
+
+  format_print ("%s: %i (%i,%i) %s\n",
+                is_new ? "new_tile" : "tile changed",
+                vsx_tile_get_number (tile),
+                vsx_tile_get_x (tile),
+                vsx_tile_get_y (tile),
+                letter);
+}
+
+static void
 print_state_message (VsxConnection *connection)
 {
   switch (vsx_connection_get_state (connection))
@@ -363,6 +382,10 @@ main (int argc, char **argv)
   g_signal_connect (connection,
                     "player-changed",
                     G_CALLBACK (player_changed_cb),
+                    NULL);
+  g_signal_connect (connection,
+                    "tile-changed",
+                    G_CALLBACK (tile_changed_cb),
                     NULL);
   g_signal_connect (connection,
                     "notify::state",

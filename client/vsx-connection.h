@@ -23,6 +23,7 @@
 #include <libsoup/soup.h>
 
 #include "vsx-player.h"
+#include "vsx-tile.h"
 
 G_BEGIN_DECLS
 
@@ -77,10 +78,14 @@ struct _VsxConnectionClass
                     const VsxPlayer *player,
                     const char *message);
 
-  /* Omitted whenever the details of a player have changed or a new
+  /* Emitted whenever the details of a player have changed or a new
    * player has been created */
   void (* player_changed) (VsxConnection *connection,
                            const VsxPlayer *player);
+
+  void (* tile_changed) (VsxConnection *connection,
+                         gboolean new_tile,
+                         const VsxTile *tile);
 };
 
 struct _VsxConnection
@@ -147,6 +152,19 @@ vsx_connection_foreach_player (VsxConnection *connection,
 
 const VsxPlayer *
 vsx_connection_get_self (VsxConnection *connection);
+
+const VsxTile *
+vsx_connection_get_tile (VsxConnection *connection,
+                         int tile_num);
+
+typedef void
+(* VsxConnectionForeachTileCallback) (const VsxTile *tile,
+                                      void *user_data);
+
+void
+vsx_connection_foreach_tile (VsxConnection *connection,
+                             VsxConnectionForeachTileCallback callback,
+                             void *user_data);
 
 GQuark
 vsx_connection_error_quark (void);

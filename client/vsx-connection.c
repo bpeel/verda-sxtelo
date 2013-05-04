@@ -30,6 +30,7 @@
 #include "vsx-marshal.h"
 #include "vsx-enum-types.h"
 #include "vsx-player-private.h"
+#include "vsx-tile-private.h"
 
 enum
 {
@@ -50,6 +51,7 @@ enum
   SIGNAL_GOT_ERROR,
   SIGNAL_MESSAGE,
   SIGNAL_PLAYER_CHANGED,
+  SIGNAL_TILE_CHANGED,
 
   LAST_SIGNAL
 };
@@ -117,6 +119,7 @@ struct _VsxConnectionPrivate
   SoupMessage *command_message;
 
   GHashTable *players;
+  GHashTable *tiles;
 
   /* A timeout for sending a keep alive message */
   guint keep_alive_timeout;
@@ -686,6 +689,62 @@ handle_player (VsxConnection *connection,
 }
 
 static gboolean
+handle_tile (VsxConnection *connection,
+             JsonArray *array)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  JsonNode *message_node;
+  JsonObject *message_object;
+  gint64 num, x, y;
+  const char *letter;
+  VsxTile *tile;
+  gboolean is_new = FALSE;
+
+  if (json_array_get_length (array) < 2)
+    return FALSE;
+
+  message_node = json_array_get_element (array, 1);
+
+  if (json_node_get_node_type (message_node) != JSON_NODE_OBJECT)
+    return FALSE;
+
+  message_object = json_node_get_object (message_node);
+
+  if (!get_object_int_member (message_object, "num", &num) ||
+      num < 0 || num > G_MAXINT ||
+      !get_object_int_member (message_object, "x", &x) ||
+      x < G_MININT16 || x > G_MAXINT16 ||
+      !get_object_int_member (message_object, "y", &y) ||
+      y < G_MININT16 || y > G_MAXINT16 ||
+      !get_object_string_member (message_object, "letter", &letter) ||
+      g_utf8_strlen (letter, -1) != 1)
+    return FALSE;
+
+  tile = g_hash_table_lookup (priv->tiles, GINT_TO_POINTER ((int) num));
+
+  if (tile == NULL)
+    {
+      tile = g_slice_new0 (VsxTile);
+      tile->num = num;
+
+      g_hash_table_insert (priv->tiles, GINT_TO_POINTER ((int) num), tile);
+      is_new = TRUE;
+    }
+
+  tile->x = x;
+  tile->y = y;
+  tile->letter = g_utf8_get_char (letter);
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_TILE_CHANGED],
+                 0, /* detail */
+                 is_new,
+                 tile);
+
+  return TRUE;
+}
+
+static gboolean
 handle_message (VsxConnection *connection,
                 JsonNode *object,
                 GError **error)
@@ -763,6 +822,11 @@ handle_message (VsxConnection *connection,
                      text);
 
       priv->next_message_num++;
+    }
+  else if (!strcmp (method_string, "tile"))
+    {
+      if (!handle_tile (connection, array))
+        goto bad_data;
     }
   else if (!strcmp (method_string, "end"))
     vsx_connection_set_state (connection, VSX_CONNECTION_STATE_DONE);
@@ -1216,6 +1280,19 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   1, /* num arguments */
                   G_TYPE_POINTER);
 
+  signals[SIGNAL_TILE_CHANGED] =
+    g_signal_new ("tile-changed",
+                  G_TYPE_FROM_CLASS (gobject_class),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (VsxConnectionClass, tile_changed),
+                  NULL, /* accumulator */
+                  NULL, /* accumulator data */
+                  vsx_marshal_VOID__BOOL_POINTER,
+                  G_TYPE_NONE,
+                  2, /* num arguments */
+                  G_TYPE_BOOLEAN,
+                  G_TYPE_POINTER);
+
   g_type_class_add_private (klass, sizeof (VsxConnectionPrivate));
 }
 
@@ -1226,6 +1303,14 @@ free_player_cb (void *data)
 
   g_free (player->name);
   g_slice_free (VsxPlayer, player);
+}
+
+static void
+free_tile_cb (void *data)
+{
+  VsxTile *tile = data;
+
+  g_slice_free (VsxTile, tile);
 }
 
 static void
@@ -1245,6 +1330,10 @@ vsx_connection_init (VsxConnection *self)
                                          g_direct_equal,
                                          NULL, /* key_destroy */
                                          free_player_cb);
+  priv->tiles = g_hash_table_new_full (g_direct_hash,
+                                       g_direct_equal,
+                                       NULL, /* key_destroy */
+                                       free_tile_cb);
 }
 
 static void
@@ -1297,6 +1386,7 @@ vsx_connection_finalize (GObject *object)
   g_timer_destroy (priv->keep_alive_time);
 
   g_hash_table_destroy (priv->players);
+  g_hash_table_destroy (priv->tiles);
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->finalize (object);
 }
@@ -1404,6 +1494,46 @@ vsx_connection_get_self (VsxConnection *connection)
   VsxConnectionPrivate *priv = connection->priv;
 
   return priv->self;
+}
+
+const VsxTile *
+vsx_connection_get_tile (VsxConnection *connection,
+                         int tile_num)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  return g_hash_table_lookup (priv->tiles,
+                              GINT_TO_POINTER (tile_num));
+}
+
+typedef struct
+{
+  VsxConnectionForeachTileCallback callback;
+  void *user_data;
+} ForeachTileData;
+
+static void
+foreach_tile_cb (void *key,
+                 void *value,
+                 void *user_data)
+{
+  ForeachTileData *data = user_data;
+
+  data->callback (value, data->user_data);
+}
+
+void
+vsx_connection_foreach_tile (VsxConnection *connection,
+                             VsxConnectionForeachTileCallback callback,
+                             void *user_data)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  ForeachTileData data;
+
+  data.callback = callback;
+  data.user_data = user_data;
+
+  g_hash_table_foreach (priv->tiles, foreach_tile_cb, &data);
 }
 
 GQuark
