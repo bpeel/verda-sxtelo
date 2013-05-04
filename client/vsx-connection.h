@@ -118,9 +118,6 @@ gboolean
 vsx_connection_get_running (VsxConnection *connection);
 
 gboolean
-vsx_connection_get_stranger_typing (VsxConnection *connection);
-
-gboolean
 vsx_connection_get_typing (VsxConnection *connection);
 
 void

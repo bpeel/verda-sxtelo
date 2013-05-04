@@ -41,7 +41,6 @@ enum
   PROP_ROOM,
   PROP_PLAYER_NAME,
   PROP_RUNNING,
-  PROP_STRANGER_TYPING,
   PROP_TYPING,
   PROP_STATE
 };
@@ -111,7 +110,6 @@ struct _VsxConnectionPrivate
   char *person_id;
   VsxConnectionRunningState running_state;
   VsxConnectionState state;
-  gboolean stranger_typing;
   gboolean typing;
   gboolean sent_typing_state;
   int next_message_num;
@@ -447,11 +445,6 @@ vsx_connection_get_property (GObject *object,
       g_value_set_boolean (value, vsx_connection_get_running (connection));
       break;
 
-    case PROP_STRANGER_TYPING:
-      g_value_set_boolean (value,
-                           vsx_connection_get_stranger_typing (connection));
-      break;
-
     case PROP_TYPING:
       g_value_set_boolean (value,
                            vsx_connection_get_typing (connection));
@@ -548,19 +541,6 @@ get_object_string_member (JsonObject *object,
   *value = json_node_get_string (node);
 
   return TRUE;
-}
-
-static void
-vsx_connection_set_stranger_typing (VsxConnection *connection,
-                                    gboolean typing)
-{
-  VsxConnectionPrivate *priv = connection->priv;
-
-  if (priv->stranger_typing != typing)
-    {
-      priv->stranger_typing = typing;
-      g_object_notify (G_OBJECT (connection), "stranger-typing");
-    }
 }
 
 void
@@ -840,10 +820,6 @@ handle_message (VsxConnection *connection,
       if (!handle_player (connection, array))
         goto bad_data;
     }
-  else if (!strcmp (method_string, "typing"))
-    vsx_connection_set_stranger_typing (connection, TRUE);
-  else if (!strcmp (method_string, "not-typing"))
-    vsx_connection_set_stranger_typing (connection, FALSE);
 
   return TRUE;
 
@@ -1211,17 +1187,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                                 | G_PARAM_STATIC_BLURB);
   g_object_class_install_property (gobject_class, PROP_RUNNING, pspec);
 
-  pspec = g_param_spec_boolean ("stranger-typing",
-                                "Stranger typing",
-                                "Whether the other person in the conversation "
-                                "is typing.",
-                                FALSE,
-                                G_PARAM_READABLE
-                                | G_PARAM_STATIC_NAME
-                                | G_PARAM_STATIC_NICK
-                                | G_PARAM_STATIC_BLURB);
-  g_object_class_install_property (gobject_class, PROP_STRANGER_TYPING, pspec);
-
   pspec = g_param_spec_boolean ("typing",
                                 "Typing",
                                 "Whether the user is typing.",
@@ -1405,14 +1370,6 @@ vsx_connection_new (SoupSession *soup_session,
                                       NULL);
 
   return self;
-}
-
-gboolean
-vsx_connection_get_stranger_typing (VsxConnection *connection)
-{
-  VsxConnectionPrivate *priv = connection->priv;
-
-  return priv->stranger_typing;
 }
 
 gboolean
