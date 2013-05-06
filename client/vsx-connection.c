@@ -646,7 +646,24 @@ vsx_connection_move_tile (VsxConnection *connection,
                           int x,
                           int y)
 {
+  VsxConnectionPrivate *priv = connection->priv;
   VsxConnectionMoveTileCommand *cmd;
+  GList *l;
+
+  /* If there is already a move command for this tile in the queue
+   * then we'll just update the position instead */
+  for (l = priv->command_queue.head; l; l = l->next)
+    {
+      cmd = l->data;
+
+      if (cmd->parent.type == VSX_CONNECTION_COMMAND_MOVE_TILE &&
+          cmd->tile_num == tile_num)
+        {
+          cmd->x = x;
+          cmd->y = y;
+          return;
+        }
+    }
 
   cmd = g_malloc (sizeof (VsxConnectionMoveTileCommand));
 
