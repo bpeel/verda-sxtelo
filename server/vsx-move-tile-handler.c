@@ -65,7 +65,16 @@ real_request_line_received (VsxRequestHandler *handler,
         self->response =
           vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
       else
-        vsx_object_ref (self->person);
+        {
+          if (self->tile_num >= self->person->conversation->n_tiles)
+            {
+              self->response =
+                vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
+              self->person = NULL;
+            }
+          else
+            vsx_object_ref (self->person);
+        }
     }
   else
     self->response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
