@@ -89,6 +89,7 @@ function ChatSession (playerName)
   this.players = [];
   this.tiles = [];
   this.dragTile = null;
+  this.dragTouchId = null;
   this.lastMovedTile = null;
   this.retryCount = 0;
   this.pendingTimeouts = [];
@@ -852,9 +853,9 @@ ChatSession.prototype.focusCb = function ()
   document.title = "Verda Ŝtelo";
 };
 
-ChatSession.prototype.getTileNumForEvent = function (event)
+ChatSession.prototype.getTileNumForTarget = function (target)
 {
-  if ((event.target.className) != "tile")
+  if ((target.className) != "tile")
     return null;
 
   var tileNum;
@@ -862,31 +863,44 @@ ChatSession.prototype.getTileNumForEvent = function (event)
   for (tileNum = 0; tileNum < this.tiles.length; tileNum++)
   {
     var tile = this.tiles[tileNum];
-    if (tile && tile.element == event.target)
+    if (tile && tile.element == target)
       return tileNum;
   }
 
   return null;
 };
 
-ChatSession.prototype.mouseDownCb = function (event)
+ChatSession.prototype.moveTile = function (tileNum, x, y)
 {
-  var tileNum;
+  var tile = this.tiles[tileNum];
 
-  if (event.which != 1)
-    return;
+  /* If we've already queued this move then just update the position */
+  for (i = 0; i < this.messageQueue.length; i++)
+  {
+    if (this.messageQueue[i][0] == "move-tile" &&
+        this.messageQueue[i][1] == tileNum)
+    {
+      this.messageQueue[i][2] = x;
+      this.messageQueue[i][3] = y;
+      return;
+    }
+  }
 
-  event.preventDefault ();
+  this.messageQueue.push (["move-tile", tileNum, x, y]);
+  this.sendNextMessage ();
+};
 
-  tileNum = this.getTileNumForEvent (event);
+ChatSession.prototype.dragStart = function (target, pageX, pageY)
+{
+  var tileNum = this.getTileNumForTarget (target);
   if (tileNum == null)
     return;
 
   var tile = this.tiles[tileNum];
 
   var position = $(tile.element).position ();
-  this.dragOffsetX = event.pageX - position.left;
-  this.dragOffsetY = event.pageY - position.top;
+  this.dragOffsetX = pageX - position.left;
+  this.dragOffsetY = pageY - position.top;
 
   this.dragTile = tileNum;
   this.tileMoved = false;
@@ -895,14 +909,11 @@ ChatSession.prototype.mouseDownCb = function (event)
   this.raiseTile (tile);
 };
 
-ChatSession.prototype.mouseMoveCb = function (event)
+ChatSession.prototype.dragMove = function (pageX, pageY)
 {
-  if (this.dragTile == null)
-    return;
-
-  var newX = Math.round ((event.pageX - this.dragOffsetX) /
+  var newX = Math.round ((pageX - this.dragOffsetX) /
                          this.pixelsPerEm * 10.0);
-  var newY = Math.round ((event.pageY - this.dragOffsetY) /
+  var newY = Math.round ((pageY - this.dragOffsetY) /
                          this.pixelsPerEm * 10.0);
   var tile = this.tiles[this.dragTile];
 
@@ -927,52 +938,121 @@ ChatSession.prototype.mouseMoveCb = function (event)
   tile.element.style.top = (newY / 10.0) + "em";
 };
 
-ChatSession.prototype.moveTile = function (tileNum, x, y)
+ChatSession.prototype.dragCancel = function ()
 {
-  var tile = this.tiles[tileNum];
+  this.dragTile = null;
+};
 
-  /* If we've already queued this move then just update the position */
-  for (i = 0; i < this.messageQueue.length; i++)
+ChatSession.prototype.dragEnd = function ()
+{
+  var tile = this.tiles[this.dragTile];
+
+  if (!this.tileMoved &&
+      this.lastMovedTile &&
+      this.lastMovedTile != tile)
   {
-    if (this.messageQueue[i][0] == "move-tile" &&
-        this.messageQueue[i][1] == tileNum)
+    var newPos = this.lastMovedTile.x + 20;
+    var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
+                  10.0 - 20);
+    if (newPos < maxPos)
     {
-      this.messageQueue[i][2] = x;
-      this.messageQueue[i][3] = y;
-      return;
+      this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
+      this.lastMovedTile = tile;
     }
   }
 
-  this.messageQueue.push (["move-tile", tileNum, x, y]);
-  this.sendNextMessage ();
+  this.dragTile = null;
 };
 
-ChatSession.prototype.mouseUpCb = function (event)
+ChatSession.prototype.mouseDownCb = function (event)
 {
-  if (event.which != 1)
+  if (event.which != 1 || this.dragTile != null)
     return;
 
   event.preventDefault ();
 
+  this.dragStart (event.target, event.pageX, event.pageY);
+};
+
+ChatSession.prototype.mouseMoveCb = function (event)
+{
+  if (this.dragTile == null || this.dragTouchId != null)
+    return;
+
+  event.preventDefault ();
+
+  this.dragMove (event.pageX, event.pageY);
+};
+
+ChatSession.prototype.mouseUpCb = function (event)
+{
+  if (event.which != 1 || this.dragTile == null || this.dragTouchId != null)
+    return;
+
+  event.preventDefault ();
+
+  this.dragEnd ();
+};
+
+ChatSession.prototype.touchStartCb = function (event)
+{
+  event.preventDefault ();
+
   if (this.dragTile != null)
+    return;
+
+  var touch = event.originalEvent.changedTouches[0];
+  this.dragStart (touch.target, touch.pageX, touch.pageY);
+  if (this.dragTile != null)
+    this.dragTouchId = touch.identifier;
+};
+
+ChatSession.prototype.getDragTouch = function (event)
+{
+  var touches = event.originalEvent.changedTouches;
+
+  for (i = 0; i < touches.length; i++)
   {
-    var tile = this.tiles[this.dragTile];
+    if (touches[i].identifier == this.dragTouchId)
+      return touches[i];
+  }
 
-    if (!this.tileMoved &&
-        this.lastMovedTile &&
-        this.lastMovedTile != tile)
-    {
-      var newPos = this.lastMovedTile.x + 20;
-      var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
-                    10.0 - 20);
-      if (newPos < maxPos)
-      {
-        this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
-        this.lastMovedTile = tile;
-      }
-    }
+  return null;
+};
 
-    this.dragTile = null;
+ChatSession.prototype.touchMoveCb = function (event)
+{
+  event.preventDefault ();
+
+  var touch = this.getDragTouch (event);
+
+  if (touch)
+    this.dragMove (touch.pageX, touch.pageY);
+};
+
+ChatSession.prototype.touchEndCb = function (event)
+{
+  event.preventDefault ();
+
+  var touch = this.getDragTouch (event);
+
+  if (touch)
+  {
+    this.dragEnd ();
+    this.dragTouchId = null;
+  }
+};
+
+ChatSession.prototype.touchCancelCb = function (event)
+{
+  event.preventDefault ();
+
+  var touch = this.getDragTouch (event);
+
+  if (touch)
+  {
+    this.dragCancel ();
+    this.dragTouchId = null;
   }
 };
 
@@ -997,6 +1077,12 @@ ChatSession.prototype.start = function ()
   $("#board").mousedown (this.mouseDownCb.bind (this));
   $("#board").mousemove (this.mouseMoveCb.bind (this));
   $("#board").mouseup (this.mouseUpCb.bind (this));
+
+  $("#board").bind ("touchstart", this.touchStartCb.bind (this));
+  $("#board").bind ("touchend", this.touchEndCb.bind (this));
+  $("#board").bind ("touchleave", this.touchEndCb.bind (this));
+  $("#board").bind ("touchcancel", this.touchCancelCb.bind (this));
+  $("#board").bind ("touchmove", this.touchMoveCb.bind (this));
 
   $("#sound-toggle").bind ("click", this.soundToggleClickCb.bind (this));
 
