@@ -395,6 +395,21 @@ ChatSession.prototype.raiseTile = function (tile)
   $(parent).append (tile.element);
 };
 
+ChatSession.prototype.animateTile = function (tile, x, y)
+{
+  var te = $(tile.element);
+  var dx = tile.x - x;
+  var dy = tile.y - y;
+  var distance = Math.sqrt (dx * dx + dy * dy);
+  var new_x = (x / 10.0) + "em";
+  var new_y = (y / 10.0) + "em";
+
+  te.stop ();
+  this.raiseTile (tile);
+  te.animate ({ "left": new_x, "top": new_y },
+              distance * 2.0);
+};
+
 ChatSession.prototype.handleTile = function (data)
 {
   if (typeof (data) != "object")
@@ -424,21 +439,9 @@ ChatSession.prototype.handleTile = function (data)
     this.playSound ("turn-sound");
   }
 
-  if (data.num != this.dragTile &&
+  if (data.player != this.personNumber &&
       (data.x != tile.x || data.y != tile.y))
-  {
-    var te = $(tile.element);
-    var dx = tile.x - data.x;
-    var dy = tile.y - data.y;
-    var distance = Math.sqrt (dx * dx + dy * dy);
-    var new_x = (data.x / 10.0) + "em";
-    var new_y = (data.y / 10.0) + "em";
-
-    te.stop ();
-    this.raiseTile (tile);
-    te.animate ({ "left": new_x, "top": new_y },
-                distance * 2.0);
-  }
+    this.animateTile (tile, data.x, data.y);
 
   tile.x = data.x;
   tile.y = data.y;
@@ -957,6 +960,9 @@ ChatSession.prototype.dragEnd = function ()
     if (newPos < maxPos)
     {
       this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
+      this.animateTile (tile, newPos, this.lastMovedTile.y);
+      tile.x = newPos;
+      tile.y = this.lastMovedTile.y;
       this.lastMovedTile = tile;
     }
   }
