@@ -110,6 +110,7 @@ vsx_conversation_add_player (VsxConversation *conversation,
 
 void
 vsx_conversation_move_tile (VsxConversation *conversation,
+                            unsigned int player_num,
                             int tile_num,
                             int x,
                             int y);

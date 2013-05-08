@@ -353,7 +353,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
       case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
         {
           const VsxTile *tile;
-          char buf[64 + 10 + 6 + 6 + 5 + VSX_TILE_MAX_LETTER_BYTES + 1];
+          char buf[61 + 10 + 6 + 6 + VSX_TILE_MAX_LETTER_BYTES + 6 + 1];
           int length;
 
           /* Decide which tile to update if we haven't started
@@ -367,6 +367,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                 self->person->conversation->tiles + self->current_dirty_thing;
               self->dirty.tile.x = tile->x;
               self->dirty.tile.y = tile->y;
+              self->dirty.tile.last_player = tile->last_player;
 
               /* We want to immediately mark the tile as not dirty
                * so that it changes again while we are still in this
@@ -384,11 +385,13 @@ vsx_watch_person_response_add_data (VsxResponse *response,
           length = sprintf (buf,
                             "[\"tile\", {\"num\": %u, "
                             "\"x\": %i, \"y\": %i, "
-                            "\"letter\": \"%s\"}]\r\n",
+                            "\"letter\": \"%s\", "
+                            "\"player\": %i}]\r\n",
                             self->current_dirty_thing,
                             self->dirty.tile.x,
                             self->dirty.tile.y,
-                            tile->letter);
+                            tile->letter,
+                            self->dirty.tile.last_player);
 
           if (write_chunked_message (self,
                                      &message_data,

@@ -447,6 +447,7 @@ vsx_conversation_turn (VsxConversation *conversation,
 
 void
 vsx_conversation_move_tile (VsxConversation *conversation,
+                            unsigned int player_num,
                             int tile_num,
                             int x,
                             int y)
@@ -457,6 +458,7 @@ vsx_conversation_move_tile (VsxConversation *conversation,
     {
       tile->x = x;
       tile->y = y;
+      tile->last_player = player_num;
       vsx_conversation_tile_changed (conversation, tile);
     }
 }

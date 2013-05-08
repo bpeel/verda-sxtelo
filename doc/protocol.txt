@@ -149,6 +149,9 @@ object containing the following keys:
   "letter": An integer value representing the Unicode character that
   should be displayed on the top of this tile.
 
+  "player": An integer representing the number of the last player that
+  moved the tile, or -1 if no-one has moved it yet.
+
 Initially there will be no tiles so none of these messages will be
 sent for a new game. New tiles are added after a /turn request.
 

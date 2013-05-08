@@ -34,6 +34,7 @@ G_BEGIN_DECLS
 typedef struct
 {
   gint16 x, y;
+  gint16 last_player;
   char letter[VSX_TILE_MAX_LETTER_BYTES + 1];
 } VsxTile;
 

@@ -89,6 +89,7 @@ real_request_finished (VsxRequestHandler *handler)
     {
       if (self->person->conversation)
         vsx_conversation_move_tile (self->person->conversation,
+                                    self->person->player->num,
                                     self->tile_num,
                                     self->x,
                                     self->y);

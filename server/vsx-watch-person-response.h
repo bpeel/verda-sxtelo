@@ -71,6 +71,7 @@ typedef struct
     struct
     {
       gint16 x, y;
+      gint16 last_player;
     } tile;
   } dirty;
 
