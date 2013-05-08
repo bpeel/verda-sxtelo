@@ -146,8 +146,8 @@ object containing the following keys:
 
   "y": The new y position of the tile as an integer in pixels.
 
-  "letter": An integer value representing the Unicode character that
-  should be displayed on the top of this tile.
+  "letter": A one character string representing the letter to display
+  on this tile.
 
   "player": An integer representing the number of the last player that
   moved the tile, or -1 if no-one has moved it yet.
