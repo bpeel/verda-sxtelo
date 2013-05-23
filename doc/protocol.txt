@@ -6,7 +6,7 @@ report the Access-Control-Allow-Origin header so that they can be used
 after a cross-domain check.
 
 By default the server listens on port 5142. The ‘official’ server
-listens on that port at http://vs.busydoingnothing.co.uk:5142/
+listens on that port at http://gemelo.org:5142/
 
 == Requests ==
 
