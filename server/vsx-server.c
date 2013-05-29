@@ -54,7 +54,7 @@ struct _VsxServer
   GError *fatal_error;
 
   /* List of open connections */
-  GList *connections;
+  VsxList connections;
 
   VsxConversationSet *pending_conversations;
 
@@ -72,9 +72,8 @@ typedef struct
   GSocket *client_socket;
   VsxMainContextSource *source;
 
-  /* Pointer to the GList node in the connections list so it can be
-     removed quickly */
-  GList *list_node;
+  /* List node within the list of connections */
+  VsxList link;
 
   VsxHttpParser http_parser;
 
@@ -371,11 +370,8 @@ set_bad_input (VsxServerConnection *connection, GError *error)
 }
 
 static void
-check_dead_connection_cb (gpointer data,
-                          gpointer user_data)
+check_dead_connection (VsxServerConnection *connection)
 {
-  VsxServerConnection *connection = data;
-
   if (vsx_list_empty (&connection->response_queue)
       && ((vsx_main_context_get_monotonic_clock (NULL)
            - connection->no_response_age)
@@ -399,7 +395,10 @@ check_dead_connection_cb (gpointer data,
 static void
 vsx_server_run_gc (VsxServer *server)
 {
-  g_list_foreach (server->connections, check_dead_connection_cb, NULL);
+  VsxServerConnection *connection, *tmp;
+
+  vsx_list_for_each_safe (connection, tmp, &server->connections, link)
+    check_dead_connection (connection);
 
   /* This is probably relatively expensive because it has to iterate
      the entire list of people, but it only happens infrequently so
@@ -417,8 +416,7 @@ vsx_server_remove_connection (VsxServer *server,
 
   vsx_main_context_remove_source (connection->source);
   g_object_unref (connection->client_socket);
-  server->connections = g_list_delete_link (server->connections,
-                                            connection->list_node);
+  vsx_list_remove (&connection->link);
   g_free (connection->peer_address_string);
   g_slice_free (VsxServerConnection, connection);
 
@@ -717,8 +715,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                                    VSX_MAIN_CONTEXT_POLL_IN,
                                    vsx_server_connection_poll_cb,
                                    connection);
-      server->connections = g_list_prepend (server->connections,
-                                            connection);
+      vsx_list_insert (&server->connections, &connection->link);
 
       vsx_http_parser_init (&connection->http_parser,
                             &vsx_server_http_parser_vtable,
@@ -746,10 +743,6 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         connection->peer_address_string = NULL;
 
       connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
-
-      /* Store the list node so we can quickly remove the connection
-         from the list */
-      connection->list_node = server->connections;
     }
 }
 
@@ -796,6 +789,8 @@ vsx_server_new (GSocketAddress *address,
                                server);
 
   server->last_gc_time = vsx_main_context_get_monotonic_clock (NULL);
+
+  vsx_list_init (&server->connections);
 
   return server;
 
@@ -872,8 +867,12 @@ vsx_server_run (VsxServer *server,
 void
 vsx_server_free (VsxServer *server)
 {
-  while (server->connections)
-    vsx_server_remove_connection (server, server->connections->data);
+  while (!vsx_list_empty (&server->connections))
+    {
+      VsxServerConnection *connection =
+        vsx_container_of (server->connections.next, connection, link);
+      vsx_server_remove_connection (server, connection);
+    }
 
   vsx_object_unref (server->person_set);
 
