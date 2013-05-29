@@ -84,7 +84,7 @@ typedef struct
 } VsxConversationChangedData;
 
 VsxConversation *
-vsx_conversation_new (void);
+vsx_conversation_new (const char *room_name);
 
 void
 vsx_conversation_start (VsxConversation *conversation);

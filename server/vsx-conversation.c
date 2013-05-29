@@ -305,9 +305,11 @@ vsx_conversation_add_player (VsxConversation *conversation,
 }
 
 VsxConversation *
-vsx_conversation_new (void)
+vsx_conversation_new (const char *room_name)
 {
   VsxConversation *self = vsx_object_allocate (vsx_conversation_get_class ());
+  const VsxTileData *tile_data;
+  const char *t;
   int i;
 
   vsx_object_init (self);
@@ -320,9 +322,39 @@ vsx_conversation_new (void)
 
   self->state = VSX_CONVERSATION_AWAITING_START;
 
-  /* Initialise the tile data with the defaults */
-  memcpy (self->tiles, vsx_tile_data, sizeof (self->tiles));
-  /* Shuffle the tiles. The positions are irrelevant */
+  /* Look for some tile data for the corresponding room */
+  for (i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+    {
+      tile_data = vsx_tile_data + i;
+      if (!strcmp (tile_data->room_name, room_name))
+        goto found_tile_data;
+    }
+
+  /* If we didn't find one then just use the last one */
+  tile_data = vsx_tile_data + VSX_TILE_DATA_N_ROOMS - 1;
+
+ found_tile_data:
+
+  /* Initialise the tile data with the letters */
+  t = tile_data->letters;
+  for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
+    {
+      const char *t_next = g_utf8_next_char (t);
+
+      g_assert (*t);
+
+      memcpy (self->tiles[i].letter, t, t_next - t);
+      self->tiles[i].letter[t_next - t] = '\0';
+      self->tiles[i].x = 0;
+      self->tiles[i].y = 0;
+      self->tiles[i].last_player = -1;
+
+      t = t_next;
+    }
+
+  g_assert_cmpint (*t, ==, 0);
+
+  /* Shuffle the tiles */
   for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
     {
       int swap_pos = g_random_int_range (0, VSX_TILE_DATA_N_TILES);

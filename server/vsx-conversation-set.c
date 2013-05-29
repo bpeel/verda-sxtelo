@@ -142,7 +142,7 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
   if ((data = g_hash_table_lookup (set->hash_table, room_name)) == NULL)
     {
       /* If there's no conversation with that name then we'll create it */
-      conversation = vsx_conversation_new ();
+      conversation = vsx_conversation_new (room_name);
 
       data = g_slice_new (VsxConversationSetHashData);
 

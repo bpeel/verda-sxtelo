@@ -25,10 +25,17 @@
 
 G_BEGIN_DECLS
 
+#define VSX_TILE_DATA_N_ROOMS 1
 #define VSX_TILE_DATA_N_TILES 122
 
-extern const VsxTile
-vsx_tile_data[VSX_TILE_DATA_N_TILES];
+typedef struct
+{
+  const char *room_name;
+  const char *letters;
+} VsxTileData;
+
+extern const VsxTileData
+vsx_tile_data[VSX_TILE_DATA_N_ROOMS];
 
 G_END_DECLS
 
