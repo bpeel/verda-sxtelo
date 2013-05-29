@@ -25,7 +25,7 @@
 
 G_BEGIN_DECLS
 
-#define VSX_TILE_DATA_N_ROOMS 1
+#define VSX_TILE_DATA_N_ROOMS 2
 #define VSX_TILE_DATA_N_TILES 122
 
 typedef struct
