@@ -899,6 +899,12 @@ ChatSession.prototype.dragStart = function (target, pageX, pageY)
   if (tileNum == null)
     return;
 
+  /* Don't allow the player to start dragging if someone else is
+   * shouting */
+  if (this.shoutingPlayer &&
+      this.shoutingPlayer != this.getPlayer (this.personNumber))
+    return;
+
   var tile = this.tiles[tileNum];
 
   var position = $(tile.element).position ();
