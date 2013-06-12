@@ -154,6 +154,12 @@ has_pending_data (VsxWatchPersonResponse *self,
   VsxConversation *conversation = self->person->conversation;
   int i;
 
+  if (self->pending_n_tiles)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_N_TILES;
+      return TRUE;
+    }
+
   if (self->named_players < conversation->n_players)
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_NAME;
@@ -259,6 +265,42 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         }
         break;
 
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_N_TILES:
+        {
+          VsxConversation *conversation = self->person->conversation;
+          char buf[15 + 10 + 1];
+          int length;
+
+          /* Decide how many tiles to write if we haven't started
+           * writing yet */
+          if (self->message_pos == 0)
+            {
+              self->dirty.n_tiles = conversation->total_n_tiles;
+
+              /* We want to immediately reset the pending tiles flag
+               * so that if it changes again while we are writing then
+               * we will end up sending another message */
+              if (message_data.length > 0)
+                self->pending_n_tiles = FALSE;
+            }
+
+          length = sprintf (buf,
+                            "[\"n-tiles\", %i]\r\n",
+                            self->dirty.n_tiles);
+
+          if (write_chunked_message (self,
+                                     &message_data,
+                                     (const guint8 *) buf,
+                                     length))
+            {
+              self->message_pos = 0;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+            }
+          else
+            goto done;
+        }
+        break;
+
       case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
         {
           VsxPlayer *player =
@@ -289,11 +331,11 @@ vsx_watch_person_response_add_data (VsxResponse *response,
            * writing yet */
           if (self->message_pos == 0)
             {
-              self->current_dirty_thing =
+              self->dirty.player.num =
                 vsx_flags_find_first_bit (self->dirty_players);
 
               player =
-                self->person->conversation->players[self->current_dirty_thing];
+                self->person->conversation->players[self->dirty.player.num];
               self->dirty.player.flags = player->flags;
 
               /* We want to immediately mark the player as not dirty
@@ -302,16 +344,16 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                * with the new state */
               if (message_data.length > 0)
                   VSX_FLAGS_SET (self->dirty_players,
-                                 self->current_dirty_thing,
+                                 self->dirty.player.num,
                                  FALSE);
             }
           else
             player =
-              self->person->conversation->players[self->current_dirty_thing];
+              self->person->conversation->players[self->dirty.player.num];
 
           length = sprintf (buf,
                             "[\"player\", {\"num\": %u, \"flags\": %i}]\r\n",
-                            self->current_dirty_thing,
+                            self->dirty.player.num,
                             self->dirty.player.flags);
 
           if (write_chunked_message (self,
@@ -360,11 +402,11 @@ vsx_watch_person_response_add_data (VsxResponse *response,
            * writing yet */
           if (self->message_pos == 0)
             {
-              self->current_dirty_thing =
+              self->dirty.tile.num =
                 vsx_flags_find_first_bit (self->dirty_tiles);
 
               tile =
-                self->person->conversation->tiles + self->current_dirty_thing;
+                self->person->conversation->tiles + self->dirty.tile.num;
               self->dirty.tile.x = tile->x;
               self->dirty.tile.y = tile->y;
               self->dirty.tile.last_player = tile->last_player;
@@ -375,19 +417,19 @@ vsx_watch_person_response_add_data (VsxResponse *response,
                * with the new state */
               if (message_data.length > 0)
                   VSX_FLAGS_SET (self->dirty_tiles,
-                                 self->current_dirty_thing,
+                                 self->dirty.tile.num,
                                  FALSE);
             }
           else
             tile =
-              self->person->conversation->tiles + self->current_dirty_thing;
+              self->person->conversation->tiles + self->dirty.tile.num;
 
           length = sprintf (buf,
                             "[\"tile\", {\"num\": %u, "
                             "\"x\": %i, \"y\": %i, "
                             "\"letter\": \"%s\", "
                             "\"player\": %i}]\r\n",
-                            self->current_dirty_thing,
+                            self->dirty.tile.num,
                             self->dirty.tile.x,
                             self->dirty.tile.y,
                             tile->letter,
@@ -475,6 +517,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
         return has_pending_data (self, &new_state);
       }
 
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_N_TILES:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
@@ -536,6 +579,10 @@ conversation_changed_cb (VsxListener *listener,
 
   switch (data->type)
     {
+    case VSX_CONVERSATION_N_TILES_CHANGED:
+      response->pending_n_tiles = TRUE;
+      break;
+
     case VSX_CONVERSATION_PLAYER_CHANGED:
       VSX_FLAGS_SET (response->dirty_players, data->num, TRUE);
       break;
@@ -570,11 +617,12 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->person = vsx_object_ref (person);
   self->message_num = last_message;
   self->pending_shout = -1;
+  self->pending_n_tiles = TRUE;
 
   vsx_flags_set_range (self->dirty_players,
                        person->conversation->n_players);
   vsx_flags_set_range (self->dirty_tiles,
-                       person->conversation->n_tiles);
+                       person->conversation->n_tiles_in_play);
 
   self->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&person->conversation->changed_signal,

@@ -26,6 +26,7 @@ source_h = \
 	$(srcdir)/vsx-request-handler.h \
 	$(srcdir)/vsx-response.h \
 	$(srcdir)/vsx-send-message-handler.h \
+	$(srcdir)/vsx-set-n-tiles-handler.h \
 	$(srcdir)/vsx-server.h \
 	$(srcdir)/vsx-shout-handler.h \
 	$(srcdir)/vsx-signal.h \
@@ -62,6 +63,7 @@ verda_sxtelo_SOURCES = \
 	$(srcdir)/vsx-request-handler.c \
 	$(srcdir)/vsx-response.c \
 	$(srcdir)/vsx-send-message-handler.c \
+	$(srcdir)/vsx-set-n-tiles-handler.c \
 	$(srcdir)/vsx-server.c \
 	$(srcdir)/vsx-simple-handler.c \
 	$(srcdir)/vsx-shout-handler.c \

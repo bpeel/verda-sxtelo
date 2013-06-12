@@ -22,14 +22,14 @@
 
 #include <glib.h>
 
-#include "vsx-move-tile-handler.h"
+#include "vsx-set-n-tiles-handler.h"
 #include "vsx-string-response.h"
 #include "vsx-arguments.h"
 
 static void
 real_free (void *object)
 {
-  VsxMoveTileHandler *handler = object;
+  VsxSetNTilesHandler *handler = object;
 
   if (handler->person)
     vsx_object_unref (handler->person);
@@ -45,19 +45,14 @@ real_request_line_received (VsxRequestHandler *handler,
                             VsxRequestMethod method,
                             const char *query_string)
 {
-  VsxMoveTileHandler *self = (VsxMoveTileHandler *) handler;
+  VsxSetNTilesHandler *self = (VsxSetNTilesHandler *) handler;
   VsxPersonId id;
 
   if (method == VSX_REQUEST_METHOD_GET
-      && vsx_arguments_parse ("piii",
+      && vsx_arguments_parse ("pi",
                               query_string,
                               &id,
-                              &self->tile_num,
-                              &self->x,
-                              &self->y)
-      && self->tile_num >= 0 && self->tile_num < VSX_TILE_DATA_N_TILES
-      && self->x >= G_MININT16 && self->x <= G_MAXINT16
-      && self->y >= G_MININT16 && self->y <= G_MAXINT16)
+                              &self->n_tiles))
     {
       self->person = vsx_person_set_activate_person (handler->person_set, id);
 
@@ -65,16 +60,7 @@ real_request_line_received (VsxRequestHandler *handler,
         self->response =
           vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
       else
-        {
-          if (self->tile_num >= self->person->conversation->n_tiles_in_play)
-            {
-              self->response =
-                vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
-              self->person = NULL;
-            }
-          else
-            vsx_object_ref (self->person);
-        }
+        vsx_object_ref (self->person);
     }
   else
     self->response = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
@@ -83,16 +69,14 @@ real_request_line_received (VsxRequestHandler *handler,
 static VsxResponse *
 real_request_finished (VsxRequestHandler *handler)
 {
-  VsxMoveTileHandler *self = (VsxMoveTileHandler *) handler;
+  VsxSetNTilesHandler *self = (VsxSetNTilesHandler *) handler;
 
   if (self->person)
     {
       if (self->person->conversation)
-        vsx_conversation_move_tile (self->person->conversation,
-                                    self->person->player->num,
-                                    self->tile_num,
-                                    self->x,
-                                    self->y);
+        vsx_conversation_set_n_tiles (self->person->conversation,
+                                      self->person->player->num,
+                                      self->n_tiles);
 
       return vsx_string_response_new (VSX_STRING_RESPONSE_OK);
     }
@@ -107,14 +91,14 @@ real_request_finished (VsxRequestHandler *handler)
 }
 
 static const VsxRequestHandlerClass *
-vsx_move_tile_handler_get_class (void)
+vsx_set_n_tiles_handler_get_class (void)
 {
   static VsxRequestHandlerClass klass;
 
   if (klass.parent_class.free == NULL)
     {
       klass = *vsx_request_handler_get_class ();
-      klass.parent_class.instance_size = sizeof (VsxMoveTileHandler);
+      klass.parent_class.instance_size = sizeof (VsxSetNTilesHandler);
       klass.parent_class.free = real_free;
 
       klass.request_line_received = real_request_line_received;
@@ -125,10 +109,10 @@ vsx_move_tile_handler_get_class (void)
 }
 
 VsxRequestHandler *
-vsx_move_tile_handler_new (void)
+vsx_set_n_tiles_handler_new (void)
 {
   VsxRequestHandler *handler =
-    vsx_object_allocate (vsx_move_tile_handler_get_class ());
+    vsx_object_allocate (vsx_set_n_tiles_handler_get_class ());
 
   vsx_request_handler_init (handler);
 

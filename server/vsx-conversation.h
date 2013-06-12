@@ -53,7 +53,9 @@ typedef struct
   VsxPlayer *players[VSX_CONVERSATION_MAX_PLAYERS];
 
   /* Number of tiles that have been added to the game */
-  int n_tiles;
+  int n_tiles_in_play;
+  /* Total number of tiles that will be used */
+  int total_n_tiles;
   VsxTile tiles[VSX_TILE_DATA_N_TILES];
 
   gint64 last_shout_time;
@@ -70,6 +72,7 @@ typedef struct
 typedef enum
 {
   VSX_CONVERSATION_STATE_CHANGED,
+  VSX_CONVERSATION_N_TILES_CHANGED,
   VSX_CONVERSATION_MESSAGE_ADDED,
   VSX_CONVERSATION_PLAYER_CHANGED,
   VSX_CONVERSATION_TILE_CHANGED,
@@ -85,6 +88,11 @@ typedef struct
 
 VsxConversation *
 vsx_conversation_new (const char *room_name);
+
+void
+vsx_conversation_set_n_tiles (VsxConversation *conversation,
+                              unsigned int player_num,
+                              int n_tiles);
 
 void
 vsx_conversation_start (VsxConversation *conversation);

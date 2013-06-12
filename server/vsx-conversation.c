@@ -315,6 +315,8 @@ vsx_conversation_new (const char *room_name)
   vsx_object_init (self);
 
   self->id = next_id++;
+  self->n_tiles_in_play = 0;
+  self->total_n_tiles = VSX_TILE_DATA_N_TILES;
 
   vsx_signal_init (&self->changed_signal);
 
@@ -368,6 +370,31 @@ vsx_conversation_new (const char *room_name)
   return self;
 }
 
+void
+vsx_conversation_set_n_tiles (VsxConversation *conversation,
+                              unsigned int player_num,
+                              int n_tiles)
+{
+  VsxPlayer *player = conversation->players[player_num];
+
+  /* Ignore attempts from players that have left */
+  if (!vsx_player_is_connected (player))
+    return;
+
+  /* Don't let the number of tiles chage once the game has started */
+  if (conversation->state != VSX_CONVERSATION_AWAITING_START)
+    return;
+
+  n_tiles = CLAMP (n_tiles, 1, VSX_TILE_DATA_N_TILES);
+
+  if (n_tiles != conversation->total_n_tiles)
+    {
+      conversation->total_n_tiles = n_tiles;
+      vsx_conversation_changed (conversation,
+                                VSX_CONVERSATION_N_TILES_CHANGED);
+    }
+}
+
 static gboolean
 try_location (VsxConversation *conversation,
               int x,
@@ -376,7 +403,7 @@ try_location (VsxConversation *conversation,
   int i;
 
   /* Check if this position would overlap any existing tiles */
-  for (i = 0; i < conversation->n_tiles; i++)
+  for (i = 0; i < conversation->n_tiles_in_play; i++)
     {
       const VsxTile *tile = conversation->tiles + i;
 
@@ -434,7 +461,7 @@ vsx_conversation_turn (VsxConversation *conversation,
 {
   VsxPlayer *player = conversation->players[player_num];
   gboolean is_first_turn =
-    conversation->n_tiles == 0;
+    conversation->n_tiles_in_play == 0;
   VsxTile *tile;
 
   /* Ignore attempts to shout for a player that has left */
@@ -451,14 +478,14 @@ vsx_conversation_turn (VsxConversation *conversation,
     return;
 
   /* Ignore turns if all of the tiles are already in */
-  if (conversation->n_tiles >= VSX_TILE_DATA_N_TILES)
+  if (conversation->n_tiles_in_play >= conversation->total_n_tiles)
     return;
 
-  tile = conversation->tiles + conversation->n_tiles;
+  tile = conversation->tiles + conversation->n_tiles_in_play;
 
   find_free_location (conversation, &tile->x, &tile->y);
 
-  conversation->n_tiles++;
+  conversation->n_tiles_in_play++;
 
   /* Once the first tile is flipped the game is considered to be
    * started so no more players can join */

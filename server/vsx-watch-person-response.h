@@ -30,6 +30,7 @@ typedef enum
   VSX_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER,
   VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER,
   VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_N_TILES,
   VSX_WATCH_PERSON_RESPONSE_WRITING_NAME,
   VSX_WATCH_PERSON_RESPONSE_WRITING_PLAYER,
   VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT,
@@ -56,20 +57,24 @@ typedef struct
   /* Number of players that we've sent a "player-name" event for */
   unsigned int named_players;
 
-  /* The player or tile number that we're currently updating */
-  unsigned int current_dirty_thing;
   union
   {
+    /* The number of tiles that was current when we started sending
+     * it */
+    int n_tiles;
+
     /* The state that was current when we started sending the player
      * state */
     struct
     {
+      unsigned int num;
       VsxPlayerFlags flags;
     } player;
 
     /* Same for the tile state */
     struct
     {
+      unsigned int num;
       gint16 x, y;
       gint16 last_player;
     } tile;
@@ -86,6 +91,8 @@ typedef struct
   gboolean last_typing_state;
 
   int pending_shout;
+
+  gboolean pending_n_tiles;
 } VsxWatchPersonResponse;
 
 VsxResponse *

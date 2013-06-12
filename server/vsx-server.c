@@ -37,6 +37,7 @@
 #include "vsx-new-person-handler.h"
 #include "vsx-leave-handler.h"
 #include "vsx-shout-handler.h"
+#include "vsx-set-n-tiles-handler.h"
 #include "vsx-send-message-handler.h"
 #include "vsx-watch-person-handler.h"
 #include "vsx-start-typing-handler.h"
@@ -142,6 +143,7 @@ requests[] =
     { "/watch_person", vsx_watch_person_handler_new },
     { "/new_person", vsx_new_person_handler_new },
     { "/shout", vsx_shout_handler_new },
+    { "/set_n_tiles", vsx_set_n_tiles_handler_new },
     { "/leave", vsx_leave_handler_new }
   };
 

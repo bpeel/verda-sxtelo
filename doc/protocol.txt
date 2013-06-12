@@ -98,6 +98,13 @@ ohter request is send. If no request is received after a certain
 amount of time the server will assume the client has disconnected and
 will remove the player from the game they are in.
 
+* GET /set_n_tiles?<person_id>&<n_tiles>
+
+Sets the number of tiles that will be used for this game. This will
+only have any effect if it is called before the game starts. It will
+cause a “n_tiles” message to be sent to every player. The value will
+be clamped to the range 0 to 122.
+
 == Data response ==
 
 The response to the /watch_person and /new_person requests is a long
@@ -132,6 +139,14 @@ string keys:
   "id": This is a string containing 16 hexdecimal characters to
   identify this person. This value should be passed as the query
   string to all of the other requests.
+
+* "n-tiles"
+
+This will be sent after the header to specify the number of tiles that
+will be used for this game. If any player calls /set_n_tiles before
+the game starts it will also be resent. Note that it is not sent while
+the game is in progress. The argument is a single integer specifying
+the number of tiles.
 
 * "tile"
 
