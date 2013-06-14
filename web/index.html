@@ -49,30 +49,40 @@
     <div class="content">
       <div id="status-note">
       </div>
-      <div id="board">
-        <div id="shout-message" style="display: none"></div>
-        <div id="player-0-holder" class="player-holder">
-          <div id="player-0"></div>
-        </div>
-        <div id="player-1-holder" class="player-holder">
-          <div id="player-1"></div>
-        </div>
-        <div id="player-2-holder" class="player-holder">
-          <div id="player-2"></div>
-        </div>
-        <div id="player-3-holder" class="player-holder">
-          <div id="player-3"></div>
-        </div>
-        <div id="player-4-holder" class="player-holder">
-          <div id="player-4"></div>
-        </div>
-        <div id="player-5-holder" class="player-holder">
-          <div id="player-5"></div>
+      <div id="scaled-region">
+        <div id="board">
+          <div id="shout-message" style="display: none"></div>
+          <div id="player-0-holder" class="player-holder">
+            <div id="player-0"></div>
+          </div>
+          <div id="player-1-holder" class="player-holder">
+            <div id="player-1"></div>
+          </div>
+          <div id="player-2-holder" class="player-holder">
+            <div id="player-2"></div>
+          </div>
+          <div id="player-3-holder" class="player-holder">
+            <div id="player-3"></div>
+          </div>
+          <div id="player-4-holder" class="player-holder">
+            <div id="player-4"></div>
+          </div>
+          <div id="player-5-holder" class="player-holder">
+            <div id="player-5"></div>
+          </div>
         </div>
         <div id="start-note" style="display: none">
           <div>
             <p>@START_NOTE@</p>
             <p>@PLAY_TIME_NOTE@</p>
+            <p>@GAME_LENGTH@
+              <select id="game-length">
+                <option value="short">@SHORT_GAME@</option>
+                <option value="normal" selected="selected">
+                  @NORMAL_GAME@
+                </option>
+              </select>
+            </p>
           </div>
         </div>
       </div>

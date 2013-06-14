@@ -23,6 +23,15 @@ Atendu pliajn ludantojn aŭ premu la butonon “Turnu” por komenci la ludon.
 @PLAY_TIME_NOTE@
 Populara horo por ludi estas lunde je la 19a UTC.
 
+@GAME_LENGTH@
+Elektu la longecon de la ludo:
+
+@SHORT_GAME@
+Rapida ludo (50 tegoletoj)
+
+@NORMAL_GAME@
+Normala ludo (122 tegoletoj)
+
 @CONNECTING@
 Konektante...
 

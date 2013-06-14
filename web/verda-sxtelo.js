@@ -20,7 +20,9 @@ var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
 var SHOUT_TIME = 10 * 1000;
 var CONNECT_RETRY_TIME = 5 * 1000;
 var TILE_SIZE = 20;
-var N_TILES = 122;
+var SHORT_GAME_N_TILES = 50;
+var NORMAL_GAME_N_TILES = 122;
+var DEFAULT_N_TILES = NORMAL_GAME_N_TILES;
 
 var PLAYER_CONNECTED = (1 << 0);
 var PLAYER_TYPING = (1 << 1);
@@ -94,6 +96,7 @@ function ChatSession (playerName)
   this.retryCount = 0;
   this.pendingTimeouts = [];
   this.soundOn = true;
+  this.totalNumTiles = DEFAULT_N_TILES;
 
   this.playerName = playerName || "ludanto";
 
@@ -109,13 +112,13 @@ function ChatSession (playerName)
 
 ChatSession.prototype.handleResize = function ()
 {
-  var board = $("#board");
+  var scaledRegion = $("#scaled-region");
   var mb = $("#messages-box");
   var winHeight = $(window).height ();
   var content = $(".content");
 
   /* Reset the heights back to the default */
-  board.css ("font-size", "1.0em");
+  scaledRegion.css ("font-size", "1.0em");
   mb.css ("height", "");
 
   var contentOffset = content.offset ();
@@ -123,12 +126,13 @@ ChatSession.prototype.handleResize = function ()
 
   if (contentBottom > winHeight)
   {
-    /* Scale the board so that the contents will exactly fit */
-    var boardHeight = board.outerHeight ();
+    /* Scale the scaledRegion so that the contents will exactly fit */
+    var boardHeight = scaledRegion.outerHeight ();
 
     if (contentBottom - winHeight < boardHeight)
-      board.css ("font-size",
-                 (1.0 - (contentBottom - winHeight) / boardHeight) + "em");
+      scaledRegion.css ("font-size",
+                        (1.0 - (contentBottom - winHeight) / boardHeight) +
+                        "em");
   }
   else
   {
@@ -142,7 +146,7 @@ ChatSession.prototype.handleResize = function ()
   dummyElem.style.width = "100em";
   dummyElem.style.height = "100em";
   dummyElem.style.position = "absolute";
-  board.append (dummyElem);
+  scaledRegion.append (dummyElem);
   this.pixelsPerEm = $(dummyElem).innerWidth () / 100.0;
   $(dummyElem).remove ();
 };
@@ -152,7 +156,7 @@ ChatSession.prototype.canTurn = function ()
   if (this.shoutingPlayer != null)
     return false;
 
-  if (this.tiles.length >= N_TILES)
+  if (this.tiles.length >= this.totalNumTiles)
     return false;
 
   if (this.tiles.length == 0)
@@ -183,7 +187,7 @@ ChatSession.prototype.updateShoutButton = function ()
 
 ChatSession.prototype.updateRemainingTiles = function ()
 {
-  $("#num-tiles").text (N_TILES - this.tiles.length);
+  $("#num-tiles").text (this.totalNumTiles - this.tiles.length);
 };
 
 ChatSession.prototype.setState = function (state)
@@ -263,6 +267,25 @@ ChatSession.prototype.handleHeader = function (header)
 
   $("#status-note").text ("");
   this.setState ("in-progress");
+};
+
+ChatSession.prototype.getGameLengthForNTiles = function (n_tiles)
+{
+  if (Math.abs (n_tiles - SHORT_GAME_N_TILES) <
+      Math.abs (n_tiles - NORMAL_GAME_N_TILES))
+    return "short";
+  else
+    return "normal";
+};
+
+ChatSession.prototype.handleNTiles = function (data)
+{
+  if (typeof (data) != "number")
+    this.setError ("@BAD_DATA@");
+
+  $("#game-length").val (this.getGameLengthForNTiles (data));
+  this.totalNumTiles = data;
+  this.updateRemainingTiles ();
 };
 
 ChatSession.prototype.handlePlayerName = function (data)
@@ -499,6 +522,10 @@ ChatSession.prototype.processMessage = function (message)
     this.handleHeader (message[1]);
     break;
 
+  case "n-tiles":
+    this.handleNTiles (message[1]);
+    break;
+
   case "end":
     this.handleEnd ();
     break;
@@ -718,19 +745,14 @@ ChatSession.prototype.sendNextMessage = function ()
                                            "text/plain; charset=UTF-8");
     this.sendMessageAjax.send (message[1]);
   }
-  else if (message[0] == "move-tile")
-  {
-    this.sendMessageAjax.open ("GET",
-                               this.getUrl ("move_tile?" + this.personId + "&" +
-                                            message[1] + "&" +
-                                            message[2] + "&" +
-                                            message[3]));
-    this.sendMessageAjax.send ();
-  }
   else
   {
-    this.sendMessageAjax.open ("GET",
-                               this.getUrl (message[0] + "?" + this.personId));
+    var url = message[0] + "?" + this.personId;
+
+    if (message.length > 1)
+      url = url + "&" + message.slice (1).join ("&");
+
+    this.sendMessageAjax.open ("GET", this.getUrl (url));
     this.sendMessageAjax.send ();
   }
 
@@ -880,7 +902,7 @@ ChatSession.prototype.moveTile = function (tileNum, x, y)
   /* If we've already queued this move then just update the position */
   for (i = 0; i < this.messageQueue.length; i++)
   {
-    if (this.messageQueue[i][0] == "move-tile" &&
+    if (this.messageQueue[i][0] == "move_tile" &&
         this.messageQueue[i][1] == tileNum)
     {
       this.messageQueue[i][2] = x;
@@ -889,7 +911,7 @@ ChatSession.prototype.moveTile = function (tileNum, x, y)
     }
   }
 
-  this.messageQueue.push (["move-tile", tileNum, x, y]);
+  this.messageQueue.push (["move_tile", tileNum, x, y]);
   this.sendNextMessage ();
 };
 
@@ -1068,6 +1090,33 @@ ChatSession.prototype.touchCancelCb = function (event)
   }
 };
 
+ChatSession.prototype.gameLengthChangeCb = function (event)
+{
+  var length = this.getGameLengthForNTiles (this.totalNumTiles);
+  var lengthElem = $("#game-length");
+
+  if (length != lengthElem.val ())
+  {
+    if (lengthElem.val () == "short")
+      length = SHORT_GAME_N_TILES;
+    else
+      length = NORMAL_GAME_N_TILES;
+
+    /* If we've already queued this move then just update the position */
+    for (i = 0; i < this.messageQueue.length; i++)
+    {
+      if (this.messageQueue[i][0] == "set_n_tiles")
+      {
+        this.messageQueue[i][1] = length;
+        return;
+      }
+    }
+
+    this.messageQueue.push (["set_n_tiles", length]);
+    this.sendNextMessage ();
+  }
+};
+
 ChatSession.prototype.start = function ()
 {
   $("#status-note").text ("@CONNECTING@");
@@ -1097,6 +1146,8 @@ ChatSession.prototype.start = function ()
   $("#board").bind ("touchmove", this.touchMoveCb.bind (this));
 
   $("#sound-toggle").bind ("click", this.soundToggleClickCb.bind (this));
+
+  $("#game-length").change (this.gameLengthChangeCb.bind (this));
 
   $(document).keydown (this.documentKeyDownCb.bind (this));
 
