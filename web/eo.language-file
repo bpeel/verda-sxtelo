@@ -21,7 +21,8 @@ Ludu!
 Atendu pliajn ludantojn aŭ premu la butonon “Turnu” por komenci la ludon.
 
 @PLAY_TIME_NOTE@
-Populara horo por ludi estas lunde je la 19a UTC.
+Populara horo por ludi estas lunde je la <a href="#"
+id="game-time-url" target="_blank">19a UTC</a>.
 
 @GAME_LENGTH@
 Elektu la longecon de la ludo:

@@ -1117,6 +1117,44 @@ ChatSession.prototype.gameLengthChangeCb = function (event)
   }
 };
 
+ChatSession.prototype.padNumber = function (num)
+{
+  num = "" + num;
+
+  return num.length == 1 ? "0" + num : num;
+};
+
+ChatSession.prototype.updateNextGameTime = function ()
+{
+  var GAME_DAY = 1; /* Mondays */
+  var GAME_TIME = 19; /* 7pm UTC */
+  var now = new Date ();
+
+  var daysAdd = GAME_DAY - now.getUTCDay ();
+
+  if (daysAdd < 0 ||
+      (daysAdd == 0 && now.getUTCHours () >= GAME_TIME + 1))
+    daysAdd += 7;
+
+  var gameDay = new Date (now.getTime () + daysAdd * 24 * 60 * 60 * 1000);
+  var gameTime = new Date (Date.UTC (gameDay.getUTCFullYear (),
+                                     gameDay.getUTCMonth (),
+                                     gameDay.getUTCDate (),
+                                     GAME_TIME,
+                                     0, /* hours */
+                                     0 /* seconds */));
+
+  var url = ("http://www.timeanddate.com/worldclock/fixedtime.html?iso=" +
+             gameTime.getUTCFullYear () +
+             this.padNumber (gameTime.getUTCMonth () + 1) +
+             this.padNumber (gameTime.getUTCDate ()) +
+             "T" + this.padNumber (GAME_TIME) +
+             "&ah=1" +
+             "&msg=Verda+%c5%9ctelo");
+
+  $("#game-time-url").attr ("href", url);
+};
+
 ChatSession.prototype.start = function ()
 {
   $("#status-note").text ("@CONNECTING@");
@@ -1156,6 +1194,7 @@ ChatSession.prototype.start = function ()
   $(window).unload (this.unloadCb.bind (this));
 
   this.updateRemainingTiles ();
+  this.updateNextGameTime ();
 
   $("#start-note").show ();
 };
