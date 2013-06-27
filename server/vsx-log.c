@@ -187,10 +187,7 @@ vsx_log_start (GError **error)
                                     TRUE, /* joinable */
                                     error);
 
-  if (vsx_log_thread == NULL)
-    vsx_log_close ();
-
-  return TRUE;
+  return vsx_log_thread != NULL;
 }
 
 void
