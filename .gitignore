@@ -20,6 +20,7 @@
 /server/vsx-enum-types.c
 /server/vsx-enum-types.h
 /server/stamp-enum-types
+/server/verda-sxtelo.service
 /client/Makefile
 /client/Makefile.in
 /client/verda-sxtelo-client

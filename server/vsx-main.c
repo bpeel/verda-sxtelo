@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -268,8 +268,6 @@ main (int argc, char **argv)
                 }
               else
                 {
-                  vsx_log ("Server listening on port %i", option_listen_port);
-
                   if (!vsx_server_run (server, &error))
                     vsx_log ("%s", error->message);
 

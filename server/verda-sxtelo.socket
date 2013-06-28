@@ -1,0 +1,8 @@
+[Unit]
+Description=Activation socket for Verda Ŝtelo
+
+[Socket]
+ListenStream=5142
+
+[Install]
+WantedBy=sockets.target

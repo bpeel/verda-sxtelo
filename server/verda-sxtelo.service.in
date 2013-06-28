@@ -1,0 +1,14 @@
+[Unit]
+Description=Server for Verda Ŝtelo
+Requires=verda-sxtelo.socket
+
+[Service]
+ExecStart=@bindir@/verda-sxtelo \
+          -u nobody \
+          -g nobody \
+          -l /var/log/verda-sxtelo.log
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
+Also=verda-sxtelo.socket

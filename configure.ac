@@ -19,6 +19,12 @@ AC_ARG_ENABLE([server],
               [],
               [enable_server=yes])
 
+AC_ARG_ENABLE([systemd],
+              [AC_HELP_STRING([--enable-systemd=@<:@no/yes@:>@],
+                              [Enable socket activation support via systemd @<:@default=yes@:>@])],
+              [],
+              [enable_systemd=yes])
+
 AS_IF([test "x$enable_server" = "xyes"],
       [have_epoll=yes
        AC_CHECK_HEADER(sys/epoll.h, , have_epoll=no)
@@ -26,7 +32,13 @@ AS_IF([test "x$enable_server" = "xyes"],
        AC_CHECK_FUNC(epoll_ctl, , have_epoll=no)
        AS_IF([test "x$have_epoll" = "xno"],
              AC_MSG_ERROR([epoll support is required to build the verda sxtelo server.
-This should be provided by glibc since version 2.3.2]))])
+This should be provided by glibc since version 2.3.2]))],
+      [enable_systemd=no])
+
+AS_IF([test "x$enable_systemd" = "xyes"],
+      [PKG_CHECK_MODULES(LIBSYSTEMD_DAEMON, [libsystemd-daemon])
+       AC_DEFINE(USE_SYSTEMD, 1, [Enable socket activation via systemd])])
+AM_CONDITIONAL(USE_SYSTEMD, [test "x$enable_systemd" = "xyes"])
 
 AM_CONDITIONAL(BUILD_SERVER, [test "x$enable_server" = "xyes"])
 

@@ -25,6 +25,10 @@
 #include <sys/socket.h>
 #include <errno.h>
 
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #include "vsx-server.h"
 #include "vsx-main-context.h"
 #include "vsx-http-parser.h"
@@ -640,22 +644,31 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
 }
 
 static char *
-get_peer_address_string (GSocket *client_socket)
+get_address_string (GSocketAddress *address,
+                    gboolean include_port)
 {
-  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
   char *address_string = NULL;
 
   if (address)
     {
       if (G_IS_INET_SOCKET_ADDRESS (address))
         {
-          GInetSocketAddress *inet_socket_address
-            = (GInetSocketAddress *) address;
-          GInetAddress *inet_address
-            = g_inet_socket_address_get_address (inet_socket_address);
+          GInetSocketAddress *inet_socket_address =
+            (GInetSocketAddress *) address;
+          GInetAddress *inet_address =
+            g_inet_socket_address_get_address (inet_socket_address);
+          char *host_part = g_inet_address_to_string (inet_address);
 
-          address_string =
-            g_inet_address_to_string ((GInetAddress *) inet_address);
+          if (include_port)
+            {
+              guint16 port =
+                g_inet_socket_address_get_port (inet_socket_address);
+
+              address_string = g_strdup_printf ("%s:%u", host_part, port);
+              g_free (host_part);
+            }
+          else
+            address_string = host_part;
         }
 
       g_object_unref (address);
@@ -665,6 +678,14 @@ get_peer_address_string (GSocket *client_socket)
     return g_strdup ("(unknown)");
   else
     return address_string;
+}
+
+static char *
+get_peer_address_string (GSocket *client_socket)
+{
+  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
+
+  return get_address_string (address, FALSE /* include_port */);
 }
 
 static void
@@ -748,44 +769,90 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
     }
 }
 
+static GSocket *
+create_server_socket (GSocketAddress *address,
+                      GError **error)
+{
+  GSocket *socket;
+
+#ifdef USE_SYSTEMD
+  {
+    int nfds = sd_listen_fds (TRUE /* unset_environment */);
+
+    if (nfds < 0)
+      {
+        g_set_error (error,
+                     G_FILE_ERROR,
+                     g_file_error_from_errno (-nfds),
+                     "Error getting systemd fds: %s",
+                     strerror (-nfds));
+        return NULL;
+      }
+    else if (nfds > 1)
+      {
+        g_set_error (error,
+                     G_FILE_ERROR,
+                     G_FILE_ERROR_BADF,
+                     "Received too many file descriptors from systemd");
+        return NULL;
+      }
+    else if (nfds == 1)
+      {
+        socket = g_socket_new_from_fd (SD_LISTEN_FDS_START, error);
+
+        if (socket)
+          g_socket_set_blocking (socket, FALSE);
+
+        return socket;
+      }
+  }
+#endif /* USE_SYSTEMD */
+
+  socket = g_socket_new (g_socket_address_get_family (address),
+                         G_SOCKET_TYPE_STREAM,
+                         G_SOCKET_PROTOCOL_DEFAULT,
+                         error);
+
+  if (socket == NULL)
+    return NULL;
+
+  g_socket_set_blocking (socket, FALSE);
+
+  if (!g_socket_bind (socket, address, TRUE, error) ||
+      !g_socket_listen (socket, error))
+    {
+      g_object_unref (socket);
+      return NULL;
+    }
+
+  return socket;
+}
+
 VsxServer *
 vsx_server_new (GSocketAddress *address,
                 GError **error)
 {
   VsxServer *server;
+  GSocket *socket;
 
   g_return_val_if_fail (G_IS_SOCKET_ADDRESS (address), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+  socket = create_server_socket (address, error);
+
+  if (socket == NULL)
+    return NULL;
+
   server = g_new0 (VsxServer, 1);
 
-  server->server_socket = g_socket_new (g_socket_address_get_family (address),
-                                        G_SOCKET_TYPE_STREAM,
-                                        G_SOCKET_PROTOCOL_DEFAULT,
-                                        error);
-
-  g_socket_set_blocking (server->server_socket, FALSE);
-
-  if (server->server_socket == NULL)
-    goto error;
-
-  if (!g_socket_bind (server->server_socket,
-                      address,
-                      TRUE,
-                      error))
-    goto error;
-
-  if (!g_socket_listen (server->server_socket,
-                        error))
-    goto error;
-
+  server->server_socket = socket;
   server->person_set = vsx_person_set_new ();
 
   server->pending_conversations = vsx_conversation_set_new ();
 
   server->server_socket_source =
     vsx_main_context_add_poll (NULL /* default context */,
-                               g_socket_get_fd (server->server_socket),
+                               g_socket_get_fd (socket),
                                VSX_MAIN_CONTEXT_POLL_IN,
                                vsx_server_pending_connection_cb,
                                server);
@@ -795,14 +862,6 @@ vsx_server_new (GSocketAddress *address,
   vsx_list_init (&server->connections);
 
   return server;
-
- error:
-  if (server->server_socket)
-    g_object_unref (server->server_socket);
-
-  g_free (server);
-
-  return NULL;
 }
 
 static void
@@ -814,6 +873,18 @@ vsx_server_quit_cb (VsxMainContextSource *source,
   *quit_received_ptr = TRUE;
 
   vsx_log ("Quit signal received");
+}
+
+static void
+log_server_listening (VsxServer *server)
+{
+  GSocketAddress *address =
+    g_socket_get_local_address (server->server_socket, NULL);
+  char *address_string = get_address_string (address, TRUE /* include_port */);
+
+  vsx_log ("Server listening on %s", address_string);
+
+  g_free (address_string);
 }
 
 gboolean
@@ -830,6 +901,8 @@ vsx_server_run (VsxServer *server,
   quit_source = vsx_main_context_add_quit (NULL /* default context */,
                                            vsx_server_quit_cb,
                                            &quit_received);
+
+  log_server_listening (server);
 
   while (TRUE)
     {

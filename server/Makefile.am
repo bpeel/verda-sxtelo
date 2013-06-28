@@ -4,6 +4,10 @@ INCLUDES = \
 	$(GLIB_CFLAGS) \
 	-DVSX_LIBDIR=\""$(libdir)"\"
 
+if USE_SYSTEMD
+INCLUDES += $(LIBSYSTEMD_DAEMON_CFLAGS)
+endif
+
 source_h = \
 	$(srcdir)/vsx-arguments.h \
 	$(srcdir)/vsx-chunked-iconv.h \
@@ -77,3 +81,19 @@ verda_sxtelo_SOURCES = \
 
 verda_sxtelo_LDFLAGS = \
 	$(GLIB_LIBS)
+
+if USE_SYSTEMD
+verda_sxtelo_LDFLAGS += $(LIBSYSTEMD_DAEMON_LIBS)
+
+dist_systemd_DATA = \
+	$(builddir)/verda-sxtelo.service \
+	$(srcdir)/verda-sxtelo.socket
+
+systemddir = $(sysconfdir)/verda-sxtelo/services
+endif
+
+%.service : %.service.in
+	$(AM_V_GEN)sed -e 's,@bindir\@,$(bindir),g' $< > $@
+
+EXTRA_DIST = \
+	verda-sxtelo.service.in
