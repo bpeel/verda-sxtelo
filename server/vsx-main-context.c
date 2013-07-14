@@ -533,7 +533,18 @@ vsx_main_context_poll (VsxMainContext *mc)
                   flags |= VSX_MAIN_CONTEXT_POLL_OUT;
                 if (event->events & (EPOLLIN | EPOLLRDHUP))
                   flags |= VSX_MAIN_CONTEXT_POLL_IN;
-                if (event->events & (EPOLLHUP | EPOLLERR))
+                if (event->events & EPOLLHUP)
+                  {
+                    /* If the source is polling for read then we'll
+                     * just mark it as ready for reading so that any
+                     * error or EOF will be handled by the read call
+                     * instead of immediately aborting */
+                    if (source->current_flags & VSX_MAIN_CONTEXT_POLL_IN)
+                      flags |= VSX_MAIN_CONTEXT_POLL_IN;
+                    else
+                      flags |= VSX_MAIN_CONTEXT_POLL_ERROR;
+                  }
+                if (event->events & EPOLLERR)
                   flags |= VSX_MAIN_CONTEXT_POLL_ERROR;
 
                 callback (source, source->fd, flags, source->user_data);
