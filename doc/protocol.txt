@@ -209,6 +209,12 @@ is a javascript hash object containing the following fields:
 Reports that a player in the game has succesfully made a shout. The
 argument is a single integer represent the player number.
 
+* "keep-alive"
+
+This is sent approximately every minute if there is no other data so
+that the client can tell if the connection has gone dead. There is no
+argument.
+
 * "end"
 
 This is sent when the player has left the game and no more messages

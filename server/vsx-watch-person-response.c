@@ -24,6 +24,10 @@
 #include <stdio.h>
 
 #include "vsx-watch-person-response.h"
+#include "vsx-main-context.h"
+
+/* Interval in microseconds between keep-alive messages */
+#define VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL 60000000 /* 1 minute */
 
 static guint8
 header[] =
@@ -59,6 +63,12 @@ header[] =
   "\r\n";
 
 static guint8
+keep_alive[] =
+  "10\r\n"
+  "[\"keep-alive\"]\r\n"
+  "\r\n";
+
+static guint8
 end[] =
   "9\r\n"
   "[\"end\"]\r\n"
@@ -85,6 +95,13 @@ write_message (VsxWatchPersonResponse *self,
   message_data->data += to_write;
   message_data->length -= to_write;
   self->message_pos += to_write;
+
+  /* Some time (half a second) is subtracted from the last write time
+   * so that if we are woken up exactly at the right interval then it
+   * won't skip until the next interval due to the small amount of
+   * time time it takes to write the message */
+  self->last_write_time =
+    vsx_main_context_get_monotonic_clock (NULL) - 500000;
 
   return self->message_pos >= message_length;
 }
@@ -195,6 +212,13 @@ has_pending_data (VsxWatchPersonResponse *self,
   if (!vsx_player_is_connected (self->person->player))
     {
       *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_END;
+      return TRUE;
+    }
+
+  if (vsx_main_context_get_monotonic_clock (NULL) -
+      self->last_write_time >= VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE;
       return TRUE;
     }
 
@@ -474,6 +498,15 @@ vsx_watch_person_response_add_data (VsxResponse *response,
         }
         break;
 
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE:
+        {
+          if (write_static_message (self, &message_data, keep_alive))
+            self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+          else
+            goto done;
+        }
+        break;
+
       case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
         {
           if (write_static_message (self, &message_data, end))
@@ -523,6 +556,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
     case VSX_WATCH_PERSON_RESPONSE_WRITING_TILE:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
       return TRUE;
 
@@ -545,6 +579,8 @@ vsx_watch_person_response_free (void *object)
       vsx_list_remove (&self->conversation_changed_listener.link);
       vsx_object_unref (self->person);
     }
+
+  vsx_main_context_remove_source (self->keep_alive_timer);
 
   vsx_response_get_class ()->parent_class.free (object);
 }
@@ -605,6 +641,17 @@ conversation_changed_cb (VsxListener *listener,
   vsx_response_changed ((VsxResponse *) response);
 }
 
+static void
+keep_alive_timer_cb (VsxMainContextSource *source,
+                     void *user_data)
+{
+  VsxWatchPersonResponse *self = user_data;
+
+  if (vsx_main_context_get_monotonic_clock (NULL) -
+      self->last_write_time >= VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL)
+    vsx_response_changed ((VsxResponse *) self);
+}
+
 VsxResponse *
 vsx_watch_person_response_new (VsxPerson *person,
                                int last_message)
@@ -618,6 +665,14 @@ vsx_watch_person_response_new (VsxPerson *person,
   self->message_num = last_message;
   self->pending_shout = -1;
   self->pending_n_tiles = TRUE;
+
+  self->last_write_time = vsx_main_context_get_monotonic_clock (NULL);
+  self->keep_alive_timer =
+    vsx_main_context_add_timer (NULL, /* default context */
+                                VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL /
+                                60000000,
+                                keep_alive_timer_cb,
+                                self);
 
   vsx_flags_set_range (self->dirty_players,
                        person->conversation->n_players);

@@ -22,6 +22,7 @@
 #include "vsx-response.h"
 #include "vsx-person.h"
 #include "vsx-flags.h"
+#include "vsx-main-context.h"
 
 G_BEGIN_DECLS
 
@@ -37,6 +38,7 @@ typedef enum
   VSX_WATCH_PERSON_RESPONSE_WRITING_TILE,
   VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES,
   VSX_WATCH_PERSON_RESPONSE_WRITING_END,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE,
 
   VSX_WATCH_PERSON_RESPONSE_DONE
 } VsxWatchPersonResponseState;
@@ -93,6 +95,9 @@ typedef struct
   int pending_shout;
 
   gboolean pending_n_tiles;
+
+  gint64 last_write_time;
+  VsxMainContextSource *keep_alive_timer;
 } VsxWatchPersonResponse;
 
 VsxResponse *
