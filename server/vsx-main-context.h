@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -74,12 +74,17 @@ vsx_main_context_add_quit (VsxMainContext *mc,
                            VsxMainContextQuitCallback callback,
                            void *user_data);
 
+VsxMainContextSource *
+vsx_main_context_add_timer (VsxMainContext *mc,
+                            int minutes,
+                            VsxMainContextTimerCallback callback,
+                            void *user_data);
+
 void
 vsx_main_context_remove_source (VsxMainContextSource *source);
 
 void
-vsx_main_context_poll (VsxMainContext *mc,
-                       int timeout);
+vsx_main_context_poll (VsxMainContext *mc);
 
 gint64
 vsx_main_context_get_monotonic_clock (VsxMainContext *mc);

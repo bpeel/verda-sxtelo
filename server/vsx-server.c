@@ -65,7 +65,7 @@ struct _VsxServer
 
   VsxPersonSet *person_set;
 
-  gint64 last_gc_time;
+  VsxMainContextSource *gc_source;
 };
 
 #define VSX_SERVER_OUTPUT_BUFFER_SIZE 1024
@@ -120,9 +120,9 @@ typedef struct
   VsxServerConnection *connection;
 } VsxServerQueuedResponse;
 
-/* Interval time in micro-seconds to run the dead person garbage
+/* Interval time in minutes to run the dead person garbage
    collector */
-#define VSX_SERVER_GC_TIMEOUT (5 * 60 * (gint64) 1000000)
+#define VSX_SERVER_GC_TIMEOUT 5
 
 /* Time in microseconds after which a connection with no responses
  * will be considered dead. This is necessary to avoid keeping around
@@ -399,8 +399,10 @@ check_dead_connection (VsxServerConnection *connection)
 }
 
 static void
-vsx_server_run_gc (VsxServer *server)
+vsx_server_gc_cb (VsxMainContextSource *source,
+                  void *user_data)
 {
+  VsxServer *server = user_data;
   VsxServerConnection *connection, *tmp;
 
   vsx_list_for_each_safe (connection, tmp, &server->connections, link)
@@ -410,8 +412,6 @@ vsx_server_run_gc (VsxServer *server)
      the entire list of people, but it only happens infrequently so
      hopefully it's not a problem */
   vsx_person_set_remove_silent_people (server->person_set);
-
-  server->last_gc_time = vsx_main_context_get_monotonic_clock (NULL);
 }
 
 static void
@@ -856,8 +856,11 @@ vsx_server_new (GSocketAddress *address,
                                VSX_MAIN_CONTEXT_POLL_IN,
                                vsx_server_pending_connection_cb,
                                server);
-
-  server->last_gc_time = vsx_main_context_get_monotonic_clock (NULL);
+  server->gc_source =
+    vsx_main_context_add_timer (NULL, /* default context */
+                                VSX_SERVER_GC_TIMEOUT,
+                                vsx_server_gc_cb,
+                                server);
 
   vsx_list_init (&server->connections);
 
@@ -904,27 +907,9 @@ vsx_server_run (VsxServer *server,
 
   log_server_listening (server);
 
-  while (TRUE)
-    {
-      gint64 wait_time;
-
-      wait_time = (server->last_gc_time + VSX_SERVER_GC_TIMEOUT
-                   - vsx_main_context_get_monotonic_clock (NULL));
-      if (wait_time < 0)
-        wait_time = 0;
-
-      vsx_main_context_poll (NULL /* default context */,
-                             /* microseconds to milliseconds rounding up */
-                             (wait_time + 999) / 1000);
-
-      if (quit_received || server->fatal_error)
-        break;
-
-      if (vsx_main_context_get_monotonic_clock (NULL)
-          - server->last_gc_time
-          >= VSX_SERVER_GC_TIMEOUT)
-        vsx_server_run_gc (server);
-    }
+  do
+    vsx_main_context_poll (NULL /* default context */);
+  while (!quit_received && !server->fatal_error);
 
   vsx_main_context_remove_source (quit_source);
 
@@ -954,6 +939,7 @@ vsx_server_free (VsxServer *server)
   vsx_object_unref (server->pending_conversations);
 
   vsx_main_context_remove_source (server->server_socket_source);
+  vsx_main_context_remove_source (server->gc_source);
 
   g_object_unref (server->server_socket);
 

@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,12 +30,15 @@
 #include <stdlib.h>
 
 #include "vsx-main-context.h"
+#include "vsx-list.h"
 
 /* This is a simple replacement for the GMainLoop which uses
    epoll. The hope is that it will scale to more connections easily
    because it doesn't use poll which needs to upload the set of file
    descriptors every time it blocks and it doesn't have to walk the
    list of file descriptors to find out which object it belongs to */
+
+typedef struct _VsxMainContextBucket VsxMainContextBucket;
 
 struct _VsxMainContext
 {
@@ -49,7 +52,7 @@ struct _VsxMainContext
 
   /* List of quit sources. All of these get invoked when a quit signal
      is received */
-  GSList *quit_sources;
+  VsxList quit_sources;
 
   VsxMainContextSource *quit_pipe_source;
   int quit_pipe[2];
@@ -58,6 +61,9 @@ struct _VsxMainContext
 
   gboolean monotonic_time_valid;
   gint64 monotonic_time;
+
+  VsxList buckets;
+  gint64 last_timer_time;
 };
 
 struct _VsxMainContextSource
@@ -65,17 +71,45 @@ struct _VsxMainContextSource
   enum
   {
     VSX_MAIN_CONTEXT_POLL_SOURCE,
+    VSX_MAIN_CONTEXT_TIMER_SOURCE,
     VSX_MAIN_CONTEXT_QUIT_SOURCE
   } type;
 
-  int fd;
+  union
+  {
+    /* Poll sources */
+    struct
+    {
+      int fd;
+      VsxMainContextPollFlags current_flags;
+    };
+
+    /* Quit sources */
+    struct
+    {
+      VsxList quit_link;
+    };
+
+    /* Timer sources */
+    struct
+    {
+      VsxMainContextBucket *bucket;
+      VsxList timer_link;
+    };
+  };
 
   gpointer user_data;
   void *callback;
 
-  VsxMainContextPollFlags current_flags;
-
   VsxMainContext *mc;
+};
+
+struct _VsxMainContextBucket
+{
+  VsxList link;
+  VsxList sources;
+  int minutes;
+  int minutes_passed;
 };
 
 static VsxMainContext *vsx_main_context_default = NULL;
@@ -143,8 +177,10 @@ vsx_main_context_new (GError **error)
       mc->n_sources = 0;
       mc->events = g_array_new (FALSE, FALSE, sizeof (struct epoll_event));
       mc->monotonic_time_valid = FALSE;
-      mc->quit_sources = NULL;
+      vsx_list_init (&mc->quit_sources);
       mc->quit_pipe_source = NULL;
+      vsx_list_init (&mc->buckets);
+      mc->last_timer_time = vsx_main_context_get_monotonic_clock (mc);
 
       return mc;
     }
@@ -216,16 +252,6 @@ vsx_main_context_modify_poll (VsxMainContextSource *source,
 }
 
 static void
-vsx_main_context_quit_foreach_cb (void *data,
-                                  void *user_data)
-{
-  VsxMainContextSource *source = data;
-  VsxMainContextQuitCallback callback = source->callback;
-
-  callback (source, source->user_data);
-}
-
-static void
 vsx_main_context_quit_pipe_cb (VsxMainContextSource *source,
                                int fd,
                                VsxMainContextPollFlags flags,
@@ -240,7 +266,16 @@ vsx_main_context_quit_pipe_cb (VsxMainContextSource *source,
         g_warning ("Read from quit pipe failed: %s", strerror (errno));
     }
   else
-    g_slist_foreach (mc->quit_sources, vsx_main_context_quit_foreach_cb, mc);
+    {
+      VsxMainContextSource *quit_source;
+
+      vsx_list_for_each (quit_source, &mc->quit_sources, quit_link)
+        {
+          VsxMainContextQuitCallback callback = quit_source->callback;
+
+          callback (quit_source, quit_source->user_data);
+        }
+    }
 }
 
 static void
@@ -264,12 +299,11 @@ vsx_main_context_add_quit (VsxMainContext *mc,
     mc = vsx_main_context_get_default_or_abort ();
 
   source->mc = mc;
-  source->fd = -1;
   source->callback = callback;
   source->type = VSX_MAIN_CONTEXT_QUIT_SOURCE;
   source->user_data = user_data;
 
-  mc->quit_sources = g_slist_prepend (mc->quit_sources, source);
+  vsx_list_insert (&mc->quit_sources, &source->quit_link);
 
   mc->n_sources++;
 
@@ -295,6 +329,51 @@ vsx_main_context_add_quit (VsxMainContext *mc,
   return source;
 }
 
+static VsxMainContextBucket *
+get_bucket (VsxMainContext *mc,
+            int minutes)
+{
+  VsxMainContextBucket *bucket;
+
+  vsx_list_for_each (bucket, &mc->buckets, link)
+    {
+      if (bucket->minutes == minutes)
+        return bucket;
+    }
+
+  bucket = g_slice_new (VsxMainContextBucket);
+  vsx_list_init (&bucket->sources);
+  bucket->minutes = minutes;
+  bucket->minutes_passed = 0;
+  vsx_list_insert (&mc->buckets, &bucket->link);
+
+  return bucket;
+}
+
+VsxMainContextSource *
+vsx_main_context_add_timer (VsxMainContext *mc,
+                            int minutes,
+                            VsxMainContextTimerCallback callback,
+                            void *user_data)
+{
+  VsxMainContextSource *source = g_slice_new (VsxMainContextSource);
+
+  if (mc == NULL)
+    mc = vsx_main_context_get_default_or_abort ();
+
+  source->mc = mc;
+  source->bucket = get_bucket (mc, minutes);
+  source->callback = callback;
+  source->type = VSX_MAIN_CONTEXT_TIMER_SOURCE;
+  source->user_data = user_data;
+
+  vsx_list_insert (&source->bucket->sources, &source->timer_link);
+
+  mc->n_sources++;
+
+  return source;
+}
+
 void
 vsx_main_context_remove_source (VsxMainContextSource *source)
 {
@@ -309,7 +388,21 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
       break;
 
     case VSX_MAIN_CONTEXT_QUIT_SOURCE:
-      mc->quit_sources = g_slist_remove (mc->quit_sources, source);
+      vsx_list_remove (&source->quit_link);
+      break;
+
+    case VSX_MAIN_CONTEXT_TIMER_SOURCE:
+      {
+        VsxMainContextBucket *bucket = source->bucket;
+
+        vsx_list_remove (&source->timer_link);
+
+        if (vsx_list_empty (&bucket->sources))
+          {
+            vsx_list_remove (&bucket->link);
+            g_slice_free (VsxMainContextBucket, bucket);
+          }
+      }
       break;
     }
 
@@ -318,9 +411,82 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
   mc->n_sources--;
 }
 
+static int
+get_timeout (VsxMainContext *mc)
+{
+  VsxMainContextBucket *bucket;
+  int min_minutes;
+  gint64 elapsed, elapsed_minutes;
+
+  if (vsx_list_empty (&mc->buckets))
+    return -1;
+
+  min_minutes = G_MAXINT;
+
+  vsx_list_for_each (bucket, &mc->buckets, link)
+    {
+      int minutes_to_wait = bucket->minutes - bucket->minutes_passed;
+
+      if (minutes_to_wait < min_minutes)
+        min_minutes = minutes_to_wait;
+    }
+
+  elapsed = vsx_main_context_get_monotonic_clock (mc) - mc->last_timer_time;
+  elapsed_minutes = elapsed / 60000000;
+
+  /* If we've already waited enough time then don't wait any further time */
+  if (elapsed_minutes >= min_minutes)
+    return 0;
+
+  /* Subtract the number of minutes we've already waited */
+  min_minutes -= (int) elapsed_minutes;
+
+  return (60000 - (elapsed / 1000 % 60000) + (min_minutes - 1) * 60000);
+}
+
+static void
+emit_bucket (VsxMainContextBucket *bucket)
+{
+  VsxMainContextSource *source, *tmp_source;
+
+  vsx_list_for_each_safe (source, tmp_source, &bucket->sources, timer_link)
+    {
+      VsxMainContextTimerCallback callback = source->callback;
+
+      callback (source, source->user_data);
+    }
+
+  bucket->minutes_passed = 0;
+}
+
+static void
+check_timer_sources (VsxMainContext *mc)
+{
+  VsxMainContextBucket *bucket, *tmp_bucket;
+  gint64 now;
+  gint64 elapsed_minutes;
+
+  if (vsx_list_empty (&mc->buckets))
+    return;
+
+  now = vsx_main_context_get_monotonic_clock (mc);
+  elapsed_minutes = (now - mc->last_timer_time) / 60000000;
+  mc->last_timer_time += elapsed_minutes * 60000000;
+
+  if (elapsed_minutes < 1)
+    return;
+
+  vsx_list_for_each_safe (bucket, tmp_bucket, &mc->buckets, link)
+    {
+      if (bucket->minutes_passed + elapsed_minutes >= bucket->minutes)
+        emit_bucket (bucket);
+      else
+        bucket->minutes_passed += elapsed_minutes;
+    }
+}
+
 void
-vsx_main_context_poll (VsxMainContext *mc,
-                       int timeout)
+vsx_main_context_poll (VsxMainContext *mc)
 {
   int n_events;
 
@@ -334,7 +500,7 @@ vsx_main_context_poll (VsxMainContext *mc,
                                          struct epoll_event,
                                          0),
                          mc->n_sources,
-                         timeout);
+                         get_timeout (mc));
 
   /* Once we've polled we can assume that some time has passed so our
      cached value of the monotonic clock is no longer valid */
@@ -375,10 +541,13 @@ vsx_main_context_poll (VsxMainContext *mc,
               break;
 
             case VSX_MAIN_CONTEXT_QUIT_SOURCE:
+            case VSX_MAIN_CONTEXT_TIMER_SOURCE:
               g_warn_if_reached ();
               break;
             }
         }
+
+      check_timer_sources (mc);
     }
 }
 
