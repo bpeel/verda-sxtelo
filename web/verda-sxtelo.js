@@ -97,6 +97,7 @@ function ChatSession (playerName)
   this.pendingTimeouts = [];
   this.soundOn = true;
   this.totalNumTiles = DEFAULT_N_TILES;
+  this.lastDataTime = new Date ();
 
   this.playerName = playerName || "ludanto";
 
@@ -578,7 +579,21 @@ ChatSession.prototype.checkData = function ()
       this.processMessage (message);
 
       this.watchPosition += terminatorPos + 2;
+
+      this.lastDataTime = new Date ();
     }
+};
+
+ChatSession.prototype.checkDataIntervalCb = function ()
+{
+  var now = new Date ();
+
+  if (now.getTime () - this.lastDataTime.getTime () >= KEEP_ALIVE_TIME)
+    /* We haven't had any data for too long so something has gone
+     * wrong and we'll try reconnecting */
+    this.startWatchAjax ();
+  else
+    this.checkData ();
 };
 
 ChatSession.prototype.clearCheckDataInterval = function ()
@@ -593,7 +608,8 @@ ChatSession.prototype.clearCheckDataInterval = function ()
 ChatSession.prototype.resetCheckDataInterval = function ()
 {
   this.clearCheckDataInterval ();
-  this.checkDataInterval = setInterval (this.checkData.bind (this), 3000);
+  this.checkDataInterval =
+    setInterval (this.checkDataIntervalCb.bind (this), 3000);
 };
 
 ChatSession.prototype.addTimeout = function (func, interval)
