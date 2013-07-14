@@ -24,12 +24,17 @@
 
 #include "vsx-person-set.h"
 
+#define VSX_PERSON_SET_REMOVE_SILENT_PEOPLE_INTERVAL 5
+
 static void
 vsx_person_set_free (void *object)
 {
   VsxPersonSet *self = object;
 
   g_hash_table_destroy (self->hash_table);
+
+  if (self->people_timer_source)
+    vsx_main_context_remove_source (self->people_timer_source);
 
   vsx_object_get_class ()->free (object);
 }
@@ -47,6 +52,44 @@ vsx_person_set_get_class (void)
     }
 
   return &klass;
+}
+
+static gboolean
+remove_silent_people_cb (gpointer key,
+                         gpointer value,
+                         gpointer user_data)
+{
+  VsxPerson *person = value;
+
+  if (vsx_person_is_silent (person))
+    {
+      if (person->conversation)
+        vsx_person_leave_conversation (person);
+
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+void
+remove_silent_people_timer_cb (VsxMainContextSource *source,
+                               void *user_data)
+{
+  VsxPersonSet *set = user_data;
+
+  /* This is probably relatively expensive because it has to iterate
+     the entire list of people, but it only happens infrequently so
+     hopefully it's not a problem */
+  g_hash_table_foreach_remove (set->hash_table,
+                               remove_silent_people_cb,
+                               NULL);
+
+  if (g_hash_table_size (set->hash_table) == 0)
+    {
+      vsx_main_context_remove_source (source);
+      set->people_timer_source = NULL;
+    }
 }
 
 VsxPersonSet *
@@ -102,31 +145,12 @@ vsx_person_set_generate_person (VsxPersonSet *set,
 
   g_hash_table_insert (set->hash_table, &person->id, vsx_object_ref (person));
 
+  if (set->people_timer_source == NULL)
+    set->people_timer_source =
+      vsx_main_context_add_timer (NULL, /* default context */
+                                  VSX_PERSON_SET_REMOVE_SILENT_PEOPLE_INTERVAL,
+                                  remove_silent_people_timer_cb,
+                                  set);
+
   return person;
-}
-
-static gboolean
-remove_silent_people_cb (gpointer key,
-                         gpointer value,
-                         gpointer user_data)
-{
-  VsxPerson *person = value;
-
-  if (vsx_person_is_silent (person))
-    {
-      if (person->conversation)
-        vsx_person_leave_conversation (person);
-
-      return TRUE;
-    }
-  else
-    return FALSE;
-}
-
-void
-vsx_person_set_remove_silent_people (VsxPersonSet *set)
-{
-  g_hash_table_foreach_remove (set->hash_table,
-                               remove_silent_people_cb,
-                               NULL);
 }

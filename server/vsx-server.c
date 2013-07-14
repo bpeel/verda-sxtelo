@@ -407,11 +407,6 @@ vsx_server_gc_cb (VsxMainContextSource *source,
 
   vsx_list_for_each_safe (connection, tmp, &server->connections, link)
     check_dead_connection (connection);
-
-  /* This is probably relatively expensive because it has to iterate
-     the entire list of people, but it only happens infrequently so
-     hopefully it's not a problem */
-  vsx_person_set_remove_silent_people (server->person_set);
 }
 
 static void
@@ -425,6 +420,12 @@ vsx_server_remove_connection (VsxServer *server,
   vsx_list_remove (&connection->link);
   g_free (connection->peer_address_string);
   g_slice_free (VsxServerConnection, connection);
+
+  if (vsx_list_empty (&server->connections))
+    {
+      vsx_main_context_remove_source (server->gc_source);
+      server->gc_source = NULL;
+    }
 
   /* Reset the poll on the server socket in case we previously stopped
      listening because we ran out of file descriptors. This will do
@@ -766,6 +767,13 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         connection->peer_address_string = NULL;
 
       connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
+
+      if (server->gc_source == NULL)
+        server->gc_source =
+          vsx_main_context_add_timer (NULL, /* default context */
+                                      VSX_SERVER_GC_TIMEOUT,
+                                      vsx_server_gc_cb,
+                                      server);
     }
 }
 
@@ -856,11 +864,6 @@ vsx_server_new (GSocketAddress *address,
                                VSX_MAIN_CONTEXT_POLL_IN,
                                vsx_server_pending_connection_cb,
                                server);
-  server->gc_source =
-    vsx_main_context_add_timer (NULL, /* default context */
-                                VSX_SERVER_GC_TIMEOUT,
-                                vsx_server_gc_cb,
-                                server);
 
   vsx_list_init (&server->connections);
 
@@ -939,7 +942,6 @@ vsx_server_free (VsxServer *server)
   vsx_object_unref (server->pending_conversations);
 
   vsx_main_context_remove_source (server->server_socket_source);
-  vsx_main_context_remove_source (server->gc_source);
 
   g_object_unref (server->server_socket);
 

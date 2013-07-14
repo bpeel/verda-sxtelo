@@ -24,6 +24,7 @@
 
 #include "vsx-person.h"
 #include "vsx-object.h"
+#include "vsx-main-context.h"
 
 G_BEGIN_DECLS
 
@@ -32,6 +33,8 @@ typedef struct
   VsxObject parent;
 
   GHashTable *hash_table;
+
+  VsxMainContextSource *people_timer_source;
 } VsxPersonSet;
 
 VsxPersonSet *
@@ -50,9 +53,6 @@ vsx_person_set_generate_person (VsxPersonSet *set,
                                 const char *player_name,
                                 GSocketAddress *address,
                                 VsxConversation *conversation);
-
-void
-vsx_person_set_remove_silent_people (VsxPersonSet *set);
 
 G_END_DECLS
 
