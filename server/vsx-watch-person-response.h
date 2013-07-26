@@ -37,6 +37,7 @@ typedef enum
   VSX_WATCH_PERSON_RESPONSE_WRITING_SHOUT,
   VSX_WATCH_PERSON_RESPONSE_WRITING_TILE,
   VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES,
+  VSX_WATCH_PERSON_RESPONSE_WRITING_SYNC,
   VSX_WATCH_PERSON_RESPONSE_WRITING_END,
   VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE,
 
@@ -95,6 +96,8 @@ typedef struct
   int pending_shout;
 
   gboolean pending_n_tiles;
+
+  gboolean sync_sent;
 
   gint64 last_write_time;
   VsxMainContextSource *keep_alive_timer;

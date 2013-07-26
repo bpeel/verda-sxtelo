@@ -215,6 +215,14 @@ This is sent approximately every minute if there is no other data so
 that the client can tell if the connection has gone dead. There is no
 argument.
 
+* "sync"
+
+This is sent when all of the known state for the game is sent after a
+watch_person or new_person request and the server is now waiting for
+further state changes before sending any more messages. The client can
+use this to start displaying messages when further state changes occur
+such as when a new player joins or leaves.
+
 * "end"
 
 This is sent when the player has left the game and no more messages

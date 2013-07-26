@@ -30,7 +30,7 @@
 #define VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL 60000000 /* 1 minute */
 
 static guint8
-header[] =
+header_message[] =
   "HTTP/1.1 200 OK\r\n"
   VSX_RESPONSE_COMMON_HEADERS
   VSX_RESPONSE_DISABLE_CACHE_HEADERS
@@ -63,13 +63,19 @@ header[] =
   "\r\n";
 
 static guint8
-keep_alive[] =
+keep_alive_message[] =
   "10\r\n"
   "[\"keep-alive\"]\r\n"
   "\r\n";
 
 static guint8
-end[] =
+sync_message[] =
+  "a\r\n"
+  "[\"sync\"]\r\n"
+  "\r\n";
+
+static guint8
+end_message[] =
   "9\r\n"
   "[\"end\"]\r\n"
   "\r\n"
@@ -215,6 +221,12 @@ has_pending_data (VsxWatchPersonResponse *self,
       return TRUE;
     }
 
+  if (!self->sync_sent)
+    {
+      *new_state = VSX_WATCH_PERSON_RESPONSE_WRITING_SYNC;
+      return TRUE;
+    }
+
   if (vsx_main_context_get_monotonic_clock (NULL) -
       self->last_write_time >= VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL)
     {
@@ -241,7 +253,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
       {
       case VSX_WATCH_PERSON_RESPONSE_WRITING_HTTP_HEADER:
         {
-          if (write_static_message (self, &message_data, header))
+          if (write_static_message (self, &message_data, header_message))
             {
               self->message_pos = 0;
               self->state = VSX_WATCH_PERSON_RESPONSE_WRITING_HEADER;
@@ -500,8 +512,20 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
       case VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE:
         {
-          if (write_static_message (self, &message_data, keep_alive))
+          if (write_static_message (self, &message_data, keep_alive_message))
             self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+          else
+            goto done;
+        }
+        break;
+
+      case VSX_WATCH_PERSON_RESPONSE_WRITING_SYNC:
+        {
+          if (write_static_message (self, &message_data, sync_message))
+            {
+              self->sync_sent = TRUE;
+              self->state = VSX_WATCH_PERSON_RESPONSE_AWAITING_DATA;
+            }
           else
             goto done;
         }
@@ -509,7 +533,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
       case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
         {
-          if (write_static_message (self, &message_data, end))
+          if (write_static_message (self, &message_data, end_message))
             self->state = VSX_WATCH_PERSON_RESPONSE_DONE;
           else
             goto done;
@@ -557,6 +581,7 @@ vsx_watch_person_response_has_data (VsxResponse *response)
     case VSX_WATCH_PERSON_RESPONSE_WRITING_NAME:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_MESSAGES:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_KEEP_ALIVE:
+    case VSX_WATCH_PERSON_RESPONSE_WRITING_SYNC:
     case VSX_WATCH_PERSON_RESPONSE_WRITING_END:
       return TRUE;
 
