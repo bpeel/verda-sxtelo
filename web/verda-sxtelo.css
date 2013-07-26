@@ -77,13 +77,9 @@ body {
     color: rgb(0, 0, 255);
 }
 
-.message-note, #typing-note {
+.message-note {
     color: rgb(90, 90, 90);
     font-style: italic;
-}
-
-.message-note {
-    margin-top: 8px;
 }
 
 #new-conversation-button {

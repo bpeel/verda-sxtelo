@@ -98,6 +98,7 @@ function ChatSession (playerName)
   this.soundOn = true;
   this.totalNumTiles = DEFAULT_N_TILES;
   this.lastDataTime = new Date ();
+  this.syncReceived = false;
 
   this.playerName = playerName || "ludanto";
 
@@ -317,6 +318,18 @@ ChatSession.prototype.updatePlayerClass = function (player)
   player.element.className = className;
 };
 
+ChatSession.prototype.addPlayerNote = function (note, playerName)
+{
+  var div = $(document.createElement ("div"));
+  div.addClass ("message-note");
+
+  note = note.replace ("%%", playerName);
+
+  div.append ($(document.createTextNode (note)));
+
+  this.addMessageDiv (div);
+};
+
 ChatSession.prototype.handlePlayer = function (data)
 {
   if (typeof (data) != "object")
@@ -326,6 +339,16 @@ ChatSession.prototype.handlePlayer = function (data)
     return;
 
   var player = this.getPlayer (data.num);
+
+  if (this.syncReceived &&
+      ((data.flags ^ player.flags) & PLAYER_CONNECTED) != 0)
+  {
+    this.addPlayerNote ((data.flags & PLAYER_CONNECTED) == 0 ?
+                        "@PLAYER_LEFT@" :
+                        "@PLAYER_JOINED@",
+                        player.name);
+  }
+
   player.flags = data.flags;
 
   this.updatePlayerClass (player);
@@ -375,6 +398,21 @@ ChatSession.prototype.soundToggleClickCb = function ()
   }
 };
 
+ChatSession.prototype.addMessageDiv = function (div)
+{
+  $("#messages").append (div);
+
+  var messagesBox = $("#messages-box");
+  messagesBox.scrollTop (messagesBox.prop("scrollHeight"));
+
+  if (document.hasFocus && !document.hasFocus ())
+  {
+    this.unreadMessages++;
+    document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
+    this.playSound ("message-alert-sound");
+  }
+};
+
 ChatSession.prototype.handleChatMessage = function (message)
 {
   if (typeof (message) != "object")
@@ -395,17 +433,7 @@ ChatSession.prototype.handleChatMessage = function (message)
 
   div.append ($(document.createTextNode (" " + message.text)));
 
-  $("#messages").append (div);
-
-  var messagesBox = $("#messages-box");
-  messagesBox.scrollTop (messagesBox.prop("scrollHeight"));
-
-  if (document.hasFocus && !document.hasFocus ())
-  {
-    this.unreadMessages++;
-    document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
-    this.playSound ("message-alert-sound");
-  }
+  this.addMessageDiv (div);
 
   this.messageNumber++;
 };
@@ -511,6 +539,11 @@ ChatSession.prototype.handleShout = function (data)
   this.playSound ("shout-sound");
 };
 
+ChatSession.prototype.handleSync = function ()
+{
+  this.syncReceived = true;
+};
+
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -549,6 +582,10 @@ ChatSession.prototype.processMessage = function (message)
 
   case "shout":
     this.handleShout (message[1]);
+    break;
+
+  case "sync":
+    this.handleSync ();
     break;
   }
 };
@@ -1264,7 +1301,7 @@ ChatSession.prototype.getPlayer = function (playerNum)
   {
     player = this.players[playerNum] = {};
 
-    player.flags = PLAYER_CONNECTED;
+    player.flags = 0;
     player.name = "";
 
     player.element = document.getElementById ("player-" + playerNum);

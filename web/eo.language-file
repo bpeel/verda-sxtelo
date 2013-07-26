@@ -36,6 +36,12 @@ Normala ludo (122 tegoletoj)
 @CONNECTING@
 Konektante...
 
+@PLAYER_JOINED@
+%% aliĝis al la ludo
+
+@PLAYER_LEFT@
+%% eliris el la ludo
+
 @NUM_TILES@
 Restantaj:
 
