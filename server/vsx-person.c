@@ -147,6 +147,7 @@ vsx_person_new (VsxPersonId id,
 
   person->id = id;
   person->conversation = vsx_object_ref (conversation);
+  person->message_offset = conversation->messages->len;
 
   person->player = vsx_conversation_add_player (conversation, player_name);
 

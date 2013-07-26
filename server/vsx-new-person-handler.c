@@ -88,7 +88,7 @@ real_request_finished (VsxRequestHandler *handler)
                  self->player_name,
                  conversation->id);
 
-      response = vsx_watch_person_response_new (person, 0);
+      response = vsx_watch_person_response_new (person, person->message_offset);
 
       vsx_object_unref (conversation);
       vsx_object_unref (person);

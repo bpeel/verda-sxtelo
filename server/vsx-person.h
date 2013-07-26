@@ -41,6 +41,12 @@ typedef struct
   VsxPlayer *player;
 
   gint64 last_noise_time;
+
+  /* When a player joins this number is set to the current number of
+   * messages. Any reference to a message number sent from the client
+   * is offset by this number so that they can't refer to any messages
+   * that were sent before they joined. */
+  unsigned int message_offset;
 } VsxPerson;
 
 gboolean

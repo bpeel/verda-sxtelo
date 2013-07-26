@@ -58,14 +58,18 @@ real_request_line_received (VsxRequestHandler *handler,
       if (person == NULL)
         self->response
           = vsx_string_response_new (VSX_STRING_RESPONSE_NOT_FOUND);
-      else if (last_message < 0
-               || last_message > person->conversation->messages->len)
+      else if (last_message < 0 ||
+               last_message > (person->conversation->messages->len -
+                               person->message_offset))
         self->response
           = vsx_string_response_new (VSX_STRING_RESPONSE_BAD_REQUEST);
       else
         {
           vsx_person_make_noise (person);
-          self->response = vsx_watch_person_response_new (person, last_message);
+          self->response =
+            vsx_watch_person_response_new (person,
+                                           last_message +
+                                           person->message_offset);
         }
     }
   else
