@@ -216,7 +216,6 @@ main (int argc, char **argv)
   VsxMainContext *mc;
   VsxServer *server;
 
-  g_thread_init (NULL);
   g_type_init ();
 
   if (!process_arguments (&argc, &argv, &error))

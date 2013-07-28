@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011  Neil Roberts
+ * Copyright (C) 2011, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,14 +32,14 @@
 static FILE *vsx_log_file = NULL;
 static GString *vsx_log_buffer = NULL;
 static GThread *vsx_log_thread = NULL;
-static GMutex *vsx_log_mutex = NULL;
-static GCond *vsx_log_cond = NULL;
+static GMutex vsx_log_mutex;
+static GCond vsx_log_cond;
 static gboolean vsx_log_finished = FALSE;
 
 gboolean
 vsx_log_available (void)
 {
-  return vsx_log_mutex != NULL;
+  return vsx_log_file != NULL;
 }
 
 void
@@ -53,7 +53,7 @@ vsx_log (const char *format,
   if (!vsx_log_available ())
     return;
 
-  g_mutex_lock (vsx_log_mutex);
+  g_mutex_lock (&vsx_log_mutex);
 
   g_string_append_c (vsx_log_buffer, '[');
 
@@ -70,9 +70,9 @@ vsx_log (const char *format,
 
   g_string_append_c (vsx_log_buffer, '\n');
 
-  g_cond_signal (vsx_log_cond);
+  g_cond_signal (&vsx_log_cond);
 
-  g_mutex_unlock (vsx_log_mutex);
+  g_mutex_unlock (&vsx_log_mutex);
 }
 
 static void
@@ -99,7 +99,7 @@ vsx_log_thread_func (gpointer data)
 
   alternate_buffer = g_string_new (NULL);
 
-  g_mutex_lock (vsx_log_mutex);
+  g_mutex_lock (&vsx_log_mutex);
 
   while (!vsx_log_finished || vsx_log_buffer->len > 0)
     {
@@ -107,7 +107,7 @@ vsx_log_thread_func (gpointer data)
 
       /* Wait until there's something to do */
       while (!vsx_log_finished && vsx_log_buffer->len == 0)
-        g_cond_wait (vsx_log_cond, vsx_log_mutex);
+        g_cond_wait (&vsx_log_cond, &vsx_log_mutex);
 
       if (had_error)
         /* Just ignore the data */
@@ -121,7 +121,7 @@ vsx_log_thread_func (gpointer data)
           alternate_buffer = tmp;
 
           /* Release the mutex while we do a blocking write */
-          g_mutex_unlock (vsx_log_mutex);
+          g_mutex_unlock (&vsx_log_mutex);
 
           wrote = fwrite (alternate_buffer->str,
                           1 /* size */,
@@ -137,11 +137,11 @@ vsx_log_thread_func (gpointer data)
 
           g_string_set_size (alternate_buffer, 0);
 
-          g_mutex_lock (vsx_log_mutex);
+          g_mutex_lock (&vsx_log_mutex);
         }
     }
 
-  g_mutex_unlock (vsx_log_mutex);
+  g_mutex_unlock (&vsx_log_mutex);
 
   g_string_free (alternate_buffer, TRUE);
 
@@ -169,8 +169,6 @@ vsx_log_set_file (const char *filename,
 
   vsx_log_file = file;
   vsx_log_buffer = g_string_new (NULL);
-  vsx_log_mutex = g_mutex_new ();
-  vsx_log_cond = g_cond_new ();
   vsx_log_finished = FALSE;
 
   return TRUE;
@@ -182,10 +180,10 @@ vsx_log_start (GError **error)
   if (!vsx_log_available () || vsx_log_thread != NULL)
     return TRUE;
 
-  vsx_log_thread = g_thread_create (vsx_log_thread_func,
-                                    NULL, /* data */
-                                    TRUE, /* joinable */
-                                    error);
+  vsx_log_thread = g_thread_try_new ("vsx-log",
+                                     vsx_log_thread_func,
+                                     NULL, /* data */
+                                     error);
 
   return vsx_log_thread != NULL;
 }
@@ -195,26 +193,14 @@ vsx_log_close (void)
 {
   if (vsx_log_thread)
     {
-      g_mutex_lock (vsx_log_mutex);
+      g_mutex_lock (&vsx_log_mutex);
       vsx_log_finished = TRUE;
-      g_cond_signal (vsx_log_cond);
-      g_mutex_unlock (vsx_log_mutex);
+      g_cond_signal (&vsx_log_cond);
+      g_mutex_unlock (&vsx_log_mutex);
 
       g_thread_join (vsx_log_thread);
 
       vsx_log_thread = NULL;
-    }
-
-  if (vsx_log_cond)
-    {
-      g_cond_free (vsx_log_cond);
-      vsx_log_cond = NULL;
-    }
-
-  if (vsx_log_mutex)
-    {
-      g_mutex_free (vsx_log_mutex);
-      vsx_log_mutex = NULL;
     }
 
   if (vsx_log_buffer)

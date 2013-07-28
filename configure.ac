@@ -11,7 +11,7 @@ AC_PROG_CC
 
 dnl gio 2.22 is needed for the socket API
 dnl glib 2.28 is needed for g_get_monotonic_time
-PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.28 gobject-2.0 >= 2.16 gio-2.0 >= 2.22 gthread-2.0])
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.32 gobject-2.0 >= 2.32 gio-2.0 >= 2.32 gthread-2.0 >= 2.32])
 
 AC_ARG_ENABLE([server],
               [AC_HELP_STRING([--enable-server=@<:@no/yes@:>@],
