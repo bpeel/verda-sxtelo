@@ -725,6 +725,8 @@ ChatSession.prototype.startWatchAjax = function ()
   this.watchAjax.open ("GET", this.getUrl (method));
   this.watchAjax.send (null);
 
+  this.lastDataTime = new Date ();
+
   this.resetCheckDataInterval ();
   this.resetKeepAlive ();
 };
