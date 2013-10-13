@@ -33,9 +33,6 @@ Rapida ludo (50 tegoletoj)
 @NORMAL_GAME@
 Normala ludo (122 tegoletoj)
 
-@CONNECTING@
-Konektante...
-
 @PLAYER_JOINED@
 %% aliĝis al la ludo
 
@@ -58,7 +55,7 @@ Turnu
 Sendu!
 
 @ERROR_OCCURRED@
-Eraro okazis
+Estis problemo komunikante kun la servilo.
 
 @BAD_DATA@
 Fuŝaj datumoj riceviĝis
@@ -71,3 +68,9 @@ Sono aŭdeblas
 
 @SOUND_OFF@
 Sono ne aŭdeblas
+
+@ERROR_BUTTON_DESCRIPTION@
+Bonvolu puŝi la jenan butonon por rekonekti.
+
+@ERROR_BUTTON@
+Rekomencu

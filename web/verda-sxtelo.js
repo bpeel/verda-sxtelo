@@ -243,8 +243,13 @@ ChatSession.prototype.setError = function (msg)
   this.clearWatchAjax ();
   this.clearCheckDataInterval ();
 
-  $("#status-note").text (msg);
   this.setState ("error");
+
+  /* Firefox seems to inexplicably add the disabled attribute to the
+   * button so this is a workaround to remove it */
+  $("#error-button").removeAttr ("disabled");
+
+  $("#error-note").show ();
 
   /* Throw an exception so that we won't continue processing messages
    * or restart the check data interval */
@@ -267,7 +272,6 @@ ChatSession.prototype.handleHeader = function (header)
   this.personNumber = header.num;
   this.personId = header.id;
 
-  $("#status-note").text ("");
   this.setState ("in-progress");
 };
 
@@ -922,7 +926,7 @@ ChatSession.prototype.inputCb = function (event)
   this.sendNextMessage ();
 };
 
-ChatSession.prototype.newConversationCb = function ()
+ChatSession.prototype.errorButtonClickCb = function ()
 {
   window.location.reload ();
 };
@@ -1212,7 +1216,6 @@ ChatSession.prototype.updateNextGameTime = function ()
 
 ChatSession.prototype.start = function ()
 {
-  $("#status-note").text ("@CONNECTING@");
   this.setState ("connecting");
   this.startWatchAjax ();
 
@@ -1221,8 +1224,7 @@ ChatSession.prototype.start = function ()
   $("#submit-message").bind ("click", this.submitMessageClickCb.bind (this));
   $("#message-input-box").bind ("keydown", this.messageKeyDownCb.bind (this));
   $("#message-input-box").bind ("input", this.inputCb.bind (this));
-  $("#new-conversation-button").bind ("click",
-                                      this.newConversationCb.bind (this));
+  $("#error-button").bind ("click", this.errorButtonClickCb.bind (this));
   /* Prevent default handling of mouse events on the board because
    * otherwise you can accidentally select the text in a tile */
   var preventDefaultCb = function (event) { event.preventDefault (); };
