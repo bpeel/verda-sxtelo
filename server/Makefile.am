@@ -5,7 +5,7 @@ INCLUDES = \
 	-DVSX_LIBDIR=\""$(libdir)"\"
 
 if USE_SYSTEMD
-INCLUDES += $(LIBSYSTEMD_DAEMON_CFLAGS)
+INCLUDES += $(LIBSYSTEMD_CFLAGS)
 endif
 
 source_h = \
@@ -83,7 +83,7 @@ verda_sxtelo_LDFLAGS = \
 	$(GLIB_LIBS)
 
 if USE_SYSTEMD
-verda_sxtelo_LDFLAGS += $(LIBSYSTEMD_DAEMON_LIBS)
+verda_sxtelo_LDFLAGS += $(LIBSYSTEMD_LIBS)
 
 dist_systemd_DATA = \
 	$(builddir)/verda-sxtelo.service \

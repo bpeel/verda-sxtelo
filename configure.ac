@@ -36,7 +36,7 @@ This should be provided by glibc since version 2.3.2]))],
       [enable_systemd=no])
 
 AS_IF([test "x$enable_systemd" = "xyes"],
-      [PKG_CHECK_MODULES(LIBSYSTEMD_DAEMON, [libsystemd-daemon])
+      [PKG_CHECK_MODULES(LIBSYSTEMD, [libsystemd])
        AC_DEFINE(USE_SYSTEMD, 1, [Enable socket activation via systemd])])
 AM_CONDITIONAL(USE_SYSTEMD, [test "x$enable_systemd" = "xyes"])
 
