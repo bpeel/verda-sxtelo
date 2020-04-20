@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011, 2012, 2013  Neil Roberts
+ * Copyright (C) 2011, 2012, 2013, 2020  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -104,9 +104,9 @@ function ChatSession (playerName)
 
   var search = window.location.search;
   if (search && search.match (/^\?.+$/))
-    this.roomName = decodeURIComponent (search.substring (1));
+    this.roomName = "@LANG_CODE@:" + decodeURIComponent (search.substring (1));
   else
-    this.roomName = "default";
+    this.roomName = "@LANG_CODE@:default";
 
   this.handleResize ();
   $(window).resize (this.handleResize.bind (this));
