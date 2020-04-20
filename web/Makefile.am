@@ -3,7 +3,8 @@ TRANSLATABLE_FILES = \
 	$(srcdir)/verda-sxtelo.js
 
 LANGUAGES = \
-	eo
+	eo \
+	en
 
 LANGUAGE_STAMPS = \
 	$(LANGUAGES:%=%.language-stamp)

@@ -1,0 +1,77 @@
+@LANG_CODE@
+en
+
+@TITLE@
+Anagrams
+
+@BLURB@
+
+Anagrams is a word game about anagrams. On this site you can play the
+game with friends or strangers on the Internet. There’s some
+instructions on how to play the game <a href="help.html"
+target="_blank">here</a>.
+
+@NAME_BOX@
+To start, please type your name or a nickname in the box
+below and then click “Play!”.
+
+@PLAY@
+Play!
+
+@START_NOTE@
+Wait for more players, or click “Turn” to start the game.
+
+@PLAY_TIME_NOTE@
+A popular time to play the game is at <a href="#"
+id="game-time-url" target="_blank">19h UTC</a>.
+
+@GAME_LENGTH@
+Choose the length of the game:
+
+@SHORT_GAME@
+Short game (50 tiles)
+
+@NORMAL_GAME@
+Normal game (122 tiles)
+
+@PLAYER_JOINED@
+%% joined the game
+
+@PLAYER_LEFT@
+%% left the game
+
+@NUM_TILES@
+Remaining:
+
+@HELP@
+Help
+
+@SHOUT_BUTTON@
+Shout!
+
+@TURN_BUTTON@
+Turn
+
+@SEND_BUTTON@
+Send!
+
+@ERROR_OCCURRED@
+There was an error communicating with the server.
+
+@BAD_DATA@
+Received bad data from the server.
+
+@OTHER_PLAYERS@
+Other players
+
+@SOUND_ON@
+Sound on
+
+@SOUND_OFF@
+Sound off
+
+@ERROR_BUTTON_DESCRIPTION@
+Please push this button to reconnect.
+
+@ERROR_BUTTON@
+Restart
