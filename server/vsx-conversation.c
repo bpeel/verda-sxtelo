@@ -304,11 +304,36 @@ vsx_conversation_add_player (VsxConversation *conversation,
   return player;
 }
 
+static const VsxTileData *
+get_tile_data_for_room_name (const char *room_name)
+{
+  const char *colon = strchr (room_name, ':');
+  int i;
+
+  /* The language code can be specified by prefixing the room name
+   * separated by a colon. If we didn’t find one then just use the
+   * first tile set. */
+  if (colon == NULL)
+    return vsx_tile_data;
+
+  /* Look for some tile data for the corresponding room */
+  for (i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+    {
+      const VsxTileData *tile_data = vsx_tile_data + i;
+      if (strlen (tile_data->language_code) == colon - room_name &&
+          !memcmp (tile_data->language_code, room_name, colon - room_name))
+        return tile_data;
+    }
+
+  /* No language found, just use the first one */
+  return vsx_tile_data;
+}
+
 VsxConversation *
 vsx_conversation_new (const char *room_name)
 {
   VsxConversation *self = vsx_object_allocate (vsx_conversation_get_class ());
-  const VsxTileData *tile_data;
+  const VsxTileData *tile_data = get_tile_data_for_room_name (room_name);
   const char *t;
   int i;
 
@@ -323,19 +348,6 @@ vsx_conversation_new (const char *room_name)
   self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
 
   self->state = VSX_CONVERSATION_AWAITING_START;
-
-  /* Look for some tile data for the corresponding room */
-  for (i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
-    {
-      tile_data = vsx_tile_data + i;
-      if (!strcmp (tile_data->room_name, room_name))
-        goto found_tile_data;
-    }
-
-  /* If we didn't find one then just use the last one */
-  tile_data = vsx_tile_data + VSX_TILE_DATA_N_ROOMS - 1;
-
- found_tile_data:
 
   /* Initialise the tile data with the letters */
   t = tile_data->letters;

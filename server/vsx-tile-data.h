@@ -30,7 +30,7 @@ G_BEGIN_DECLS
 
 typedef struct
 {
-  const char *room_name;
+  const char *language_code;
   const char *letters;
 } VsxTileData;
 
