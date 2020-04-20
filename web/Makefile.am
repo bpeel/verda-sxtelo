@@ -16,7 +16,8 @@ EXTRA_DIST = \
 	$(LANGUAGE_FILES) \
 	$(TRANSLATABLE_FILES) \
 	translate-file.pl \
-	sound.svg
+	sound.svg \
+	$(LANGUAGES:%=%/help.html)
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
@@ -24,7 +25,6 @@ dist_webfiles_DATA = \
 	jquery-1.9.1.min.js \
 	favicon.ico \
 	favicon.png \
-	help.html \
 	message-alert-sound.ogg \
 	message-alert-sound.mp3 \
 	shout-sound.ogg \
@@ -58,6 +58,7 @@ install-data-hook :
 			bn=`basename "$$tf"`; \
 			install -m 644 -t "$(DESTDIR)$(webfilesdir)/$$lang" "$(builddir)/$$lang/$$bn"; \
 		done; \
+		install -m 644 -t "$(DESTDIR)$(webfilesdir)/$$lang" "$(srcdir)/$$lang/help.html"; \
 	done
 
 uninstall-hook :
@@ -66,4 +67,5 @@ uninstall-hook :
 			bn=`basename "$$tf"`; \
 			rm -f "$(DESTDIR)$(webfilesdir)/$$lang/$$bn"; \
 		done; \
+		rm -f "$(DESTDIR)$(webfilesdir)/$$lang/help.html"; \
 	done
