@@ -17,7 +17,8 @@ EXTRA_DIST = \
 	$(TRANSLATABLE_FILES) \
 	translate-file.pl \
 	sound.svg \
-	$(LANGUAGES:%=%/help.html)
+	$(LANGUAGES:%=%/help.html) \
+	htaccess
 
 webfilesdir = $(datadir)/web
 dist_webfiles_DATA = \
@@ -59,7 +60,8 @@ install-data-hook :
 			install -m 644 -t "$(DESTDIR)$(webfilesdir)/$$lang" "$(builddir)/$$lang/$$bn"; \
 		done; \
 		install -m 644 -t "$(DESTDIR)$(webfilesdir)/$$lang" "$(srcdir)/$$lang/help.html"; \
-	done
+	done && \
+        install -m 644 "$(srcdir)/htaccess" "$(DESTDIR)$(webfilesdir)/.htaccess";
 
 uninstall-hook :
 	for lang in $(LANGUAGES); do \
@@ -68,4 +70,5 @@ uninstall-hook :
 			rm -f "$(DESTDIR)$(webfilesdir)/$$lang/$$bn"; \
 		done; \
 		rm -f "$(DESTDIR)$(webfilesdir)/$$lang/help.html"; \
-	done
+	done && \
+        rm -f "$(DESTDIR)$(webfilesdir)/.htaccess";
