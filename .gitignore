@@ -33,9 +33,8 @@
 /client/stamp-marshal
 /web/Makefile
 /web/Makefile.in
-/web/verda-sxtelo.*.js
-/web/index.*.html
-/web/index.html.var
+/web/eo
+/web/en
 /web/*.language-stamp
 /doc/Makefile
 /doc/Makefile.in
