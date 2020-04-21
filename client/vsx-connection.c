@@ -1407,7 +1407,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   G_STRUCT_OFFSET (VsxConnectionClass, tile_changed),
                   NULL, /* accumulator */
                   NULL, /* accumulator data */
-                  vsx_marshal_VOID__BOOL_POINTER,
+                  vsx_marshal_VOID__BOOLEAN_POINTER,
                   G_TYPE_NONE,
                   2, /* num arguments */
                   G_TYPE_BOOLEAN,
