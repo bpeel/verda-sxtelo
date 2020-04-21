@@ -362,8 +362,6 @@ main (int argc, char **argv)
   GError *error = NULL;
   SoupSession *soup_session;
 
-  g_type_init ();
-
   if (!process_arguments (&argc, &argv, &error))
     {
       fprintf (stderr, "%s\n", error->message);

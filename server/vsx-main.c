@@ -216,8 +216,6 @@ main (int argc, char **argv)
   VsxMainContext *mc;
   VsxServer *server;
 
-  g_type_init ();
-
   if (!process_arguments (&argc, &argv, &error))
     {
       fprintf (stderr, "%s\n", error->message);
