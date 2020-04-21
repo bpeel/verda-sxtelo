@@ -72,7 +72,7 @@ remove_silent_people_cb (gpointer key,
     return FALSE;
 }
 
-void
+static void
 remove_silent_people_timer_cb (VsxMainContextSource *source,
                                void *user_data)
 {
