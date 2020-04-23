@@ -329,6 +329,22 @@ get_tile_data_for_room_name (const char *room_name)
   return vsx_tile_data;
 }
 
+static void
+shuffle_tiles (VsxConversation *self)
+{
+  int i;
+
+  for (i = VSX_TILE_DATA_N_TILES - 1; i > 0; i--)
+    {
+      int swap_pos = g_random_int_range (0, i + 1);
+      VsxTile temp;
+
+      temp = self->tiles[swap_pos];
+      self->tiles[swap_pos] = self->tiles[i];
+      self->tiles[i] = temp;
+    }
+}
+
 VsxConversation *
 vsx_conversation_new (const char *room_name)
 {
@@ -369,15 +385,7 @@ vsx_conversation_new (const char *room_name)
   g_assert_cmpint (*t, ==, 0);
 
   /* Shuffle the tiles */
-  for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
-    {
-      int swap_pos = g_random_int_range (0, VSX_TILE_DATA_N_TILES);
-      VsxTile temp;
-
-      temp = self->tiles[swap_pos];
-      self->tiles[swap_pos] = self->tiles[i];
-      self->tiles[i] = temp;
-    }
+  shuffle_tiles (self);
 
   return self;
 }
