@@ -412,7 +412,7 @@ ChatSession.prototype.addMessageDiv = function (div)
   if (document.hasFocus && !document.hasFocus ())
   {
     this.unreadMessages++;
-    document.title = "(" + this.unreadMessages + ") Verda Ŝtelo";
+    document.title = "(" + this.unreadMessages + ") @TITLE@";
     this.playSound ("message-alert-sound");
   }
 };
@@ -934,7 +934,7 @@ ChatSession.prototype.errorButtonClickCb = function ()
 ChatSession.prototype.focusCb = function ()
 {
   this.unreadMessages = 0;
-  document.title = "Verda Ŝtelo";
+  document.title = "@TITLE@";
 };
 
 ChatSession.prototype.getTileNumForTarget = function (target)
@@ -1209,7 +1209,7 @@ ChatSession.prototype.updateNextGameTime = function ()
              this.padNumber (gameTime.getUTCDate ()) +
              "T" + this.padNumber (GAME_TIME) +
              "&ah=1" +
-             "&msg=Verda+%c5%9ctelo");
+             "&msg=" + encodeURI("@TITLE@"));
 
   $("#game-time-url").attr ("href", url);
 };
