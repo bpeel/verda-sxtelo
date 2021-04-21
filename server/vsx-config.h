@@ -34,6 +34,7 @@ typedef struct
 {
   VsxList link;
   char *address;
+  int port;
   char *certificate;
   char *private_key;
   char *private_key_password;

@@ -83,6 +83,7 @@ static const Option server_options[] = {
                 OPTION_TYPE_ ## type,                           \
         }
   OPTION (address, STRING),
+  OPTION (port, INT),
   OPTION (certificate, STRING),
   OPTION (private_key, STRING),
   OPTION (private_key_password, STRING),
@@ -171,6 +172,7 @@ load_config_func (VsxKeyValueEvent event,
       if (!strcmp (value, "server"))
         {
           data->server = g_malloc0 (sizeof *data->server);
+          data->server->port = -1;
           vsx_list_insert (data->config->servers.prev, &data->server->link);
         }
       else if (!strcmp (value, "general"))
