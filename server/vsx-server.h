@@ -22,12 +22,14 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+#include "vsx-config.h"
+
 G_BEGIN_DECLS
 
 typedef struct _VsxServer VsxServer;
 
 VsxServer *
-vsx_server_new (GSocketAddress *address,
+vsx_server_new (VsxConfigServer *server_config,
                 GError **error);
 
 gboolean

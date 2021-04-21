@@ -32,10 +32,10 @@
 #include "vsx-server.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
+#include "vsx-config.h"
 
-static char *option_listen_address = "0.0.0.0";
-static int option_listen_port = 5142;
 static char *option_log_file = NULL;
+static char *option_config_file = NULL;
 static gboolean option_daemonize = FALSE;
 static char *option_user = NULL;
 static char *option_group = NULL;
@@ -44,12 +44,8 @@ static GOptionEntry
 options[] =
   {
     {
-      "address", 'a', 0, G_OPTION_ARG_STRING, &option_listen_address,
-      "Address to listen on", "address"
-    },
-    {
-      "port", 'p', 0, G_OPTION_ARG_INT, &option_listen_port,
-      "Port to listen on", "port"
+      "config", 'c', 0, G_OPTION_ARG_STRING, &option_config_file,
+      "Config file to use instead of the default", "file"
     },
     {
       "log", 'l', 0, G_OPTION_ARG_STRING, &option_log_file,
@@ -100,30 +96,55 @@ process_arguments (int *argc, char ***argv,
   return ret;
 }
 
-static VsxServer *
-create_server (GError **error)
+static VsxConfig *
+load_config(GError **error)
 {
-  GInetAddress *inet_address;
-  VsxServer *server = NULL;
+  if (option_config_file)
+    return vsx_config_load (option_config_file, error);
 
-  inet_address = g_inet_address_new_from_string (option_listen_address);
+  const char * const *dirs = g_get_system_config_dirs ();
+  GString *filename = g_string_new (NULL);
+  VsxConfig *config = NULL;
 
-  if (inet_address == NULL)
-    g_set_error (error, G_IO_ERROR, G_IO_ERROR_UNKNOWN,
-                 "Failed to parse address '%s'",
-                 option_listen_address);
-  else
+  for (int i = 0; dirs[i]; i++)
     {
-      GSocketAddress *address = g_inet_socket_address_new (inet_address,
-                                                           option_listen_port);
+      g_string_truncate (filename, 0);
+      g_string_append (filename, dirs[i]);
+      g_string_append (filename,
+                       G_DIR_SEPARATOR_S
+                       "verda-sxtelo"
+                       G_DIR_SEPARATOR_S
+                       "conf.txt");
 
-      server = vsx_server_new (address, error);
-
-      g_object_unref (address);
-      g_object_unref (inet_address);
+      if (g_file_test (filename->str, G_FILE_TEST_EXISTS))
+        {
+          config = vsx_config_load (filename->str, error);
+          goto found;
+        }
     }
 
-  return server;
+  g_set_error (error,
+               G_FILE_ERROR,
+               G_FILE_ERROR_NOENT,
+               "No config file found");
+
+ found:
+  g_string_free (filename, TRUE);
+
+  return config;
+}
+
+static VsxServer *
+create_server (VsxConfig *config,
+               GError **error)
+{
+  g_assert (!vsx_list_empty (&config->servers));
+
+  VsxConfigServer *server_config = vsx_container_of (config->servers.next,
+                                                     server_config,
+                                                     link);
+
+  return vsx_server_new (server_config, error);
 }
 
 static void
@@ -215,10 +236,20 @@ main (int argc, char **argv)
   GError *error = NULL;
   VsxMainContext *mc;
   VsxServer *server;
+  VsxConfig *config;
 
   if (!process_arguments (&argc, &argv, &error))
     {
       fprintf (stderr, "%s\n", error->message);
+      return EXIT_FAILURE;
+    }
+
+  config = load_config (&error);
+
+  if (config == NULL)
+    {
+      fprintf (stderr, "%s\n", error->message);
+      g_clear_error (&error);
       return EXIT_FAILURE;
     }
 
@@ -239,7 +270,7 @@ main (int argc, char **argv)
         }
       else
         {
-          server = create_server (&error);
+          server = create_server (config, &error);
 
           if (server == NULL)
             {
@@ -279,6 +310,8 @@ main (int argc, char **argv)
 
       vsx_main_context_free (mc);
     }
+
+  vsx_config_free (config);
 
   return 0;
 }

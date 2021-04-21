@@ -49,6 +49,8 @@
 #include "vsx-keep-alive-handler.h"
 #include "vsx-log.h"
 
+#define DEFAULT_PORT 5142
+
 struct _VsxServer
 {
   VsxMainContextSource *server_socket_source;
@@ -836,17 +838,89 @@ create_server_socket (GSocketAddress *address,
   return socket;
 }
 
+static GSocket *
+create_socket_for_port (int port,
+                        GError **error)
+{
+  /* First try binding it with an IPv6 address */
+  GInetAddress *any_address_ipv6 =
+    g_inet_address_new_any (G_SOCKET_FAMILY_IPV6);
+  GSocketAddress *address_ipv6 =
+    g_inet_socket_address_new (any_address_ipv6, port);
+
+  GError *local_error = NULL;
+
+  GSocket *socket_ipv6 = create_server_socket (address_ipv6, &local_error);
+
+  g_object_unref (address_ipv6);
+  g_object_unref (any_address_ipv6);
+
+  if (socket_ipv6)
+    return socket_ipv6;
+
+  /* Some server try to disable IPv6 so try IPv4 in that case */
+  if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+    {
+      g_propagate_error (error, local_error);
+      return NULL;
+    }
+
+  GInetAddress *any_address =
+    g_inet_address_new_any (G_SOCKET_FAMILY_IPV4);
+  GSocketAddress *address =
+    g_inet_socket_address_new (any_address, port);
+
+  GSocket *socket_ipv4 = create_server_socket (address, error);
+
+  g_object_unref (any_address);
+  g_object_unref (address);
+
+  return socket_ipv4;
+}
+
 VsxServer *
-vsx_server_new (GSocketAddress *address,
+vsx_server_new (VsxConfigServer *server_config,
                 GError **error)
 {
   VsxServer *server;
   GSocket *socket;
 
-  g_return_val_if_fail (G_IS_SOCKET_ADDRESS (address), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-  socket = create_server_socket (address, error);
+  int port;
+
+  if (server_config->port == -1)
+    port = DEFAULT_PORT;
+  else
+    port = server_config->port;
+
+  if (server_config->address)
+    {
+      GInetAddress *address =
+        g_inet_address_new_from_string (server_config->address);
+
+      if (address == NULL)
+        {
+          g_set_error (error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_INVALID_DATA,
+                       "Invalid address \"%s\"",
+                       server_config->address);
+          return NULL;
+        }
+
+      GSocketAddress *socket_address =
+        g_inet_socket_address_new (address, port);
+
+      socket = create_server_socket (socket_address, error);
+
+      g_object_unref (socket_address);
+      g_object_unref (address);
+    }
+  else
+    {
+      socket = create_socket_for_port (port, error);
+    }
 
   if (socket == NULL)
     return NULL;
