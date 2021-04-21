@@ -98,6 +98,8 @@ static const Option general_options[] = {
                 OPTION_TYPE_ ## type,                   \
         }
   OPTION (log_file, STRING),
+  OPTION (user, STRING),
+  OPTION (group, STRING),
 #undef OPTION
 };
 
@@ -352,6 +354,8 @@ vsx_config_free (VsxConfig *config)
 {
   free_servers (config);
 
+  g_free (config->user);
+  g_free (config->group);
   g_free (config->log_file);
 
   g_free (config);

@@ -282,10 +282,16 @@ main (int argc, char **argv)
             }
           else
             {
-              if (option_group)
-                set_group (option_group);
-              if (option_user)
-                set_user (option_user);
+              const char *group = option_group ? option_group : config->group;
+
+              if (group)
+                set_group (group);
+
+              const char *user = option_user ? option_user : config->user;
+
+              if (user)
+                set_user (user);
+
               if (option_daemonize)
                 daemonize ();
 

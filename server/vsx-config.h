@@ -43,6 +43,8 @@ typedef struct
 typedef struct
 {
   char *log_file;
+  char *user;
+  char *group;
   VsxList servers;
 } VsxConfig;
 
