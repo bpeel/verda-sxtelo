@@ -216,7 +216,10 @@ ChatSession.prototype.setState = function (state)
 ChatSession.prototype.getUrl = function (method)
 {
   var location = window.location;
-  return "http://" + location.hostname + ":5142/" + method;
+  if (location.protocol.toLowerCase().startsWith("https"))
+    return "https://" + location.hostname + ":5143/" + method;
+  else
+    return "http://" + location.hostname + ":5142/" + method;
 };
 
 ChatSession.prototype.clearWatchAjax = function ()

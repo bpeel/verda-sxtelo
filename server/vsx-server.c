@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <errno.h>
+#include <openssl/ssl.h>
 
 #include "vsx-server.h"
 #include "vsx-main-context.h"
@@ -44,8 +45,10 @@
 #include "vsx-stop-typing-handler.h"
 #include "vsx-keep-alive-handler.h"
 #include "vsx-log.h"
+#include "vsx-ssl-error.h"
 
 #define DEFAULT_PORT 5142
+#define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
 
 struct _VsxServer
 {
@@ -98,6 +101,12 @@ typedef struct
   /* Queue of VsxServerQueuedResponses to send to this client */
   VsxList response_queue;
 
+  /* If we’ve already started an SSL_read that needed to block in
+   * order to continue, these are the flags needed to complete it. */
+  VsxMainContextPollFlags ssl_read_block;
+  /* Same for an SSL_write */
+  VsxMainContextPollFlags ssl_write_block;
+
   unsigned int output_length;
   guint8 output_buffer[VSX_SERVER_OUTPUT_BUFFER_SIZE];
 
@@ -108,6 +117,8 @@ typedef struct
   /* Time since the response queue became empty. The connection will
    * be removed if this stays empty for too long */
   gint64 no_response_age;
+
+  SSL *ssl;
 } VsxServerConnection;
 
 typedef struct
@@ -124,6 +135,7 @@ typedef struct
   VsxMainContextSource *source;
   GSocket *socket;
   VsxServer *server;
+  SSL_CTX *ssl_ctx;
 } VsxServerSocket;
 
 /* Interval time in minutes to run the dead person garbage
@@ -421,6 +433,9 @@ vsx_server_remove_connection (VsxServer *server,
 {
   vsx_server_connection_clear_responses (connection);
 
+  if (connection->ssl)
+    SSL_free(connection->ssl);
+
   vsx_main_context_remove_source (connection->source);
   g_object_unref (connection->client_socket);
   vsx_list_remove (&connection->link);
@@ -448,6 +463,9 @@ static void
 vsx_server_remove_socket (VsxServer *server,
                           VsxServerSocket *ssocket)
 {
+  if (ssocket->ssl_ctx)
+    SSL_CTX_free (ssocket->ssl_ctx);
+
   if (ssocket->source)
     vsx_main_context_remove_source (ssocket->source);
 
@@ -460,11 +478,23 @@ vsx_server_remove_socket (VsxServer *server,
 }
 
 static void
+log_ssl_error (VsxServerConnection *connection)
+{
+  GError *error = NULL;
+
+  vsx_ssl_error_set (&error);
+  vsx_log ("For %s: %s", connection->peer_address_string, error->message);
+  g_clear_error (&error);
+}
+
+static void
 update_poll (VsxServerConnection *connection)
 {
   VsxMainContextPollFlags flags = 0;
 
-  if (!connection->read_finished)
+  if (connection->ssl_read_block)
+    flags |= connection->ssl_read_block;
+  else if (!connection->read_finished)
     flags |= VSX_MAIN_CONTEXT_POLL_IN;
 
   /* Shutdown the socket if we've finished writing */
@@ -473,27 +503,57 @@ update_poll (VsxServerConnection *connection)
       && vsx_list_empty (&connection->response_queue)
       && connection->output_length == 0)
     {
-      GError *error = NULL;
-
-      if (!g_socket_shutdown (connection->client_socket,
-                              FALSE, /* shutdown_read */
-                              TRUE, /* shutdown_write */
-                              &error))
+      if (connection->ssl)
         {
-          vsx_log ("shutdown socket failed for %s: %s",
-                   connection->peer_address_string,
-                   error->message);
-          g_clear_error (&error);
-          vsx_server_remove_connection (connection->server, connection);
-          return;
-        }
+          int ret = SSL_shutdown (connection->ssl);
 
-      connection->write_finished = TRUE;
+          if (ret >= 0)
+            {
+              connection->write_finished = TRUE;
+            }
+          else
+            {
+              switch (SSL_get_error (connection->ssl, ret))
+                {
+                case SSL_ERROR_WANT_READ:
+                  flags |= VSX_MAIN_CONTEXT_POLL_IN;
+                  break;
+                case SSL_ERROR_WANT_WRITE:
+                  flags |= VSX_MAIN_CONTEXT_POLL_OUT;
+                  break;
+                default:
+                  log_ssl_error (connection);
+                  vsx_server_remove_connection (connection->server, connection);
+                  return;
+                }
+            }
+        }
+      else
+        {
+          GError *error = NULL;
+
+          if (!g_socket_shutdown (connection->client_socket,
+                                  FALSE, /* shutdown_read */
+                                  TRUE, /* shutdown_write */
+                                  &error))
+            {
+              vsx_log ("shutdown socket failed for %s: %s",
+                       connection->peer_address_string,
+                       error->message);
+              g_clear_error (&error);
+              vsx_server_remove_connection (connection->server, connection);
+              return;
+            }
+
+          connection->write_finished = TRUE;
+        }
     }
 
   if (!connection->write_finished)
     {
-      if (connection->output_length > 0)
+      if (connection->ssl_write_block)
+        flags |= connection->ssl_write_block;
+      else if (connection->output_length > 0)
         flags |= VSX_MAIN_CONTEXT_POLL_OUT;
       else if (!vsx_list_empty (&connection->response_queue))
         {
@@ -517,6 +577,222 @@ update_poll (VsxServerConnection *connection)
 }
 
 static void
+handle_read (VsxServer *server,
+             VsxServerConnection *connection)
+{
+  GError *error = NULL;
+
+  if (connection->read_finished)
+    {
+      /* This might happen if the SSL_Shutdown command triggered a
+       * poll for input */
+      update_poll (connection);
+      return;
+    }
+
+  char buf[1024];
+
+  gssize got;
+
+  if (connection->ssl)
+    {
+      connection->ssl_read_block = 0;
+
+      got = SSL_read (connection->ssl, buf, sizeof (buf));
+
+      if (got <= 0)
+        {
+          switch (SSL_get_error (connection->ssl, got))
+            {
+            case SSL_ERROR_ZERO_RETURN:
+              got = 0;
+              break;
+            case SSL_ERROR_WANT_READ:
+              connection->ssl_read_block = VSX_MAIN_CONTEXT_POLL_IN;
+              update_poll (connection);
+              return;
+            case SSL_ERROR_WANT_WRITE:
+              connection->ssl_read_block = VSX_MAIN_CONTEXT_POLL_OUT;
+              update_poll (connection);
+              return;
+            default:
+              log_ssl_error (connection);
+              vsx_server_remove_connection (connection->server, connection);
+              return;
+            }
+        }
+    }
+  else
+    {
+      got = g_socket_receive (connection->client_socket,
+                              buf,
+                              sizeof (buf),
+                              NULL, /* cancellable */
+                              &error);
+      if (got == -1)
+        {
+          if (error->domain != G_IO_ERROR
+              || error->code != G_IO_ERROR_WOULD_BLOCK)
+            {
+              vsx_log ("Error reading from socket for %s: %s",
+                       connection->peer_address_string,
+                       error->message);
+              vsx_server_remove_connection (server, connection);
+            }
+
+          g_clear_error (&error);
+          return;
+        }
+    }
+
+  if (got == 0)
+    {
+      if (!connection->had_bad_input
+          && !vsx_http_parser_parser_eof (&connection->http_parser,
+                                          &error))
+        {
+          set_bad_input (connection, error);
+          g_clear_error (&error);
+        }
+
+      connection->read_finished = TRUE;
+
+      update_poll (connection);
+    }
+  else
+    {
+      if (!connection->had_bad_input
+          && !vsx_http_parser_parse_data (&connection->http_parser,
+                                          (guint8 *) buf,
+                                          got,
+                                          &error))
+        {
+          set_bad_input (connection, error);
+          g_clear_error (&error);
+        }
+
+      update_poll (connection);
+    }
+}
+
+static void
+fill_output_buffer (VsxServerConnection *connection)
+{
+  /* Try to fill the output buffer as much as possible before
+     initiating a write */
+  while (connection->output_length < VSX_SERVER_OUTPUT_BUFFER_SIZE
+         && !vsx_list_empty (&connection->response_queue))
+    {
+      VsxServerQueuedResponse *queued_response
+        = vsx_container_of (connection->response_queue.next,
+                            queued_response,
+                            link);
+      VsxResponse *response = queued_response->response;
+      unsigned int added;
+
+      if (!vsx_response_has_data (response))
+        break;
+
+      added =
+        vsx_response_add_data (response,
+                               connection->output_buffer
+                               + connection->output_length,
+                               VSX_SERVER_OUTPUT_BUFFER_SIZE
+                               - connection->output_length);
+
+      connection->output_length += added;
+
+      /* If the response is now finished then remove it from the queue */
+      if (vsx_response_is_finished (response))
+        vsx_server_connection_pop_response (connection);
+      /* If the buffer wasn't big enough to fit a chunk in then
+         the response might not will the buffer so we should give
+         up until the buffer is emptied */
+      else
+        break;
+    }
+}
+
+static void
+handle_write (VsxServer *server,
+              VsxServerConnection *connection)
+{
+  GError *error = NULL;
+  gssize wrote;
+
+  if (connection->ssl_write_block == 0)
+    fill_output_buffer (connection);
+
+  if (connection->output_length == 0)
+    {
+      /* This might happen if the SSL_Shutdown command triggered a
+       * poll for output */
+      update_poll (connection);
+      return;
+    }
+
+
+  if (connection->ssl)
+    {
+      connection->ssl_write_block = 0;
+
+      wrote = SSL_write (connection->ssl,
+                         connection->output_buffer,
+                         connection->output_length);
+
+      if (wrote <= 0)
+        {
+          switch (SSL_get_error (connection->ssl, wrote))
+            {
+            case SSL_ERROR_WANT_READ:
+              connection->ssl_write_block = VSX_MAIN_CONTEXT_POLL_IN;
+              update_poll (connection);
+              return;
+            case SSL_ERROR_WANT_WRITE:
+              connection->ssl_write_block = VSX_MAIN_CONTEXT_POLL_OUT;
+              update_poll (connection);
+              return;
+            default:
+              log_ssl_error (connection);
+              vsx_server_remove_connection (connection->server, connection);
+              return;
+            }
+        }
+    }
+  else
+    {
+      wrote = g_socket_send (connection->client_socket,
+                             (const gchar *) connection->output_buffer,
+                             connection->output_length,
+                             NULL,
+                             &error);
+
+      if (wrote == -1)
+        {
+          if (error->domain != G_IO_ERROR
+              || error->code != G_IO_ERROR_WOULD_BLOCK)
+            {
+              g_print ("Error writing to socket for %s: %s",
+                       connection->peer_address_string,
+                       error->message);
+              vsx_server_remove_connection (server, connection);
+            }
+
+          g_clear_error (&error);
+          return;
+        }
+    }
+
+  /* Move any remaining data in the output buffer to the front */
+  memmove (connection->output_buffer,
+           connection->output_buffer + wrote,
+           connection->output_length - wrote);
+  connection->output_length -= wrote;
+
+  update_poll (connection);
+}
+
+static void
 vsx_server_connection_poll_cb (VsxMainContextSource *source,
                                int fd,
                                VsxMainContextPollFlags flags,
@@ -524,7 +800,6 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
 {
   VsxServerConnection *connection = user_data;
   VsxServer *server = connection->server;
-  char buf[1024];
 
   if (flags & VSX_MAIN_CONTEXT_POLL_ERROR)
     {
@@ -547,125 +822,25 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
 
       vsx_server_remove_connection (server, connection);
     }
+  else if (connection->ssl_read_block
+           && ((flags & connection->ssl_read_block)
+               == connection->ssl_read_block))
+    {
+      handle_read (server, connection);
+    }
+  else if (connection->ssl_write_block
+           && ((flags & connection->ssl_write_block)
+               == connection->ssl_write_block))
+    {
+      handle_write (server, connection);
+    }
   else if (flags & VSX_MAIN_CONTEXT_POLL_IN)
     {
-      GError *error = NULL;
-
-      gssize got =
-        g_socket_receive (connection->client_socket,
-                          buf,
-                          sizeof (buf),
-                          NULL, /* cancellable */
-                          &error);
-
-      if (got == 0)
-        {
-          if (!connection->had_bad_input
-              && !vsx_http_parser_parser_eof (&connection->http_parser,
-                                              &error))
-            {
-              set_bad_input (connection, error);
-              g_clear_error (&error);
-            }
-
-          connection->read_finished = TRUE;
-
-          update_poll (connection);
-        }
-      else if (got == -1)
-        {
-          if (error->domain != G_IO_ERROR
-              || error->code != G_IO_ERROR_WOULD_BLOCK)
-            {
-              vsx_log ("Error reading from socket for %s: %s",
-                       connection->peer_address_string,
-                       error->message);
-              vsx_server_remove_connection (server, connection);
-            }
-
-          g_clear_error (&error);
-        }
-      else
-        {
-          if (!connection->had_bad_input
-              && !vsx_http_parser_parse_data (&connection->http_parser,
-                                              (guint8 *) buf,
-                                              got,
-                                              &error))
-            {
-              set_bad_input (connection, error);
-              g_clear_error (&error);
-            }
-
-          update_poll (connection);
-        }
+      handle_read (server, connection);
     }
   else if (flags & VSX_MAIN_CONTEXT_POLL_OUT)
     {
-      GError *error = NULL;
-      gssize wrote;
-
-      /* Try to fill the output buffer as much as possible before
-         initiating a write */
-      while (connection->output_length < VSX_SERVER_OUTPUT_BUFFER_SIZE
-             && !vsx_list_empty (&connection->response_queue))
-        {
-          VsxServerQueuedResponse *queued_response
-            = vsx_container_of (connection->response_queue.next,
-                                queued_response,
-                                link);
-          VsxResponse *response = queued_response->response;
-          unsigned int added;
-
-          if (!vsx_response_has_data (response))
-            break;
-
-          added =
-            vsx_response_add_data (response,
-                                   connection->output_buffer
-                                   + connection->output_length,
-                                   VSX_SERVER_OUTPUT_BUFFER_SIZE
-                                   - connection->output_length);
-
-          connection->output_length += added;
-
-          /* If the response is now finished then remove it from the queue */
-          if (vsx_response_is_finished (response))
-            vsx_server_connection_pop_response (connection);
-          /* If the buffer wasn't big enough to fit a chunk in then
-             the response might not will the buffer so we should give
-             up until the buffer is emptied */
-          else
-            break;
-        }
-
-      if ((wrote = g_socket_send (connection->client_socket,
-                                  (const gchar *) connection->output_buffer,
-                                  connection->output_length,
-                                  NULL,
-                                  &error)) == -1)
-        {
-          if (error->domain != G_IO_ERROR
-              || error->code != G_IO_ERROR_WOULD_BLOCK)
-            {
-              g_print ("Error writing to socket for %s: %s",
-                       connection->peer_address_string,
-                       error->message);
-              vsx_server_remove_connection (server, connection);
-            }
-
-          g_clear_error (&error);
-        }
-      else
-        {
-          /* Move any remaining data in the output buffer to the front */
-          memmove (connection->output_buffer,
-                   connection->output_buffer + wrote,
-                   connection->output_length - wrote);
-          connection->output_length -= wrote;
-
-          update_poll (connection);
-        }
+      handle_write (server, connection);
     }
 }
 
@@ -712,6 +887,29 @@ get_peer_address_string (GSocket *client_socket)
   GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
 
   return get_address_string (address, FALSE /* include_port */);
+}
+
+static gboolean
+init_connection_ssl (VsxServerConnection *connection,
+                     SSL_CTX *ssl_ctx,
+                     GError **error)
+{
+  connection->ssl = SSL_new (ssl_ctx);
+
+  if (connection->ssl == NULL)
+    goto error;
+
+  SSL_set_accept_state (connection->ssl);
+
+  if (!SSL_set_fd (connection->ssl,
+                   g_socket_get_fd (connection->client_socket)))
+    goto error;
+
+  return TRUE;
+
+ error:
+  vsx_ssl_error_set (error);
+  return FALSE;
 }
 
 static void
@@ -774,6 +972,9 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
       connection->had_bad_input = FALSE;
       connection->read_finished = FALSE;
       connection->write_finished = FALSE;
+      connection->ssl_read_block = 0;
+      connection->ssl_write_block = 0;
+      connection->ssl = NULL;
 
       connection->output_length = 0;
 
@@ -791,7 +992,16 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
 
       connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
 
-      if (server->gc_source == NULL)
+      if (ssocket->ssl_ctx
+          && !init_connection_ssl (connection, ssocket->ssl_ctx, &error))
+        {
+          vsx_log ("SSL error for %s: %s",
+                   connection->peer_address_string,
+                   error->message);
+          g_clear_error (&error);
+          vsx_server_remove_connection (server, connection);
+        }
+      else if (server->gc_source == NULL)
         server->gc_source =
           vsx_main_context_add_timer (NULL, /* default context */
                                       VSX_SERVER_GC_TIMEOUT,
@@ -872,9 +1082,16 @@ create_socket_for_config (VsxConfigServer *server_config,
   int port;
 
   if (server_config->port == -1)
-    port = DEFAULT_PORT;
+    {
+      if (server_config->certificate)
+        port = DEFAULT_SSL_PORT;
+      else
+        port = DEFAULT_PORT;
+    }
   else
-    port = server_config->port;
+    {
+      port = server_config->port;
+    }
 
   if (server_config->address)
     {
@@ -918,6 +1135,56 @@ create_socket_for_fd (int fd, GError **error)
   return socket;
 }
 
+static int
+ssl_password_cb (char *buf, int size, int rwflag, void *user_data)
+{
+  VsxConfigServer *server_config = user_data;
+
+  if (server_config->private_key_password == NULL)
+    return -1;
+
+  size_t length = strlen (server_config->private_key_password);
+
+  if (length > size)
+    return -1;
+
+  memcpy (buf, server_config->private_key_password, length);
+
+  return length;
+}
+
+static gboolean
+init_ssl (VsxServerSocket *ssocket,
+          const VsxConfigServer *server_config,
+          GError **error)
+{
+  ssocket->ssl_ctx = SSL_CTX_new (TLS_server_method ());
+  if (ssocket->ssl_ctx == NULL)
+    goto error;
+
+  SSL_CTX_set_default_passwd_cb (ssocket->ssl_ctx, ssl_password_cb);
+  SSL_CTX_set_default_passwd_cb_userdata (ssocket->ssl_ctx,
+                                          (void *) server_config);
+
+  if (SSL_CTX_use_certificate_file (ssocket->ssl_ctx,
+                                    server_config->certificate,
+                                    SSL_FILETYPE_PEM) <= 0)
+    goto error;
+
+  if (SSL_CTX_use_PrivateKey_file (ssocket->ssl_ctx,
+                                   server_config->private_key,
+                                   SSL_FILETYPE_PEM) <= 0)
+    goto error;
+
+  SSL_CTX_set_mode (ssocket->ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+
+  return TRUE;
+
+ error:
+  vsx_ssl_error_set (error);
+  return FALSE;
+}
+
 gboolean
 vsx_server_add_config (VsxServer *server,
                        VsxConfigServer *server_config,
@@ -949,6 +1216,13 @@ vsx_server_add_config (VsxServer *server,
                                ssocket);
 
   vsx_list_insert (&server->sockets, &ssocket->link);
+
+  if (server_config->certificate
+      && !init_ssl (ssocket, server_config, error))
+    {
+      vsx_server_remove_socket (server, ssocket);
+      return FALSE;
+    }
 
   return TRUE;
 }

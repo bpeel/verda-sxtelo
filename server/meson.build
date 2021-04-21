@@ -1,4 +1,4 @@
-server_deps = glib_deps
+server_deps = glib_deps + [ openssl_dep ]
 
 if get_option('systemd')
   server_deps += dependency('libsystemd')
@@ -42,6 +42,7 @@ server_src = [
         'vsx-server.c',
         'vsx-simple-handler.c',
         'vsx-shout-handler.c',
+        'vsx-ssl-error.c',
         'vsx-start-typing-handler.c',
         'vsx-stop-typing-handler.c',
         'vsx-string-response.c',

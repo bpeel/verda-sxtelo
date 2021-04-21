@@ -31,6 +31,8 @@ foreach part : glib_parts
   glib_deps += dependency(part, version: '>=2.32')
 endforeach
 
+openssl_dep = dependency('openssl')
+
 if get_option('server')
   subdir('server')
 endif
