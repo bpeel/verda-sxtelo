@@ -17,10 +17,12 @@ endif
 server_src = [
         'vsx-arguments.c',
         'vsx-chunked-iconv.c',
+        'vsx-config.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
         'vsx-http-parser.c',
         'vsx-keep-alive-handler.c',
+        'vsx-key-value.c',
         'vsx-leave-handler.c',
         'vsx-list.c',
         'vsx-log.c',
