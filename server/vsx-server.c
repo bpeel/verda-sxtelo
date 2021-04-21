@@ -25,10 +25,6 @@
 #include <sys/socket.h>
 #include <errno.h>
 
-#ifdef USE_SYSTEMD
-#include <systemd/sd-daemon.h>
-#endif
-
 #include "vsx-server.h"
 #include "vsx-main-context.h"
 #include "vsx-http-parser.h"
@@ -53,8 +49,8 @@
 
 struct _VsxServer
 {
-  VsxMainContextSource *server_socket_source;
-  GSocket *server_socket;
+  /* List of VsxServerSockets */
+  VsxList sockets;
 
   /* If this gets set then vsx_server_run will return and report the
      error */
@@ -121,6 +117,14 @@ typedef struct
   VsxResponse *response;
   VsxServerConnection *connection;
 } VsxServerQueuedResponse;
+
+typedef struct
+{
+  VsxList link;
+  VsxMainContextSource *source;
+  GSocket *socket;
+  VsxServer *server;
+} VsxServerSocket;
 
 /* Interval time in minutes to run the dead person garbage
    collector */
@@ -429,11 +433,30 @@ vsx_server_remove_connection (VsxServer *server,
       server->gc_source = NULL;
     }
 
-  /* Reset the poll on the server socket in case we previously stopped
-     listening because we ran out of file descriptors. This will do
-     nothing if we were already listening */
-  vsx_main_context_modify_poll (server->server_socket_source,
-                                VSX_MAIN_CONTEXT_POLL_IN);
+  /* Reset the poll on the server sockets in case we previously
+     stopped listening because we ran out of file descriptors. This
+     will do nothing if we were already listening */
+  VsxServerSocket *ssocket;
+
+  vsx_list_for_each (ssocket, &server->sockets, link)
+    {
+      vsx_main_context_modify_poll (ssocket->source, VSX_MAIN_CONTEXT_POLL_IN);
+    }
+}
+
+static void
+vsx_server_remove_socket (VsxServer *server,
+                          VsxServerSocket *ssocket)
+{
+  if (ssocket->source)
+    vsx_main_context_remove_source (ssocket->source);
+
+  if (ssocket->socket)
+    g_object_unref (ssocket->socket);
+
+  vsx_list_remove (&ssocket->link);
+
+  g_free (ssocket);
 }
 
 static void
@@ -697,13 +720,12 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                                   VsxMainContextPollFlags flags,
                                   void *user_data)
 {
-  VsxServer *server = user_data;
+  VsxServerSocket *ssocket = user_data;
+  VsxServer *server = ssocket->server;
   GSocket *client_socket;
   GError *error = NULL;
 
-  client_socket = g_socket_accept (server->server_socket,
-                                   NULL,
-                                   &error);
+  client_socket = g_socket_accept (ssocket->socket, NULL, &error);
 
   if (client_socket == NULL)
     {
@@ -717,8 +739,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
           vsx_log ("Too many open files to accept connection");
 
           /* Stop listening for new connections until someone disconnects */
-          vsx_main_context_modify_poll (server->server_socket_source,
-                                        0);
+          vsx_main_context_modify_poll (source, 0);
           g_clear_error (&error);
         }
       else
@@ -783,45 +804,10 @@ static GSocket *
 create_server_socket (GSocketAddress *address,
                       GError **error)
 {
-  GSocket *socket;
-
-#ifdef USE_SYSTEMD
-  {
-    int nfds = sd_listen_fds (TRUE /* unset_environment */);
-
-    if (nfds < 0)
-      {
-        g_set_error (error,
-                     G_FILE_ERROR,
-                     g_file_error_from_errno (-nfds),
-                     "Error getting systemd fds: %s",
-                     strerror (-nfds));
-        return NULL;
-      }
-    else if (nfds > 1)
-      {
-        g_set_error (error,
-                     G_FILE_ERROR,
-                     G_FILE_ERROR_BADF,
-                     "Received too many file descriptors from systemd");
-        return NULL;
-      }
-    else if (nfds == 1)
-      {
-        socket = g_socket_new_from_fd (SD_LISTEN_FDS_START, error);
-
-        if (socket)
-          g_socket_set_blocking (socket, FALSE);
-
-        return socket;
-      }
-  }
-#endif /* USE_SYSTEMD */
-
-  socket = g_socket_new (g_socket_address_get_family (address),
-                         G_SOCKET_TYPE_STREAM,
-                         G_SOCKET_PROTOCOL_DEFAULT,
-                         error);
+  GSocket *socket = g_socket_new (g_socket_address_get_family (address),
+                                  G_SOCKET_TYPE_STREAM,
+                                  G_SOCKET_PROTOCOL_DEFAULT,
+                                  error);
 
   if (socket == NULL)
     return NULL;
@@ -878,15 +864,11 @@ create_socket_for_port (int port,
   return socket_ipv4;
 }
 
-VsxServer *
-vsx_server_new (VsxConfigServer *server_config,
-                GError **error)
+static GSocket *
+create_socket_for_config (VsxConfigServer *server_config,
+                          GError **error)
 {
-  VsxServer *server;
   GSocket *socket;
-
-  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
-
   int port;
 
   if (server_config->port == -1)
@@ -906,7 +888,7 @@ vsx_server_new (VsxConfigServer *server_config,
                        G_IO_ERROR_INVALID_DATA,
                        "Invalid address \"%s\"",
                        server_config->address);
-          return NULL;
+          return FALSE;
         }
 
       GSocketAddress *socket_address =
@@ -922,23 +904,65 @@ vsx_server_new (VsxConfigServer *server_config,
       socket = create_socket_for_port (port, error);
     }
 
+  return socket;
+}
+
+static GSocket *
+create_socket_for_fd (int fd, GError **error)
+{
+  GSocket *socket = g_socket_new_from_fd (fd, error);
+
+  if (socket)
+    g_socket_set_blocking (socket, FALSE);
+
+  return socket;
+}
+
+gboolean
+vsx_server_add_config (VsxServer *server,
+                       VsxConfigServer *server_config,
+                       int fd_override,
+                       GError **error)
+{
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  GSocket *socket;
+
+  if (fd_override >= 0)
+    socket = create_socket_for_fd (fd_override, error);
+  else
+    socket = create_socket_for_config (server_config, error);
+
   if (socket == NULL)
-    return NULL;
+    return FALSE;
 
-  server = g_new0 (VsxServer, 1);
+  VsxServerSocket *ssocket = g_new0 (VsxServerSocket, 1);
 
-  server->server_socket = socket;
-  server->person_set = vsx_person_set_new ();
+  ssocket->server = server;
+  ssocket->socket = socket;
 
-  server->pending_conversations = vsx_conversation_set_new ();
-
-  server->server_socket_source =
+  ssocket->source =
     vsx_main_context_add_poll (NULL /* default context */,
                                g_socket_get_fd (socket),
                                VSX_MAIN_CONTEXT_POLL_IN,
                                vsx_server_pending_connection_cb,
-                               server);
+                               ssocket);
 
+  vsx_list_insert (&server->sockets, &ssocket->link);
+
+  return TRUE;
+}
+
+VsxServer *
+vsx_server_new (void)
+{
+  VsxServer *server = g_new0 (VsxServer, 1);
+
+  server->person_set = vsx_person_set_new ();
+
+  server->pending_conversations = vsx_conversation_set_new ();
+
+  vsx_list_init (&server->sockets);
   vsx_list_init (&server->connections);
 
   return server;
@@ -958,13 +982,32 @@ vsx_server_quit_cb (VsxMainContextSource *source,
 static void
 log_server_listening (VsxServer *server)
 {
-  GSocketAddress *address =
-    g_socket_get_local_address (server->server_socket, NULL);
-  char *address_string = get_address_string (address, TRUE /* include_port */);
+  GString *buf = g_string_new (NULL);
+  VsxServerSocket *ssocket;
 
-  vsx_log ("Server listening on %s", address_string);
+  vsx_list_for_each (ssocket, &server->sockets, link)
+    {
+      if (buf->len > 0)
+        {
+          if (ssocket->link.next == &server->sockets)
+            g_string_append (buf, " and ");
+          else
+            g_string_append (buf, ", ");
+        }
 
-  g_free (address_string);
+      GSocketAddress *address =
+        g_socket_get_local_address (ssocket->socket, NULL);
+      char *address_string =
+        get_address_string (address, TRUE /* include_port */);
+
+      g_string_append (buf, address_string);
+
+      g_free (address_string);
+    }
+
+  vsx_log ("Server listening on %s", buf->str);
+
+  g_string_free (buf, TRUE);
 }
 
 gboolean
@@ -1011,13 +1054,16 @@ vsx_server_free (VsxServer *server)
       vsx_server_remove_connection (server, connection);
     }
 
+  while (!vsx_list_empty (&server->sockets))
+    {
+      VsxServerSocket *ssocket =
+        vsx_container_of (server->sockets.next, ssocket, link);
+      vsx_server_remove_socket (server, ssocket);
+    }
+
   vsx_object_unref (server->person_set);
 
   vsx_object_unref (server->pending_conversations);
-
-  vsx_main_context_remove_source (server->server_socket_source);
-
-  g_object_unref (server->server_socket);
 
   g_free (server);
 }

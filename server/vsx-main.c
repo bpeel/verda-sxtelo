@@ -29,6 +29,10 @@
 #include <grp.h>
 #include <pwd.h>
 
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #include "vsx-server.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
@@ -140,11 +144,57 @@ create_server (VsxConfig *config,
 {
   g_assert (!vsx_list_empty (&config->servers));
 
-  VsxConfigServer *server_config = vsx_container_of (config->servers.next,
-                                                     server_config,
-                                                     link);
+  int override_fd = -1;
 
-  return vsx_server_new (server_config, error);
+#ifdef USE_SYSTEMD
+  {
+    int nfds = sd_listen_fds (TRUE /* unset_environment */);
+
+    if (nfds < 0)
+      {
+        g_set_error (error,
+                     G_FILE_ERROR,
+                     g_file_error_from_errno (-nfds),
+                     "Error getting systemd fds: %s",
+                     strerror (-nfds));
+        return NULL;
+      }
+    if (nfds > 0)
+      {
+        if (nfds != vsx_list_length (&config->servers))
+          {
+            g_set_error (error,
+                         G_FILE_ERROR,
+                         G_FILE_ERROR_BADF,
+                         "Wrong number of file descriptors received from "
+                         "systemd (expected: %i, got %i)",
+                         vsx_list_length (&config->servers),
+                         nfds);
+            return NULL;
+          }
+
+        override_fd = SD_LISTEN_FDS_START;
+      }
+  }
+#endif /* USE_SYSTEMD */
+
+  VsxServer *server = vsx_server_new ();
+
+  VsxConfigServer *server_config;
+
+  vsx_list_for_each (server_config, &config->servers, link)
+    {
+      if (!vsx_server_add_config (server, server_config, override_fd, error))
+        {
+          vsx_server_free (server);
+          return NULL;
+        }
+
+      if (override_fd != -1)
+        override_fd++;
+    }
+
+  return server;
 }
 
 static void

@@ -29,8 +29,13 @@ G_BEGIN_DECLS
 typedef struct _VsxServer VsxServer;
 
 VsxServer *
-vsx_server_new (VsxConfigServer *server_config,
-                GError **error);
+vsx_server_new (void);
+
+gboolean
+vsx_server_add_config (VsxServer *server,
+                       VsxConfigServer *server_config,
+                       int fd_override,
+                       GError **error);
 
 gboolean
 vsx_server_run (VsxServer *server,
