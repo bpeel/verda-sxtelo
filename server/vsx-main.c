@@ -262,8 +262,11 @@ main (int argc, char **argv)
     }
   else
     {
-      if (option_log_file
-          && !vsx_log_set_file (option_log_file, &error))
+      const char *log_file = (option_log_file ?
+                              option_log_file :
+                              config->log_file);
+
+      if (log_file && !vsx_log_set_file (log_file, &error))
         {
           fprintf (stderr, "Error setting log file: %s\n", error->message);
           g_clear_error (&error);
