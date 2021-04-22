@@ -3,6 +3,7 @@ Description=Activation socket for Verda Ŝtelo
 
 [Socket]
 ListenStream=5142
+ListenStream=5143
 
 [Install]
 WantedBy=sockets.target
