@@ -27,18 +27,7 @@ typedef enum
 {
   VSX_WS_PARSER_ERROR_INVALID,
   VSX_WS_PARSER_ERROR_UNSUPPORTED,
-  VSX_WS_PARSER_ERROR_CANCELLED
 } VsxWsParserError;
-
-typedef struct
-{
-  gboolean (*request_line_received) (const char *method,
-                                     const char *uri,
-                                     void *user_data);
-  gboolean (*header_received) (const char *field_name,
-                               const char *value,
-                               void *user_data);
-} VsxWsParserVtable;
 
 typedef enum
 {
@@ -49,8 +38,7 @@ typedef enum
 
 #define VSX_WS_PARSER_ERROR (vsx_ws_parser_error_quark ())
 
-VsxWsParser *vsx_ws_parser_new (const VsxWsParserVtable *vtable,
-                                void *user_data);
+VsxWsParser *vsx_ws_parser_new (void);
 
 VsxWsParserResult
 vsx_ws_parser_parse_data (VsxWsParser *parser,
@@ -58,6 +46,10 @@ vsx_ws_parser_parse_data (VsxWsParser *parser,
                           size_t length,
                           size_t *consumed,
                           GError **error);
+
+const guint8 *
+vsx_ws_parser_get_key_hash (VsxWsParser *parser,
+                            size_t *key_hash_size);
 
 void vsx_ws_parser_free (VsxWsParser *parser);
 

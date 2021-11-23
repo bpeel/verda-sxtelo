@@ -22,6 +22,7 @@
 
 #include "vsx-ws-parser.h"
 
+#include <openssl/evp.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -46,20 +47,23 @@ struct _VsxWsParser
     VSX_WS_PARSER_DONE
   } state;
 
-  const VsxWsParserVtable *vtable;
-  void *user_data;
+  guint8 key_hash[EVP_MAX_MD_SIZE];
+  unsigned int key_hash_length;
+
+  EVP_MD_CTX *key_hash_ctx;
 };
 
+static const char
+ws_sec_key_guid[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
 VsxWsParser *
-vsx_ws_parser_new (const VsxWsParserVtable *vtable,
-                   void *user_data)
+vsx_ws_parser_new (void)
 {
   VsxWsParser *parser = g_new (VsxWsParser, 1);
 
   parser->buf_len = 0;
   parser->state = VSX_WS_PARSER_READING_REQUEST_LINE;
-  parser->vtable = vtable;
-  parser->user_data = user_data;
+  parser->key_hash_ctx = NULL;
 
   return parser;
 }
@@ -94,15 +98,6 @@ bad:
   return FALSE;
 }
 
-static void
-set_cancelled_error (GError **error)
-{
-  g_set_error (error,
-               VSX_WS_PARSER_ERROR,
-               VSX_WS_PARSER_ERROR_CANCELLED,
-               "Application cancelled parsing");
-}
-
 static gboolean
 add_bytes_to_buffer (VsxWsParser *parser,
                      const guint8 *data,
@@ -132,12 +127,7 @@ process_request_line (VsxWsParser *parser,
                       unsigned int length,
                       GError **error)
 {
-  guint8 *method_end;
-  guint8 *uri_end;
-  const char *method = (char *) data;
-  const char *uri;
-
-  method_end = memchr (data, ' ', length);
+  guint8 *method_end = memchr (data, ' ', length);
 
   if (method_end == NULL)
     {
@@ -156,8 +146,7 @@ process_request_line (VsxWsParser *parser,
   length -= method_end - data + 1;
   data = method_end + 1;
 
-  uri = (const char *) data;
-  uri_end = memchr (data, ' ', length);
+  guint8 *uri_end = memchr (data, ' ', length);
 
   if (uri_end == NULL)
     {
@@ -176,12 +165,6 @@ process_request_line (VsxWsParser *parser,
   if (!check_http_version (data, length, error))
     return FALSE;
 
-  if (!parser->vtable->request_line_received (method, uri, parser->user_data))
-    {
-      set_cancelled_error (error);
-      return FALSE;
-    }
-
   return TRUE;
 }
 
@@ -191,8 +174,6 @@ process_header (VsxWsParser *parser, GError **error)
   guint8 *data = parser->buf;
   unsigned int length = parser->buf_len;
   const char *field_name = (char *) data;
-  const char *value;
-  guint8 zero = '\0';
   guint8 *field_name_end;
 
   field_name_end = memchr (data, ':', length);
@@ -206,10 +187,21 @@ process_header (VsxWsParser *parser, GError **error)
       return FALSE;
     }
 
-  /* Replace the colon with a zero terminator so we can reuse
-   * the buffer to pass to the callback
-   */
-  *field_name_end = '\0';
+  static const char key_header[] = "sec-websocket-key:";
+
+  /* Ignore any headers apart from the key header */
+  if (g_ascii_strncasecmp (field_name, key_header, (sizeof key_header) - 1))
+    return TRUE;
+
+  if (parser->key_hash_ctx != NULL)
+    {
+      g_set_error (error,
+                   VSX_WS_PARSER_ERROR,
+                   VSX_WS_PARSER_ERROR_INVALID,
+                   "Client sent a WebSocket header with multiple "
+                   "Sec-WebSocket-Key headers");
+      return FALSE;
+    }
 
   length -= field_name_end - data + 1;
   data = field_name_end + 1;
@@ -221,17 +213,9 @@ process_header (VsxWsParser *parser, GError **error)
       data++;
     }
 
-  value = (char *) data;
-
-  /* Add a terminator so we can pass it to the callback */
-  if (!add_bytes_to_buffer (parser, &zero, 1, error))
-    return FALSE;
-
-  if (!parser->vtable->header_received (field_name, value, parser->user_data))
-    {
-      set_cancelled_error (error);
-      return FALSE;
-    }
+  parser->key_hash_ctx = EVP_MD_CTX_new ();
+  EVP_DigestInit_ex (parser->key_hash_ctx, EVP_sha1 (), NULL);
+  EVP_DigestUpdate (parser->key_hash_ctx, data, length);
 
   return TRUE;
 }
@@ -353,6 +337,30 @@ handle_reading_header (VsxWsParser *parser,
 }
 
 static gboolean
+finish_key_hash (VsxWsParser *parser,
+                 GError **error)
+{
+  if (parser->key_hash_ctx == NULL)
+    {
+      g_set_error (error,
+                   VSX_WS_PARSER_ERROR,
+                   VSX_WS_PARSER_ERROR_INVALID,
+                   "Client sent a WebSocket header without a "
+                   "Sec-WebSocket-Key header");
+      return FALSE;
+    }
+
+  EVP_DigestUpdate (parser->key_hash_ctx,
+                    ws_sec_key_guid,
+                    sizeof ws_sec_key_guid - 1);
+  EVP_DigestFinal (parser->key_hash_ctx,
+                   parser->key_hash,
+                   &parser->key_hash_length);
+
+  return TRUE;
+}
+
+static gboolean
 handle_terminating_header (VsxWsParser *parser,
                            VsxWsParserClosure *c,
                            GError **error)
@@ -365,6 +373,9 @@ handle_terminating_header (VsxWsParser *parser,
        */
       if (parser->buf_len == 0)
         {
+          if (!finish_key_hash (parser, error))
+            return FALSE;
+
           parser->state = VSX_WS_PARSER_DONE;
         }
       else
@@ -475,9 +486,20 @@ vsx_ws_parser_parse_data (VsxWsParser *parser,
   return VSX_WS_PARSER_RESULT_NEED_MORE_DATA;
 }
 
+const guint8 *
+vsx_ws_parser_get_key_hash (VsxWsParser *parser,
+                            size_t *key_hash_size)
+{
+  *key_hash_size = parser->key_hash_length;
+  return parser->key_hash;
+}
+
 void
 vsx_ws_parser_free (VsxWsParser *parser)
 {
+  if (parser->key_hash_ctx)
+    EVP_MD_CTX_free (parser->key_hash_ctx);
+
   g_free (parser);
 }
 
