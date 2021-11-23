@@ -51,6 +51,7 @@ server_src = [
         'vsx-turn-handler.c',
         'vsx-watch-person-handler.c',
         'vsx-watch-person-response.c',
+        'vsx-ws-parser.c',
 ]
 
 executable('verda-sxtelo', server_src,
