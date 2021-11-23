@@ -97,8 +97,8 @@ vsx_http_parser_parse_data (VsxHttpParser *parser,
                             GError **error);
 
 gboolean
-vsx_http_parser_parser_eof (VsxHttpParser *parser,
-                            GError **error);
+vsx_http_parser_parse_eof (VsxHttpParser *parser,
+                           GError **error);
 
 GQuark
 vsx_http_parser_error_quark (void);

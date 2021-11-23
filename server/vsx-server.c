@@ -686,8 +686,8 @@ handle_read (VsxServer *server,
 
           if (connection->websocket_connection == NULL)
             {
-              ret = vsx_http_parser_parser_eof (&connection->http_parser,
-                                                &error);
+              ret = vsx_http_parser_parse_eof (&connection->http_parser,
+                                               &error);
             }
           else
             {

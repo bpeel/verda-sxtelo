@@ -652,8 +652,8 @@ vsx_http_parser_parse_data (VsxHttpParser *parser,
 }
 
 gboolean
-vsx_http_parser_parser_eof (VsxHttpParser *parser,
-                            GError **error)
+vsx_http_parser_parse_eof (VsxHttpParser *parser,
+                           GError **error)
 {
   switch (parser->state)
     {
