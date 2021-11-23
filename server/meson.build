@@ -58,3 +58,13 @@ executable('verda-sxtelo', server_src,
            dependencies: server_deps,
            install: true,
            include_directories: configinc)
+
+test_ws_parser_src = [
+        'vsx-ws-parser.c',
+        'test-ws-parser.c',
+]
+test_ws_parser = executable('test-ws-parser',
+                            test_ws_parser_src,
+                            dependencies: server_deps,
+                            include_directories: configinc)
+test('ws-parser', test_ws_parser)
