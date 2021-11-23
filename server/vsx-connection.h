@@ -27,6 +27,13 @@
 
 typedef struct _VsxConnection VsxConnection;
 
+typedef enum
+{
+  VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+} VsxConnectionError;
+
+#define VSX_CONNECTION_ERROR (vsx_connection_error_quark ())
+
 VsxConnection *
 vsx_connection_new (GSocketAddress *socket_address,
                     VsxConversationSet *conversation_set,
@@ -47,8 +54,16 @@ gboolean
 vsx_connection_parse_eof (VsxConnection *conn,
                           GError **error);
 
+gboolean
+vsx_connection_is_finished (VsxConnection *conn);
+
+gboolean
+vsx_connection_has_data (VsxConnection *conn);
 
 void
 vsx_connection_free (VsxConnection *conn);
+
+GQuark
+vsx_connection_error_quark (void);
 
 #endif /* __VSX_CONNECTION_H__ */
