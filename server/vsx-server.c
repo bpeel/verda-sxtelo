@@ -392,6 +392,10 @@ set_bad_input_with_code (VsxServerConnection *connection,
 static void
 set_bad_input (VsxServerConnection *connection, GError *error)
 {
+  vsx_log ("For %s: %s",
+           connection->peer_address_string,
+           error->message);
+
   if (error->domain == VSX_HTTP_PARSER_ERROR
       && error->code == VSX_HTTP_PARSER_ERROR_UNSUPPORTED)
     set_bad_input_with_code (connection,
