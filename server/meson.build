@@ -36,6 +36,7 @@ server_src = [
         'vsx-person.c',
         'vsx-person-set.c',
         'vsx-player.c',
+        'vsx-proto.c',
         'vsx-request-handler.c',
         'vsx-response.c',
         'vsx-send-message-handler.c',
