@@ -140,15 +140,15 @@ set_option (LoadConfigData *data,
       }
     case OPTION_TYPE_BOOL:
       {
-        bool *ptr = (bool *) ((uint8_t *) config_item + option->offset);
+        gboolean *ptr = (gboolean *) ((uint8_t *) config_item + option->offset);
 
         if (!strcmp (value, "true"))
           {
-            *ptr = true;
+            *ptr = TRUE;
           }
         else if (!strcmp (value, "false"))
           {
-            *ptr = false;
+            *ptr = FALSE;
           }
         else
           {
