@@ -69,3 +69,24 @@ test_ws_parser = executable('test-ws-parser',
                             dependencies: server_deps,
                             include_directories: configinc)
 test('ws-parser', test_ws_parser)
+
+test_connection_src = [
+        'vsx-connection.c',
+        'vsx-conversation.c',
+        'vsx-conversation-set.c',
+        'vsx-list.c',
+        'vsx-log.c',
+        'vsx-main-context.c',
+        'vsx-object.c',
+        'vsx-person.c',
+        'vsx-person-set.c',
+        'vsx-player.c',
+        'vsx-tile-data.c',
+        'vsx-ws-parser.c',
+        'test-connection.c',
+]
+test_connection = executable('test-connection',
+                             test_connection_src,
+                             dependencies: server_deps,
+                             include_directories: configinc)
+test('connection', test_connection)
