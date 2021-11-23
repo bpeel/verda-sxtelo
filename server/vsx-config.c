@@ -32,7 +32,7 @@ typedef struct
 {
   const char *filename;
   VsxConfig *config;
-  bool had_error;
+  gboolean had_error;
   GString *error_buffer;
   VsxConfigServer *server;
 } LoadConfigData;
@@ -85,6 +85,7 @@ static const Option server_options[] = {
         }
   OPTION (address, STRING),
   OPTION (port, INT),
+  OPTION (websocket, BOOL),
   OPTION (certificate, STRING),
   OPTION (private_key, STRING),
   OPTION (private_key_password, STRING),
