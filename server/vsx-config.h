@@ -20,6 +20,7 @@
 #define __VSX_CONFIG_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 #include "vsx-list.h"
 
