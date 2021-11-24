@@ -37,10 +37,14 @@
 typedef enum
 {
   VSX_CONNECTION_STATE_READING_WS_HEADERS,
-  VSX_CONNECTION_STATE_WRITING_WS_RESPONSE,
   VSX_CONNECTION_STATE_WRITING_DATA,
   VSX_CONNECTION_STATE_DONE,
 } VsxConnectionState;
+
+typedef enum
+{
+  VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
+} VsxConnectionDirtyFlag;
 
 struct _VsxConnection
 {
@@ -54,6 +58,8 @@ struct _VsxConnection
    * been parsed.
    */
   VsxWsParser *ws_parser;
+
+  VsxConnectionDirtyFlag dirty_flags;
 
   guint8 read_buf[1024];
   size_t read_buf_pos;
@@ -86,6 +92,10 @@ ws_header_prefix[] =
 
 static const char
 ws_header_postfix[] = "\r\n\r\n";
+
+typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
+                                             guint8 *buffer,
+                                             size_t buffer_size);
 
 static gboolean
 handle_new_player(VsxConnection *conn,
@@ -138,6 +148,15 @@ vsx_connection_new (GSocketAddress *socket_address,
   return conn;
 }
 
+static gboolean
+has_pending_data (VsxConnection *conn)
+{
+  if (conn->dirty_flags)
+    return TRUE;
+
+  return FALSE;
+}
+
 static int
 write_ws_response (VsxConnection *conn,
                    guint8 *buffer,
@@ -183,6 +202,8 @@ write_ws_response (VsxConnection *conn,
   memcpy (p, ws_header_postfix, (sizeof ws_header_postfix) - 1);
   p += (sizeof ws_header_postfix) - 1;
 
+  conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_WS_HEADER;
+
   return p - buffer;
 }
 
@@ -191,8 +212,16 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    guint8 *buffer,
                                    size_t buffer_size)
 {
+  static const struct
+  {
+    VsxConnectionDirtyFlag flag;
+    VsxConnectionWriteStateFunc func;
+  } dirty_write_funcs[] =
+    {
+      { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
+    };
+
   size_t total_wrote = 0;
-  int wrote;
 
   while (TRUE)
     {
@@ -201,22 +230,28 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
         case VSX_CONNECTION_STATE_READING_WS_HEADERS:
           return total_wrote;
 
-        case VSX_CONNECTION_STATE_WRITING_WS_RESPONSE:
-          wrote = write_ws_response(conn,
-                                    buffer + total_wrote,
-                                    buffer_size - total_wrote);
-          if (wrote == -1)
+        case VSX_CONNECTION_STATE_WRITING_DATA:
+          if (!has_pending_data (conn))
             return total_wrote;
 
-          total_wrote += wrote;
+          for (int i = 0; i < G_N_ELEMENTS (dirty_write_funcs); i++)
+            {
+              if ((conn->dirty_flags & dirty_write_funcs[i].flag) == 0)
+                continue;
 
-          conn->state = VSX_CONNECTION_STATE_WRITING_DATA;
+              int wrote = dirty_write_funcs[i].func (conn,
+                                                     buffer + total_wrote,
+                                                     buffer_size - total_wrote);
 
+              if (wrote == -1)
+                return total_wrote;
+
+              total_wrote += wrote;
+
+              goto found;
+            }
+        found:
           break;
-
-        case VSX_CONNECTION_STATE_WRITING_DATA:
-          /* FIXME */
-          return total_wrote;
 
         case VSX_CONNECTION_STATE_DONE:
           return total_wrote;
@@ -498,7 +533,8 @@ vsx_connection_parse_data (VsxConnection *conn,
         case VSX_WS_PARSER_RESULT_ERROR:
           return FALSE;
         case VSX_WS_PARSER_RESULT_FINISHED:
-          conn->state = VSX_CONNECTION_STATE_WRITING_WS_RESPONSE;
+          conn->state = VSX_CONNECTION_STATE_WRITING_DATA;
+          conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_WS_HEADER;
           buffer += consumed;
           buffer_length -= consumed;
           break;
@@ -534,11 +570,8 @@ vsx_connection_has_data (VsxConnection *conn)
     {
     case VSX_CONNECTION_STATE_READING_WS_HEADERS:
       return FALSE;
-    case VSX_CONNECTION_STATE_WRITING_WS_RESPONSE:
-      return TRUE;
     case VSX_CONNECTION_STATE_WRITING_DATA:
-      /* FIXME */
-      return FALSE;
+      return has_pending_data (conn);
     case VSX_CONNECTION_STATE_DONE:
       return FALSE;
     }
