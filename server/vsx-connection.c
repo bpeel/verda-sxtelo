@@ -238,7 +238,7 @@ vsx_connection_parse_eof (VsxConnection *conn,
       return FALSE;
     }
 
-  if (conn->read_buf_pos > 0)
+  if (conn->read_buf_pos > 0 || conn->message_data_length > 0)
     {
       g_set_error (error,
                    VSX_CONNECTION_ERROR,

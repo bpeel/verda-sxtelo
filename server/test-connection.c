@@ -280,6 +280,8 @@ test_close_in_frame (void)
     {
       /* Unfinished frame */
       "\x82\x5!",
+      /* Unfinished fragmented message */
+      "\x02\x1!",
     };
 
   gboolean ret = TRUE;
