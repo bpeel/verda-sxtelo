@@ -107,7 +107,7 @@ process_message (VsxConnection *conn,
   g_set_error (error,
                VSX_CONNECTION_ERROR,
                VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-               "Client sent an unknown message ID (0x%u)",
+               "Client sent an unknown message ID (0x%x)",
                conn->message_data[0]);
 
   return FALSE;
