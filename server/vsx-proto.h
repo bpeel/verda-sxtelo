@@ -65,6 +65,7 @@ typedef enum
     VSX_PROTO_TYPE_UINT16,
     VSX_PROTO_TYPE_UINT32,
     VSX_PROTO_TYPE_UINT64,
+    VSX_PROTO_TYPE_INT16,
     VSX_PROTO_TYPE_BLOB,
     VSX_PROTO_TYPE_STRING,
     VSX_PROTO_TYPE_NONE
@@ -98,6 +99,14 @@ vsx_proto_write_guint64 (guint8 *buffer,
                          guint64 value)
 {
   value = GUINT64_TO_LE (value);
+  memcpy (buffer, &value, sizeof value);
+}
+
+static inline void
+vsx_proto_write_gint16 (guint8 *buffer,
+                       gint16 value)
+{
+  value = GINT16_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
@@ -141,6 +150,14 @@ vsx_proto_read_guint64 (const guint8 *buffer)
   guint64 value;
   memcpy (&value, buffer, sizeof value);
   return GUINT64_FROM_LE (value);
+}
+
+static inline gint16
+vsx_proto_read_gint16 (const guint8 *buffer)
+{
+  gint16 value;
+  memcpy (&value, buffer, sizeof value);
+  return GINT16_FROM_LE (value);
 }
 
 gboolean
