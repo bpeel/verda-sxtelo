@@ -442,6 +442,22 @@ handle_turn (VsxConnection *conn,
 }
 
 static gboolean
+handle_shout (VsxConnection *conn,
+             GError **error)
+{
+  if (!ensure_empty_payload (conn, "shout", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_shout (conn->person->conversation,
+                          conn->person->player->num);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -474,6 +490,8 @@ process_message (VsxConnection *conn,
       return handle_turn (conn, error);
     case VSX_PROTO_MOVE_TILE:
       return handle_move_tile (conn, error);
+    case VSX_PROTO_SHOUT:
+      return handle_shout (conn, error);
     }
 
   g_set_error (error,

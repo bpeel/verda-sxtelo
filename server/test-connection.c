@@ -1164,6 +1164,53 @@ test_turn_and_move (void)
   return ret;
 }
 
+static gboolean
+test_shout (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (guint8 *) "\x82\x1\x8a",
+                                      3,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_shout: Unexpected error: %s\n",
+                   error->message);
+          g_error_free (error);
+          ret = FALSE;
+        }
+      else if (person->conversation->last_shout_time == 0)
+        {
+          fprintf (stderr,
+                   "test_shout: last_shout_time is still zero after shouting");
+          ret = FALSE;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1197,6 +1244,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_turn_and_move ())
+    ret = EXIT_FAILURE;
+
+  if (!test_shout ())
     ret = EXIT_FAILURE;
 
   return ret;
