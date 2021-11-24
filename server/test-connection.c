@@ -48,6 +48,66 @@ ws_reply[] =
   "Sec-WebSocket-Accept: p4PX7Zjj5DyJVCBrt49wxR4RyoQ=\r\n"
   "\r\n";
 
+typedef struct
+{
+  const char *frame;
+  size_t frame_length;
+  const char *expected_message;
+} FrameErrorTest;
+
+#define BIN_STR(x) x, (sizeof (x)) - 1
+
+static const FrameErrorTest
+frame_error_tests[] =
+  {
+    {
+      BIN_STR("\x82\x1\x42"),
+      "Client sent an unknown message ID (0x42)"
+    },
+    {
+      BIN_STR("\x8f\x3HI!"),
+      "Client sent an unknown control frame"
+    },
+    {
+      BIN_STR("\x92\x1\x42"),
+      "Client sent a frame with non-zero RSV bits",
+    },
+    {
+      BIN_STR("\xa2\x1\x42"),
+      "Client sent a frame with non-zero RSV bits",
+    },
+    {
+      BIN_STR("\x88\x7e\x00\x7eggggggggggggggggggggggggggggggggggggggggggggg"
+              "ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+              "gggggggggggggggggggg"),
+      "Client sent a control frame (0x8) that is too long (126)"
+    },
+    {
+      BIN_STR("\x08\x1!"),
+      "Client sent a fragmented control frame"
+    },
+    {
+      BIN_STR("\x82\x7e\x04\x01 This has a length of 1025 …"),
+      "Client sent a message (0x2) that is too long (1025)"
+    },
+    {
+      BIN_STR("\x00\x1!"),
+      "Client sent a continuation frame without starting a message"
+    },
+    {
+      BIN_STR("\x00\x1!"),
+      "Client sent a continuation frame without starting a message"
+    },
+    {
+      BIN_STR("\x02\x0"),
+      "Client sent an empty fragmented message"
+    },
+    {
+      BIN_STR("\x83\x1!"),
+      "Client sent a frame opcode (0x3) which the server doesn’t understand"
+    },
+  };
+
 static Harness *
 create_harness(void)
 {
@@ -124,21 +184,61 @@ create_negotiated_harness (void)
   return harness;
 }
 
+static gboolean
+test_frame_errors(void)
+{
+  gboolean ret = TRUE;
+
+  for (int i = 0; i < G_N_ELEMENTS (frame_error_tests); i++)
+    {
+      Harness *harness = create_negotiated_harness ();
+
+      if (harness == NULL)
+        return FALSE;
+
+      GError *error = NULL;
+
+      if (vsx_connection_parse_data (harness->conn,
+                                     (guint8 *) frame_error_tests[i].frame,
+                                     frame_error_tests[i].frame_length,
+                                     &error))
+        {
+          fprintf (stderr,
+                   "frame error test %i: "
+                   "error expected but parsing succeeded\n",
+                   i);
+          ret = FALSE;
+        }
+      else
+        {
+          if (strcmp (error->message, frame_error_tests[i].expected_message))
+            {
+              fprintf (stderr,
+                       "frame error test %i: "
+                       "expected error message does not match received one\n"
+                       " Expected: %s\n"
+                       " Received: %s\n",
+                       i,
+                       frame_error_tests[i].expected_message,
+                       error->message);
+              ret = FALSE;
+            }
+          g_error_free (error);
+        }
+
+      free_harness (harness);
+    }
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
   int ret = EXIT_SUCCESS;
 
-  Harness *harness = create_negotiated_harness ();
-
-  if (harness == NULL)
-    {
-      ret = EXIT_FAILURE;
-    }
-  else
-    {
-      free_harness (harness);
-    }
+  if (!test_frame_errors ())
+    ret = EXIT_FAILURE;
 
   return ret;
 }
