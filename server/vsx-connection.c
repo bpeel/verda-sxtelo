@@ -306,6 +306,40 @@ handle_leave (VsxConnection *conn,
 }
 
 static gboolean
+handle_start_typing (VsxConnection *conn,
+                     GError **error)
+{
+  if (!ensure_empty_payload (conn, "start typing", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_set_typing (conn->person->conversation,
+                               conn->person->player->num,
+                               TRUE);
+
+  return TRUE;
+}
+
+static gboolean
+handle_stop_typing (VsxConnection *conn,
+                    GError **error)
+{
+  if (!ensure_empty_payload (conn, "stop typing", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_set_typing (conn->person->conversation,
+                               conn->person->player->num,
+                               FALSE);
+
+  return TRUE;
+}
+
+static gboolean
 handle_send_message (VsxConnection *conn,
                      GError **error)
 {
@@ -367,6 +401,10 @@ process_message (VsxConnection *conn,
       return handle_leave (conn, error);
     case VSX_PROTO_SEND_MESSAGE:
       return handle_send_message (conn, error);
+    case VSX_PROTO_START_TYPING:
+      return handle_start_typing (conn, error);
+    case VSX_PROTO_STOP_TYPING:
+      return handle_stop_typing (conn, error);
     }
 
   g_set_error (error,

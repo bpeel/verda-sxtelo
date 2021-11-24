@@ -953,6 +953,103 @@ test_send_message (void)
   return ret;
 }
 
+static gboolean
+test_typing_commands (Harness *harness, VsxPerson *person)
+{
+  static const struct
+  {
+    guint8 command;
+    gboolean typing_result;
+  } typing_commands[] =
+    {
+      { VSX_PROTO_STOP_TYPING, FALSE },
+      { VSX_PROTO_START_TYPING, TRUE },
+      { VSX_PROTO_START_TYPING, TRUE },
+      { VSX_PROTO_STOP_TYPING, FALSE },
+      { VSX_PROTO_START_TYPING, TRUE },
+    };
+
+  for (int i = 0; i < G_N_ELEMENTS (typing_commands); i++)
+    {
+      GError *error = NULL;
+
+      guint8 buf[] = { 0x82, 0x1, typing_commands[i].command };
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      buf, sizeof buf,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_typing_commands: %i: Unexpected error: %s\n",
+                   i,
+                   error->message);
+          g_error_free (error);
+
+          return FALSE;
+        }
+
+      if (!!(person->player->flags & VSX_PLAYER_TYPING)
+          != !!typing_commands[i].typing_result)
+        {
+          fprintf (stderr,
+                   "test_typing_commands: %i: "
+                   "Typing status is not as expected\n",
+                   i);
+          return FALSE;
+        }
+    }
+
+  return TRUE;
+}
+
+static gboolean
+test_typing (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      if (!test_typing_commands (harness, person))
+        {
+          ret = FALSE;
+        }
+      else
+        {
+          /* Try sending a message. This should automatically set the
+           * typing status to FALSE.
+           */
+          if (!test_send_one_message (harness, person))
+            {
+              ret = FALSE;
+            }
+          else if ((person->player->flags & VSX_PLAYER_TYPING))
+            {
+              fprintf (stderr,
+                       "Sending a message did not reset the typing status\n");
+              ret = FALSE;
+            }
+       }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -980,6 +1077,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_send_message ())
+    ret = EXIT_FAILURE;
+
+  if (!test_typing ())
     ret = EXIT_FAILURE;
 
   return ret;
