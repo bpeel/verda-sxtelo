@@ -45,6 +45,7 @@ typedef enum
 typedef enum
 {
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
+  VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 1),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -99,6 +100,12 @@ ws_header_postfix[] = "\r\n\r\n";
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              guint8 *buffer,
                                              size_t buffer_size);
+
+static void
+set_dirty_flags_for_connected_person (VsxConnection *conn)
+{
+  conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID;
+}
 
 static gboolean
 handle_new_player (VsxConnection *conn,
@@ -157,6 +164,8 @@ handle_new_player (VsxConnection *conn,
                player_name,
                conversation->id);
     }
+
+  set_dirty_flags_for_connected_person (conn);
 
   return TRUE;
 }
@@ -226,6 +235,8 @@ handle_reconnect (VsxConnection *conn,
 
   vsx_person_make_noise (person);
   conn->person = vsx_object_ref (person);
+
+  set_dirty_flags_for_connected_person (conn);
 
   return TRUE;
 }
@@ -335,6 +346,30 @@ write_ws_response (VsxConnection *conn,
   return p - buffer;
 }
 
+static int
+write_player_id (VsxConnection *conn,
+                 guint8 *buffer,
+                 size_t buffer_size)
+{
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_PLAYER_ID,
+
+                                       VSX_PROTO_TYPE_UINT64,
+                                       conn->person->id,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       conn->person->player->num,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote != -1)
+    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID;
+
+  return wrote;
+}
+
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    guint8 *buffer,
@@ -347,6 +382,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
   } dirty_write_funcs[] =
     {
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
+      { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
     };
 
   size_t total_wrote = 0;

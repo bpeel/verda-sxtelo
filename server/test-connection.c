@@ -22,8 +22,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "vsx-connection.h"
+#include "vsx-proto.h"
 
 typedef struct
 {
@@ -364,11 +366,51 @@ test_close_in_frame (void)
 }
 
 static gboolean
+read_person_id (Harness *harness,
+                guint64 *person_id_out,
+                guint8 *player_num_out)
+{
+  guint8 buf[1 + 1 + 1 + sizeof (guint64) + 1];
+
+  size_t got = vsx_connection_fill_output_buffer (harness->conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read the player ID\n",
+               got,
+               sizeof buf);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_PLAYER_ID)
+    {
+      fprintf (stderr,
+               "Expected player ID command but received 0x%02x",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (person_id_out)
+    {
+      memcpy (person_id_out, buf + 3, sizeof *person_id_out);
+      *person_id_out = GUINT64_FROM_LE (*person_id_out);
+    }
+
+  if (player_num_out)
+    *player_num_out = buf[3 + sizeof (guint64)];
+
+  return TRUE;
+}
+
+static gboolean
 create_player (Harness *harness,
                const char *room_name,
                const char *player_name,
-               VsxConversation **conversation_out,
-               VsxPlayer **player_out)
+               VsxPerson **person_out)
 {
   GString *buf = g_string_new (NULL);
 
@@ -396,41 +438,50 @@ create_player (Harness *harness,
     }
   else
     {
-      VsxConversation *conversation =
-        vsx_conversation_set_get_conversation (harness->conversation_set,
-                                               room_name);
+      guint64 person_id;
+      guint8 player_num;
 
-      if (conversation->n_players < 1)
+      if (!read_person_id (harness, &person_id, &player_num))
         {
-          fprintf (stderr,
-                   "The conversation is empty after creating a player\n");
           ret = FALSE;
         }
       else
         {
-          VsxPlayer *player =
-            conversation->players[conversation->n_players - 1];
+          VsxPerson *person = vsx_person_set_get_person (harness->person_set,
+                                                         person_id);
 
-          if (strcmp (player->name, player_name))
+          if (person == NULL)
+            {
+              fprintf (stderr,
+                       "Returned person ID (%" PRIu64 ") doesn’t exist after "
+                       "creating player\n",
+                       person_id);
+              ret = FALSE;
+            }
+          else if (strcmp (person->player->name, player_name))
             {
               fprintf (stderr,
                        "The player name does not match:\n"
                        " Expected: %s\n"
                        " Received: %s\n",
                        player_name,
-                       player->name);
+                       person->player->name);
+              ret = FALSE;
+            }
+          else if (person->conversation->n_players - 1 != player_num)
+            {
+              fprintf (stderr,
+                       "New player is not last player (%i / %i)\n",
+                       player_num,
+                       person->conversation->n_players);
               ret = FALSE;
             }
           else
             {
-              if (conversation_out)
-                *conversation_out = vsx_object_ref (conversation);
-              if (player_out)
-                *player_out = vsx_object_ref (player);
+              if (person_out)
+                *person_out = vsx_object_ref (person);
             }
         }
-
-      vsx_object_unref (conversation);
     }
 
   g_string_free (buf, TRUE);
@@ -448,8 +499,7 @@ test_new_player (void)
 
   gboolean ret = create_player (harness,
                                 "default:eo", "Zamenhof",
-                                NULL, /* conversation_out */
-                                NULL /* player_out */);
+                                NULL /* person_out */);
 
   free_harness (harness);
 
