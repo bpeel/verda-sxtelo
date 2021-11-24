@@ -63,6 +63,8 @@ struct _VsxConnection
 
   VsxPerson *person;
 
+  VsxListener conversation_changed_listener;
+
   VsxConnectionDirtyFlag dirty_flags;
 
   guint8 read_buf[1024];
@@ -102,9 +104,33 @@ typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              size_t buffer_size);
 
 static void
-set_dirty_flags_for_connected_person (VsxConnection *conn)
+conversation_changed_cb (VsxListener *listener,
+                         void *user_data)
+{
+  VsxConnection *conn =
+    vsx_container_of (listener, conn, conversation_changed_listener);
+  VsxConversationChangedData *data = user_data;
+
+  switch (data->type)
+    {
+    case VSX_CONVERSATION_N_TILES_CHANGED:
+    case VSX_CONVERSATION_PLAYER_CHANGED:
+    case VSX_CONVERSATION_TILE_CHANGED:
+    case VSX_CONVERSATION_STATE_CHANGED:
+    case VSX_CONVERSATION_MESSAGE_ADDED:
+    case VSX_CONVERSATION_SHOUTED:
+      break;
+    }
+}
+
+static void
+start_following_person (VsxConnection *conn)
 {
   conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID;
+
+  conn->conversation_changed_listener.notify = conversation_changed_cb;
+  vsx_signal_add (&conn->person->conversation->changed_signal,
+                  &conn->conversation_changed_listener);
 }
 
 static gboolean
@@ -165,7 +191,7 @@ handle_new_player (VsxConnection *conn,
                conversation->id);
     }
 
-  set_dirty_flags_for_connected_person (conn);
+  start_following_person (conn);
 
   return TRUE;
 }
@@ -236,7 +262,7 @@ handle_reconnect (VsxConnection *conn,
   vsx_person_make_noise (person);
   conn->person = vsx_object_ref (person);
 
-  set_dirty_flags_for_connected_person (conn);
+  start_following_person (conn);
 
   return TRUE;
 }
@@ -1014,7 +1040,10 @@ void
 vsx_connection_free (VsxConnection *conn)
 {
   if (conn->person)
-    vsx_object_unref (conn->person);
+    {
+      vsx_list_remove (&conn->conversation_changed_listener.link);
+      vsx_object_unref (conn->person);
+    }
 
   g_object_unref (conn->socket_address);
   vsx_object_unref (conn->conversation_set);
