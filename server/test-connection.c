@@ -106,6 +106,10 @@ frame_error_tests[] =
       BIN_STR("\x83\x1!"),
       "Client sent a frame opcode (0x3) which the server doesn’t understand"
     },
+    {
+      BIN_STR("\x82\x0"),
+      "Client sent an empty message"
+    },
   };
 
 static Harness *

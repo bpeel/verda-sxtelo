@@ -98,6 +98,15 @@ static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
+  if (conn->message_data_length < 1)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent an empty message");
+      return FALSE;
+    }
+
   switch (conn->message_data[0])
     {
     case VSX_PROTO_NEW_PLAYER:
