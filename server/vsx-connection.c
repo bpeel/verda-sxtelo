@@ -26,6 +26,7 @@
 
 #include "vsx-ws-parser.h"
 #include "vsx-proto.h"
+#include "vsx-log.h"
 
 /* VsxConnection specifically handles connections using the WebSocket
  * protocol. Connections via the HTTP protocol use an HTTP parser
@@ -58,6 +59,8 @@ struct _VsxConnection
    * been parsed.
    */
   VsxWsParser *ws_parser;
+
+  VsxPerson *person;
 
   VsxConnectionDirtyFlag dirty_flags;
 
@@ -98,9 +101,63 @@ typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              size_t buffer_size);
 
 static gboolean
-handle_new_player(VsxConnection *conn,
-                  GError **error)
+handle_new_player (VsxConnection *conn,
+                   GError **error)
 {
+  const char *room_name, *player_name;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &room_name,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &player_name,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid new player command received");
+      return FALSE;
+    }
+
+  if (conn->person)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent a new player request but already specified "
+                   "a player");
+      return FALSE;
+    }
+
+  VsxConversation *conversation =
+    vsx_conversation_set_get_conversation (conn->conversation_set, room_name);
+
+  conn->person = vsx_person_set_generate_person (conn->person_set,
+                                                 player_name,
+                                                 conn->socket_address,
+                                                 conversation);
+
+  vsx_object_unref (conversation);
+
+  if (conversation->n_players == 1)
+    {
+      vsx_log ("New player “%s” created game %i in “%s”",
+               player_name,
+               conversation->id,
+               room_name);
+    }
+  else
+    {
+      vsx_log ("New player “%s” joined game %i",
+               player_name,
+               conversation->id);
+    }
+
   return TRUE;
 }
 
@@ -584,6 +641,9 @@ vsx_connection_has_data (VsxConnection *conn)
 void
 vsx_connection_free (VsxConnection *conn)
 {
+  if (conn->person)
+    vsx_object_unref (conn->person);
+
   g_object_unref (conn->socket_address);
   vsx_object_unref (conn->conversation_set);
   vsx_object_unref (conn->person_set);

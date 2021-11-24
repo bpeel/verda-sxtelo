@@ -110,6 +110,15 @@ frame_error_tests[] =
       BIN_STR("\x82\x0"),
       "Client sent an empty message"
     },
+    {
+      BIN_STR("\x82\x9\x80no_name\0"),
+      "Invalid new player command received"
+    },
+    {
+      BIN_STR("\x82\x12\x80gefault\0Zamenhof\0"
+              "\x82\x12\x80gefault\0Zamenhof\0"),
+      "Client sent a new player request but already specified a player"
+    },
   };
 
 static Harness *
@@ -341,6 +350,99 @@ test_close_in_frame (void)
   return ret;
 }
 
+static gboolean
+create_player (Harness *harness,
+               const char *room_name,
+               const char *player_name,
+               VsxConversation **conversation_out,
+               VsxPlayer **player_out)
+{
+  GString *buf = g_string_new (NULL);
+
+  g_string_append_c (buf, 0x82);
+  g_string_append_c (buf, strlen (room_name) + strlen (player_name) + 3);
+  g_string_append_c (buf, 0x80);
+  g_string_append (buf, room_name);
+  g_string_append_c (buf, 0);
+  g_string_append (buf, player_name);
+  g_string_append_c (buf, 0);
+
+  gboolean ret = TRUE;
+  GError *error = NULL;
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (guint8 *) buf->str,
+                                  buf->len,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error while creating new player: %s\n",
+               error->message);
+      g_error_free (error);
+      ret = FALSE;
+    }
+  else
+    {
+      VsxConversation *conversation =
+        vsx_conversation_set_get_conversation (harness->conversation_set,
+                                               room_name);
+
+      if (conversation->n_players < 1)
+        {
+          fprintf (stderr,
+                   "The conversation is empty after creating a player\n");
+          ret = FALSE;
+        }
+      else
+        {
+          VsxPlayer *player =
+            conversation->players[conversation->n_players - 1];
+
+          if (strcmp (player->name, player_name))
+            {
+              fprintf (stderr,
+                       "The player name does not match:\n"
+                       " Expected: %s\n"
+                       " Received: %s\n",
+                       player_name,
+                       player->name);
+              ret = FALSE;
+            }
+          else
+            {
+              if (conversation_out)
+                *conversation_out = vsx_object_ref (conversation);
+              if (player_out)
+                *player_out = vsx_object_ref (player);
+            }
+        }
+
+      vsx_object_unref (conversation);
+    }
+
+  g_string_free (buf, TRUE);
+
+  return ret;
+}
+
+static gboolean
+test_new_player (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  gboolean ret = create_player (harness,
+                                "default:eo", "Zamenhof",
+                                NULL, /* conversation_out */
+                                NULL /* player_out */);
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -353,6 +455,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_close_in_frame ())
+    ret = EXIT_FAILURE;
+
+  if (!test_new_player ())
     ret = EXIT_FAILURE;
 
   return ret;
