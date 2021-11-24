@@ -745,6 +745,56 @@ test_keep_alive (void)
   return ret;
 }
 
+static gboolean
+test_leave (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (guint8 *) "\x82\x1\x84",
+                                      3,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_leave: Unexpected error: %s\n",
+                   error->message);
+          g_error_free (error);
+
+          ret = FALSE;
+        }
+      else if (person->conversation->n_connected_players != 0)
+        {
+          fprintf (stderr,
+                   "test_leave: The conversation still has %i players after "
+                   "leave command sent\n",
+                   person->conversation->n_connected_players);
+          ret = FALSE;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -766,6 +816,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_keep_alive ())
+    ret = EXIT_FAILURE;
+
+  if (!test_leave ())
     ret = EXIT_FAILURE;
 
   return ret;

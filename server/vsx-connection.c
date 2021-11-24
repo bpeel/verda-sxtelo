@@ -291,6 +291,21 @@ handle_keep_alive (VsxConnection *conn,
 }
 
 static gboolean
+handle_leave (VsxConnection *conn,
+              GError **error)
+{
+  if (!ensure_empty_payload (conn, "leave", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_person_leave_conversation (conn->person);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -311,6 +326,8 @@ process_message (VsxConnection *conn,
       return handle_reconnect (conn, error);
     case VSX_PROTO_KEEP_ALIVE:
       return handle_keep_alive (conn, error);
+    case VSX_PROTO_LEAVE:
+      return handle_leave (conn, error);
     }
 
   g_set_error (error,
