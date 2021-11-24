@@ -85,6 +85,7 @@ typedef struct
   VsxHttpParser http_parser;
 
   VsxConnection *ws_connection;
+  VsxListener ws_connection_listener;
 
   /* This becomes TRUE when we've received something from the client
      that we don't understand and we're ignoring any further input */
@@ -192,6 +193,16 @@ response_changed_cb (VsxListener *listener,
   if (&queued_response->link ==
       queued_response->connection->response_queue.next)
     update_poll (queued_response->connection);
+}
+
+static void
+ws_connection_changed_cb (VsxListener *listener,
+                          void *data)
+{
+  VsxServerConnection *connection =
+    vsx_container_of (listener, connection, ws_connection_listener);
+
+  update_poll (connection);
 }
 
 static gboolean
@@ -1043,6 +1054,12 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
             vsx_connection_new (remote_address,
                                 server->pending_conversations,
                                 server->person_set);
+          VsxSignal *changed_signal =
+            vsx_connection_get_changed_signal (connection->ws_connection);
+          connection->ws_connection_listener.notify =
+            ws_connection_changed_cb;
+          vsx_signal_add (changed_signal,
+                          &connection->ws_connection_listener);
           g_object_unref (remote_address);
         }
       else
