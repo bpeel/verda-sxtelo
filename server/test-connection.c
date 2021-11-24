@@ -167,14 +167,12 @@ free_harness(Harness *harness)
   g_free (harness);
 }
 
-static Harness *
-create_negotiated_harness (void)
+static gboolean
+negotiate_connection (VsxConnection *conn)
 {
-  Harness *harness = create_harness ();
-
   GError *error = NULL;
 
-  if (!vsx_connection_parse_data (harness->conn,
+  if (!vsx_connection_parse_data (conn,
                                   (guint8 *) ws_request,
                                   (sizeof ws_request) - 1,
                                   &error))
@@ -183,13 +181,12 @@ create_negotiated_harness (void)
                "Unexpected error negotiating WebSocket: %s",
                error->message);
       g_error_free (error);
-      free_harness (harness);
 
-      return NULL;
+      return FALSE;
     }
 
   guint8 buf[(sizeof ws_reply) * 2];
-  size_t got = vsx_connection_fill_output_buffer (harness->conn,
+  size_t got = vsx_connection_fill_output_buffer (conn,
                                                   buf,
                                                   sizeof buf);
 
@@ -205,6 +202,19 @@ create_negotiated_harness (void)
                (int) got,
                buf,
                ws_reply);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static Harness *
+create_negotiated_harness (void)
+{
+  Harness *harness = create_harness ();
+
+  if (!negotiate_connection (harness->conn))
+    {
       free_harness (harness);
       return NULL;
     }
@@ -366,13 +376,13 @@ test_close_in_frame (void)
 }
 
 static gboolean
-read_person_id (Harness *harness,
+read_person_id (VsxConnection *conn,
                 guint64 *person_id_out,
                 guint8 *player_num_out)
 {
   guint8 buf[1 + 1 + 1 + sizeof (guint64) + 1];
 
-  size_t got = vsx_connection_fill_output_buffer (harness->conn,
+  size_t got = vsx_connection_fill_output_buffer (conn,
                                                   buf,
                                                   sizeof buf);
 
@@ -441,7 +451,7 @@ create_player (Harness *harness,
       guint64 person_id;
       guint8 player_num;
 
-      if (!read_person_id (harness, &person_id, &player_num))
+      if (!read_person_id (harness->conn, &person_id, &player_num))
         {
           ret = FALSE;
         }
@@ -506,6 +516,185 @@ test_new_player (void)
   return ret;
 }
 
+static gboolean
+reconnect_to_player (VsxConnection *conn,
+                     guint64 player_id,
+                     guint16 n_messages_received,
+                     GError **error)
+{
+  GString *buf = g_string_new (NULL);
+
+  player_id = GUINT64_TO_LE (player_id);
+  n_messages_received = GUINT64_TO_LE (n_messages_received);
+
+  g_string_append_c (buf, 0x82);
+  g_string_append_c (buf, 1 + sizeof (guint64) + sizeof (guint16));
+  g_string_append_c (buf, 0x81);
+  g_string_append_len (buf, (void *) &player_id, sizeof player_id);
+  g_string_append_len (buf,
+                       (void *) &n_messages_received,
+                       sizeof n_messages_received);
+
+  gboolean ret = TRUE;
+
+  if (!vsx_connection_parse_data (conn,
+                                  (guint8 *) buf->str,
+                                  buf->len,
+                                  error))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      guint64 person_id;
+
+      if (!read_person_id (conn, &person_id, NULL /* player_num */))
+        {
+          ret = FALSE;
+        }
+      else
+        {
+          if (person_id != player_id)
+            {
+              fprintf (stderr,
+                       "After reconnect, received person ID != request ID "
+                       "(%" PRIu64 " != %" PRIu64 ")\n",
+                       person_id,
+                       player_id);
+              ret = FALSE;
+            }
+        }
+    }
+
+  g_string_free (buf, TRUE);
+
+  return ret;
+}
+
+static gboolean
+test_reconnect_ok (Harness *harness,
+                   guint64 player_id)
+{
+  VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
+                                                  harness->conversation_set,
+                                                  harness->person_set);
+
+  gboolean ret = TRUE;
+
+  if (!negotiate_connection (other_conn))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (!reconnect_to_player (other_conn,
+                                player_id,
+                                0, /* n_messages_received */
+                                &error))
+        {
+          fprintf (stderr,
+                   "test_reconnect_ok: Unexpected error: %s\n",
+                   error->message);
+          g_error_free (error);
+          ret = FALSE;
+        }
+    }
+
+  vsx_connection_free (other_conn);
+
+  return ret;
+}
+
+static gboolean
+test_reconnect_bad_n_messages_received (Harness *harness,
+                                        guint64 player_id)
+{
+  VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
+                                                  harness->conversation_set,
+                                                  harness->person_set);
+
+  gboolean ret = TRUE;
+
+  if (!negotiate_connection (other_conn))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (reconnect_to_player (other_conn,
+                               player_id,
+                               10, /* n_messages_received */
+                               &error))
+        {
+          fprintf (stderr,
+                   "test_reconnect_bad_n_messages_received: "
+                   "Reconnect unexpectedly succeeded\n");
+          ret = FALSE;
+        }
+      else
+        {
+          const char *expected_message =
+            "Client claimed to have received 10 messages but only 0 "
+            "are available";
+
+          if (strcmp (error->message, expected_message))
+            {
+              fprintf (stderr,
+                       "test_reconnect_bad_n_messages_received: "
+                       "Error message does not match\n"
+                       " Expected: %s\n"
+                       " Received: %s\n",
+                       expected_message,
+                       error->message);
+              ret = FALSE;
+            }
+
+          g_error_free (error);
+        }
+    }
+
+  vsx_connection_free (other_conn);
+
+  return ret;
+}
+
+static gboolean
+test_reconnect (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      if (!test_reconnect_ok (harness, person->id))
+        ret = FALSE;
+
+      if (!test_reconnect_bad_n_messages_received (harness, person->id))
+        ret = FALSE;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -521,6 +710,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_new_player ())
+    ret = EXIT_FAILURE;
+
+  if (!test_reconnect ())
     ret = EXIT_FAILURE;
 
   return ret;
