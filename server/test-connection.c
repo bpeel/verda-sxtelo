@@ -236,12 +236,121 @@ test_frame_errors(void)
   return ret;
 }
 
+static gboolean
+test_eof_before_ws (void)
+{
+  Harness *harness = create_harness ();
+
+  gboolean ret = TRUE;
+  GError *error = NULL;
+
+  if (vsx_connection_parse_eof (harness->conn, &error))
+    {
+      fprintf (stderr,
+               "test_eof_before_ws: Parsing EOF succeeded but expected "
+               "to fail\n");
+      ret = FALSE;
+    }
+  else
+    {
+      char *expected_message = ("Client closed the connection before "
+                                "finishing WebSocket negotiation");
+      if (strcmp (error->message, expected_message))
+        {
+          fprintf (stderr,
+                   "test_eof_before_ws: Error message differs:\n"
+                   " Expected: %s\n"
+                   " Received: %s\n",
+                   expected_message,
+                   error->message);
+          ret = FALSE;
+        }
+      g_error_free (error);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
+static gboolean
+test_close_in_frame (void)
+{
+  static const char *tests[] =
+    {
+      /* Unfinished frame */
+      "\x82\x5!",
+    };
+
+  gboolean ret = TRUE;
+
+  for (int i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      Harness *harness = create_negotiated_harness ();
+
+      if (harness == NULL)
+        return FALSE;
+
+      GError *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (guint8 *) tests[i],
+                                      strlen (tests[i]),
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_close_in_frame: %i: Parsing failed when success "
+                   "expected: %s",
+                   i,
+                   error->message);
+          g_error_free (error);
+          ret = FALSE;
+        }
+      else if (vsx_connection_parse_eof (harness->conn, &error))
+        {
+          fprintf (stderr,
+                   "test_close_in_frame: %i: Parsing EOF succeeded but "
+                   "expected to fail\n",
+                   i);
+          ret = FALSE;
+        }
+      else
+        {
+          char *expected_message = ("Client closed the connection in the "
+                                    "middle of a frame");
+
+          if (strcmp (error->message, expected_message))
+            {
+              fprintf (stderr,
+                       "test_close_in_frame: %i: Error message differs:\n"
+                       " Expected: %s\n"
+                       " Received: %s\n",
+                       i,
+                       expected_message,
+                       error->message);
+              ret = FALSE;
+            }
+          g_error_free (error);
+        }
+
+      free_harness (harness);
+    }
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
   int ret = EXIT_SUCCESS;
 
   if (!test_frame_errors ())
+    ret = EXIT_FAILURE;
+
+  if (!test_eof_before_ws ())
+    ret = EXIT_FAILURE;
+
+  if (!test_close_in_frame ())
     ret = EXIT_FAILURE;
 
   return ret;
