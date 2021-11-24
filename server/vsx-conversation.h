@@ -67,6 +67,7 @@ typedef struct
 {
   unsigned int length;
   char *text;
+  char *raw_text;
 } VsxConversationMessage;
 
 typedef enum

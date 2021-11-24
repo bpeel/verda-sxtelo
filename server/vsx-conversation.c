@@ -46,6 +46,7 @@ vsx_conversation_free (void *object)
       VsxConversationMessage *message = &g_array_index (self->messages,
                                                         VsxConversationMessage,
                                                         i);
+      g_free (message->raw_text);
       g_free (message->text);
     }
 
@@ -144,6 +145,8 @@ vsx_conversation_add_message (VsxConversation *conversation,
   message = &g_array_index (conversation->messages,
                             VsxConversationMessage,
                             conversation->messages->len - 1);
+
+  message->raw_text = g_strndup (buffer, length);
 
   message_str = g_string_sized_new (length + 32);
 
