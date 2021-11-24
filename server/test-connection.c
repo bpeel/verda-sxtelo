@@ -119,6 +119,19 @@ frame_error_tests[] =
               "\x82\x12\x80gefault\0Zamenhof\0"),
       "Client sent a new player request but already specified a player"
     },
+    {
+      BIN_STR("\x82\x5\x81gggg"),
+      "Invalid reconnect command received"
+    },
+    {
+      BIN_STR("\x82\x12\x80gefault\0Zamenhof\0"
+              "\x82\xb\x81gggggggghh"),
+      "Client sent a reconnect request but already specified a player"
+    },
+    {
+      BIN_STR("\x82\xb\x81gggggggghh"),
+      "Client tried to reconnect to non-existant player 0x6767676767676767"
+    },
   };
 
 static Harness *

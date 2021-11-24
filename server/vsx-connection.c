@@ -162,6 +162,75 @@ handle_new_player (VsxConnection *conn,
 }
 
 static gboolean
+handle_reconnect (VsxConnection *conn,
+                  GError **error)
+{
+  uint64_t player_id;
+  uint16_t n_messages_received;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_UINT64,
+                               &player_id,
+
+                               VSX_PROTO_TYPE_UINT16,
+                               &n_messages_received,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid reconnect command received");
+      return FALSE;
+    }
+
+  if (conn->person)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent a reconnect request but already specified "
+                   "a player");
+      return FALSE;
+    }
+
+  VsxPerson *person = vsx_person_set_get_person (conn->person_set, player_id);
+
+  if (person == NULL)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client tried to reconnect to non-existant player "
+                   "0x%016" PRIx64,
+                   player_id);
+      return FALSE;
+    }
+
+  int n_messages_available = (person->conversation->messages->len -
+                              person->message_offset);
+
+  if (n_messages_received > n_messages_available)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client claimed to have received %i messages but only %i "
+                   "are available",
+                   n_messages_received,
+                   n_messages_available);
+      return FALSE;
+    }
+
+  vsx_person_make_noise (person);
+  conn->person = vsx_object_ref (person);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -178,6 +247,8 @@ process_message (VsxConnection *conn,
     {
     case VSX_PROTO_NEW_PLAYER:
       return handle_new_player (conn, error);
+    case VSX_PROTO_RECONNECT:
+      return handle_reconnect (conn, error);
     }
 
   g_set_error (error,
