@@ -377,6 +377,71 @@ handle_send_message (VsxConnection *conn,
 }
 
 static gboolean
+handle_move_tile (VsxConnection *conn,
+                  GError **error)
+{
+  guint8 tile_num;
+  gint16 tile_x, tile_y;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &tile_num,
+
+                               VSX_PROTO_TYPE_INT16,
+                               &tile_x,
+
+                               VSX_PROTO_TYPE_INT16,
+                               &tile_y,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid move tile command received");
+      return FALSE;
+    }
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  if (tile_num >= conn->person->conversation->n_tiles_in_play)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Player tried to move a tile that is not in play");
+      return FALSE;
+    }
+
+  vsx_conversation_move_tile (conn->person->conversation,
+                              conn->person->player->num,
+                              tile_num,
+                              tile_x,
+                              tile_y);
+
+  return TRUE;
+}
+
+static gboolean
+handle_turn (VsxConnection *conn,
+             GError **error)
+{
+  if (!ensure_empty_payload (conn, "turn", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_turn (conn->person->conversation,
+                         conn->person->player->num);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -405,6 +470,10 @@ process_message (VsxConnection *conn,
       return handle_start_typing (conn, error);
     case VSX_PROTO_STOP_TYPING:
       return handle_stop_typing (conn, error);
+    case VSX_PROTO_TURN:
+      return handle_turn (conn, error);
+    case VSX_PROTO_MOVE_TILE:
+      return handle_move_tile (conn, error);
     }
 
   g_set_error (error,

@@ -146,6 +146,10 @@ frame_error_tests[] =
       BIN_STR("\x82\x8\x85no-zero"),
       "Invalid send message command received",
     },
+    {
+      BIN_STR("\x82\x2\x88\x0"),
+      "Invalid move tile command received",
+    },
   };
 
 static Harness *
@@ -1050,6 +1054,116 @@ test_typing (void)
   return ret;
 }
 
+static gboolean
+test_turn_and_move_commands (Harness *harness, VsxPerson *person)
+{
+  GError *error = NULL;
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (guint8 *) "\x82\x1\x89",
+                                  3,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error after turn command: %s\n",
+               error->message);
+      g_error_free (error);
+
+      return FALSE;
+    }
+
+  if (person->conversation->n_tiles_in_play != 1)
+    {
+      fprintf (stderr,
+               "After turning a tile, n_tiles_in_play = %i\n",
+               person->conversation->n_tiles_in_play);
+      return FALSE;
+    }
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (guint8 *) "\x82\x6\x88\x0\xfe\xff\x20\x00",
+                                  8,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error after move command: %s\n",
+               error->message);
+      g_error_free (error);
+
+      return FALSE;
+    }
+
+  if (person->conversation->tiles[0].x != -2 ||
+      person->conversation->tiles[0].y != 32)
+    {
+      fprintf (stderr,
+               "After moving a tile to -2,32, it is at %i,%i\n",
+               person->conversation->tiles[0].x,
+               person->conversation->tiles[0].y);
+      return FALSE;
+    }
+
+  if (vsx_connection_parse_data (harness->conn,
+                                 (guint8 *) "\x82\x6\x88\x1\x10\x00\x20\x00",
+                                 8,
+                                 &error))
+    {
+      fprintf (stderr,
+               "Unexpected success after trying to move an invalid tile\n");
+      return FALSE;
+    }
+
+  const char *expected_message =
+    "Player tried to move a tile that is not in play";
+  gboolean ret = TRUE;
+
+  if (strcmp (error->message, expected_message))
+    {
+      fprintf (stderr,
+               "Error message does not match after trying to move an invalid "
+               "tile.\n"
+               " Expected: %s\n"
+               " Received: %s\n",
+               expected_message,
+               error->message);
+      ret = FALSE;
+    }
+
+  g_error_free (error);
+
+  return ret;
+}
+
+static gboolean
+test_turn_and_move (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      if (!test_turn_and_move_commands (harness, person))
+        ret = FALSE;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1080,6 +1194,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_typing ())
+    ret = EXIT_FAILURE;
+
+  if (!test_turn_and_move ())
     ret = EXIT_FAILURE;
 
   return ret;
