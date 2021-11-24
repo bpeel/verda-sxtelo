@@ -306,6 +306,43 @@ handle_leave (VsxConnection *conn,
 }
 
 static gboolean
+handle_send_message (VsxConnection *conn,
+                     GError **error)
+{
+  const char *message;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &message,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid send message command received");
+      return FALSE;
+    }
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_add_message (conn->person->conversation,
+                                conn->person->player->num,
+                                message,
+                                strlen (message));
+  /* Sending a message implicitly marks the person as no longer
+     typing */
+  vsx_conversation_set_typing (conn->person->conversation,
+                               conn->person->player->num,
+                               FALSE);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -328,6 +365,8 @@ process_message (VsxConnection *conn,
       return handle_keep_alive (conn, error);
     case VSX_PROTO_LEAVE:
       return handle_leave (conn, error);
+    case VSX_PROTO_SEND_MESSAGE:
+      return handle_send_message (conn, error);
     }
 
   g_set_error (error,

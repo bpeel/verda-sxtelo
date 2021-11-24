@@ -142,6 +142,10 @@ frame_error_tests[] =
       BIN_STR("\x82\x5\x83poop"),
       "Invalid keep alive message received",
     },
+    {
+      BIN_STR("\x82\x8\x85no-zero"),
+      "Invalid send message command received",
+    },
   };
 
 static Harness *
@@ -795,6 +799,160 @@ test_leave (void)
   return ret;
 }
 
+static gboolean
+check_expected_message (VsxPerson *person,
+                        const char *expected_message)
+{
+  if (person->conversation->messages->len < 1)
+    {
+      fprintf (stderr,
+               "There are no messages in the conversation after sending a "
+               "message\n");
+      return FALSE;
+    }
+
+  VsxConversationMessage *message =
+    &g_array_index (person->conversation->messages,
+                    VsxConversationMessage,
+                    person->conversation->messages->len - 1);
+
+  if (strcmp (message->raw_text, expected_message))
+    {
+      fprintf (stderr,
+               "Message in conversation does not match message sent.\n"
+               " Expected: %s\n"
+               " Received: %s\n",
+               expected_message,
+               message->raw_text);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
+test_send_one_message (Harness *harness,
+                       VsxPerson *person)
+{
+  GError *error = NULL;
+  gboolean ret = TRUE;
+
+  const char *expected_message = "Hello, world!";
+
+  GString *buf = g_string_new (NULL);
+
+  g_string_append_c (buf, 0x82);
+  g_string_append_c (buf, strlen (expected_message) + 2);
+  g_string_append_c (buf, 0x85);
+  g_string_append (buf, expected_message);
+  g_string_append_c (buf, '\0');
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (guint8 *) buf->str, buf->len,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error when sending message: %s\n",
+               error->message);
+      g_error_free (error);
+
+      ret = FALSE;
+    }
+  else if (!check_expected_message (person, expected_message))
+    {
+      ret = FALSE;
+    }
+
+    g_string_free (buf, TRUE);
+
+    return ret;
+}
+
+static gboolean
+test_send_fragmented_message (Harness *harness,
+                              VsxPerson *person)
+{
+  GError *error = NULL;
+  gboolean ret = TRUE;
+
+  const char *expected_message = "Hello, fragmented world!";
+
+  GString *buf = g_string_new (NULL);
+
+  g_string_append_c (buf, 0x85);
+  g_string_append (buf, expected_message);
+  g_string_append_c (buf, '\0');
+
+  /* Send the message as a series of one-byte fragments */
+  for (int i = 0; i < buf->len; i++)
+    {
+      guint8 frag[] =
+        {
+          i == 0 ? 0x02
+          : i == buf->len - 1 ? 0x80
+          : 0x00,
+          1,
+          buf->str[i]
+        };
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      frag,
+                                      sizeof frag,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "Unexpected error when sending fragmented message: %s\n",
+                   error->message);
+          g_error_free (error);
+
+          ret = FALSE;
+
+          goto done;
+        }
+    }
+
+  if (!check_expected_message (person, expected_message))
+    ret = FALSE;
+
+ done:
+  g_string_free (buf, TRUE);
+
+  return ret;
+}
+
+static gboolean
+test_send_message (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      if (!test_send_one_message (harness, person))
+        ret = FALSE;
+
+      if (!test_send_fragmented_message (harness, person))
+        ret = FALSE;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -819,6 +977,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_leave ())
+    ret = EXIT_FAILURE;
+
+  if (!test_send_message ())
     ret = EXIT_FAILURE;
 
   return ret;
