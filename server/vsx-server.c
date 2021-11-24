@@ -84,7 +84,7 @@ typedef struct
 
   VsxHttpParser http_parser;
 
-  VsxConnection *websocket_connection;
+  VsxConnection *ws_connection;
 
   /* This becomes TRUE when we've received something from the client
      that we don't understand and we're ignoring any further input */
@@ -374,7 +374,7 @@ static void
 set_bad_input_with_code (VsxServerConnection *connection,
                          VsxStringResponseType code)
 {
-  if (connection->websocket_connection == NULL)
+  if (connection->ws_connection == NULL)
     {
       VsxResponse *response;
 
@@ -452,8 +452,8 @@ vsx_server_remove_connection (VsxServer *server,
   vsx_list_remove (&connection->link);
   g_free (connection->peer_address_string);
 
-  if (connection->websocket_connection)
-    vsx_connection_free (connection->websocket_connection);
+  if (connection->ws_connection)
+    vsx_connection_free (connection->ws_connection);
 
   g_slice_free (VsxServerConnection, connection);
 
@@ -597,9 +597,9 @@ parse_data (VsxServerConnection *connection,
             size_t buffer_length,
             GError **error)
 {
-  if (connection->websocket_connection)
+  if (connection->ws_connection)
     {
-      return vsx_connection_parse_data (connection->websocket_connection,
+      return vsx_connection_parse_data (connection->ws_connection,
                                         buffer,
                                         buffer_length,
                                         error);
@@ -688,14 +688,14 @@ handle_read (VsxServer *server,
         {
           gboolean ret;
 
-          if (connection->websocket_connection == NULL)
+          if (connection->ws_connection == NULL)
             {
               ret = vsx_http_parser_parse_eof (&connection->http_parser,
                                                &error);
             }
           else
             {
-              ret = vsx_connection_parse_eof (connection->websocket_connection,
+              ret = vsx_connection_parse_eof (connection->ws_connection,
                                               &error);
             }
 
@@ -768,7 +768,7 @@ static void
 fill_output_buffer_from_websocket (VsxServerConnection *connection)
 {
   size_t added =
-    vsx_connection_fill_output_buffer (connection->websocket_connection,
+    vsx_connection_fill_output_buffer (connection->ws_connection,
                                        connection->output_buffer
                                        + connection->output_length,
                                        VSX_SERVER_OUTPUT_BUFFER_SIZE
@@ -780,7 +780,7 @@ fill_output_buffer_from_websocket (VsxServerConnection *connection)
 static void
 fill_output_buffer (VsxServerConnection *connection)
 {
-  if (connection->websocket_connection)
+  if (connection->ws_connection)
     fill_output_buffer_from_websocket (connection);
   else
     fill_output_buffer_from_responses (connection);
@@ -1039,7 +1039,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         {
           GSocketAddress *remote_address =
             g_socket_get_remote_address (client_socket, NULL);
-          connection->websocket_connection =
+          connection->ws_connection =
             vsx_connection_new (remote_address,
                                 server->pending_conversations,
                                 server->person_set);
@@ -1047,7 +1047,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         }
       else
         {
-          connection->websocket_connection = NULL;
+          connection->ws_connection = NULL;
 
           vsx_http_parser_init (&connection->http_parser,
                                 &vsx_server_http_parser_vtable,
