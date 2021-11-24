@@ -242,6 +242,55 @@ handle_reconnect (VsxConnection *conn,
 }
 
 static gboolean
+activate_person (VsxConnection *conn,
+                 GError **error)
+{
+  if (conn->person == NULL)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent a command without a person");
+      return FALSE;
+    }
+
+  vsx_person_make_noise (conn->person);
+
+  return TRUE;
+}
+
+static gboolean
+ensure_empty_payload (VsxConnection *conn,
+                      const char *message_type,
+                      GError **error)
+{
+  if (conn->message_data_length != 1)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid %s message received",
+                   message_type);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
+handle_keep_alive (VsxConnection *conn,
+                   GError **error)
+{
+  if (!ensure_empty_payload (conn, "keep alive", error))
+    return FALSE;
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -260,6 +309,8 @@ process_message (VsxConnection *conn,
       return handle_new_player (conn, error);
     case VSX_PROTO_RECONNECT:
       return handle_reconnect (conn, error);
+    case VSX_PROTO_KEEP_ALIVE:
+      return handle_keep_alive (conn, error);
     }
 
   g_set_error (error,

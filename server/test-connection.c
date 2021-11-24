@@ -134,6 +134,14 @@ frame_error_tests[] =
       BIN_STR("\x82\xb\x81gggggggghh"),
       "Client tried to reconnect to non-existant player 0x6767676767676767"
     },
+    {
+      BIN_STR("\x82\x1\x83"),
+      "Client sent a command without a person",
+    },
+    {
+      BIN_STR("\x82\x5\x83poop"),
+      "Invalid keep alive message received",
+    },
   };
 
 static Harness *
@@ -695,6 +703,48 @@ test_reconnect (void)
   return ret;
 }
 
+static gboolean
+test_keep_alive (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (guint8 *) "\x82\x1\x83",
+                                      3,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_keep_alive: Unexpected error: %s\n",
+                   error->message);
+          g_error_free (error);
+
+          ret = FALSE;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -713,6 +763,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_reconnect ())
+    ret = EXIT_FAILURE;
+
+  if (!test_keep_alive ())
     ret = EXIT_FAILURE;
 
   return ret;
