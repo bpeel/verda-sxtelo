@@ -24,6 +24,7 @@
 
 #include "vsx-person-set.h"
 #include "vsx-conversation-set.h"
+#include "vsx-signal.h"
 
 typedef struct _VsxConnection VsxConnection;
 
@@ -59,6 +60,9 @@ vsx_connection_is_finished (VsxConnection *conn);
 
 gboolean
 vsx_connection_has_data (VsxConnection *conn);
+
+VsxSignal *
+vsx_connection_get_changed_signal (VsxConnection *conn);
 
 void
 vsx_connection_free (VsxConnection *conn);

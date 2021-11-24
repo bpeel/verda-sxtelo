@@ -52,6 +52,8 @@ struct _VsxConnection
 {
   VsxConnectionState state;
 
+  VsxSignal changed_signal;
+
   GSocketAddress *socket_address;
   VsxConversationSet *conversation_set;
   VsxPersonSet *person_set;
@@ -121,6 +123,8 @@ conversation_changed_cb (VsxListener *listener,
     case VSX_CONVERSATION_SHOUTED:
       break;
     }
+
+  vsx_signal_emit (&conn->changed_signal, NULL);
 }
 
 static void
@@ -574,6 +578,8 @@ vsx_connection_new (GSocketAddress *socket_address,
   conn->person_set = vsx_object_ref (person_set);
 
   conn->ws_parser = vsx_ws_parser_new ();
+
+  vsx_signal_init (&conn->changed_signal);
 
   return conn;
 }
@@ -1034,6 +1040,12 @@ vsx_connection_has_data (VsxConnection *conn)
   g_warn_if_reached ();
 
   return FALSE;
+}
+
+VsxSignal *
+vsx_connection_get_changed_signal (VsxConnection *conn)
+{
+  return &conn->changed_signal;
 }
 
 void
