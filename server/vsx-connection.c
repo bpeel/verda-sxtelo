@@ -458,6 +458,37 @@ handle_shout (VsxConnection *conn,
 }
 
 static gboolean
+handle_set_n_tiles (VsxConnection *conn,
+                    GError **error)
+{
+  guint8 n_tiles;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &n_tiles,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Invalid set_n_tiles command received");
+      return FALSE;
+    }
+
+  if (!activate_person (conn, error))
+    return FALSE;
+
+  vsx_conversation_set_n_tiles (conn->person->conversation,
+                                conn->person->player->num,
+                                n_tiles);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *conn,
                  GError **error)
 {
@@ -492,6 +523,8 @@ process_message (VsxConnection *conn,
       return handle_move_tile (conn, error);
     case VSX_PROTO_SHOUT:
       return handle_shout (conn, error);
+    case VSX_PROTO_SET_N_TILES:
+      return handle_set_n_tiles (conn, error);
     }
 
   g_set_error (error,

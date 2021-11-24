@@ -150,6 +150,10 @@ frame_error_tests[] =
       BIN_STR("\x82\x2\x88\x0"),
       "Invalid move tile command received",
     },
+    {
+      BIN_STR("\x82\x1\x8b"),
+      "Invalid set_n_tiles command received",
+    }
   };
 
 static Harness *
@@ -1211,6 +1215,55 @@ test_shout (void)
   return ret;
 }
 
+static gboolean
+test_set_n_tiles (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      GError *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (guint8 *) "\x82\x2\x8b\x5",
+                                      4,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_set_n_tiles: Unexpected error: %s\n",
+                   error->message);
+          g_error_free (error);
+          ret = FALSE;
+        }
+      else if (person->conversation->total_n_tiles != 5)
+        {
+          fprintf (stderr,
+                   "test_set_n_tiles: failed to set total_n_tiles "
+                   "(%i != 5)\n",
+                   person->conversation->total_n_tiles);
+          ret = FALSE;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1247,6 +1300,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_shout ())
+    ret = EXIT_FAILURE;
+
+  if (!test_set_n_tiles ())
     ret = EXIT_FAILURE;
 
   return ret;
