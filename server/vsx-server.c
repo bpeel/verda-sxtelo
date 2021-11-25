@@ -527,7 +527,10 @@ update_poll (VsxServerConnection *connection)
   if (!connection->write_finished
       && (connection->read_finished || connection->had_bad_input)
       && vsx_list_empty (&connection->response_queue)
-      && connection->output_length == 0)
+      && connection->output_length == 0
+      && (connection->ws_connection == NULL
+          || vsx_connection_is_finished (connection->ws_connection)
+          || connection->had_bad_input))
     {
       if (connection->ssl)
         {
@@ -591,6 +594,9 @@ update_poll (VsxServerConnection *connection)
           if (vsx_response_has_data (queued_response->response))
             flags |= VSX_MAIN_CONTEXT_POLL_OUT;
         }
+      else if (connection->ws_connection
+               && vsx_connection_has_data (connection->ws_connection))
+        flags |= VSX_MAIN_CONTEXT_POLL_OUT;
     }
 
   /* If both ends of the connection are closed then we can abandon
