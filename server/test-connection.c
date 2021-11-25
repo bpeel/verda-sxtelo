@@ -917,6 +917,46 @@ test_keep_alive (void)
 }
 
 static gboolean
+read_leave_commands (VsxConnection *conn)
+{
+  if (!read_player (conn,
+                    0, /* expected_player_num */
+                    0 /* flags (no longer connected) */))
+    return FALSE;
+
+  guint8 buf[1 /* frame command */
+             + 1 /* length */
+             + 1 /* command */];
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "read_leave_commands: Expected %zu bytes but received %zu\n",
+               sizeof buf,
+               got);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_END)
+    {
+      fprintf (stderr,
+               "Expected end command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (!vsx_connection_is_finished (conn))
+    {
+      fprintf (stderr, "Connection is not finished after leaving\n");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 test_leave (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -957,6 +997,8 @@ test_leave (void)
                    person->conversation->n_connected_players);
           ret = FALSE;
         }
+      else if (!read_leave_commands (harness->conn))
+        ret = FALSE;
 
       vsx_object_unref (person);
     }

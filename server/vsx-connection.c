@@ -959,6 +959,28 @@ write_pending_shout (VsxConnection *conn,
 }
 
 static int
+write_end (VsxConnection *conn,
+           guint8 *buffer,
+           size_t buffer_size)
+{
+  if (conn->person == NULL
+      || vsx_player_is_connected (conn->person->player))
+    return 0;
+
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_END,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote != -1)
+    conn->state = VSX_CONNECTION_STATE_DONE;
+
+  return wrote;
+}
+
+static int
 write_sync (VsxConnection *conn,
             guint8 *buffer,
             size_t buffer_size)
@@ -990,6 +1012,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },
       { .func = write_tile },
       { .func = write_message },
+      { .func = write_end },
       { VSX_CONNECTION_DIRTY_FLAG_SYNC, write_sync },
     };
 
