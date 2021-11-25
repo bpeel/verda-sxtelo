@@ -982,20 +982,16 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
   {
     VsxConnectionDirtyFlag flag;
     VsxConnectionWriteStateFunc func;
-  } dirty_write_funcs[] =
+  } write_funcs[] =
     {
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
       { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
       { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },
-    };
-
-  static const VsxConnectionWriteStateFunc other_write_funcs[] =
-    {
-      write_player_name,
-      write_player,
-      write_tile,
-      write_message,
+      { .func = write_player_name },
+      { .func = write_player },
+      { .func = write_tile },
+      { .func = write_message },
     };
 
   size_t total_wrote = 0;
@@ -1008,38 +1004,40 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
           return total_wrote;
 
         case VSX_CONNECTION_STATE_WRITING_DATA:
-          for (int i = 0; i < G_N_ELEMENTS (dirty_write_funcs); i++)
+          for (int i = 0; i < G_N_ELEMENTS (write_funcs); i++)
             {
-              if ((conn->dirty_flags & dirty_write_funcs[i].flag) == 0)
-                continue;
+              if (write_funcs[i].flag == 0)
+                {
+                  int wrote = write_funcs[i].func (conn,
+                                                   buffer + total_wrote,
+                                                   buffer_size - total_wrote);
 
-              int wrote = dirty_write_funcs[i].func (conn,
-                                                     buffer + total_wrote,
-                                                     buffer_size - total_wrote);
+                  if (wrote == 0)
+                    continue;
 
-              if (wrote == -1)
-                return total_wrote;
+                  if (wrote == -1)
+                    return total_wrote;
 
-              total_wrote += wrote;
+                  total_wrote += wrote;
 
-              goto found;
-            }
+                  goto found;
+                }
+              else
+                {
+                  if ((conn->dirty_flags & write_funcs[i].flag) == 0)
+                    continue;
 
-          for (int i = 0; i < G_N_ELEMENTS (other_write_funcs); i++)
-            {
-              int wrote = other_write_funcs[i] (conn,
-                                                buffer + total_wrote,
-                                                buffer_size - total_wrote);
+                  int wrote = write_funcs[i].func (conn,
+                                                   buffer + total_wrote,
+                                                   buffer_size - total_wrote);
 
-              if (wrote == 0)
-                continue;
+                  if (wrote == -1)
+                    return total_wrote;
 
-              if (wrote == -1)
-                return total_wrote;
+                  total_wrote += wrote;
 
-              total_wrote += wrote;
-
-              goto found;
+                  goto found;
+                }
             }
 
           return total_wrote;
