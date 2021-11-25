@@ -900,8 +900,6 @@ write_ws_response (VsxConnection *conn,
   memcpy (p, ws_header_postfix, (sizeof ws_header_postfix) - 1);
   p += (sizeof ws_header_postfix) - 1;
 
-  conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_WS_HEADER;
-
   return p - buffer;
 }
 
@@ -910,23 +908,18 @@ write_player_id (VsxConnection *conn,
                  guint8 *buffer,
                  size_t buffer_size)
 {
-  int wrote = vsx_proto_write_command (buffer,
-                                       buffer_size,
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
 
-                                       VSX_PROTO_PLAYER_ID,
+                                  VSX_PROTO_PLAYER_ID,
 
-                                       VSX_PROTO_TYPE_UINT64,
-                                       conn->person->id,
+                                  VSX_PROTO_TYPE_UINT64,
+                                  conn->person->id,
 
-                                       VSX_PROTO_TYPE_UINT8,
-                                       conn->person->player->num,
+                                  VSX_PROTO_TYPE_UINT8,
+                                  conn->person->player->num,
 
-                                       VSX_PROTO_TYPE_NONE);
-
-  if (wrote != -1)
-    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID;
-
-  return wrote;
+                                  VSX_PROTO_TYPE_NONE);
 }
 
 static int
@@ -936,20 +929,15 @@ write_n_tiles (VsxConnection *conn,
 {
   uint8_t n_tiles = conn->person->conversation->total_n_tiles;
 
-  int wrote = vsx_proto_write_command (buffer,
-                                       buffer_size,
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
 
-                                       VSX_PROTO_N_TILES,
+                                  VSX_PROTO_N_TILES,
 
-                                       VSX_PROTO_TYPE_UINT8,
-                                       n_tiles,
+                                  VSX_PROTO_TYPE_UINT8,
+                                  n_tiles,
 
-                                       VSX_PROTO_TYPE_NONE);
-
-  if (wrote != -1)
-    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_N_TILES;
-
-  return wrote;
+                                  VSX_PROTO_TYPE_NONE);
 }
 
 static int
@@ -957,20 +945,15 @@ write_pending_shout (VsxConnection *conn,
                      guint8 *buffer,
                      size_t buffer_size)
 {
-  int wrote = vsx_proto_write_command (buffer,
-                                       buffer_size,
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
 
-                                       VSX_PROTO_PLAYER_SHOUTED,
+                                  VSX_PROTO_PLAYER_SHOUTED,
 
-                                       VSX_PROTO_TYPE_UINT8,
-                                       conn->pending_shout,
+                                  VSX_PROTO_TYPE_UINT8,
+                                  conn->pending_shout,
 
-                                       VSX_PROTO_TYPE_NONE);
-
-  if (wrote != -1)
-    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT;
-
-  return wrote;
+                                  VSX_PROTO_TYPE_NONE);
 }
 
 size_t
@@ -1035,6 +1018,8 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
                     return total_wrote;
 
                   total_wrote += wrote;
+
+                  conn->dirty_flags &= ~write_funcs[i].flag;
 
                   goto found;
                 }
