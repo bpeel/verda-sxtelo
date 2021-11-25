@@ -1096,6 +1096,75 @@ test_typing (void)
 }
 
 static gboolean
+read_tile (VsxConnection *conn,
+           int *tile_num_out,
+           int *x_out,
+           int *y_out,
+           int *player_out)
+{
+  /* The two is for the character. This would break if there were any
+   * tiles that have a unicode character that requires >2 UTF-8 bytes.
+   */
+  guint8 buf[1 /* frame command */
+             + 1 /* length */
+             + 1 /* command */
+             + 1 /* tile_num */
+             + 2 + 2 /* x/y */
+             + 3 /* letter (max 2 bytes + terminator) */
+             + 1 /* player */];
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, sizeof buf);
+
+  if (got != (sizeof buf) && got != (sizeof buf) - 1)
+    {
+      fprintf (stderr,
+               "read_tile: Expected %zu or %zu bytes but received %zu\n",
+               sizeof buf,
+               (sizeof buf) - 1,
+               got);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_TILE)
+    {
+      fprintf (stderr,
+               "Expected tile command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  const guint8 *letter_start = buf + 8;
+  const guint8 *letter_end = memchr (letter_start,
+                                     '\0',
+                                     buf + (sizeof buf) - letter_start);
+
+  if (letter_end == NULL)
+    {
+      fprintf (stderr, "Unterminated string in tile command\n");
+      return FALSE;
+    }
+
+  if (tile_num_out)
+    *tile_num_out = buf[3];
+  if (x_out)
+    {
+      gint16 val;
+      memcpy (&val, buf + 4, sizeof (gint16));
+      *x_out = GINT16_FROM_LE (val);
+    }
+  if (y_out)
+    {
+      gint16 val;
+      memcpy (&val, buf + 6, sizeof (gint16));
+      *y_out = GINT16_FROM_LE (val);
+    }
+  if (player_out)
+    *player_out = letter_end[1];
+
+  return TRUE;
+}
+
+static gboolean
 test_turn_and_move_commands (Harness *harness, VsxPerson *person)
 {
   GError *error = NULL;
@@ -1121,6 +1190,27 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       return FALSE;
     }
 
+  int tile_num, tile_x, tile_y, tile_player;
+
+  if (!read_tile (harness->conn, &tile_num, &tile_x, &tile_y, &tile_player))
+    return FALSE;
+
+  if (tile_num != 0)
+    {
+      fprintf (stderr,
+               "Turned one tile but tile_num is %i\n",
+               tile_num);
+      return FALSE;
+    }
+
+  if (tile_player != 255)
+    {
+      fprintf (stderr,
+               "Newly turned tile has player_num %i\n",
+               tile_player);
+      return FALSE;
+    }
+
   if (!vsx_connection_parse_data (harness->conn,
                                   (guint8 *) "\x82\x6\x88\x0\xfe\xff\x20\x00",
                                   8,
@@ -1141,6 +1231,35 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                "After moving a tile to -2,32, it is at %i,%i\n",
                person->conversation->tiles[0].x,
                person->conversation->tiles[0].y);
+      return FALSE;
+    }
+
+  if (!read_tile (harness->conn, &tile_num, &tile_x, &tile_y, &tile_player))
+    return FALSE;
+
+  if (tile_num != 0)
+    {
+      fprintf (stderr,
+               "Moved first tile but tile_num is %i\n",
+               tile_num);
+      return FALSE;
+    }
+
+  if (tile_player != person->player->num)
+    {
+      fprintf (stderr,
+               "Player %i moved tile but tile command reported %i\n",
+               person->player->num,
+               tile_player);
+      return FALSE;
+    }
+
+  if (tile_x != -2 || tile_y != 32)
+    {
+      fprintf (stderr,
+               "After moving a tile to -2,32, the connection reported %i,%i\n",
+               tile_x,
+               tile_y);
       return FALSE;
     }
 

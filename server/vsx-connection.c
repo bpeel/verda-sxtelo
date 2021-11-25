@@ -27,6 +27,7 @@
 #include "vsx-ws-parser.h"
 #include "vsx-proto.h"
 #include "vsx-log.h"
+#include "vsx-flags.h"
 
 /* VsxConnection specifically handles connections using the WebSocket
  * protocol. Connections via the HTTP protocol use an HTTP parser
@@ -70,6 +71,10 @@ struct _VsxConnection
   VsxListener conversation_changed_listener;
 
   VsxConnectionDirtyFlag dirty_flags;
+
+  /* Bit mask of tiles that need updating */
+  unsigned long dirty_tiles
+  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
 
   int pending_shout;
 
@@ -124,7 +129,12 @@ conversation_changed_cb (VsxListener *listener,
       break;
 
     case VSX_CONVERSATION_PLAYER_CHANGED:
+      break;
+
     case VSX_CONVERSATION_TILE_CHANGED:
+      VSX_FLAGS_SET (conn->dirty_tiles, data->num, TRUE);
+      break;
+
     case VSX_CONVERSATION_STATE_CHANGED:
     case VSX_CONVERSATION_MESSAGE_ADDED:
       break;
@@ -143,6 +153,9 @@ start_following_person (VsxConnection *conn)
 {
   conn->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID
                         | VSX_CONNECTION_DIRTY_FLAG_N_TILES);
+
+  vsx_flags_set_range (conn->dirty_tiles,
+                       conn->person->conversation->n_tiles_in_play);
 
   conn->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&conn->person->conversation->changed_signal,
@@ -602,7 +615,71 @@ has_pending_data (VsxConnection *conn)
   if (conn->dirty_flags)
     return TRUE;
 
+  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_tiles); i++)
+    {
+      if (conn->dirty_tiles[i])
+        return TRUE;
+    }
+
   return FALSE;
+}
+
+static int
+write_tile (VsxConnection *conn,
+            guint8 *buffer,
+            size_t buffer_size)
+{
+  /* This returns -1 if there wasn’t enough space, 0 if there are no
+   * tiles to write or the size of the written data if one tile was
+   * written. We can only write one tile at a time because there’s no
+   * way to return that we wrote some data but still need to write
+   * more.
+   */
+
+  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_tiles); i++)
+    {
+      if (conn->dirty_tiles[i] == 0)
+        continue;
+
+      int bit_num = ffsl (conn->dirty_tiles[i]) - 1;
+      int tile_num = i * sizeof (unsigned long) * 8 + bit_num;
+
+      const VsxTile *tile = conn->person->conversation->tiles + tile_num;
+
+      int wrote = vsx_proto_write_command (buffer,
+                                           buffer_size,
+
+                                           VSX_PROTO_TILE,
+
+                                           VSX_PROTO_TYPE_UINT8,
+                                           tile_num,
+
+                                           VSX_PROTO_TYPE_INT16,
+                                           tile->x,
+
+                                           VSX_PROTO_TYPE_INT16,
+                                           tile->y,
+
+                                           VSX_PROTO_TYPE_STRING,
+                                           tile->letter,
+
+                                           VSX_PROTO_TYPE_UINT8,
+                                           tile->last_player,
+
+                                           VSX_PROTO_TYPE_NONE);
+
+      if (wrote == -1)
+        {
+          return -1;
+        }
+      else
+        {
+          conn->dirty_tiles[i] &= ~(1 << bit_num);
+          return wrote;
+        }
+    }
+
+  return 0;
 }
 
 static int
@@ -740,6 +817,11 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },
     };
 
+  static const VsxConnectionWriteStateFunc other_write_funcs[] =
+    {
+      write_tile,
+    };
+
   size_t total_wrote = 0;
 
   while (TRUE)
@@ -769,6 +851,30 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
 
               goto found;
             }
+
+          for (int i = 0; i < G_N_ELEMENTS (other_write_funcs); i++)
+            {
+              int wrote = other_write_funcs[i] (conn,
+                                                buffer + total_wrote,
+                                                buffer_size - total_wrote);
+
+              if (wrote == 0)
+                continue;
+
+              if (wrote == -1)
+                return total_wrote;
+
+              total_wrote += wrote;
+
+              goto found;
+            }
+
+          /* This shouldn’t happen because if there was nothing to
+           * write then has_pending_data would return FALSE.
+           */
+          g_assert_not_reached ();
+          return total_wrote;
+
         found:
           break;
 
