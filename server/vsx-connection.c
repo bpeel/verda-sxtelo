@@ -47,6 +47,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
   VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 1),
   VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 2),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 3),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -69,6 +70,8 @@ struct _VsxConnection
   VsxListener conversation_changed_listener;
 
   VsxConnectionDirtyFlag dirty_flags;
+
+  int pending_shout;
 
   guint8 read_buf[1024];
   size_t read_buf_pos;
@@ -124,7 +127,11 @@ conversation_changed_cb (VsxListener *listener,
     case VSX_CONVERSATION_TILE_CHANGED:
     case VSX_CONVERSATION_STATE_CHANGED:
     case VSX_CONVERSATION_MESSAGE_ADDED:
+      break;
+
     case VSX_CONVERSATION_SHOUTED:
+      conn->pending_shout = data->num;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT;
       break;
     }
 
@@ -695,6 +702,27 @@ write_n_tiles (VsxConnection *conn,
   return wrote;
 }
 
+static int
+write_pending_shout (VsxConnection *conn,
+                     guint8 *buffer,
+                     size_t buffer_size)
+{
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_PLAYER_SHOUTED,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       conn->pending_shout,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote != -1)
+    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT;
+
+  return wrote;
+}
+
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    guint8 *buffer,
@@ -709,6 +737,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
       { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
+      { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },
     };
 
   size_t total_wrote = 0;

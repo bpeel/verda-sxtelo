@@ -1206,6 +1206,45 @@ test_turn_and_move (void)
 }
 
 static gboolean
+test_got_shout (Harness *harness, int shout_player)
+{
+  guint8 buf[1 + 1 + 1 + 1];
+
+  size_t got = vsx_connection_fill_output_buffer (harness->conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read the shout\n",
+               got,
+               sizeof buf);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_PLAYER_SHOUTED)
+    {
+      fprintf (stderr,
+               "Expected PLAYER_SHOUTED command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (buf[3] != shout_player)
+    {
+      fprintf (stderr,
+               "test_got_shout: Expected %i but received %i\n",
+               shout_player,
+               buf[3]);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 test_shout (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -1243,6 +1282,8 @@ test_shout (void)
                    "test_shout: last_shout_time is still zero after shouting");
           ret = FALSE;
         }
+      else if (!test_got_shout (harness, 0 /* shout_player */))
+        ret = FALSE;
 
       vsx_object_unref (person);
     }
