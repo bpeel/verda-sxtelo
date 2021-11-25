@@ -430,6 +430,63 @@ read_n_tiles (VsxConnection *conn,
 }
 
 static gboolean
+read_player_name (VsxConnection *conn,
+                  int expected_player_num,
+                  const char *expected_name)
+{
+  size_t buf_size = (1 /* frame command */
+                     + 1 /* length */
+                     + 1 /* command */
+                     + 1 /* player_num */
+                     + strlen (expected_name) + 1 /* name + terminator */);
+  guint8 *buf = g_alloca (buf_size);
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
+
+  if (got != buf_size)
+    {
+      fprintf (stderr,
+               "read_player_name: Expected %zu bytes but received %zu\n",
+               buf_size,
+               got);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_PLAYER_NAME)
+    {
+      fprintf (stderr,
+               "Expected player name command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (buf[3] != expected_player_num)
+    {
+      fprintf (stderr,
+               "read_player_name: player_num does not match\n"
+               " Expected: %i\n"
+               " Received: %i\n",
+               expected_player_num,
+               buf[3]);
+      return FALSE;
+    }
+
+  if (memcmp (buf + 4, expected_name, strlen (expected_name) + 1))
+    {
+      fprintf (stderr,
+               "read_player_name: name does not match\n"
+               " Expected: %s\n"
+               " Received: %.*s\n",
+               expected_name,
+               (int) strlen (expected_name),
+               buf + 4);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 read_player (VsxConnection *conn,
              int expected_player_num,
              int expected_flags)
@@ -514,6 +571,11 @@ read_connect_header (VsxConnection *conn,
     }
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
+    return FALSE;
+
+  if (!read_player_name (conn,
+                         0, /* expected_player_num */
+                         "Zamenhof"))
     return FALSE;
 
   if (!read_player (conn,

@@ -70,6 +70,9 @@ struct _VsxConnection
 
   VsxListener conversation_changed_listener;
 
+  /* Number of players that we've sent a "player-name" event for */
+  unsigned int named_players;
+
   VsxConnectionDirtyFlag dirty_flags;
 
   /* Bit mask of players whose state needs updating */
@@ -623,6 +626,10 @@ has_pending_data (VsxConnection *conn)
   if (conn->dirty_flags)
     return TRUE;
 
+  if (conn->person
+      && conn->named_players < conn->person->conversation->n_players)
+    return TRUE;
+
   for (int i = 0; i < G_N_ELEMENTS (conn->dirty_players); i++)
     {
       if (conn->dirty_players[i])
@@ -636,6 +643,52 @@ has_pending_data (VsxConnection *conn)
     }
 
   return FALSE;
+}
+
+static int
+write_player_name (VsxConnection *conn,
+                   guint8 *buffer,
+                   size_t buffer_size)
+{
+  /* This returns -1 if there wasn’t enough space, 0 if there are no
+   * players to write or the size of the written data if one name was
+   * written. We can only write one name at a time because there’s no
+   * way to return that we wrote some data but still need to write
+   * more.
+   */
+
+  if (conn->person == NULL)
+    return 0;
+
+  VsxConversation *conversation = conn->person->conversation;
+
+  if (conn->named_players >= conversation->n_players)
+    return 0;
+
+  const VsxPlayer *player = conversation->players[conn->named_players];
+
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_PLAYER_NAME,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       conn->named_players,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       player->name,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote == -1)
+    {
+      return -1;
+    }
+  else
+    {
+      conn->named_players++;
+      return wrote;
+    }
 }
 
 static int
@@ -882,6 +935,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
 
   static const VsxConnectionWriteStateFunc other_write_funcs[] =
     {
+      write_player_name,
       write_player,
       write_tile,
     };
