@@ -396,9 +396,43 @@ test_close_in_frame (void)
 }
 
 static gboolean
-read_person_id (VsxConnection *conn,
-                guint64 *person_id_out,
-                guint8 *player_num_out)
+read_n_tiles (VsxConnection *conn,
+              guint8 *n_tiles_out)
+{
+  guint8 buf[1 + 1 + 1 + 1];
+
+  size_t got = vsx_connection_fill_output_buffer (conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read n_tiles\n",
+               got,
+               sizeof buf);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_N_TILES)
+    {
+      fprintf (stderr,
+               "Expected N_TILES command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (n_tiles_out)
+      *n_tiles_out = buf[3];
+
+  return TRUE;
+}
+
+static gboolean
+read_connect_header (VsxConnection *conn,
+                     guint64 *person_id_out,
+                     guint8 *player_num_out)
 {
   guint8 buf[1 + 1 + 1 + sizeof (guint64) + 1];
 
@@ -423,6 +457,9 @@ read_person_id (VsxConnection *conn,
                buf[2]);
       return FALSE;
     }
+
+  if (!read_n_tiles (conn, NULL /* n_tiles_out */))
+    return FALSE;
 
   if (person_id_out)
     {
@@ -471,7 +508,7 @@ create_player (Harness *harness,
       guint64 person_id;
       guint8 player_num;
 
-      if (!read_person_id (harness->conn, &person_id, &player_num))
+      if (!read_connect_header (harness->conn, &person_id, &player_num))
         {
           ret = FALSE;
         }
@@ -568,7 +605,7 @@ reconnect_to_player (VsxConnection *conn,
     {
       guint64 person_id;
 
-      if (!read_person_id (conn, &person_id, NULL /* player_num */))
+      if (!read_connect_header (conn, &person_id, NULL /* player_num */))
         {
           ret = FALSE;
         }
@@ -1254,6 +1291,21 @@ test_set_n_tiles (void)
                    "(%i != 5)\n",
                    person->conversation->total_n_tiles);
           ret = FALSE;
+        }
+      else
+        {
+          guint8 got_n_tiles;
+
+          if (!read_n_tiles (harness->conn, &got_n_tiles))
+            ret = FALSE;
+          else if (got_n_tiles != 5)
+            {
+              fprintf (stderr,
+                       "test_set_n_tiles: After sending set_n_tiles 5, the "
+                       "connection reported %i tiles\n",
+                       got_n_tiles);
+              ret = FALSE;
+            }
         }
 
       vsx_object_unref (person);

@@ -46,6 +46,7 @@ typedef enum
 {
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
   VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 1),
+  VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 2),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -116,6 +117,9 @@ conversation_changed_cb (VsxListener *listener,
   switch (data->type)
     {
     case VSX_CONVERSATION_N_TILES_CHANGED:
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
+      break;
+
     case VSX_CONVERSATION_PLAYER_CHANGED:
     case VSX_CONVERSATION_TILE_CHANGED:
     case VSX_CONVERSATION_STATE_CHANGED:
@@ -130,7 +134,8 @@ conversation_changed_cb (VsxListener *listener,
 static void
 start_following_person (VsxConnection *conn)
 {
-  conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID;
+  conn->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID
+                        | VSX_CONNECTION_DIRTY_FLAG_N_TILES);
 
   conn->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&conn->person->conversation->changed_signal,
@@ -667,6 +672,29 @@ write_player_id (VsxConnection *conn,
   return wrote;
 }
 
+static int
+write_n_tiles (VsxConnection *conn,
+               guint8 *buffer,
+               size_t buffer_size)
+{
+  uint8_t n_tiles = conn->person->conversation->total_n_tiles;
+
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_N_TILES,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       n_tiles,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote != -1)
+    conn->dirty_flags &= ~VSX_CONNECTION_DIRTY_FLAG_N_TILES;
+
+  return wrote;
+}
+
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    guint8 *buffer,
@@ -680,6 +708,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
     {
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
+      { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
     };
 
   size_t total_wrote = 0;
