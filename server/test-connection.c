@@ -419,7 +419,7 @@ read_person_id (VsxConnection *conn,
   if (buf[2] != VSX_PROTO_PLAYER_ID)
     {
       fprintf (stderr,
-               "Expected player ID command but received 0x%02x",
+               "Expected player ID command but received 0x%02x\n",
                buf[2]);
       return FALSE;
     }
