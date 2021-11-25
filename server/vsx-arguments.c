@@ -27,6 +27,7 @@
 
 #include "vsx-arguments.h"
 #include "vsx-person.h"
+#include "vsx-normalize-name.h"
 
 static gboolean
 uri_decode (const char *str,
@@ -84,50 +85,6 @@ parse_int (const char *str,
     return FALSE;
 
   *value = (int) v;
-
-  return TRUE;
-}
-
-static gboolean
-make_name (GString *buf)
-{
-  guint8 *dst = (guint8 *) buf->str;
-  const guint8 *src = dst;
-  gboolean got_letter = FALSE;
-
-  /* Skip leading whitespace */
-  while (*src && g_ascii_isspace (*src))
-    src++;
-
-  /* Combine any other sequences of whitespace characters into a
-   * single space */
-  for (; *src; src++)
-    {
-      if (g_ascii_isspace (*src))
-        {
-          *(dst++) = ' ';
-          while (src[1] && g_ascii_isspace (src[1]))
-            src++;
-        }
-      /* Don't allow any control characters */
-      else if (*src <= ' ')
-        return FALSE;
-      else
-        {
-          *(dst++) = *src;
-          got_letter = TRUE;
-        }
-    }
-
-  /* We must have at least one non-whitespace character */
-  if (!got_letter)
-    return FALSE;
-
-  /* String off any trailing space */
-  if (dst[-1] == ' ')
-    dst--;
-
-  g_string_set_size (buf, dst - (guint8 *) buf->str);
 
   return TRUE;
 }
@@ -190,7 +147,7 @@ vsx_arguments_parse (const char *template,
           break;
 
         case 'n': /* name */
-          if (!make_name (buf))
+          if (!vsx_normalize_name (buf->str))
             goto arg_error;
           /* flow through */
         case 's': /* string */

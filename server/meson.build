@@ -31,6 +31,7 @@ server_src = [
         'vsx-main-context.c',
         'vsx-move-tile-handler.c',
         'vsx-new-person-handler.c',
+        'vsx-normalize-name.c',
         'vsx-object.c',
         'vsx-parse-content-type.c',
         'vsx-person.c',
