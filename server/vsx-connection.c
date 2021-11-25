@@ -49,6 +49,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 1),
   VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 2),
   VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 3),
+  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 4),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -162,7 +163,8 @@ static void
 start_following_person (VsxConnection *conn)
 {
   conn->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID
-                        | VSX_CONNECTION_DIRTY_FLAG_N_TILES);
+                        | VSX_CONNECTION_DIRTY_FLAG_N_TILES
+                        | VSX_CONNECTION_DIRTY_FLAG_SYNC);
 
   vsx_flags_set_range (conn->dirty_tiles,
                        conn->person->conversation->n_tiles_in_play);
@@ -956,6 +958,19 @@ write_pending_shout (VsxConnection *conn,
                                   VSX_PROTO_TYPE_NONE);
 }
 
+static int
+write_sync (VsxConnection *conn,
+            guint8 *buffer,
+            size_t buffer_size)
+{
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_SYNC,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    guint8 *buffer,
@@ -975,6 +990,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },
       { .func = write_tile },
       { .func = write_message },
+      { VSX_CONNECTION_DIRTY_FLAG_SYNC, write_sync },
     };
 
   size_t total_wrote = 0;

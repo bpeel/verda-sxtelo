@@ -1681,6 +1681,66 @@ test_set_n_tiles (void)
   return ret;
 }
 
+static gboolean
+test_sync (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      guint8 buf[3];
+      guint8 *large_buf = g_malloc(1024);
+
+      size_t got = vsx_connection_fill_output_buffer (harness->conn,
+                                                      buf,
+                                                      sizeof buf);
+
+      if (got != sizeof buf)
+        {
+          fprintf (stderr,
+                   "Only got %zu bytes out of %zu "
+                   "when trying to read the sync\n",
+                   got,
+                   sizeof buf);
+          ret = FALSE;
+        }
+      else if (buf[2] != VSX_PROTO_SYNC)
+        {
+          fprintf (stderr,
+                   "Expected sync command but received 0x%02x\n",
+                   buf[2]);
+          ret = FALSE;
+        }
+      else if (vsx_connection_fill_output_buffer (harness->conn,
+                                                  large_buf,
+                                                  1024) != 0)
+        {
+          fprintf (stderr, "Unexpected data after sync command\n");
+          ret = FALSE;
+        }
+
+      g_free (large_buf);
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1720,6 +1780,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_set_n_tiles ())
+    ret = EXIT_FAILURE;
+
+  if (!test_sync ())
     ret = EXIT_FAILURE;
 
   return ret;
