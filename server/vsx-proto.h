@@ -33,6 +33,9 @@
 /* Maximum number of bytes allowed in a room or player name */
 #define VSX_PROTO_MAX_NAME_LENGTH 256
 
+/* Maxmimum number of bytes allowed in a message */
+#define VSX_PROTO_MAX_MESSAGE_LENGTH 1000
+
 /* The WebSocket protocol says that a control frame payload can not be
  * longer than 125 bytes.
  */

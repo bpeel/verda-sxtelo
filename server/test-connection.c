@@ -1030,8 +1030,11 @@ read_message (VsxConnection *conn,
               int expected_player_num,
               const char *expected_message)
 {
+  size_t expected_message_len = strlen (expected_message);
+  size_t length_length = expected_message_len >= 0x7e ? 3 : 1;
+
   size_t buf_size = (1 /* frame command */
-                     + 1 /* length */
+                     + length_length
                      + 1 /* command */
                      + 1 /* player_num */
                      + strlen (expected_message) + 1 /* name + terminator */);
@@ -1048,26 +1051,28 @@ read_message (VsxConnection *conn,
       return FALSE;
     }
 
-  if (buf[2] != VSX_PROTO_MESSAGE)
+  guint8 *cmd = buf + 1 + length_length;
+
+  if (cmd[0] != VSX_PROTO_MESSAGE)
     {
       fprintf (stderr,
                "Expected message command but received 0x%02x\n",
-               buf[2]);
+               cmd[0]);
       return FALSE;
     }
 
-  if (buf[3] != expected_player_num)
+  if (cmd[1] != expected_player_num)
     {
       fprintf (stderr,
                "read_message: player_num does not match\n"
                " Expected: %i\n"
                " Received: %i\n",
                expected_player_num,
-               buf[3]);
+               cmd[1]);
       return FALSE;
     }
 
-  if (memcmp (buf + 4, expected_message, strlen (expected_message) + 1))
+  if (memcmp (cmd + 2, expected_message, strlen (expected_message) + 1))
     {
       fprintf (stderr,
                "read_message: message does not match\n"
@@ -1075,7 +1080,7 @@ read_message (VsxConnection *conn,
                " Received: %.*s\n",
                expected_message,
                (int) strlen (expected_message),
-               buf + 4);
+               cmd + 2);
       return FALSE;
     }
 
@@ -1222,6 +1227,62 @@ test_send_fragmented_message (Harness *harness,
 }
 
 static gboolean
+test_send_long_message (Harness *harness,
+                        VsxPerson *person)
+{
+  GError *error = NULL;
+  gboolean ret = TRUE;
+
+  GString *buf = g_string_new (NULL);
+
+  /* Send a message that is 999 ASCII characters followed by one
+   * 2-byte UTF-8 character. The limit is 1000 bytes and the resulting
+   * message should be clipped to remove the whole 2-byte character.
+   */
+  g_string_append (buf, "\x82\x7e\x03\xeb\x85");
+
+  size_t expected_start = buf->len;
+
+  for (int i = 0; i < 999; i++)
+    g_string_append_c (buf, 'a');
+  g_string_append (buf, "ĉ");
+  g_string_append_c (buf, '\0');
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (guint8 *) buf->str, buf->len,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error when sending message: %s\n",
+               error->message);
+      g_error_free (error);
+
+      ret = FALSE;
+    }
+  else
+    {
+      g_string_set_size (buf, buf->len - 3);
+
+      const char *expected_message = buf->str + expected_start;
+
+      if (!check_expected_message (person, expected_message))
+        {
+          ret = FALSE;
+        }
+      else if (!read_message (harness->conn,
+                              0, /* expected_player_num */
+                              expected_message))
+        {
+          ret = FALSE;
+        }
+    }
+
+  g_string_free (buf, TRUE);
+
+  return ret;
+}
+
+static gboolean
 test_send_message (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -1244,6 +1305,9 @@ test_send_message (void)
         ret = FALSE;
 
       if (!test_send_fragmented_message (harness, person))
+        ret = FALSE;
+
+      if (!test_send_long_message (harness, person))
         ret = FALSE;
 
       vsx_object_unref (person);

@@ -83,6 +83,8 @@ SEND_MESSAGE (0x85)
 
 Send a message to the chat.
 
+Messages that are longer than 1000 bytes will get clipped.
+
 START_TYPING (0x86)
 -------------------
 

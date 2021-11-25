@@ -27,6 +27,7 @@
 #include "vsx-conversation.h"
 #include "vsx-main-context.h"
 #include "vsx-log.h"
+#include "vsx-proto.h"
 
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
@@ -147,7 +148,21 @@ vsx_conversation_add_message (VsxConversation *conversation,
                             conversation->messages->len - 1);
 
   message->player_num = player_num;
-  message->raw_text = g_strndup (buffer, length);
+
+  unsigned int raw_length = length;
+
+  if (raw_length > VSX_PROTO_MAX_MESSAGE_LENGTH)
+    {
+      raw_length = VSX_PROTO_MAX_MESSAGE_LENGTH;
+      /* Clip to a valid UTF-8 boundary */
+      if (buffer[raw_length] < 0)
+        {
+          while (raw_length > 0 && buffer[raw_length - 1] < 0)
+            raw_length--;
+        }
+    }
+
+  message->raw_text = g_strndup (buffer, raw_length);
 
   message_str = g_string_sized_new (length + 32);
 
