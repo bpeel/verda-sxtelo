@@ -950,9 +950,6 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
           return total_wrote;
 
         case VSX_CONNECTION_STATE_WRITING_DATA:
-          if (!has_pending_data (conn))
-            return total_wrote;
-
           for (int i = 0; i < G_N_ELEMENTS (dirty_write_funcs); i++)
             {
               if ((conn->dirty_flags & dirty_write_funcs[i].flag) == 0)
@@ -987,10 +984,6 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
               goto found;
             }
 
-          /* This shouldn’t happen because if there was nothing to
-           * write then has_pending_data would return FALSE.
-           */
-          g_assert_not_reached ();
           return total_wrote;
 
         found:
