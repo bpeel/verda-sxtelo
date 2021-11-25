@@ -21,6 +21,7 @@
 #endif
 
 #include "vsx-normalize-name.h"
+#include "vsx-proto.h"
 
 gboolean
 vsx_normalize_name (char *name)
@@ -60,6 +61,9 @@ vsx_normalize_name (char *name)
   /* String off any trailing space */
   if (dst[-1] == ' ')
     dst--;
+
+  if (dst - (guint8 *) name > VSX_PROTO_MAX_NAME_LENGTH)
+    return FALSE;
 
   *dst = '\0';
 

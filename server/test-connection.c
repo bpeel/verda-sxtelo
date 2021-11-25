@@ -161,7 +161,16 @@ frame_error_tests[] =
     {
       BIN_STR("\x82\x13\x80gefa\x1bult\0Zamenhof\0"),
       "Client sent an invalid room name",
-    }
+    },
+    {
+      BIN_STR("\x82\x7e\x01\x0b\x80gefault\0"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaa\0"),
+      "Client sent an invalid player name",
+    },
   };
 
 static Harness *

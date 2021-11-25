@@ -30,6 +30,9 @@
  */
 #define VSX_PROTO_MAX_PAYLOAD_SIZE 1024
 
+/* Maximum number of bytes allowed in a room or player name */
+#define VSX_PROTO_MAX_NAME_LENGTH 256
+
 /* The WebSocket protocol says that a control frame payload can not be
  * longer than 125 bytes.
  */

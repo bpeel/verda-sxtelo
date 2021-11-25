@@ -42,6 +42,8 @@ people. If there is already a game in that room that has not started
 then the new person will immediately join that game. Otherwise a new
 game will be created.
 
+The names can not be longer than 256 bytes.
+
 RECONNECT (0x81)
 ----------------
 
