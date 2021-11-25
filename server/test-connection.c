@@ -153,6 +153,14 @@ frame_error_tests[] =
     {
       BIN_STR("\x82\x1\x8b"),
       "Invalid set_n_tiles command received",
+    },
+    {
+      BIN_STR("\x82\x13\x80gefault\0Zamenhof\x1b\0"),
+      "Client sent an invalid player name",
+    },
+    {
+      BIN_STR("\x82\x13\x80gefa\x1bult\0Zamenhof\0"),
+      "Client sent an invalid room name",
     }
   };
 

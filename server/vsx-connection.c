@@ -28,6 +28,7 @@
 #include "vsx-proto.h"
 #include "vsx-log.h"
 #include "vsx-flags.h"
+#include "vsx-normalize-name.h"
 
 /* VsxConnection specifically handles connections using the WebSocket
  * protocol. Connections via the HTTP protocol use an HTTP parser
@@ -211,35 +212,62 @@ handle_new_player (VsxConnection *conn,
       return FALSE;
     }
 
-  VsxConversation *conversation =
-    vsx_conversation_set_get_conversation (conn->conversation_set, room_name);
+  gboolean ret = TRUE;
+  char *normalized_room_name = g_strdup (room_name);
+  char *normalized_player_name = g_strdup (player_name);
 
-  conn->person = vsx_person_set_generate_person (conn->person_set,
-                                                 player_name,
-                                                 conn->socket_address,
-                                                 conversation);
-
-  vsx_object_unref (conversation);
-
-  conn->message_num = conn->person->message_offset;
-
-  if (conversation->n_players == 1)
+  if (!vsx_normalize_name (normalized_room_name))
     {
-      vsx_log ("New player “%s” created game %i in “%s”",
-               player_name,
-               conversation->id,
-               room_name);
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent an invalid room name");
+      ret = FALSE;
+    }
+  else if (!vsx_normalize_name (normalized_player_name))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client sent an invalid player name");
+      ret = FALSE;
     }
   else
     {
-      vsx_log ("New player “%s” joined game %i",
-               player_name,
-               conversation->id);
+      VsxConversation *conversation =
+        vsx_conversation_set_get_conversation (conn->conversation_set,
+                                               room_name);
+
+      conn->person = vsx_person_set_generate_person (conn->person_set,
+                                                     player_name,
+                                                     conn->socket_address,
+                                                     conversation);
+
+      vsx_object_unref (conversation);
+
+      conn->message_num = conn->person->message_offset;
+
+      if (conversation->n_players == 1)
+        {
+          vsx_log ("New player “%s” created game %i in “%s”",
+                   player_name,
+                   conversation->id,
+                   room_name);
+        }
+      else
+        {
+          vsx_log ("New player “%s” joined game %i",
+                   player_name,
+                   conversation->id);
+        }
+
+      start_following_person (conn);
     }
 
-  start_following_person (conn);
+  g_free (normalized_player_name);
+  g_free (normalized_room_name);
 
-  return TRUE;
+  return ret;
 }
 
 static gboolean

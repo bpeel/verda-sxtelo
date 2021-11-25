@@ -79,6 +79,7 @@ test_connection_src = [
         'vsx-log.c',
         'vsx-main-context.c',
         'vsx-object.c',
+        'vsx-normalize-name.c',
         'vsx-person.c',
         'vsx-person-set.c',
         'vsx-player.c',
