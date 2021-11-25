@@ -47,6 +47,7 @@
 #include "vsx-keep-alive-handler.h"
 #include "vsx-log.h"
 #include "vsx-ssl-error.h"
+#include "vsx-proto.h"
 
 #define DEFAULT_PORT 5142
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -70,7 +71,10 @@ struct _VsxServer
   VsxMainContextSource *gc_source;
 };
 
-#define VSX_SERVER_OUTPUT_BUFFER_SIZE 1024
+/* Make sure the output buffer is large enough to contain the largest
+ * payload plus the corresponding frame header.
+ */
+#define VSX_SERVER_OUTPUT_BUFFER_SIZE (1 + 1 + 2 + VSX_PROTO_MAX_PAYLOAD_SIZE)
 
 typedef struct
 {
