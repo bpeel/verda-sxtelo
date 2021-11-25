@@ -430,6 +430,61 @@ read_n_tiles (VsxConnection *conn,
 }
 
 static gboolean
+read_player (VsxConnection *conn,
+             int expected_player_num,
+             int expected_flags)
+{
+  guint8 buf[1 /* frame command */
+             + 1 /* length */
+             + 1 /* command */
+             + 1 /* player_num */
+             + 1 /* flags */];
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "read_player: Expected %zu bytes but received %zu\n",
+               sizeof buf,
+               got);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_PLAYER)
+    {
+      fprintf (stderr,
+               "Expected player command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (buf[3] != expected_player_num)
+    {
+      fprintf (stderr,
+               "read_player: player_num does not match\n"
+               " Expected: %i\n"
+               " Received: %i\n",
+               expected_player_num,
+               buf[3]);
+      return FALSE;
+    }
+
+  if (buf[4] != expected_flags)
+    {
+      fprintf (stderr,
+               "read_player: flags do not match\n"
+               " Expected 0x%x\n"
+               " Received 0x%x\n",
+               expected_flags,
+               buf[4]);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 read_connect_header (VsxConnection *conn,
                      guint64 *person_id_out,
                      guint8 *player_num_out)
@@ -459,6 +514,11 @@ read_connect_header (VsxConnection *conn,
     }
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
+    return FALSE;
+
+  if (!read_player (conn,
+                    0, /* expected_player_num */
+                    VSX_PLAYER_CONNECTED))
     return FALSE;
 
   if (person_id_out)
@@ -1189,6 +1249,14 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                person->conversation->n_tiles_in_play);
       return FALSE;
     }
+
+  /* When a tile is turned the player flags will change to update the
+   * current player.
+   */
+  if (!read_player (harness->conn,
+                    0, /* expected_player_num */
+                    VSX_PLAYER_CONNECTED | VSX_PLAYER_NEXT_TURN))
+    return FALSE;
 
   int tile_num, tile_x, tile_y, tile_player;
 

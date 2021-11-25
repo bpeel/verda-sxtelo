@@ -72,6 +72,10 @@ struct _VsxConnection
 
   VsxConnectionDirtyFlag dirty_flags;
 
+  /* Bit mask of players whose state needs updating */
+  unsigned long dirty_players
+  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_CONVERSATION_MAX_PLAYERS)];
+
   /* Bit mask of tiles that need updating */
   unsigned long dirty_tiles
   [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
@@ -129,6 +133,7 @@ conversation_changed_cb (VsxListener *listener,
       break;
 
     case VSX_CONVERSATION_PLAYER_CHANGED:
+      VSX_FLAGS_SET (conn->dirty_players, data->num, TRUE);
       break;
 
     case VSX_CONVERSATION_TILE_CHANGED:
@@ -156,6 +161,9 @@ start_following_person (VsxConnection *conn)
 
   vsx_flags_set_range (conn->dirty_tiles,
                        conn->person->conversation->n_tiles_in_play);
+
+  vsx_flags_set_range (conn->dirty_players,
+                       conn->person->conversation->n_players);
 
   conn->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&conn->person->conversation->changed_signal,
@@ -615,6 +623,12 @@ has_pending_data (VsxConnection *conn)
   if (conn->dirty_flags)
     return TRUE;
 
+  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_players); i++)
+    {
+      if (conn->dirty_players[i])
+        return TRUE;
+    }
+
   for (int i = 0; i < G_N_ELEMENTS (conn->dirty_tiles); i++)
     {
       if (conn->dirty_tiles[i])
@@ -622,6 +636,55 @@ has_pending_data (VsxConnection *conn)
     }
 
   return FALSE;
+}
+
+static int
+write_player (VsxConnection *conn,
+              guint8 *buffer,
+              size_t buffer_size)
+{
+  /* This returns -1 if there wasn’t enough space, 0 if there are no
+   * players to write or the size of the written data if one player was
+   * written. We can only write one player at a time because there’s
+   * no way to return that we wrote some data but still need to write
+   * more.
+   */
+
+  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_players); i++)
+    {
+      if (conn->dirty_players[i] == 0)
+        continue;
+
+      int bit_num = ffsl (conn->dirty_players[i]) - 1;
+      int player_num = i * sizeof (unsigned long) * 8 + bit_num;
+
+      const VsxPlayer *player = conn->person->conversation->players[player_num];
+
+      int wrote = vsx_proto_write_command (buffer,
+                                           buffer_size,
+
+                                           VSX_PROTO_PLAYER,
+
+                                           VSX_PROTO_TYPE_UINT8,
+                                           player_num,
+
+                                           VSX_PROTO_TYPE_UINT8,
+                                           player->flags,
+
+                                           VSX_PROTO_TYPE_NONE);
+
+      if (wrote == -1)
+        {
+          return -1;
+        }
+      else
+        {
+          conn->dirty_players[i] &= ~(1 << bit_num);
+          return wrote;
+        }
+    }
+
+  return 0;
 }
 
 static int
@@ -819,6 +882,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
 
   static const VsxConnectionWriteStateFunc other_write_funcs[] =
     {
+      write_player,
       write_tile,
     };
 
