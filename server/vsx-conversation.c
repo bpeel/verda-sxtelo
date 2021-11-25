@@ -146,6 +146,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
                             VsxConversationMessage,
                             conversation->messages->len - 1);
 
+  message->player_num = player_num;
   message->raw_text = g_strndup (buffer, length);
 
   message_str = g_string_sized_new (length + 32);
