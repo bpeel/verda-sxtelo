@@ -70,6 +70,8 @@ struct _VsxConnection
 
   VsxListener conversation_changed_listener;
 
+  unsigned int message_num;
+
   /* Number of players that we've sent a "player-name" event for */
   unsigned int named_players;
 
@@ -217,6 +219,8 @@ handle_new_player (VsxConnection *conn,
 
   vsx_object_unref (conversation);
 
+  conn->message_num = conn->person->message_offset;
+
   if (conversation->n_players == 1)
     {
       vsx_log ("New player “%s” created game %i in “%s”",
@@ -301,6 +305,7 @@ handle_reconnect (VsxConnection *conn,
 
   vsx_person_make_noise (person);
   conn->person = vsx_object_ref (person);
+  conn->message_num = n_messages_received + person->message_offset;
 
   start_following_person (conn);
 
@@ -642,6 +647,10 @@ has_pending_data (VsxConnection *conn)
         return TRUE;
     }
 
+  if (conn->person
+      && conn->message_num < conn->person->conversation->messages->len)
+    return TRUE;
+
   return FALSE;
 }
 
@@ -799,6 +808,54 @@ write_tile (VsxConnection *conn,
 }
 
 static int
+write_message (VsxConnection *conn,
+               guint8 *buffer,
+                   size_t buffer_size)
+{
+  /* This returns -1 if there wasn’t enough space, 0 if there are no
+   * messages to write or the size of the written data if one message
+   * was written. We can only write one message at a time because
+   * there’s no way to return that we wrote some data but still need
+   * to write more.
+   */
+
+  if (conn->person == NULL)
+    return 0;
+
+  VsxConversation *conversation = conn->person->conversation;
+
+  if (conn->message_num >= conversation->messages->len)
+    return 0;
+
+  VsxConversationMessage *message = &g_array_index (conversation->messages,
+                                                    VsxConversationMessage,
+                                                    conn->message_num);
+
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_MESSAGE,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       message->player_num,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       message->raw_text,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote == -1)
+    {
+      return -1;
+    }
+  else
+    {
+      conn->message_num++;
+      return wrote;
+    }
+}
+
+static int
 write_ws_response (VsxConnection *conn,
                    guint8 *buffer,
                    size_t buffer_size)
@@ -938,6 +995,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       write_player_name,
       write_player,
       write_tile,
+      write_message,
     };
 
   size_t total_wrote = 0;

@@ -967,6 +967,63 @@ test_leave (void)
 }
 
 static gboolean
+read_message (VsxConnection *conn,
+              int expected_player_num,
+              const char *expected_message)
+{
+  size_t buf_size = (1 /* frame command */
+                     + 1 /* length */
+                     + 1 /* command */
+                     + 1 /* player_num */
+                     + strlen (expected_message) + 1 /* name + terminator */);
+  guint8 *buf = g_alloca (buf_size);
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
+
+  if (got != buf_size)
+    {
+      fprintf (stderr,
+               "read_message: Expected %zu bytes but received %zu\n",
+               buf_size,
+               got);
+      return FALSE;
+    }
+
+  if (buf[2] != VSX_PROTO_MESSAGE)
+    {
+      fprintf (stderr,
+               "Expected message command but received 0x%02x\n",
+               buf[2]);
+      return FALSE;
+    }
+
+  if (buf[3] != expected_player_num)
+    {
+      fprintf (stderr,
+               "read_message: player_num does not match\n"
+               " Expected: %i\n"
+               " Received: %i\n",
+               expected_player_num,
+               buf[3]);
+      return FALSE;
+    }
+
+  if (memcmp (buf + 4, expected_message, strlen (expected_message) + 1))
+    {
+      fprintf (stderr,
+               "read_message: message does not match\n"
+               " Expected: %s\n"
+               " Received: %.*s\n",
+               expected_message,
+               (int) strlen (expected_message),
+               buf + 4);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 check_expected_message (VsxPerson *person,
                         const char *expected_message)
 {
@@ -999,7 +1056,8 @@ check_expected_message (VsxPerson *person,
 
 static gboolean
 test_send_one_message (Harness *harness,
-                       VsxPerson *person)
+                       VsxPerson *person,
+                       gboolean was_typing)
 {
   GError *error = NULL;
   gboolean ret = TRUE;
@@ -1026,6 +1084,19 @@ test_send_one_message (Harness *harness,
       ret = FALSE;
     }
   else if (!check_expected_message (person, expected_message))
+    {
+      ret = FALSE;
+    }
+  else if (was_typing
+           && !read_player (harness->conn,
+                            0, /* expected_player_num */
+                            VSX_PLAYER_CONNECTED))
+    {
+      ret = FALSE;
+    }
+  else if (!read_message (harness->conn,
+                          0, /* expected_player_num */
+                          expected_message))
     {
       ret = FALSE;
     }
@@ -1080,6 +1151,10 @@ test_send_fragmented_message (Harness *harness,
 
   if (!check_expected_message (person, expected_message))
     ret = FALSE;
+  else if (!read_message (harness->conn,
+                          0, /* expected_player_num */
+                          expected_message))
+    ret = FALSE;
 
  done:
   g_string_free (buf, TRUE);
@@ -1106,7 +1181,7 @@ test_send_message (void)
     }
   else
     {
-      if (!test_send_one_message (harness, person))
+      if (!test_send_one_message (harness, person, FALSE /* was_typing */))
         ret = FALSE;
 
       if (!test_send_fragmented_message (harness, person))
@@ -1197,7 +1272,7 @@ test_typing (void)
           /* Try sending a message. This should automatically set the
            * typing status to FALSE.
            */
-          if (!test_send_one_message (harness, person))
+          if (!test_send_one_message (harness, person, TRUE /* was_typing */))
             {
               ret = FALSE;
             }
