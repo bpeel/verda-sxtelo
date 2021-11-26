@@ -1101,7 +1101,9 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         {
           connection->peer_address_string
             = get_peer_address_string (client_socket);
-          vsx_log ("Accepted connection from %s",
+          vsx_log ("Accepted %s%s connection from %s",
+                   ssocket->is_websocket ? "WebSocket" : "HTTP",
+                   ssocket->ssl_ctx ? " SSL" : "",
                    connection->peer_address_string);
         }
       else
