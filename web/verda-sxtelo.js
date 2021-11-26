@@ -146,6 +146,13 @@ function ChatSession (playerName)
   this.lastDataTime = new Date ();
   this.syncReceived = false;
 
+  this.sock = null;
+  this.sockHandlers = [];
+  this.connected = false;
+  this.reconnectTimeout = null;
+  this.reconnectCount = 0;
+  this.keepAliveTimeout = null;
+
   this.playerName = playerName || "ludanto";
 
   var search = window.location.search;
@@ -1265,6 +1272,12 @@ ChatSession.prototype.updateNextGameTime = function ()
 
 ChatSession.prototype.start = function ()
 {
+  if (!this.connected)
+    {
+      this.reconnectCount = 0;
+      this.doConnect ();
+    }
+
   this.setState ("connecting");
   this.startWatchAjax ();
 
@@ -1303,6 +1316,251 @@ ChatSession.prototype.start = function ()
   this.updateNextGameTime ();
 
   $("#start-note").show ();
+};
+
+ChatSession.prototype.stringToUtf8 = function (s)
+{
+  s = encodeURIComponent (s);
+
+  var length = 0;
+  var i;
+
+  for (i = 0; i < s.length; i++)
+    {
+      if (s[i] == '%')
+        i += 2;
+      length++;
+    }
+
+  var ba = new Uint8Array (length);
+  var p = 0;
+
+  for (i = 0; i < s.length; i++)
+    {
+      if (s[i] == '%')
+        {
+          ba[p++] = parseInt ("0x" + s.substring (i + 1, i + 3));
+          i += 2;
+        }
+      else
+        {
+          ba[p++] = s.charCodeAt (i);
+        }
+    }
+
+  return ba;
+};
+
+ChatSession.prototype.clearKeepAliveTimeout = function ()
+{
+  if (this.keepAliveTimeout)
+    {
+      clearTimeout (this.keepAliveTimeout);
+      this.keepAliveTimeout = null;
+    }
+};
+
+ChatSession.prototype.resetKeepAliveTimeout = function ()
+{
+  this.clearKeepAliveTimeout ();
+
+  function callback ()
+  {
+    this.keepAliveTimout = null;
+    if (this.sock)
+      this.sendMessage (0x83, "");
+  }
+
+  this.keepAliveTimeout = setTimeout (callback.bind (this), 60 * 1000);
+};
+
+ChatSession.prototype.addSocketHandler = function (event, func)
+{
+  this.sockHandlers.push (event, func);
+  this.sock.addEventListener (event, func);
+}
+
+ChatSession.prototype.removeSocketHandlers = function (event, func)
+{
+  var i;
+
+  for (i = 0; i < this.sockHandlers.length; i += 2)
+    {
+      this.sock.removeEventListener (this.sockHandlers[i],
+                                     this.sockHandlers[i + 1]);
+    }
+
+  this.sockHandlers = [];
+}
+
+ChatSession.prototype.doConnect = function ()
+{
+  var location = window.location;
+
+  console.log ("Connecting…");
+
+  var protocol, port;
+
+  if (location.protocol.toLowerCase ().startsWith ("https"))
+    {
+      protocol = "wss";
+      port = 5145;
+    }
+  else
+    {
+      protocol = "ws";
+      port = 5144;
+    }
+
+  this.sock = new WebSocket (protocol + "://" +
+                             location.hostname + ":" +
+                             port + "/");
+  this.sock.binaryType = 'arraybuffer';
+  this.addSocketHandler ("error", this.sockErrorCb.bind (this));
+  this.addSocketHandler ("close", this.sockErrorCb.bind (this));
+  this.addSocketHandler ("open", this.sockOpenCb.bind (this));
+  this.addSocketHandler ("message", this.messageCb.bind (this));
+};
+
+ChatSession.prototype.reconnectTimeoutCb = function ()
+{
+  this.reconnectTimeout = null;
+  this.doConnect ();
+};
+
+ChatSession.prototype.disconnect = function ()
+{
+  if (this.reconnectTimeout != null)
+    {
+      clearTimeout (this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+  if (this.sock == null)
+    return;
+
+  this.removeSocketHandlers ();
+  this.clearKeepAliveTimeout ();
+  this.sock.close ();
+  this.sock = null;
+  this.connected = false;
+};
+
+ChatSession.prototype.sockErrorCb = function (e)
+{
+  console.log ("Error on socket: " + e);
+  this.disconnect ();
+
+  if (++this.reconnectCount >= 10)
+    {
+      this.setError ();
+    }
+  else
+    {
+      if (this.reconnectTimeout == null)
+        {
+          this.reconnectTimeout =
+            setTimeout (this.reconnectTimeoutCb.bind (this),
+                        30000);
+        }
+    }
+};
+
+ChatSession.ARG_SIZES =
+  {
+    "B": 8,
+    "W": 2,
+  };
+
+ChatSession.prototype.sendMessage = function (msgType, argTypes)
+{
+  var msgSize = 1;
+  var i;
+  var stringArgs = null;
+
+  for (i = 0; i < argTypes.length; i++)
+    {
+      var ch = argTypes.charAt (i);
+      if (ch == "s")
+        {
+          if (stringArgs == null)
+            stringArgs = [];
+          stringArgs.push (this.stringToUtf8 (arguments[i + 2]));
+          msgSize += stringArgs[stringArgs.length - 1].length + 1;
+        }
+      else
+        {
+          msgSize += ChatSession.ARG_SIZES[ch];
+        }
+    }
+
+  var ab = new ArrayBuffer (msgSize);
+  var dv = new DataView (ab);
+
+  dv.setUint8 (0, msgType);
+
+  var pos = 1;
+  var stringArg = 0;
+
+  for (i = 0; i < argTypes.length; i++)
+    {
+      var arg = arguments[i + 2];
+      var t = argTypes.charAt (i);
+
+      if (t == 'B')
+        {
+          var j;
+          for (j = 0; j < 8; j++)
+            dv.setUint8 (pos++, arg[j]);
+        }
+      else if (t == 'W')
+        {
+          dv.setUint16 (pos, arg, true);
+          pos += 2;
+        }
+      else if (t == 's')
+        {
+          arg = stringArgs[stringArg++];
+          var j;
+          for (j = 0; j < arg.length; j++)
+            dv.setUint8 (pos++, arg[j]);
+          dv.setUint8 (pos++, 0);
+        }
+    }
+
+  this.sock.send (ab);
+
+  this.resetKeepAliveTimeout ();
+};
+
+ChatSession.prototype.sockOpenCb = function (e)
+{
+  console.log ("connected!");
+
+  this.connected = true;
+
+  if (this.personId != null)
+    this.sendMessage (0x81, "BW", this.personId, this.numMessagesReceived);
+  else
+    this.sendMessage (0x80, "ss", this.roomName, this.playerName);
+};
+
+ChatSession.prototype.handlePlayerId = function (mr)
+{
+  this.personId = mr.getUint64 ();
+  this.personNumber = mr.getUint8 ();
+
+  /* If we get a player ID then we can assume the connection was worked */
+  this.reconnectCount = 0;
+};
+
+ChatSession.prototype.messageCb = function (e)
+{
+  var mr = new MessageReader (new DataView (e.data));
+  var msgType = mr.getUint8 ();
+
+  if (msgType == 0)
+    this.handlePlayerId (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
