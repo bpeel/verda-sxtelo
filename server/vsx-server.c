@@ -424,10 +424,16 @@ set_bad_input (VsxServerConnection *connection, GError *error)
 static void
 check_dead_connection (VsxServerConnection *connection)
 {
-  if (vsx_list_empty (&connection->response_queue)
-      && ((vsx_main_context_get_monotonic_clock (NULL)
-           - connection->no_response_age)
-          >= VSX_SERVER_NO_RESPONSE_TIMEOUT))
+  if (!vsx_list_empty (&connection->response_queue))
+    return;
+
+  gint64 dead_time =
+    connection->ws_connection
+    ? vsx_connection_get_last_message_time (connection->ws_connection)
+    : connection->no_response_age;
+
+  if (vsx_main_context_get_monotonic_clock (NULL) - dead_time
+      >= VSX_SERVER_NO_RESPONSE_TIMEOUT)
     {
       /* If we've already had bad input then we'll just remove the
        * connection. This will happen if the client doesn't close its
