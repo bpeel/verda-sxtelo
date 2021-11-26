@@ -985,7 +985,7 @@ ChatSession.prototype.sockErrorCb = function (e)
   console.log ("Error on socket: " + e);
   this.disconnect ();
 
-  if (++this.reconnectCount >= 10)
+  if (++this.reconnectCount >= 20)
     {
       this.setError ();
     }
@@ -997,7 +997,7 @@ ChatSession.prototype.sockErrorCb = function (e)
         {
           this.reconnectTimeout =
             setTimeout (this.reconnectTimeoutCb.bind (this),
-                        30000);
+                        15000);
         }
     }
 };
