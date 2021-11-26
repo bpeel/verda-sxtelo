@@ -16,9 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-var KEEP_ALIVE_TIME = 2.5 * 60 * 1000;
 var SHOUT_TIME = 10 * 1000;
-var CONNECT_RETRY_TIME = 5 * 1000;
 var TILE_SIZE = 20;
 var SHORT_GAME_N_TILES = 50;
 var NORMAL_GAME_N_TILES = 122;
@@ -81,64 +79,12 @@ MessageReader.prototype.isFinished = function ()
   return this.pos >= this.dv.byteLength;
 };
 
-function getAjaxObject ()
-{
-  /* On IE we'll use XDomainRequest but make it look like an
-   * XMLHttpRequest object */
-  if (window["XDomainRequest"])
-    {
-      /** constructor */
-      function Wrapper () { }
-      var obj = new Wrapper ();
-      obj.xdr = new XDomainRequest ();
-
-      obj.xdr.onprogress = function ()
-        {
-          obj.readyState = 3;
-          obj.responseText = obj.xdr.responseText;
-          if (obj.onreadystatechange)
-            obj.onreadystatechange ();
-        };
-      obj.xdr.onload = function ()
-        {
-          obj.status = 200;
-          obj.readyState = 4;
-          obj.responseText = obj.xdr.responseText;
-          if (obj.onreadystatechange)
-            obj.onreadystatechange ();
-        };
-      obj.xdr.onerror = function ()
-        {
-          obj.status = 300;
-          obj.readyState = 4;
-          if (obj.onreadystatechange)
-            obj.onreadystatechange ();
-        }
-      obj.xdr.ontimeout = obj.xdr.onerror;
-
-      obj.setRequestHeader = function () { };
-
-      /** @this {Wrapper} */
-      obj.abort = function () { this.xdr.abort (); };
-      /** @this {Wrapper} */
-      obj.open = function () { this.xdr.open.apply (this.xdr, arguments); };
-      /** @this {Wrapper} */
-      obj.send = function () { this.xdr.send.apply (this.xdr, arguments); };
-
-      return obj;
-    }
-  else
-    return new XMLHttpRequest ();
-}
-
 /**@constructor*/
 function ChatSession (playerName)
 {
-  this.terminatorRegexp = /\r\n/;
   this.personId = null;
   this.personNumber = null;
   this.messageNumber = 0;
-  this.messageQueue = [];
   this.sentTypingState = false;
   this.unreadMessages = 0;
   this.players = [];
@@ -146,11 +92,8 @@ function ChatSession (playerName)
   this.dragTile = null;
   this.dragTouchId = null;
   this.lastMovedTile = null;
-  this.retryCount = 0;
-  this.pendingTimeouts = [];
   this.soundOn = true;
   this.totalNumTiles = DEFAULT_N_TILES;
-  this.lastDataTime = new Date ();
   this.syncReceived = false;
 
   /* Set of the tile numbers that need their position to be sent to
@@ -280,25 +223,6 @@ ChatSession.prototype.setState = function (state)
   this.updateShoutButton ();
 };
 
-ChatSession.prototype.getUrl = function (method)
-{
-  var location = window.location;
-  if (location.protocol.toLowerCase().startsWith("https"))
-    return "https://" + location.hostname + ":5143/" + method;
-  else
-    return "http://" + location.hostname + ":5142/" + method;
-};
-
-ChatSession.prototype.clearWatchAjax = function ()
-{
-  var watchAjax = this.watchAjax;
-  /* Clear the Ajax object first incase aborting it fires a
-   * readystatechange event */
-  this.watchAjax = null;
-  if (watchAjax)
-    watchAjax.abort ();
-};
-
 ChatSession.prototype.setError = function (msg)
 {
   var i;
@@ -306,12 +230,6 @@ ChatSession.prototype.setError = function (msg)
   if (!msg)
     msg = "@ERROR_OCCURRED@";
 
-  for (i = 0; i < this.pendingTimeouts.length; i++)
-    clearTimeout (this.pendingTimeouts[i]);
-  this.pendingTimeouts.splice (0, this.pendingTimeouts.length);
-
-  this.clearWatchAjax ();
-  this.clearCheckDataInterval ();
   this.disconnect ();
 
   this.setState ("error");
@@ -325,25 +243,6 @@ ChatSession.prototype.setError = function (msg)
   /* Throw an exception so that we won't continue processing messages
    * or restart the check data interval */
   throw msg;
-};
-
-ChatSession.prototype.handleHeader = function (header)
-{
-  if (typeof (header) != "object")
-    this.setError ("@BAD_DATA@");
-
-  /* Ignore the header if we've already got further than this state */
-  if (this.state != "connecting")
-    return;
-
-  /* If we've successfully got the header then we've succesfully
-   * connected so we can reset the count */
-  this.retryCount = 0;
-
-  this.personNumber = header.num;
-  this.personId = header.id;
-
-  this.setState ("in-progress");
 };
 
 ChatSession.prototype.getGameLengthForNTiles = function (n_tiles)
@@ -470,206 +369,6 @@ ChatSession.prototype.stopShout = function ()
   }
 };
 
-ChatSession.prototype.processMessage = function (message)
-{
-  if (typeof (message) != "object"
-      || typeof (message[0]) != "string")
-    this.setError ("@BAD_DATA@");
-
-  switch (message[0])
-  {
-  case "header":
-    this.handleHeader (message[1]);
-    break;
-  }
-};
-
-ChatSession.prototype.checkData = function ()
-{
-  var responseText = this.watchAjax.responseText;
-
-  if (responseText)
-    while (this.watchPosition < responseText.length)
-    {
-      var rest = responseText.slice (this.watchPosition);
-      var terminatorPos = rest.search (this.terminatorRegexp);
-
-      if (terminatorPos == -1)
-        break;
-
-      try
-      {
-        var message = eval ('(' + rest.slice (0, terminatorPos) + ')');
-      }
-      catch (e)
-      {
-        this.setError ("@BAD_DATA@");
-        return;
-      }
-
-      this.processMessage (message);
-
-      this.watchPosition += terminatorPos + 2;
-
-      this.lastDataTime = new Date ();
-    }
-};
-
-ChatSession.prototype.checkDataIntervalCb = function ()
-{
-  var now = new Date ();
-
-  if (now.getTime () - this.lastDataTime.getTime () >= KEEP_ALIVE_TIME)
-    /* We haven't had any data for too long so something has gone
-     * wrong and we'll try reconnecting */
-    this.startWatchAjax ();
-  else
-    this.checkData ();
-};
-
-ChatSession.prototype.clearCheckDataInterval = function ()
-{
-  if (this.checkDataInterval)
-  {
-    clearInterval (this.checkDataInterval);
-    this.checkDataInterval = null;
-  }
-};
-
-ChatSession.prototype.resetCheckDataInterval = function ()
-{
-  this.clearCheckDataInterval ();
-  this.checkDataInterval =
-    setInterval (this.checkDataIntervalCb.bind (this), 3000);
-};
-
-ChatSession.prototype.addTimeout = function (func, interval)
-{
-  /* This is a wrapper around window.setTimeout except that it adds
-   * the timeoutID to a list so that we can cancel it if an error
-   * occurs */
-  var timeout;
-  var wrapperFunc = (function () {
-    var i;
-
-    for (i = 0; i < this.pendingTimeouts.length; i++)
-    {
-      if (this.pendingTimeouts[i] == timeout)
-      {
-        this.pendingTimeouts.splice (i, 1);
-        break;
-      }
-    }
-
-    func ();
-  }).bind (this);
-
-  timeout = window.setTimeout (wrapperFunc, interval);
-  this.pendingTimeouts.push (timeout);
-}
-
-ChatSession.prototype.watchReadyStateChangeCb = function ()
-{
-  if (!this.watchAjax)
-    return;
-
-  /* Every time the ready state changes we'll check for new data in
-   * the response and reset the timer. That way browsers that call
-   * onreadystatechange whenever new data arrives can get data as soon
-   * as it comes it, but other browsers will still eventually get the
-   * data from the timeout */
-
-  if (this.watchAjax.readyState == 3)
-  {
-    this.checkData ();
-    this.resetCheckDataInterval ();
-  }
-  else if (this.watchAjax.readyState == 4)
-  {
-    this.checkData ();
-    this.watchAjax = null;
-    this.clearCheckDataInterval ();
-
-    if (this.retryCount++ < 10)
-      this.addTimeout (this.startWatchAjax.bind (this), CONNECT_RETRY_TIME);
-    else
-      this.setError ();
-  }
-};
-
-ChatSession.prototype.startWatchAjax = function ()
-{
-  var method;
-
-  if (this.personId)
-    method = "watch_person?" + this.personId + "&" + this.messageNumber;
-
-  else
-    method = ("new_person?" + encodeURIComponent (this.roomName) + "&" +
-              encodeURIComponent (this.playerName));
-
-  this.clearWatchAjax ();
-
-  this.watchPosition = 0;
-
-  this.watchAjax = getAjaxObject ();
-
-  this.watchAjax.onreadystatechange = this.watchReadyStateChangeCb.bind (this);
-
-  this.watchAjax.open ("GET", this.getUrl (method));
-  this.watchAjax.send (null);
-
-  this.lastDataTime = new Date ();
-
-  this.resetCheckDataInterval ();
-  this.resetKeepAlive ();
-};
-
-ChatSession.prototype.sendMessageReadyStateChangeCb = function ()
-{
-  if (!this.sendMessageAjax)
-    return;
-
-  if (this.sendMessageAjax.readyState == 4)
-  {
-    if (this.sendMessageAjax.status == 200)
-    {
-      this.sendMessageAjax = null;
-      this.sendNextMessage ();
-    }
-    else
-    {
-      this.sendMessageAjax = null;
-      this.setError ();
-    }
-  }
-};
-
-ChatSession.prototype.sendNextMessage = function ()
-{
-  if (this.sendMessageAjax)
-    return;
-
-  if (this.messageQueue.length < 1)
-    return;
-
-  var message = this.messageQueue.shift ();
-
-  this.sendMessageAjax = getAjaxObject ();
-  this.sendMessageAjax.onreadystatechange =
-    this.sendMessageReadyStateChangeCb.bind (this);
-
-  var url = message[0] + "?" + this.personId;
-
-  if (message.length > 1)
-    url = url + "&" + message.slice (1).join ("&");
-
-  this.sendMessageAjax.open ("GET", this.getUrl (url));
-  this.sendMessageAjax.send ();
-
-  this.resetKeepAlive ();
-};
-
 ChatSession.prototype.sendCurrentMessage = function ()
 {
   var message;
@@ -699,22 +398,6 @@ ChatSession.prototype.shoutButtonClickCb = function ()
   this.shout ();
   this.focusMessageBox ();
 };
-
-ChatSession.prototype.queueSimpleMessage = function (message)
-{
-  var i;
-
-  if (this.state != "in-progress")
-    return;
-
-  /* Make sure that we haven't already queued the same message */
-  for (i = 0; i < this.messageQueue.length; i++)
-    if (this.messageQueue[i][0] == message)
-      return;
-
-  this.messageQueue.push ([message]);
-  this.sendNextMessage ();
-}
 
 ChatSession.prototype.shout = function ()
 {
@@ -1108,7 +791,6 @@ ChatSession.prototype.start = function ()
     }
 
   this.setState ("connecting");
-  this.startWatchAjax ();
 
   $("#shout-button").bind ("click", this.shoutButtonClickCb.bind (this));
   $("#turn-button").bind ("click", this.turnButtonClickCb.bind (this));
@@ -1393,6 +1075,8 @@ ChatSession.prototype.handlePlayerId = function (mr)
 
   /* If we get a player ID then we can assume the connection was worked */
   this.reconnectCount = 0;
+
+  this.setState ("in-progress");
 };
 
 ChatSession.prototype.handleMessage = function (mr)
@@ -1559,22 +1243,6 @@ ChatSession.prototype.unloadCb = function ()
   /* Try to let the server know the player is going. */
   if (this.connected)
     this.sendMessage(0x84, "");
-};
-
-ChatSession.prototype.resetKeepAlive = function ()
-{
-  if (this.keepAliveTimeout)
-    clearTimeout (this.keepAliveTimeout);
-  this.keepAliveTime = new Date ();
-  var cs = this;
-
-  function callback ()
-  {
-    cs.keepAliveTimeout = null;
-    cs.queueSimpleMessage ("keep_alive");
-  }
-
-  this.keepAliveTimeout = setTimeout (callback, KEEP_ALIVE_TIME);
 };
 
 ChatSession.prototype.getPlayer = function (playerNum)
