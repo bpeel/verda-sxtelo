@@ -470,32 +470,6 @@ ChatSession.prototype.stopShout = function ()
   }
 };
 
-ChatSession.prototype.handleShout = function (data)
-{
-  if (typeof (data) != "number")
-    this.setError ("@BAD_DATA@");
-
-  if (this.state != "in-progress")
-    return;
-
-  this.stopShout ();
-
-  this.shoutingPlayer = this.getPlayer (data);
-
-  this.updatePlayerClass (this.shoutingPlayer);
-  this.updateShoutButton ();
-
-  var sm = $("#shout-message");
-  sm.show ();
-  sm.text (this.shoutingPlayer.name);
-  sm.fadeOut (3000);
-
-  this.shoutTimeout = setTimeout (this.stopShout.bind (this),
-                                  SHOUT_TIME);
-
-  this.playSound ("shout-sound");
-};
-
 ChatSession.prototype.handleSync = function ()
 {
   this.syncReceived = true;
@@ -515,10 +489,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "end":
     this.handleEnd ();
-    break;
-
-  case "shout":
-    this.handleShout (message[1]);
     break;
 
   case "sync":
@@ -1513,6 +1483,28 @@ ChatSession.prototype.handlePlayer = function (mr)
   this.updateTurnButton ();
 };
 
+ChatSession.prototype.handlePlayerShouted = function (mr)
+{
+  var playerNum = mr.getUint8 ();
+
+  this.stopShout ();
+
+  this.shoutingPlayer = this.getPlayer (playerNum);
+
+  this.updatePlayerClass (this.shoutingPlayer);
+  this.updateShoutButton ();
+
+  var sm = $("#shout-message");
+  sm.show ();
+  sm.text (this.shoutingPlayer.name);
+  sm.fadeOut (3000);
+
+  this.shoutTimeout = setTimeout (this.stopShout.bind (this),
+                                  SHOUT_TIME);
+
+  this.playSound ("shout-sound");
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1530,6 +1522,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handlePlayerName (mr);
   else if (msgType == 0x05)
     this.handlePlayer (mr);
+  else if (msgType == 0x06)
+    this.handlePlayerShouted (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
