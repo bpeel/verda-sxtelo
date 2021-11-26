@@ -374,31 +374,6 @@ ChatSession.prototype.addPlayerNote = function (note, playerName)
   this.addMessageDiv (div);
 };
 
-ChatSession.prototype.handlePlayer = function (data)
-{
-  if (typeof (data) != "object")
-    this.setError ("@BAD_DATA@");
-
-  if (this.state != "in-progress")
-    return;
-
-  var player = this.getPlayer (data.num);
-
-  if (this.syncReceived &&
-      ((data.flags ^ player.flags) & PLAYER_CONNECTED) != 0)
-  {
-    this.addPlayerNote ((data.flags & PLAYER_CONNECTED) == 0 ?
-                        "@PLAYER_LEFT@" :
-                        "@PLAYER_JOINED@",
-                        player.name);
-  }
-
-  player.flags = data.flags;
-
-  this.updatePlayerClass (player);
-  this.updateTurnButton ();
-};
-
 ChatSession.prototype.handleEnd = function ()
 {
   /* This should only happen if we've left the conversation, but that
@@ -540,10 +515,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "end":
     this.handleEnd ();
-    break;
-
-  case "player":
-    this.handlePlayer (message[1]);
     break;
 
   case "shout":
@@ -1520,6 +1491,28 @@ ChatSession.prototype.handlePlayerName = function (mr)
   $(player.element).text (player.name);
 };
 
+ChatSession.prototype.handlePlayer = function (mr)
+{
+  var playerNum = mr.getUint8 ();
+  var flags = mr.getUint8 ();
+
+  var player = this.getPlayer (playerNum);
+
+  if (this.syncReceived &&
+      ((flags ^ player.flags) & PLAYER_CONNECTED) != 0)
+  {
+    this.addPlayerNote ((flags & PLAYER_CONNECTED) == 0 ?
+                        "@PLAYER_LEFT@" :
+                        "@PLAYER_JOINED@",
+                        player.name);
+  }
+
+  player.flags = flags;
+
+  this.updatePlayerClass (player);
+  this.updateTurnButton ();
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1535,6 +1528,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleTile (mr);
   else if (msgType == 0x04)
     this.handlePlayerName (mr);
+  else if (msgType == 0x05)
+    this.handlePlayer (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
