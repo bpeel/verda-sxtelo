@@ -340,16 +340,6 @@ ChatSession.prototype.getGameLengthForNTiles = function (n_tiles)
     return "normal";
 };
 
-ChatSession.prototype.handleNTiles = function (data)
-{
-  if (typeof (data) != "number")
-    this.setError ("@BAD_DATA@");
-
-  $("#game-length").val (this.getGameLengthForNTiles (data));
-  this.totalNumTiles = data;
-  this.updateRemainingTiles ();
-};
-
 ChatSession.prototype.handlePlayerName = function (data)
 {
   if (typeof (data) != "object")
@@ -589,10 +579,6 @@ ChatSession.prototype.processMessage = function (message)
   {
   case "header":
     this.handleHeader (message[1]);
-    break;
-
-  case "n-tiles":
-    this.handleNTiles (message[1]);
     break;
 
   case "end":
@@ -1529,6 +1515,15 @@ ChatSession.prototype.handleMessage = function (mr)
   this.messageNumber++;
 };
 
+ChatSession.prototype.handleNTiles = function (mr)
+{
+  var nTiles = mr.getUint8 ();
+
+  $("#game-length").val (this.getGameLengthForNTiles (nTiles));
+  this.totalNumTiles = nTiles;
+  this.updateRemainingTiles ();
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1538,6 +1533,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handlePlayerId (mr);
   else if (msgType == 0x01)
     this.handleMessage (mr);
+  else if (msgType == 0x02)
+    this.handleNTiles (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
