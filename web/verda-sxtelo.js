@@ -733,7 +733,7 @@ ChatSession.prototype.turnButtonClickCb = function ()
 ChatSession.prototype.turn = function ()
 {
   if (this.canTurn ())
-    this.queueSimpleMessage ("turn");
+    this.sendMessage (0x89, '');
 };
 
 ChatSession.prototype.submitMessageClickCb = function ()
