@@ -83,7 +83,7 @@ body {
 }
 
 .player.typing:after {
-    content: "⌨";
+    content: " ⌨️";
 }
 
 .player.shouting {
