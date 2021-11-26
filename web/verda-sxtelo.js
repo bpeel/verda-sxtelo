@@ -473,31 +473,6 @@ ChatSession.prototype.addMessageDiv = function (div)
   }
 };
 
-ChatSession.prototype.handleChatMessage = function (message)
-{
-  if (typeof (message) != "object")
-    this.setError ("@BAD_DATA@");
-
-  /* Ignore the message if we've already got further than this state */
-  if (this.state != "in-progress")
-    return;
-
-  var div = $(document.createElement ("div"));
-  div.addClass ("message");
-
-  var span = $(document.createElement ("span"));
-  div.append (span);
-  span.text (this.getPlayer (message.person).name);
-  span.addClass (message.person == this.personNumber
-                 ? "message-you" : "message-stranger");
-
-  div.append ($(document.createTextNode (" " + message.text)));
-
-  this.addMessageDiv (div);
-
-  this.messageNumber++;
-};
-
 ChatSession.prototype.raiseTile = function (tile)
 {
   /* Reappend the tile to its parent so that it will appear above all
@@ -630,10 +605,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "player":
     this.handlePlayer (message[1]);
-    break;
-
-  case "message":
-    this.handleChatMessage (message[1]);
     break;
 
   case "tile":
@@ -1537,6 +1508,27 @@ ChatSession.prototype.handlePlayerId = function (mr)
   this.reconnectCount = 0;
 };
 
+ChatSession.prototype.handleMessage = function (mr)
+{
+  var person = mr.getUint8 ();
+  var text = mr.getString ();
+
+  var div = $(document.createElement ("div"));
+  div.addClass ("message");
+
+  var span = $(document.createElement ("span"));
+  div.append (span);
+  span.text (this.getPlayer (person).name);
+  span.addClass (person == this.personNumber
+                 ? "message-you" : "message-stranger");
+
+  div.append ($(document.createTextNode (" " + text)));
+
+  this.addMessageDiv (div);
+
+  this.messageNumber++;
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1544,6 +1536,8 @@ ChatSession.prototype.messageCb = function (e)
 
   if (msgType == 0)
     this.handlePlayerId (mr);
+  else if (msgType == 0x01)
+    this.handleMessage (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
