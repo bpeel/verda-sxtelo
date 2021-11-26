@@ -51,6 +51,8 @@
 
 #define DEFAULT_PORT 5142
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
+#define DEFAULT_WEBSOCKET_PORT (DEFAULT_PORT + 2)
+#define DEFAULT_WEBSOCKET_SSL_PORT (DEFAULT_WEBSOCKET_PORT + 1)
 
 struct _VsxServer
 {
@@ -1198,10 +1200,20 @@ create_socket_for_config (VsxConfigServer *server_config,
 
   if (server_config->port == -1)
     {
-      if (server_config->certificate)
-        port = DEFAULT_SSL_PORT;
+      if (server_config->websocket)
+        {
+          if (server_config->certificate)
+            port = DEFAULT_WEBSOCKET_SSL_PORT;
+          else
+            port = DEFAULT_WEBSOCKET_PORT;
+        }
       else
-        port = DEFAULT_PORT;
+        {
+          if (server_config->certificate)
+            port = DEFAULT_SSL_PORT;
+          else
+            port = DEFAULT_PORT;
+        }
     }
   else
     {
