@@ -771,7 +771,7 @@ write_player (VsxConnection *conn,
         }
       else
         {
-          conn->dirty_players[i] &= ~(1 << bit_num);
+          conn->dirty_players[i] &= ~(1UL << bit_num);
           return wrote;
         }
     }
@@ -829,7 +829,7 @@ write_tile (VsxConnection *conn,
         }
       else
         {
-          conn->dirty_tiles[i] &= ~(1 << bit_num);
+          conn->dirty_tiles[i] &= ~(1UL << bit_num);
           return wrote;
         }
     }
