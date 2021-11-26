@@ -988,6 +988,8 @@ ChatSession.prototype.sockErrorCb = function (e)
     }
   else
     {
+      this.setState ("connecting");
+
       if (this.reconnectTimeout == null)
         {
           this.reconnectTimeout =
