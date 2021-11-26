@@ -1056,18 +1056,7 @@ ChatSession.prototype.gameLengthChangeCb = function (event)
     else
       length = NORMAL_GAME_N_TILES;
 
-    /* If we've already queued this move then just update the position */
-    for (i = 0; i < this.messageQueue.length; i++)
-    {
-      if (this.messageQueue[i][0] == "set_n_tiles")
-      {
-        this.messageQueue[i][1] = length;
-        return;
-      }
-    }
-
-    this.messageQueue.push (["set_n_tiles", length]);
-    this.sendNextMessage ();
+    this.sendMessage (0x8b, 'C', length);
   }
 };
 
