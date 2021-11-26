@@ -64,6 +64,9 @@ vsx_connection_has_data (VsxConnection *conn);
 VsxSignal *
 vsx_connection_get_changed_signal (VsxConnection *conn);
 
+gint64
+vsx_connection_get_last_message_time (VsxConnection *conn);
+
 void
 vsx_connection_free (VsxConnection *conn);
 

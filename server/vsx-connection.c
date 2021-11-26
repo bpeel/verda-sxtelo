@@ -59,6 +59,8 @@ struct _VsxConnection
 
   VsxSignal changed_signal;
 
+  gint64 last_message_time;
+
   GSocketAddress *socket_address;
   VsxConversationSet *conversation_set;
   VsxPersonSet *person_set;
@@ -602,6 +604,8 @@ process_message (VsxConnection *conn,
       return FALSE;
     }
 
+  conn->last_message_time = vsx_main_context_get_monotonic_clock (NULL);
+
   switch (conn->message_data[0])
     {
     case VSX_PROTO_NEW_PLAYER:
@@ -649,6 +653,8 @@ vsx_connection_new (GSocketAddress *socket_address,
   conn->person_set = vsx_object_ref (person_set);
 
   conn->ws_parser = vsx_ws_parser_new ();
+
+  conn->last_message_time = vsx_main_context_get_monotonic_clock (NULL);
 
   vsx_signal_init (&conn->changed_signal);
 
@@ -1429,6 +1435,12 @@ VsxSignal *
 vsx_connection_get_changed_signal (VsxConnection *conn)
 {
   return &conn->changed_signal;
+}
+
+gint64
+vsx_connection_get_last_message_time (VsxConnection *conn)
+{
+  return conn->last_message_time;
 }
 
 void
