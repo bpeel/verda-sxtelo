@@ -171,6 +171,9 @@ ChatSession.prototype.canTurn = function ()
   if (this.tiles.length >= this.totalNumTiles)
     return false;
 
+  if (this.state != "in-progress")
+    return false;
+
   if (this.tiles.length == 0)
     return true;
 
@@ -404,6 +407,9 @@ ChatSession.prototype.shout = function ()
   if (this.shoutingPlayer)
     return;
 
+  if (this.state != "in-progress")
+    return;
+
   this.sendMessage (0x8a, '');
 };
 
@@ -464,6 +470,9 @@ ChatSession.prototype.inputCb = function (event)
   if (newTypingState == this.sentTypingState)
     return;
 
+  if (this.state != "in-progress")
+    return;
+
   this.sentTypingState = newTypingState;
 
   this.sendMessage(newTypingState ? 0x86 : 0x87, '');
@@ -510,7 +519,7 @@ ChatSession.prototype.trySendTiles = function ()
 {
   this.clearDirtyTilesTimeout ();
 
-  if (!this.connected)
+  if (this.state != "in-progress")
     return;
 
   if (this.dirtyTiles.size <= 0)
@@ -559,6 +568,9 @@ ChatSession.prototype.dragStart = function (target, pageX, pageY)
   if (tileNum == null)
     return;
 
+  if (this.state != "in-progress")
+    return;
+
   /* Don't allow the player to start dragging if someone else is
    * shouting */
   if (this.shoutingPlayer &&
@@ -580,6 +592,9 @@ ChatSession.prototype.dragStart = function (target, pageX, pageY)
 
 ChatSession.prototype.dragMove = function (pageX, pageY)
 {
+  if (this.state != "in-progress")
+    return;
+
   var newX = Math.round ((pageX - this.dragOffsetX) /
                          this.pixelsPerEm * 10.0);
   var newY = Math.round ((pageY - this.dragOffsetY) /
@@ -616,7 +631,8 @@ ChatSession.prototype.dragEnd = function ()
 {
   var tile = this.tiles[this.dragTile];
 
-  if (!this.tileMoved &&
+  if (this.state == "in-progress" &&
+      !this.tileMoved &&
       this.lastMovedTile &&
       this.lastMovedTile != tile)
   {
@@ -730,6 +746,9 @@ ChatSession.prototype.touchCancelCb = function (event)
 
 ChatSession.prototype.gameLengthChangeCb = function (event)
 {
+  if (this.state != "in-progress")
+    return;
+
   var length = this.getGameLengthForNTiles (this.totalNumTiles);
   var lengthElem = $("#game-length");
 
