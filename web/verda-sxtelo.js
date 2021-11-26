@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011, 2012, 2013, 2020  Neil Roberts
+ * Copyright (C) 2011, 2012, 2013, 2020, 2021  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,52 @@ var DEFAULT_N_TILES = NORMAL_GAME_N_TILES;
 var PLAYER_CONNECTED = (1 << 0);
 var PLAYER_TYPING = (1 << 1);
 var PLAYER_NEXT_TURN = (1 << 2);
+
+function MessageReader (dv, pos)
+{
+  this.dv = dv;
+  this.pos = 0;
+}
+
+MessageReader.prototype.getString = function ()
+{
+  var s = "";
+
+  while (!this.isFinished ()) {
+    var c = this.getUint8 ();
+
+    if (c == 0)
+      break;
+
+    s = s + '%';
+    if (c < 16)
+      s = s + '0';
+    s = s + c.toString (16);
+  }
+
+  return decodeURIComponent (s);
+};
+
+MessageReader.prototype.getUint64 = function ()
+{
+  var a = new Uint8Array (8);
+  var i;
+
+  for (i = 0; i < 8; i++)
+    a[i] = this.getUint8 ();
+
+  return a;
+};
+
+MessageReader.prototype.getUint8 = function ()
+{
+  return this.dv.getUint8 (this.pos++);
+};
+
+MessageReader.prototype.isFinished = function ()
+{
+  return this.pos >= this.dv.byteLength;
+};
 
 function getAjaxObject ()
 {
