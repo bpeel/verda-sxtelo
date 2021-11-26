@@ -212,6 +212,9 @@ ChatSession.prototype.setState = function (state)
 
   this.state = state;
 
+  $("#connecting-message").css('display',
+                               state == "connecting" ? "block" : "none");
+
   if (state == "in-progress")
   {
     for (i = 0; i < controls.length; i++)
