@@ -720,7 +720,7 @@ ChatSession.prototype.shout = function ()
   if (this.shoutingPlayer)
     return;
 
-  this.queueSimpleMessage ("shout");
+  this.sendMessage (0x8a, '');
 };
 
 ChatSession.prototype.turnButtonClickCb = function ()
