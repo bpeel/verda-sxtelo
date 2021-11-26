@@ -312,6 +312,7 @@ ChatSession.prototype.setError = function (msg)
 
   this.clearWatchAjax ();
   this.clearCheckDataInterval ();
+  this.disconnect ();
 
   this.setState ("error");
 
