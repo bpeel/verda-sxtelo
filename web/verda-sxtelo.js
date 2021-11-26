@@ -470,11 +470,6 @@ ChatSession.prototype.stopShout = function ()
   }
 };
 
-ChatSession.prototype.handleSync = function ()
-{
-  this.syncReceived = true;
-};
-
 ChatSession.prototype.processMessage = function (message)
 {
   if (typeof (message) != "object"
@@ -489,10 +484,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "end":
     this.handleEnd ();
-    break;
-
-  case "sync":
-    this.handleSync ();
     break;
   }
 };
@@ -1505,6 +1496,11 @@ ChatSession.prototype.handlePlayerShouted = function (mr)
   this.playSound ("shout-sound");
 };
 
+ChatSession.prototype.handleSync = function (mr)
+{
+  this.syncReceived = true;
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1524,6 +1520,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handlePlayer (mr);
   else if (msgType == 0x06)
     this.handlePlayerShouted (mr);
+  else if (msgType == 0x07)
+    this.handleSync (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
