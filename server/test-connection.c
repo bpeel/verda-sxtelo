@@ -1901,13 +1901,14 @@ test_turn_all_tiles (void)
               break;
             }
 
-          /* When the fist tile is turned the player flags will change
-           * to update the current player.
+          /* When the first and last tiles are turned the player flags
+           * will change to update the current player.
            */
-          if (i == 0
+          if ((i == 0 || i == 121)
               && !read_player (harness->conn,
                                0, /* expected_player_num */
-                               VSX_PLAYER_CONNECTED | VSX_PLAYER_NEXT_TURN))
+                               VSX_PLAYER_CONNECTED |
+                               (i == 0 ? VSX_PLAYER_NEXT_TURN : 0)))
             {
               ret = FALSE;
               break;

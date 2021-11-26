@@ -244,6 +244,16 @@ static void
 set_next_player (VsxConversation *conversation,
                  unsigned int old_player)
 {
+  if (conversation->n_tiles_in_play >= conversation->total_n_tiles)
+    {
+      /* If there are no tiles left then make it nobody’s turn */
+      vsx_conversation_set_flag (conversation,
+                                 conversation->players[old_player],
+                                 VSX_PLAYER_NEXT_TURN,
+                                 FALSE);
+      return;
+    }
+
   /* Find the next player that is connected */
   unsigned int next_turn_player = old_player;
 
