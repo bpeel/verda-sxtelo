@@ -69,6 +69,13 @@ MessageReader.prototype.getUint8 = function ()
   return this.dv.getUint8 (this.pos++);
 };
 
+MessageReader.prototype.getInt16 = function ()
+{
+  var val = this.dv.getInt16 (this.pos, true /* littleEndian */);
+  this.pos += 2;
+  return val;
+};
+
 MessageReader.prototype.isFinished = function ()
 {
   return this.pos >= this.dv.byteLength;
