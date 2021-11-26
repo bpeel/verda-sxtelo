@@ -494,43 +494,6 @@ ChatSession.prototype.animateTile = function (tile, x, y)
               distance * 2.0);
 };
 
-ChatSession.prototype.handleTile = function (data)
-{
-  if (typeof (data) != "object")
-    this.setError ("@BAD_DATA@");
-
-  if (this.state != "in-progress")
-    return;
-
-  var tile = this.tiles[data.num];
-
-  if (tile == null)
-  {
-    tile = this.tiles[data.num] = {};
-    tile.element = document.createElement ("div");
-    tile.element.className = "tile";
-    tile.element.style.left = (-TILE_SIZE / 10.0) + "em";
-    tile.element.style.top = (-TILE_SIZE / 10.0) + "em";
-    $(tile.element).text (data.letter);
-    tile.x = tile.y = -TILE_SIZE;
-    $("#board").append (tile.element);
-
-    this.updateRemainingTiles ();
-    this.updateTurnButton ();
-
-    $("#start-note").remove ();
-
-    this.playSound ("turn-sound");
-  }
-
-  if (data.player != this.personNumber &&
-      (data.x != tile.x || data.y != tile.y))
-    this.animateTile (tile, data.x, data.y);
-
-  tile.x = data.x;
-  tile.y = data.y;
-};
-
 ChatSession.prototype.stopShout = function ()
 {
   if (this.shoutingPlayer)
@@ -598,10 +561,6 @@ ChatSession.prototype.processMessage = function (message)
 
   case "player":
     this.handlePlayer (message[1]);
-    break;
-
-  case "tile":
-    this.handleTile (message[1]);
     break;
 
   case "shout":
@@ -1531,6 +1490,43 @@ ChatSession.prototype.handleNTiles = function (mr)
   this.updateRemainingTiles ();
 };
 
+ChatSession.prototype.handleTile = function (mr)
+{
+  var tileNum = mr.getUint8 ();
+  var tileX = mr.getInt16 ();
+  var tileY = mr.getInt16 ();
+  var letter = mr.getString ();
+  var playerNum = mr.getUint8 ();
+
+  var tile = this.tiles[tileNum];
+
+  if (tile == null)
+  {
+    tile = this.tiles[tileNum] = {};
+    tile.element = document.createElement ("div");
+    tile.element.className = "tile";
+    tile.element.style.left = (-TILE_SIZE / 10.0) + "em";
+    tile.element.style.top = (-TILE_SIZE / 10.0) + "em";
+    $(tile.element).text (letter);
+    tile.x = tile.y = -TILE_SIZE;
+    $("#board").append (tile.element);
+
+    this.updateRemainingTiles ();
+    this.updateTurnButton ();
+
+    $("#start-note").remove ();
+
+    this.playSound ("turn-sound");
+  }
+
+  if (playerNum != this.personNumber &&
+      (tileX != tile.x || tileY != tile.y))
+    this.animateTile (tile, tileX, tileY);
+
+  tile.x = tileX;
+  tile.y = tileY;
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1542,6 +1538,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleMessage (mr);
   else if (msgType == 0x02)
     this.handleNTiles (mr);
+  else if (msgType == 0x03)
+    this.handleTile (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
