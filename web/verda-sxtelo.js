@@ -153,6 +153,13 @@ function ChatSession (playerName)
   this.lastDataTime = new Date ();
   this.syncReceived = false;
 
+  /* Set of the tile numbers that need their position to be sent to
+   * the server. */
+  this.dirtyTiles = new Set ();
+  /* Timeout to check if the bufferedAmount is empty in order to
+   * update the tiles. */
+  this.dirtyTilesTimeout = null;
+
   this.sock = null;
   this.sockHandlers = [];
   this.connected = false;
@@ -806,24 +813,60 @@ ChatSession.prototype.getTileNumForTarget = function (target)
   return null;
 };
 
-ChatSession.prototype.moveTile = function (tileNum, x, y)
+ChatSession.prototype.clearDirtyTilesTimeout = function ()
 {
-  var tile = this.tiles[tileNum];
-
-  /* If we've already queued this move then just update the position */
-  for (i = 0; i < this.messageQueue.length; i++)
-  {
-    if (this.messageQueue[i][0] == "move_tile" &&
-        this.messageQueue[i][1] == tileNum)
+  if (this.dirtyTilesTimeout)
     {
-      this.messageQueue[i][2] = x;
-      this.messageQueue[i][3] = y;
-      return;
+      clearTimeout (this.dirtyTilesTimeout);
+      this.dirtyTilesTimeout = null;
     }
-  }
+};
 
-  this.messageQueue.push (["move_tile", tileNum, x, y]);
-  this.sendNextMessage ();
+ChatSession.prototype.trySendTiles = function ()
+{
+  this.clearDirtyTilesTimeout ();
+
+  if (!this.connected)
+    return;
+
+  if (this.dirtyTiles.size <= 0)
+    return;
+
+  /* Only send tile updates when no other data is queued on the socket
+   * to avoid flooding it.
+   */
+  if (this.sock.bufferedAmount > 0)
+    {
+      /* If there is already some data queued then try again an eighth
+       * of a second. */
+      if (this.dirtyTilesTimeout == null)
+        {
+          function callback ()
+          {
+            this.dirtyTilesTimeout = null;
+            this.trySendTiles ();
+          }
+
+          this.dirtyTilesTimout = setTimeout (callback.bind (this), 125);
+        }
+    }
+  else
+    {
+      function sendTile (tileNum)
+      {
+        var tile = this.tiles[tileNum];
+        this.sendMessage (0x88, 'Cww', tileNum, tile.x, tile.y);
+      }
+
+      this.dirtyTiles.forEach (sendTile.bind (this));
+      this.dirtyTiles.clear ();
+    }
+};
+
+ChatSession.prototype.dirtyTile = function (tileNum)
+{
+  this.dirtyTiles.add (tileNum);
+  this.trySendTiles ();
 };
 
 ChatSession.prototype.dragStart = function (target, pageX, pageY)
@@ -871,10 +914,10 @@ ChatSession.prototype.dragMove = function (pageX, pageY)
   this.tileMoved = true;
   this.lastMovedTile = tile;
 
-  this.moveTile (this.dragTile, newX, newY);
-
   tile.x = newX;
   tile.y = newY;
+
+  this.dirtyTile (this.dragTile);
 
   tile.element.style.left = (newX / 10.0) + "em";
   tile.element.style.top = (newY / 10.0) + "em";
@@ -898,10 +941,10 @@ ChatSession.prototype.dragEnd = function ()
                   10.0 - 20);
     if (newPos < maxPos)
     {
-      this.moveTile (this.dragTile, newPos, this.lastMovedTile.y);
       this.animateTile (tile, newPos, this.lastMovedTile.y);
       tile.x = newPos;
       tile.y = this.lastMovedTile.y;
+      this.dirtyTile (this.dragTile);
       this.lastMovedTile = tile;
     }
   }
@@ -1237,6 +1280,7 @@ ChatSession.prototype.disconnect = function ()
 
   this.removeSocketHandlers ();
   this.clearKeepAliveTimeout ();
+  this.clearDirtyTilesTimeout ();
   this.sock.close ();
   this.sock = null;
   this.connected = false;
