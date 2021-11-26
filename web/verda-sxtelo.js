@@ -817,30 +817,7 @@ ChatSession.prototype.sendNextMessage = function ()
     return;
 
   if (this.messageQueue.length < 1)
-  {
-    /* Check if we need to update the typing state */
-    var newTypingState = $("#message-input-box").val ().length > 0;
-    if (newTypingState != this.sentTypingState)
-    {
-      this.sentTypingState = newTypingState;
-
-      this.sendMessageAjax = getAjaxObject ();
-      this.sendMessageAjax.onreadystatechange =
-        this.sendMessageReadyStateChangeCb.bind (this);
-      this.sendMessageAjax.open ("GET",
-                                 this.getUrl ((newTypingState ?
-                                               "start_typing?" :
-                                               "stop_typing?") +
-                                              this.personId));
-      this.sendMessageAjax.setRequestHeader ("Content-Type",
-                                             "text/plain; charset=UTF-8");
-      this.sendMessageAjax.send (message);
-
-      this.resetKeepAlive ();
-    }
-
     return;
-  }
 
   var message = this.messageQueue.shift ();
 
@@ -978,8 +955,14 @@ ChatSession.prototype.documentKeyDownCb = function (event)
 
 ChatSession.prototype.inputCb = function (event)
 {
-  /* Maybe update the typing status */
-  this.sendNextMessage ();
+  var newTypingState = $("#message-input-box").val ().length > 0;
+
+  if (newTypingState == this.sentTypingState)
+    return;
+
+  this.sentTypingState = newTypingState;
+
+  this.sendMessage(newTypingState ? 0x86 : 0x87, '');
 };
 
 ChatSession.prototype.errorButtonClickCb = function ()
