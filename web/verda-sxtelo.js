@@ -374,14 +374,6 @@ ChatSession.prototype.addPlayerNote = function (note, playerName)
   this.addMessageDiv (div);
 };
 
-ChatSession.prototype.handleEnd = function ()
-{
-  /* This should only happen if we've left the conversation, but that
-   * shouldn't be possible without leaving the page so something has
-   * gone wrong */
-  this.setError ();
-};
-
 ChatSession.prototype.playSound = function (name)
 {
   if (!this.soundOn)
@@ -480,10 +472,6 @@ ChatSession.prototype.processMessage = function (message)
   {
   case "header":
     this.handleHeader (message[1]);
-    break;
-
-  case "end":
-    this.handleEnd ();
     break;
   }
 };
@@ -1501,6 +1489,14 @@ ChatSession.prototype.handleSync = function (mr)
   this.syncReceived = true;
 };
 
+ChatSession.prototype.handleEnd = function (mr)
+{
+  /* This should only happen if we've left the conversation, but that
+   * shouldn't be possible without leaving the page so something has
+   * gone wrong */
+  this.setError ();
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1522,6 +1518,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handlePlayerShouted (mr);
   else if (msgType == 0x07)
     this.handleSync (mr);
+  else if (msgType == 0x08)
+    this.handleEnd (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
