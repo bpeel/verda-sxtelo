@@ -1265,7 +1265,9 @@ ChatSession.prototype.sockErrorCb = function (e)
 ChatSession.ARG_SIZES =
   {
     "B": 8,
+    "C": 1,
     "W": 2,
+    "w": 2,
   };
 
 ChatSession.prototype.sendMessage = function (msgType, argTypes)
@@ -1309,9 +1311,18 @@ ChatSession.prototype.sendMessage = function (msgType, argTypes)
           for (j = 0; j < 8; j++)
             dv.setUint8 (pos++, arg[j]);
         }
+      else if (t == 'C')
+        {
+          dv.setUint8 (pos++, arg, true);
+        }
       else if (t == 'W')
         {
           dv.setUint16 (pos, arg, true);
+          pos += 2;
+        }
+      else if (t == 'w')
+        {
+          dv.setInt16 (pos, arg, true);
           pos += 2;
         }
       else if (t == 's')
