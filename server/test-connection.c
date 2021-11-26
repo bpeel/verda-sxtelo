@@ -1864,6 +1864,82 @@ test_sync (void)
   return ret;
 }
 
+static gboolean
+test_turn_all_tiles (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  VsxPerson *person;
+  gboolean ret = TRUE;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = FALSE;
+    }
+  else
+    {
+      for (int i = 0; i < 122; i++)
+        {
+          GError *error = NULL;
+
+          if (!vsx_connection_parse_data (harness->conn,
+                                          (guint8 *) "\x82\x1\x89",
+                                          3,
+                                          &error))
+            {
+              fprintf (stderr,
+                       "Unexpected error after turn command: %s\n",
+                       error->message);
+              g_error_free (error);
+
+              ret = FALSE;
+              break;
+            }
+
+          /* When the fist tile is turned the player flags will change
+           * to update the current player.
+           */
+          if (i == 0
+              && !read_player (harness->conn,
+                               0, /* expected_player_num */
+                               VSX_PLAYER_CONNECTED | VSX_PLAYER_NEXT_TURN))
+            {
+              ret = FALSE;
+              break;
+            }
+
+          int tile_num;
+
+          if (!read_tile (harness->conn, &tile_num, NULL, NULL, NULL))
+            {
+              ret = FALSE;
+              break;
+            }
+
+          if (tile_num != i)
+            {
+              fprintf (stderr,
+                       "After turning tile %i, server updated tile %i\n",
+                       i,
+                       tile_num);
+              ret = FALSE;
+              break;
+            }
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1906,6 +1982,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_sync ())
+    ret = EXIT_FAILURE;
+
+  if (!test_turn_all_tiles ())
     ret = EXIT_FAILURE;
 
   return ret;
