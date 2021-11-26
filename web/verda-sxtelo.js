@@ -651,37 +651,22 @@ ChatSession.prototype.sendNextMessage = function ()
   this.sendMessageAjax.onreadystatechange =
     this.sendMessageReadyStateChangeCb.bind (this);
 
-  if (message[0] == "message")
-  {
-    /* The server assumes we've stopped typing whenever a message is
-     * sent */
-    this.sentTypingState = false;
+  var url = message[0] + "?" + this.personId;
 
-    this.sendMessageAjax.open ("POST",
-                               this.getUrl ("send_message?" + this.personId));
-    this.sendMessageAjax.setRequestHeader ("Content-Type",
-                                           "text/plain; charset=UTF-8");
-    this.sendMessageAjax.send (message[1]);
-  }
-  else
-  {
-    var url = message[0] + "?" + this.personId;
+  if (message.length > 1)
+    url = url + "&" + message.slice (1).join ("&");
 
-    if (message.length > 1)
-      url = url + "&" + message.slice (1).join ("&");
-
-    this.sendMessageAjax.open ("GET", this.getUrl (url));
-    this.sendMessageAjax.send ();
-  }
+  this.sendMessageAjax.open ("GET", this.getUrl (url));
+  this.sendMessageAjax.send ();
 
   this.resetKeepAlive ();
 };
 
-ChatSession.prototype.queueCurrentMessage = function ()
+ChatSession.prototype.sendCurrentMessage = function ()
 {
   var message;
 
-  if (this.state != "in-progress")
+  if (!this.connected)
     return;
 
   message = $("#message-input-box").val ();
@@ -689,8 +674,10 @@ ChatSession.prototype.queueCurrentMessage = function ()
   if (message.length > 0)
   {
     $("#message-input-box").val ("");
-    this.messageQueue.push (["message", message]);
-    this.sendNextMessage ();
+    this.sendMessage (0x85, 's', message);
+    /* The server assumes we've stopped typing whenever a message is
+     * sent */
+    this.sentTypingState = false;
   }
 };
 
@@ -743,7 +730,7 @@ ChatSession.prototype.turn = function ()
 
 ChatSession.prototype.submitMessageClickCb = function ()
 {
-  this.queueCurrentMessage ();
+  this.sendCurrentMessage ();
   this.focusMessageBox ();
 };
 
@@ -754,7 +741,7 @@ ChatSession.prototype.messageKeyDownCb = function (event)
   {
     event.preventDefault ();
     event.stopPropagation ();
-    this.queueCurrentMessage ();
+    this.sendCurrentMessage ();
   }
 };
 
