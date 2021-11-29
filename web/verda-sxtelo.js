@@ -1266,7 +1266,10 @@ ChatSession.prototype.unloadCb = function ()
 {
   /* Try to let the server know the player is going. */
   if (this.connected)
-    this.sendMessage(0x84, "");
+  {
+    this.sendMessage (0x84, "");
+    this.disconnect ();
+  }
 };
 
 ChatSession.prototype.getPlayer = function (playerNum)
