@@ -1941,6 +1941,107 @@ test_turn_all_tiles (void)
   return ret;
 }
 
+static gboolean
+test_ping_string (VsxConnection *conn,
+                  const char *str)
+{
+  size_t str_len = strlen (str);
+  size_t frame_len = str_len + 2;
+  guint8 *frame = g_alloca (frame_len);
+
+  frame[0] = 0x89;
+  frame[1] = str_len;
+
+  memcpy (frame + 2, str, str_len);
+
+  GError *error = NULL;
+
+  if (!vsx_connection_parse_data (conn, frame, str_len + 2, &error))
+    {
+      fprintf (stderr,
+               "Unexpected error sending ping control frame: %s\n",
+               error->message);
+      g_error_free (error);
+
+      return FALSE;
+    }
+
+  /* Allocate enough space to receive the pong a second time so that
+   * we can verify that the connection only sends it once.
+   */
+  guint8 *result = g_alloca (frame_len * 2);
+
+  size_t got = vsx_connection_fill_output_buffer (conn, result, frame_len * 2);
+
+  if (got != frame_len)
+    {
+      fprintf (stderr,
+               "Received %zu bytes for pong frame but %zu were expected\n",
+               got,
+               frame_len);
+      return FALSE;
+    }
+
+  if (result[0] != 0x8a)
+    {
+      fprintf (stderr,
+               "Expected pong command (0x8a) but received 0x%02x)\n",
+               result[0]);
+      return FALSE;
+    }
+
+  if (result[1] != str_len)
+    {
+      fprintf (stderr,
+               "Length of pong command not as expected: %i != %zu\n",
+               result[1],
+               str_len);
+      return FALSE;
+    }
+
+  if (memcmp (result + 2, str, str_len))
+    {
+      fprintf (stderr,
+               "Pong command data is different\n"
+               "  Expected: %s\n"
+               "  Received: %.*s\n",
+               str,
+               (int) str_len,
+               result + 2);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
+test_ping (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return FALSE;
+
+  gboolean ret = TRUE;
+
+  /* Test a simple ping */
+  if (!test_ping_string (harness->conn, "poop"))
+    ret = FALSE;
+
+  /* Test a string with the maximum control frame length */
+  if (!test_ping_string (harness->conn,
+                         "abcdefghijklmnopqrstuvwxyz"
+                         "abcdefghijklmnopqrstuvwxyz"
+                         "abcdefghijklmnopqrstuvwxyz"
+                         "abcdefghijklmnopqrstuvwxyz"
+                         "abcdefghijklmnopqrstu"))
+    ret = FALSE;
+
+  free_harness (harness);
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1986,6 +2087,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_turn_all_tiles ())
+    ret = EXIT_FAILURE;
+
+  if (!test_ping ())
     ret = EXIT_FAILURE;
 
   return ret;

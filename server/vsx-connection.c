@@ -47,10 +47,11 @@ typedef enum
 typedef enum
 {
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
-  VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 1),
-  VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 2),
-  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 3),
-  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 4),
+  VSX_CONNECTION_DIRTY_FLAG_PONG = (1 << 1),
+  VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 2),
+  VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 3),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 4),
+  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 5),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -94,10 +95,9 @@ struct _VsxConnection
   guint8 read_buf[1024];
   size_t read_buf_pos;
 
-  /* If pong_queued is non-zero then pong_data then we need to
-   * send a pong control frame with the payload given payload.
+  /* If VSX_CONNECTION_DIRTY_FLAG_PONG is set then we need to send a
+   * pong control frame with the given payload.
    */
-  gboolean pong_queued;
   _Static_assert (VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD <= G_MAXUINT8,
                   "The max pong data length is too for a uint8_t");
   guint8 pong_data_length;
@@ -940,6 +940,24 @@ write_ws_response (VsxConnection *conn,
 }
 
 static int
+write_pong (VsxConnection *conn,
+            guint8 *buffer,
+            size_t buffer_size)
+{
+  size_t frame_size = conn->pong_data_length + 2;
+
+  if (frame_size > buffer_size)
+    return -1;
+
+  /* FIN bit + opcode 0xa (pong) */
+  *(buffer++) = 0x8a;
+  *(buffer++) = conn->pong_data_length;
+  memcpy (buffer, conn->pong_data, conn->pong_data_length);
+
+  return frame_size;
+}
+
+static int
 write_player_id (VsxConnection *conn,
                  guint8 *buffer,
                  size_t buffer_size)
@@ -1039,6 +1057,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
   } write_funcs[] =
     {
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
+      { VSX_CONNECTION_DIRTY_FLAG_PONG, write_pong },
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
       { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
       { .func = write_player_name },
@@ -1153,7 +1172,7 @@ process_control_frame (VsxConnection *conn,
       g_assert (data_length <= sizeof conn->pong_data);
       memcpy (conn->pong_data, data, data_length);
       conn->pong_data_length = data_length;
-      conn->pong_queued = TRUE;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PONG;
       break;
     case 0xa:
       /* pong, ignore */
