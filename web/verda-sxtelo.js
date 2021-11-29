@@ -639,9 +639,9 @@ ChatSession.prototype.dragEnd = function ()
       this.lastMovedTile &&
       this.lastMovedTile != tile)
   {
-    var newPos = this.lastMovedTile.x + 20;
+    var newPos = this.lastMovedTile.x + TILE_SIZE;
     var maxPos = ($("#board").innerWidth () / this.pixelsPerEm *
-                  10.0 - 20);
+                  10.0 - TILE_SIZE);
     if (newPos < maxPos)
     {
       this.animateTile (tile, newPos, this.lastMovedTile.y);
