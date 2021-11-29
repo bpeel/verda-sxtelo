@@ -775,6 +775,11 @@ ChatSession.prototype.padNumber = function (num)
 
 ChatSession.prototype.updateNextGameTime = function ()
 {
+  var link = $("#game-time-url");
+
+  if (link.length <= 0)
+    return;
+
   var GAME_DAY = 1; /* Mondays */
   var GAME_TIME = 19; /* 7pm UTC */
   var now = new Date ();
@@ -801,7 +806,7 @@ ChatSession.prototype.updateNextGameTime = function ()
              "&ah=1" +
              "&msg=" + encodeURI("@TITLE@"));
 
-  $("#game-time-url").attr ("href", url);
+  link.attr ("href", url);
 };
 
 ChatSession.prototype.start = function ()
