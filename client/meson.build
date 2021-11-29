@@ -1,7 +1,5 @@
 gnome = import('gnome')
 
-json_glib_dep = dependency('json-glib-1.0')
-soup_dep = dependency('libsoup-2.4')
 readline_dep = declare_dependency(link_args: '-lreadline -ltermcap')
 
 readline_dep = cc.find_library('readline', required : true)
@@ -14,7 +12,7 @@ cc.check_header('term.h',
                 dependencies: readline_dep,
                 required: true)
  
-client_deps = glib_deps + [ json_glib_dep, soup_dep, readline_dep, termcap_dep ]
+client_deps = glib_deps + [ readline_dep, termcap_dep ]
 
 client_headers = [
         'vsx-connection.h',

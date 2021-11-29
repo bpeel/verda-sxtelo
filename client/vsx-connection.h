@@ -20,7 +20,6 @@
 #define __VSX_CONNECTION_H__
 
 #include <glib-object.h>
-#include <libsoup/soup.h>
 
 #include "vsx-player.h"
 #include "vsx-tile.h"
@@ -65,12 +64,11 @@ struct _VsxConnectionClass
 {
   GObjectClass parent_class;
 
-  /* Emitted whenever the connection encounters an error. These could be
-     either an I/O error from the underlying socket, an HTTP error or
-     an error trying to parse the JSON.  Usually the connection will try
-     to recover from the error by reconnected, but you can prevent
-     this in the signal handler by calling
-     vsx_connection_set_running().*/
+  /* Emitted whenever the connection encounters an error. These could
+     be either an I/O error from the underlying socket or a protocol
+     error. Usually the connection will try to recover from the error
+     by reconnecting, but you can prevent this in the signal handler
+     by calling vsx_connection_set_running().*/
   void (* got_error) (VsxConnection *connection,
                       GError *error);
 
@@ -108,8 +106,7 @@ GType
 vsx_connection_get_type (void) G_GNUC_CONST;
 
 VsxConnection *
-vsx_connection_new (SoupSession *soup_session,
-                    const char *server_base_url,
+vsx_connection_new (const char *server_base_url,
                     const char *room,
                     const char *player_name);
 
