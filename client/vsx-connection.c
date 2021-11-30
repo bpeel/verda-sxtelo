@@ -1120,12 +1120,13 @@ update_poll (VsxConnection *connection)
 
   GIOCondition condition;
 
-  if (priv->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING)
+  switch (priv->running_state)
     {
+    case VSX_CONNECTION_RUNNING_STATE_RECONNECTING:
       condition = G_IO_OUT;
-    }
-  else
-    {
+      break;
+
+    case VSX_CONNECTION_RUNNING_STATE_RUNNING:
       condition = G_IO_IN;
 
       if (!priv->write_finished)
@@ -1145,6 +1146,10 @@ update_poll (VsxConnection *connection)
               priv->write_finished = TRUE;
             }
         }
+      break;
+
+    default:
+      return;
     }
 
   set_sock_condition (connection, condition);
