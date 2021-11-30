@@ -546,6 +546,44 @@ handle_player_name (VsxConnection *connection,
 }
 
 static gboolean
+handle_player (VsxConnection *connection,
+               const guint8 *payload,
+               size_t payload_length,
+               GError **error)
+{
+  guint8 num, flags;
+
+  if (!vsx_proto_read_payload (payload + 1,
+                               payload_length - 1,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &num,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &flags,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an invalid player command");
+      return FALSE;
+    }
+
+  VsxPlayer *player = get_or_create_player (connection, num);
+
+  player->flags = flags;
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_PLAYER_CHANGED],
+                 0, /* detail */
+                 player);
+
+  return TRUE;
+}
+
+static gboolean
 handle_player_shouted (VsxConnection *connection,
                        const guint8 *payload,
                        size_t payload_length,
@@ -603,6 +641,8 @@ process_message (VsxConnection *connection,
       return handle_tile (connection, payload, payload_length, error);
     case VSX_PROTO_PLAYER_NAME:
       return handle_player_name (connection, payload, payload_length, error);
+    case VSX_PROTO_PLAYER:
+      return handle_player (connection, payload, payload_length, error);
     case VSX_PROTO_PLAYER_SHOUTED:
       return handle_player_shouted (connection, payload, payload_length, error);
     }
