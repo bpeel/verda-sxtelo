@@ -125,6 +125,13 @@ typedef struct
   VsxList link;
 } VsxConnectionTileToMove;
 
+typedef struct
+{
+  VsxList link;
+  /* Over-allocated */
+  char message[1];
+} VsxConnectionMessageToSend;
+
 struct _VsxConnectionPrivate
 {
   char *server_base_url;
@@ -144,6 +151,7 @@ struct _VsxConnectionPrivate
 
   VsxConnectionDirtyFlag dirty_flags;
   VsxList tiles_to_move;
+  VsxList messages_to_send;
 
   GSocket *sock;
   GIOChannel *sock_channel;
@@ -1023,6 +1031,42 @@ write_move_tile (VsxConnection *connection,
 }
 
 static int
+write_send_message (VsxConnection *connection,
+                    guint8 *buffer,
+                    size_t buffer_size)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (vsx_list_empty (&priv->messages_to_send))
+    return 0;
+
+  VsxConnectionMessageToSend *message =
+    vsx_container_of (priv->messages_to_send.next, message, link);
+
+  int ret = vsx_proto_write_command (buffer,
+                                     buffer_size,
+
+                                     VSX_PROTO_SEND_MESSAGE,
+
+                                     VSX_PROTO_TYPE_STRING,
+                                     message->message,
+
+                                     VSX_PROTO_TYPE_NONE);
+
+  if (ret > 0)
+    {
+      /* The server automatically assumes we're not typing anymore
+         when the client sends a message */
+      priv->sent_typing_state = FALSE;
+
+      vsx_list_remove (&message->link);
+      g_free (message);
+    }
+
+  return ret;
+}
+
+static int
 write_typing_state (VsxConnection *connection,
                     guint8 *buffer,
                     size_t buffer_size)
@@ -1065,6 +1109,7 @@ fill_output_buffer (VsxConnection *connection)
       { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
       { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
       { .func = write_move_tile },
+      { .func = write_send_message },
       { .func = write_typing_state },
     };
 
@@ -1205,6 +1250,9 @@ has_pending_data (VsxConnection *connection)
     return TRUE;
 
   if (!vsx_list_empty (&priv->tiles_to_move))
+    return TRUE;
+
+  if (!vsx_list_empty (&priv->messages_to_send))
     return TRUE;
 
   if (priv->sent_typing_state != priv->typing)
@@ -1598,6 +1646,7 @@ vsx_connection_init (VsxConnection *self)
                                        free_tile_cb);
 
   vsx_list_init (&priv->tiles_to_move);
+  vsx_list_init (&priv->messages_to_send);
 }
 
 static void
@@ -1623,6 +1672,18 @@ free_tiles_to_move (VsxConnection *connection)
 }
 
 static void
+free_messages_to_send (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  VsxConnectionMessageToSend *message, *tmp;
+
+  vsx_list_for_each_safe (message, tmp, &priv->messages_to_send, link)
+    {
+      g_free (message);
+    }
+}
+
+static void
 vsx_connection_finalize (GObject *object)
 {
   VsxConnection *self = (VsxConnection *) object;
@@ -1638,6 +1699,7 @@ vsx_connection_finalize (GObject *object)
   g_hash_table_destroy (priv->tiles);
 
   free_tiles_to_move (self);
+  free_messages_to_send (self);
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->finalize (object);
 }
@@ -1676,7 +1738,30 @@ void
 vsx_connection_send_message (VsxConnection *connection,
                              const char *message)
 {
-  /* FIXME */
+  VsxConnectionPrivate *priv = connection->priv;
+
+  size_t message_length = strlen (message);
+
+  if (message_length > VSX_PROTO_MAX_MESSAGE_LENGTH)
+    {
+      message_length = VSX_PROTO_MAX_MESSAGE_LENGTH;
+      /* If we’ve clipped before a continuation byte then also clip
+       * the rest of the UTF-8 sequence so that it will remain valid
+       * UTF-8. */
+      while ((message[message_length] & 0xc0) == 0x80)
+        message_length--;
+    }
+
+  VsxConnectionMessageToSend *message_to_send =
+    g_malloc (offsetof (VsxConnectionMessageToSend, message)
+              + message_length + 1);
+
+  memcpy (message_to_send->message, message, message_length);
+  message_to_send->message[message_length] = '\0';
+
+  vsx_list_insert (priv->messages_to_send.prev, &message_to_send->link);
+
+  update_poll (connection);
 }
 
 void
