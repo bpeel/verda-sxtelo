@@ -31,6 +31,7 @@
 #include "vsx-player-private.h"
 #include "vsx-tile-private.h"
 #include "vsx-proto.h"
+#include "vsx-list.h"
 
 enum
 {
@@ -116,6 +117,14 @@ typedef enum
   VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT
 } VsxConnectionRunningState;
 
+typedef struct
+{
+  int num;
+  int x;
+  int y;
+  VsxList link;
+} VsxConnectionTileToMove;
+
 struct _VsxConnectionPrivate
 {
   char *server_base_url;
@@ -134,6 +143,7 @@ struct _VsxConnectionPrivate
   int next_message_num;
 
   VsxConnectionDirtyFlag dirty_flags;
+  VsxList tiles_to_move;
 
   GSocket *sock;
   GIOChannel *sock_channel;
@@ -337,7 +347,25 @@ vsx_connection_move_tile (VsxConnection *connection,
                           int x,
                           int y)
 {
-  /* FIXME */
+  VsxConnectionPrivate *priv = connection->priv;
+
+  VsxConnectionTileToMove *tile;
+
+  vsx_list_for_each (tile, &priv->tiles_to_move, link)
+    {
+      if (tile->num == tile_num)
+        goto found_tile;
+    }
+
+  tile = g_new (VsxConnectionTileToMove, 1);
+  tile->num = tile_num;
+  vsx_list_insert (priv->tiles_to_move.prev, &tile->link);
+
+ found_tile:
+  tile->x = x;
+  tile->y = y;
+
+  update_poll (connection);
 }
 
 static void
@@ -955,6 +983,45 @@ write_turn (VsxConnection *connection,
                                   VSX_PROTO_TYPE_NONE);
 }
 
+static int
+write_move_tile (VsxConnection *connection,
+                 guint8 *buffer,
+                 size_t buffer_size)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (vsx_list_empty (&priv->tiles_to_move))
+    return 0;
+
+  VsxConnectionTileToMove *tile = vsx_container_of (priv->tiles_to_move.next,
+                                                    tile,
+                                                    link);
+
+  int ret = vsx_proto_write_command (buffer,
+                                     buffer_size,
+
+                                     VSX_PROTO_MOVE_TILE,
+
+                                     VSX_PROTO_TYPE_UINT8,
+                                     tile->num,
+
+                                     VSX_PROTO_TYPE_INT16,
+                                     tile->x,
+
+                                     VSX_PROTO_TYPE_INT16,
+                                     tile->y,
+
+                                     VSX_PROTO_TYPE_NONE);
+
+  if (ret > 0)
+    {
+      vsx_list_remove (&tile->link);
+      g_free (tile);
+    }
+
+  return ret;
+}
+
 static void
 fill_output_buffer (VsxConnection *connection)
 {
@@ -972,6 +1039,7 @@ fill_output_buffer (VsxConnection *connection)
       { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
       { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
       { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
+      { .func = write_move_tile },
     };
 
   while (TRUE)
@@ -1108,6 +1176,9 @@ has_pending_data (VsxConnection *connection)
     return TRUE;
 
   if (priv->dirty_flags)
+    return TRUE;
+
+  if (!vsx_list_empty (&priv->tiles_to_move))
     return TRUE;
 
   return FALSE;
@@ -1496,6 +1567,8 @@ vsx_connection_init (VsxConnection *self)
                                        g_direct_equal,
                                        NULL, /* key_destroy */
                                        free_tile_cb);
+
+  vsx_list_init (&priv->tiles_to_move);
 }
 
 static void
@@ -1506,6 +1579,18 @@ vsx_connection_dispose (GObject *object)
   vsx_connection_set_running_internal (self, FALSE);
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->dispose (object);
+}
+
+static void
+free_tiles_to_move (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  VsxConnectionTileToMove *tile, *tmp;
+
+  vsx_list_for_each_safe (tile, tmp, &priv->tiles_to_move, link)
+    {
+      g_free (tile);
+    }
 }
 
 static void
@@ -1522,6 +1607,8 @@ vsx_connection_finalize (GObject *object)
 
   g_hash_table_destroy (priv->players);
   g_hash_table_destroy (priv->tiles);
+
+  free_tiles_to_move (self);
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->finalize (object);
 }

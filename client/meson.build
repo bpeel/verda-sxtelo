@@ -24,6 +24,7 @@ client_headers = [
 
 client_src = [
         'vsx-connection.c',
+        '../common/vsx-list.c',
         'vsx-main.c',
         'vsx-player.c',
         '../common/vsx-proto.c',
