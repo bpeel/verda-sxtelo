@@ -316,7 +316,7 @@ vsx_connection_set_typing (VsxConnection *connection,
   if (priv->typing != typing)
     {
       priv->typing = typing;
-      /* FIXME */
+      update_poll (connection);
       g_object_notify (G_OBJECT (connection), "typing");
     }
 }
@@ -1022,6 +1022,31 @@ write_move_tile (VsxConnection *connection,
   return ret;
 }
 
+static int
+write_typing_state (VsxConnection *connection,
+                    guint8 *buffer,
+                    size_t buffer_size)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->typing == priv->sent_typing_state)
+    return 0;
+
+  int ret = vsx_proto_write_command (buffer,
+                                     buffer_size,
+
+                                     priv->typing
+                                     ? VSX_PROTO_START_TYPING
+                                     : VSX_PROTO_STOP_TYPING,
+
+                                     VSX_PROTO_TYPE_NONE);
+
+  if (ret > 0)
+    priv->sent_typing_state = priv->typing;
+
+  return ret;
+}
+
 static void
 fill_output_buffer (VsxConnection *connection)
 {
@@ -1040,6 +1065,7 @@ fill_output_buffer (VsxConnection *connection)
       { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
       { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
       { .func = write_move_tile },
+      { .func = write_typing_state },
     };
 
   while (TRUE)
@@ -1179,6 +1205,9 @@ has_pending_data (VsxConnection *connection)
     return TRUE;
 
   if (!vsx_list_empty (&priv->tiles_to_move))
+    return TRUE;
+
+  if (priv->sent_typing_state != priv->typing)
     return TRUE;
 
   return FALSE;
