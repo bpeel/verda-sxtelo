@@ -38,6 +38,7 @@ enum
   PROP_0,
 
   PROP_SERVER_BASE_URL,
+  PROP_ADDRESS,
   PROP_ROOM,
   PROP_PLAYER_NAME,
   PROP_RUNNING,
@@ -135,6 +136,7 @@ typedef struct
 struct _VsxConnectionPrivate
 {
   char *server_base_url;
+  GSocketAddress *address;
   char *room;
   char *player_name;
   guint reconnect_timeout;
@@ -303,6 +305,12 @@ vsx_connection_set_property (GObject *object,
 
     case PROP_ROOM:
       priv->room = g_strdup (g_value_get_string (value));
+      break;
+
+    case PROP_ADDRESS:
+      priv->address = g_value_get_object (value);
+      if (priv->address)
+        g_object_ref (priv->address);
       break;
 
     case PROP_PLAYER_NAME:
@@ -1328,17 +1336,10 @@ vsx_connection_reconnect_cb (gpointer user_data)
 
   g_socket_set_blocking (priv->sock, FALSE);
 
-  GInetAddress *localhost =
-    g_inet_address_new_loopback (G_SOCKET_FAMILY_IPV4);
-  GSocketAddress *address = g_inet_socket_address_new (localhost, 5144);
-
   gboolean connect_ret = g_socket_connect (priv->sock,
-                                           address,
+                                           priv->address,
                                            NULL, /* cancellable */
                                            &error);
-
-  g_object_unref (address);
-  g_object_unref (localhost);
 
   GIOCondition condition;
 
@@ -1397,6 +1398,22 @@ vsx_connection_queue_reconnect (VsxConnection *connection)
     priv->reconnect_timeout = VSX_CONNECTION_MAX_TIMEOUT;
 
   priv->running_state = VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+}
+
+static void
+vsx_connection_constructed (GObject *object)
+{
+  VsxConnection *connection = VSX_CONNECTION (object);
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->address == NULL)
+    {
+      GInetAddress *localhost =
+        g_inet_address_new_loopback (G_SOCKET_FAMILY_IPV4);
+      priv->address = g_inet_socket_address_new (localhost, 5144);
+
+      g_object_unref (localhost);
+    }
 }
 
 static void
@@ -1473,6 +1490,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
 
   gobject_class->dispose = vsx_connection_dispose;
   gobject_class->finalize = vsx_connection_finalize;
+  gobject_class->constructed = vsx_connection_constructed;
   gobject_class->set_property = vsx_connection_set_property;
   gobject_class->get_property = vsx_connection_get_property;
 
@@ -1486,6 +1504,18 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                                | G_PARAM_STATIC_NICK
                                | G_PARAM_STATIC_BLURB);
   g_object_class_install_property (gobject_class, PROP_SERVER_BASE_URL, pspec);
+
+  pspec = g_param_spec_object ("address",
+                               "Server address to connect to",
+                               "The address of the server to connect to. "
+                               "Defaults to localhost:5144",
+                               G_TYPE_SOCKET_ADDRESS,
+                               G_PARAM_WRITABLE
+                               | G_PARAM_CONSTRUCT_ONLY
+                               | G_PARAM_STATIC_NAME
+                               | G_PARAM_STATIC_NICK
+                               | G_PARAM_STATIC_BLURB);
+  g_object_class_install_property (gobject_class, PROP_ADDRESS, pspec);
 
   pspec = g_param_spec_string ("room",
                                "Room to connect to",
@@ -1652,8 +1682,15 @@ static void
 vsx_connection_dispose (GObject *object)
 {
   VsxConnection *self = (VsxConnection *) object;
+  VsxConnectionPrivate *priv = self->priv;
 
   vsx_connection_set_running_internal (self, FALSE);
+
+  if (priv->address)
+    {
+      g_object_unref (priv->address);
+      priv->address = NULL;
+    }
 
   G_OBJECT_CLASS (vsx_connection_parent_class)->dispose (object);
 }
@@ -1705,11 +1742,13 @@ vsx_connection_finalize (GObject *object)
 
 VsxConnection *
 vsx_connection_new (const char *server_base_url,
+                    GSocketAddress *address,
                     const char *room,
                     const char *player_name)
 {
   VsxConnection *self = g_object_new (VSX_TYPE_CONNECTION,
                                       "server-base-url", server_base_url,
+                                      "address", address,
                                       "room", room,
                                       "player-name", player_name,
                                       NULL);

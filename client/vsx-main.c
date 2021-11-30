@@ -349,6 +349,7 @@ main (int argc, char **argv)
     option_player_name = g_strdup (g_get_user_name ());
 
   connection = vsx_connection_new (option_server_base_url,
+                                   NULL,
                                    option_room,
                                    option_player_name);
 

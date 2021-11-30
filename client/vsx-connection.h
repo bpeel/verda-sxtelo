@@ -20,6 +20,7 @@
 #define __VSX_CONNECTION_H__
 
 #include <glib-object.h>
+#include <gio/gio.h>
 
 #include "vsx-player.h"
 #include "vsx-tile.h"
@@ -107,6 +108,7 @@ vsx_connection_get_type (void) G_GNUC_CONST;
 
 VsxConnection *
 vsx_connection_new (const char *server_base_url,
+                    GSocketAddress *address,
                     const char *room,
                     const char *player_name);
 
