@@ -441,6 +441,71 @@ handle_message (VsxConnection *connection,
 }
 
 static gboolean
+handle_tile (VsxConnection *connection,
+             const guint8 *payload,
+             size_t payload_length,
+             GError **error)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  guint8 num, player;
+  gint16 x, y;
+  const char *letter;
+
+  if (!vsx_proto_read_payload (payload + 1,
+                               payload_length - 1,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &num,
+
+                               VSX_PROTO_TYPE_INT16,
+                               &x,
+
+                               VSX_PROTO_TYPE_INT16,
+                               &y,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &letter,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &player,
+
+                               VSX_PROTO_TYPE_NONE)
+      || g_utf8_strlen (letter, -1) != 1)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an invalid tile command");
+      return FALSE;
+    }
+
+  VsxTile *tile = g_hash_table_lookup (priv->tiles,
+                                       GINT_TO_POINTER ((int) num));
+  gboolean is_new = FALSE;
+
+  if (tile == NULL)
+    {
+      tile = g_slice_new0 (VsxTile);
+      tile->num = num;
+
+      g_hash_table_insert (priv->tiles, GINT_TO_POINTER ((int) num), tile);
+      is_new = TRUE;
+    }
+
+  tile->x = x;
+  tile->y = y;
+  tile->letter = g_utf8_get_char (letter);
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_TILE_CHANGED],
+                 0, /* detail */
+                 is_new,
+                 tile);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *connection,
                  const guint8 *payload,
                  size_t payload_length,
@@ -461,6 +526,8 @@ process_message (VsxConnection *connection,
       return handle_player_id (connection, payload, payload_length, error);
     case VSX_PROTO_MESSAGE:
       return handle_message (connection, payload, payload_length, error);
+    case VSX_PROTO_TILE:
+      return handle_tile (connection, payload, payload_length, error);
     }
 
   return TRUE;
