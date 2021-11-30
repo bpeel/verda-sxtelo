@@ -128,6 +128,7 @@ struct _VsxConnectionPrivate
   VsxConnectionState state;
   gboolean typing;
   gboolean sent_typing_state;
+  gboolean write_finished;
   int next_message_num;
 
   VsxConnectionDirtyFlag dirty_flags;
@@ -742,11 +743,18 @@ handle_read (VsxConnection *connection)
     }
   else if (got == 0)
     {
-      error = g_error_new (VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
-                           "The server unexpectedly closed the connection");
-      report_error (connection, error);
-      g_error_free (error);
+      if (priv->state == VSX_CONNECTION_STATE_DONE)
+        {
+          vsx_connection_set_running (connection, FALSE);
+        }
+      else
+        {
+          error = g_error_new (VSX_CONNECTION_ERROR,
+                               VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                               "The server unexpectedly closed the connection");
+          report_error (connection, error);
+          g_error_free (error);
+        }
     }
   else
     {
@@ -820,6 +828,8 @@ handle_read (VsxConnection *connection)
                p,
                priv->input_buffer + priv->input_length - p);
       priv->input_length -= p - priv->input_buffer;
+
+      update_poll (connection);
     }
 }
 
@@ -1080,8 +1090,23 @@ update_poll (VsxConnection *connection)
     {
       condition = G_IO_IN;
 
-      if (has_pending_data (connection))
-        condition = G_IO_OUT;
+      if (!priv->write_finished)
+        {
+          if (has_pending_data (connection))
+            {
+              condition = G_IO_OUT;
+            }
+          else if (priv->self
+                   && !vsx_player_is_connected (priv->self))
+            {
+              g_socket_shutdown (priv->sock,
+                                 FALSE, /* shutdown read */
+                                 TRUE, /* shutdown write */
+                                 NULL /* error */);
+
+              priv->write_finished = TRUE;
+            }
+        }
     }
 
   set_sock_condition (connection, condition);
@@ -1149,6 +1174,7 @@ vsx_connection_reconnect_cb (gpointer user_data)
   priv->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER
                         | VSX_CONNECTION_DIRTY_FLAG_HEADER);
   priv->ws_terminator_pos = 0;
+  priv->write_finished = FALSE;
 
   priv->sock_channel = g_io_channel_unix_new (g_socket_get_fd (priv->sock));
 
