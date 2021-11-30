@@ -365,11 +365,65 @@ get_or_create_player (VsxConnection *connection,
 }
 
 static gboolean
+handle_message (VsxConnection *connection,
+                const guint8 *payload,
+                size_t payload_length,
+                GError **error)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  guint8 person;
+  const char *text;
+
+  if (!vsx_proto_read_payload (payload + 1,
+                               payload_length - 1,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &person,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &text,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an invalid message command");
+      return FALSE;
+    }
+
+  priv->next_message_num++;
+
+  g_signal_emit (connection,
+                 signals[SIGNAL_MESSAGE],
+                 0, /* detail */
+                 get_or_create_player (connection, person),
+                 text);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *connection,
                  const guint8 *payload,
                  size_t payload_length,
                  GError **error)
 {
+  if (payload_length < 1)
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an empty message");
+      return FALSE;
+    }
+
+  switch (payload[0])
+    {
+    case VSX_PROTO_MESSAGE:
+      return handle_message (connection, payload, payload_length, error);
+    }
+
   return TRUE;
 }
 
