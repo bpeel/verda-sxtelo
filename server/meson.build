@@ -1,5 +1,7 @@
 server_deps = glib_deps + [ openssl_dep ]
 
+inc_dirs = [ configinc, '../common' ]
+
 if get_option('systemd')
   server_deps += dependency('libsystemd')
   cdata.set('USE_SYSTEMD', true)
@@ -37,7 +39,7 @@ server_src = [
         'vsx-person.c',
         'vsx-person-set.c',
         'vsx-player.c',
-        'vsx-proto.c',
+        '../common/vsx-proto.c',
         'vsx-request-handler.c',
         'vsx-response.c',
         'vsx-send-message-handler.c',
@@ -59,7 +61,7 @@ server_src = [
 executable('verda-sxtelo', server_src,
            dependencies: server_deps,
            install: true,
-           include_directories: configinc)
+           include_directories: inc_dirs)
 
 test_ws_parser_src = [
         'vsx-ws-parser.c',
@@ -68,7 +70,7 @@ test_ws_parser_src = [
 test_ws_parser = executable('test-ws-parser',
                             test_ws_parser_src,
                             dependencies: server_deps,
-                            include_directories: configinc)
+                            include_directories: inc_dirs)
 test('ws-parser', test_ws_parser)
 
 test_connection_src = [
@@ -83,7 +85,7 @@ test_connection_src = [
         'vsx-person.c',
         'vsx-person-set.c',
         'vsx-player.c',
-        'vsx-proto.c',
+        '../common/vsx-proto.c',
         'vsx-tile-data.c',
         'vsx-ws-parser.c',
         'test-connection.c',
@@ -91,5 +93,5 @@ test_connection_src = [
 test_connection = executable('test-connection',
                              test_connection_src,
                              dependencies: server_deps,
-                             include_directories: configinc)
+                             include_directories: inc_dirs)
 test('connection', test_connection)
