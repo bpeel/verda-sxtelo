@@ -154,12 +154,11 @@ vsx_conversation_add_message (VsxConversation *conversation,
   if (raw_length > VSX_PROTO_MAX_MESSAGE_LENGTH)
     {
       raw_length = VSX_PROTO_MAX_MESSAGE_LENGTH;
-      /* Clip to a valid UTF-8 boundary */
-      if (buffer[raw_length] < 0)
-        {
-          while (raw_length > 0 && buffer[raw_length - 1] < 0)
-            raw_length--;
-        }
+      /* If we’ve clipped before a continuation byte then also clip
+       * the rest of the UTF-8 sequence so that it will remain valid
+       * UTF-8. */
+      while ((buffer[raw_length] & 0xc0) == 0x80)
+        raw_length--;
     }
 
   message->raw_text = g_strndup (buffer, raw_length);
