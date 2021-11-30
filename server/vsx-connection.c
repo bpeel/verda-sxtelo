@@ -1151,7 +1151,21 @@ vsx_connection_parse_eof (VsxConnection *conn,
       return FALSE;
     }
 
-  conn->state = VSX_CONNECTION_STATE_DONE;
+  /* The player shouldn’t close the connection without leaving the
+   * game. If they do leave the game first this will initiate a clean
+   * shutdown sequence because the state will be changed to DONE when
+   * the END command gets sent.
+   */
+  if (conn->person == NULL
+      || vsx_player_is_connected (conn->person->player))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                   "Client closed the connection before sending a LEAVE "
+                   "command");
+      return FALSE;
+    }
 
   return TRUE;
 }
