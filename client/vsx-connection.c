@@ -24,11 +24,13 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <gio/gio.h>
 
 #include "vsx-marshal.h"
 #include "vsx-enum-types.h"
 #include "vsx-player-private.h"
 #include "vsx-tile-private.h"
+#include "vsx-proto.h"
 
 enum
 {
@@ -55,11 +57,33 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
+static const guint8
+ws_terminator[] = "\r\n\r\n";
+
+#define WS_TERMINATOR_LENGTH ((sizeof ws_terminator) - 1)
+
+typedef enum
+{
+  VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
+  VSX_CONNECTION_DIRTY_FLAG_HEADER = (1 << 1),
+  VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE = (1 << 2),
+} VsxConnectionDirtyFlag;
+
+typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
+                                             guint8 *buffer,
+                                             size_t buffer_size);
+
 static void
 vsx_connection_dispose (GObject *object);
 
 static void
 vsx_connection_finalize (GObject *object);
+
+static void
+vsx_connection_queue_reconnect (VsxConnection *connection);
+
+static void
+update_poll (VsxConnection *connection);
 
 G_DEFINE_TYPE (VsxConnection, vsx_connection, G_TYPE_OBJECT);
 
@@ -82,6 +106,9 @@ G_DEFINE_TYPE (VsxConnection, vsx_connection, G_TYPE_OBJECT);
 typedef enum
 {
   VSX_CONNECTION_RUNNING_STATE_DISCONNECTED,
+  /* g_socket_connect has been called and we are waiting for it to
+   * become ready for writing */
+  VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
   VSX_CONNECTION_RUNNING_STATE_RUNNING,
   VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT
 } VsxConnectionRunningState;
@@ -94,6 +121,7 @@ struct _VsxConnectionPrivate
   guint reconnect_timeout;
   guint reconnect_handler;
   VsxPlayer *self;
+  gboolean has_person_id;
   guint64 person_id;
   VsxConnectionRunningState running_state;
   VsxConnectionState state;
@@ -101,12 +129,36 @@ struct _VsxConnectionPrivate
   gboolean sent_typing_state;
   int next_message_num;
 
+  VsxConnectionDirtyFlag dirty_flags;
+
+  GSocket *sock;
+  GIOChannel *sock_channel;
+  guint sock_source;
+  /* The condition that the source was last created with so we can
+   * know if we need to recreate it.
+   */
+  GIOCondition sock_condition;
+
   GHashTable *players;
   GHashTable *tiles;
 
   /* A timeout for sending a keep alive message */
   guint keep_alive_timeout;
   GTimer *keep_alive_time;
+
+  unsigned int output_length;
+  guint8 output_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
+                       + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
+
+  unsigned int input_length;
+  guint8 input_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
+                      + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
+
+  /* Position within ws terminator that we have found so far. If this
+   * is greater than the terminator length then we’ve finished the
+   * WebSocket negotation.
+   */
+  unsigned int ws_terminator_pos;
 };
 
 static gboolean
@@ -117,7 +169,9 @@ vsx_connection_keep_alive_cb (void *data)
 
   priv->keep_alive_timeout = 0;
 
-  /* FIXME */
+  priv->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE;
+
+  update_poll (connection);
 
   return FALSE;
 }
@@ -146,6 +200,38 @@ vsx_connection_signal_error (VsxConnection *connection,
                  signals[SIGNAL_GOT_ERROR],
                  0, /* detail */
                  error);
+}
+
+static void
+close_socket (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->keep_alive_timeout)
+    {
+      g_source_remove (priv->keep_alive_timeout);
+      priv->keep_alive_timeout = 0;
+    }
+
+  if (priv->sock_source)
+    {
+      g_source_remove (priv->sock_source);
+      priv->sock_source = 0;
+      priv->sock_condition = 0;
+    }
+
+  if (priv->sock_channel)
+    {
+      g_io_channel_unref (priv->sock_channel);
+      priv->sock_channel = NULL;
+    }
+
+  if (priv->sock)
+    {
+      g_socket_close (priv->sock, NULL);
+      g_object_unref (priv->sock);
+      priv->sock = NULL;
+    }
 }
 
 static void
@@ -279,11 +365,482 @@ get_or_create_player (VsxConnection *connection,
 }
 
 static gboolean
+process_message (VsxConnection *connection,
+                 const guint8 *payload,
+                 size_t payload_length,
+                 GError **error)
+{
+  return TRUE;
+}
+
+static void
+report_error (VsxConnection *connection,
+              GError *error)
+{
+  close_socket (connection);
+  vsx_connection_queue_reconnect (connection);
+  vsx_connection_signal_error (connection, error);
+}
+
+static gboolean
+get_payload_length (const guint8 *buf,
+                    size_t buf_length,
+                    size_t *payload_length_out,
+                    const guint8 **payload_start_out)
+{
+  if (buf_length < 2)
+    return FALSE;
+
+  switch (buf[1])
+    {
+    case 0x7e:
+      if (buf_length < 4)
+        return FALSE;
+
+      *payload_length_out = vsx_proto_read_guint16 (buf + 2);
+      *payload_start_out = buf + 4;
+      return TRUE;
+
+    case 0x7f:
+      if (buf_length < 6)
+        return FALSE;
+
+      *payload_length_out = vsx_proto_read_guint32 (buf + 2);
+      *payload_start_out = buf + 6;
+      return TRUE;
+
+    default:
+      *payload_length_out = buf[1];
+      *payload_start_out = buf + 2;
+      return TRUE;
+    }
+}
+
+static void
+handle_read (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  GError *error = NULL;
+
+  gssize got = g_socket_receive (priv->sock,
+                                 (char *) priv->input_buffer
+                                 + priv->input_length,
+                                 (sizeof priv->input_buffer)
+                                 - priv->input_length,
+                                 NULL, /* cancellable */
+                                 &error);
+  if (got == -1)
+    {
+      if (error->domain != G_IO_ERROR
+          || error->code != G_IO_ERROR_WOULD_BLOCK)
+          report_error (connection, error);
+
+      g_clear_error (&error);
+    }
+  else if (got == 0)
+    {
+      error = g_error_new (VSX_CONNECTION_ERROR,
+                           VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                           "The server unexpectedly closed the connection");
+      report_error (connection, error);
+      g_error_free (error);
+    }
+  else
+    {
+      const guint8 *p = priv->input_buffer;
+
+      priv->input_length += got;
+
+      if (priv->ws_terminator_pos < WS_TERMINATOR_LENGTH)
+        {
+          while (p - priv->input_buffer < priv->input_length)
+            {
+              if (*(p++) == ws_terminator[priv->ws_terminator_pos])
+                {
+                  if (++priv->ws_terminator_pos >= WS_TERMINATOR_LENGTH)
+                    goto terminated;
+                }
+              else
+                {
+                  priv->ws_terminator_pos = 0;
+                }
+            }
+
+          /* If we make it here then we haven’t found the end of the
+           * terminator yet.
+           */
+          priv->input_length = 0;
+          return;
+        }
+
+    terminated: ((void) 0);
+
+      size_t payload_length;
+      const guint8 *payload_start;
+
+      while (get_payload_length (p,
+                                 priv->input_buffer
+                                 + priv->input_length
+                                 - p,
+                                 &payload_length,
+                                 &payload_start))
+        {
+          if (payload_length > VSX_PROTO_MAX_PAYLOAD_SIZE)
+            {
+              error = g_error_new (VSX_CONNECTION_ERROR,
+                                   VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                                   "The server sent a frame that is too long");
+              report_error (connection, error);
+              g_error_free (error);
+              return;
+            }
+
+          if (payload_start + payload_length
+              > priv->input_buffer + priv->input_length)
+            break;
+
+          /* Ignore control frames and non-binary frames */
+          if (*p == 0x82
+              && !process_message (connection,
+                                   payload_start, payload_length,
+                                   &error))
+            {
+              report_error (connection, error);
+              g_error_free (error);
+              return;
+            }
+
+          p = payload_start + payload_length;
+        }
+
+      memmove (priv->input_buffer,
+               p,
+               priv->input_buffer + priv->input_length - p);
+      priv->input_length -= p - priv->input_buffer;
+    }
+}
+
+static int
+write_ws_request (VsxConnection *connection,
+                  guint8 *buffer,
+                  size_t buffer_size)
+{
+  static const guint8 ws_request[] =
+    "GET / HTTP/1.1\r\n"
+    "Upgrade: websocket\r\n"
+    "Connection: Upgrade\r\n"
+    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+    "\r\n";
+  const size_t ws_request_len = (sizeof ws_request) - 1;
+
+  if (buffer_size < ws_request_len)
+    return -1;
+
+  memcpy (buffer, ws_request, ws_request_len);
+
+  return ws_request_len;
+}
+
+static int
+write_header (VsxConnection *connection,
+              guint8 *buffer,
+              size_t buffer_size)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->has_person_id)
+    {
+      return vsx_proto_write_command (buffer,
+                                      buffer_size,
+
+                                      VSX_PROTO_RECONNECT,
+
+                                      VSX_PROTO_TYPE_UINT64,
+                                      priv->person_id,
+
+                                      VSX_PROTO_TYPE_UINT16,
+                                      priv->next_message_num,
+
+                                      VSX_PROTO_TYPE_NONE);
+    }
+  else
+    {
+      return vsx_proto_write_command (buffer,
+                                      buffer_size,
+
+                                      VSX_PROTO_NEW_PLAYER,
+
+                                      VSX_PROTO_TYPE_STRING,
+                                      priv->room,
+
+                                      VSX_PROTO_TYPE_STRING,
+                                      priv->player_name,
+
+                                      VSX_PROTO_TYPE_NONE);
+    }
+}
+
+static int
+write_keep_alive (VsxConnection *connection,
+                  guint8 *buffer,
+                  size_t buffer_size)
+{
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_KEEP_ALIVE,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
+static void
+fill_output_buffer (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  static const struct
+  {
+    VsxConnectionDirtyFlag flag;
+    VsxConnectionWriteStateFunc func;
+  } write_funcs[] =
+    {
+      { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_request },
+      { VSX_CONNECTION_DIRTY_FLAG_HEADER, write_header },
+      { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
+    };
+
+  while (TRUE)
+    {
+      for (int i = 0; i < G_N_ELEMENTS (write_funcs); i++)
+        {
+          if (write_funcs[i].flag != 0 &&
+              (priv->dirty_flags & write_funcs[i].flag) == 0)
+            continue;
+
+          int wrote = write_funcs[i].func (connection,
+                                           priv->output_buffer
+                                           + priv->output_length,
+                                           (sizeof priv->output_buffer)
+                                           - priv->output_length);
+
+          if (wrote == -1)
+            return;
+
+          priv->dirty_flags &= ~write_funcs[i].flag;
+
+          if (wrote == 0)
+            continue;
+
+          priv->output_length += wrote;
+
+          goto found;
+        }
+
+      return;
+
+    found:
+      continue;
+    }
+}
+
+static void
+handle_write (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  fill_output_buffer (connection);
+
+  GError *error = NULL;
+
+  gssize wrote = g_socket_send (priv->sock,
+                                (const gchar *) priv->output_buffer,
+                                priv->output_length,
+                                NULL, /* cancellable */
+                                &error);
+
+  if (wrote == -1)
+    {
+      if (error->domain != G_IO_ERROR
+          || error->code != G_IO_ERROR_WOULD_BLOCK)
+        {
+          report_error (connection, error);
+          g_error_free (error);
+        }
+    }
+  else
+    {
+      /* Move any remaining data in the output buffer to the front */
+      memmove (priv->output_buffer,
+               priv->output_buffer + wrote,
+               priv->output_length - wrote);
+      priv->output_length -= wrote;
+
+      vsx_connection_queue_keep_alive (connection);
+
+      update_poll (connection);
+    }
+}
+
+static gboolean
+sock_source_cb (GIOChannel *source,
+                GIOCondition condition,
+                gpointer data)
+{
+  VsxConnection *connection = data;
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING)
+    {
+      GError *error = NULL;
+
+      if (!g_socket_check_connect_result (priv->sock, &error))
+        {
+          report_error (connection, error);
+          g_error_free (error);
+          return TRUE;
+        }
+
+      priv->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
+    }
+
+  if ((condition & (G_IO_IN |
+                    G_IO_ERR |
+                    G_IO_HUP)))
+    handle_read (connection);
+  else if ((condition & G_IO_OUT))
+    handle_write (connection);
+  else
+    update_poll (connection);
+
+  return TRUE;
+}
+
+static void
+set_sock_condition (VsxConnection *connection,
+                    GIOCondition condition)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (condition == priv->sock_condition)
+    return;
+
+  if (priv->sock_source)
+    g_source_remove (priv->sock_source);
+
+  priv->sock_source = g_io_add_watch (priv->sock_channel,
+                                      condition,
+                                      sock_source_cb,
+                                      connection);
+  priv->sock_condition = condition;
+}
+
+static gboolean
+has_pending_data (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  if (priv->output_length > 0)
+    return TRUE;
+
+  if (priv->dirty_flags)
+    return TRUE;
+
+  return FALSE;
+}
+
+static void
+update_poll (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  GIOCondition condition;
+
+  if (priv->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING)
+    {
+      condition = G_IO_OUT;
+    }
+  else
+    {
+      condition = G_IO_IN;
+
+      if (has_pending_data (connection))
+        condition = G_IO_OUT;
+    }
+
+  set_sock_condition (connection, condition);
+}
+
+static gboolean
 vsx_connection_reconnect_cb (gpointer user_data)
 {
   VsxConnection *connection = user_data;
+  VsxConnectionPrivate *priv = connection->priv;
 
-  /* FIXME */
+  priv->reconnect_handler = 0;
+
+  close_socket (connection);
+
+  GError *error = NULL;
+
+  priv->sock = g_socket_new (G_SOCKET_FAMILY_IPV4,
+                             G_SOCKET_TYPE_STREAM,
+                             G_SOCKET_PROTOCOL_DEFAULT,
+                             &error);
+
+  if (priv->sock == NULL)
+    {
+      report_error (connection, error);
+      g_error_free (error);
+      return FALSE;
+    }
+
+  g_socket_set_blocking (priv->sock, FALSE);
+
+  GInetAddress *localhost =
+    g_inet_address_new_loopback (G_SOCKET_FAMILY_IPV4);
+  GSocketAddress *address = g_inet_socket_address_new (localhost, 5144);
+
+  gboolean connect_ret = g_socket_connect (priv->sock,
+                                           address,
+                                           NULL, /* cancellable */
+                                           &error);
+
+  g_object_unref (address);
+  g_object_unref (localhost);
+
+  GIOCondition condition;
+
+  if (connect_ret)
+    {
+      priv->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
+      condition = G_IO_IN | G_IO_OUT;
+    }
+  else if (error->domain == G_IO_ERROR
+           && error->code == G_IO_ERROR_PENDING)
+    {
+      g_error_free (error);
+      priv->running_state = VSX_CONNECTION_RUNNING_STATE_RECONNECTING;
+      condition = G_IO_OUT;
+    }
+  else
+    {
+      report_error (connection, error);
+      g_error_free (error);
+      return FALSE;
+    }
+
+  priv->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER
+                        | VSX_CONNECTION_DIRTY_FLAG_HEADER);
+  priv->ws_terminator_pos = 0;
+
+  priv->sock_channel = g_io_channel_unix_new (g_socket_get_fd (priv->sock));
+
+  g_io_channel_set_encoding (priv->sock_channel,
+                             NULL /* encoding */,
+                             NULL /* error */);
+  g_io_channel_set_buffered (priv->sock_channel, FALSE);
+
+  set_sock_condition (connection, condition);
 
   /* Remove the handler */
   return FALSE;
@@ -293,6 +850,8 @@ static void
 vsx_connection_queue_reconnect (VsxConnection *connection)
 {
   VsxConnectionPrivate *priv = connection->priv;
+
+  g_assert (priv->reconnect_handler == 0);
 
   priv->reconnect_handler =
     g_timeout_add_seconds (priv->reconnect_timeout,
@@ -320,7 +879,13 @@ vsx_connection_set_running_internal (VsxConnection *connection,
           /* Reset the retry timeout because this is a first attempt
              at connecting */
           priv->reconnect_timeout = VSX_CONNECTION_INITIAL_TIMEOUT;
-          /* FIXME */
+
+          priv->running_state =
+            VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+
+          g_assert (priv->reconnect_handler == 0);
+          priv->reconnect_handler = g_idle_add (vsx_connection_reconnect_cb,
+                                                connection);
         }
     }
   else
@@ -331,8 +896,11 @@ vsx_connection_set_running_internal (VsxConnection *connection,
           /* already disconnected */
           break;
 
+        case VSX_CONNECTION_RUNNING_STATE_RECONNECTING:
         case VSX_CONNECTION_RUNNING_STATE_RUNNING:
-          /* FIXME */
+          priv->running_state =
+            VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
+          close_socket (connection);
           break;
 
         case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT:
@@ -548,7 +1116,6 @@ static void
 vsx_connection_dispose (GObject *object)
 {
   VsxConnection *self = (VsxConnection *) object;
-  VsxConnectionPrivate *priv = self->priv;
 
   vsx_connection_set_running_internal (self, FALSE);
 

@@ -1,5 +1,7 @@
 gnome = import('gnome')
 
+inc_dirs = [ configinc, '../common' ]
+
 readline_dep = declare_dependency(link_args: '-lreadline -ltermcap')
 
 readline_dep = cc.find_library('readline', required : true)
@@ -24,6 +26,7 @@ client_src = [
         'vsx-connection.c',
         'vsx-main.c',
         'vsx-player.c',
+        '../common/vsx-proto.c',
         'vsx-tile.c',
 ]
 
@@ -35,4 +38,4 @@ marshals = gnome.genmarshal('vsx-marshal',
 executable('verda-sxtelo-client', client_src, enums, marshals,
            dependencies: client_deps,
            install: true,
-           include_directories: configinc)
+           include_directories: inc_dirs)
