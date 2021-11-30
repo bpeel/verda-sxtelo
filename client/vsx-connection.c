@@ -365,6 +365,43 @@ get_or_create_player (VsxConnection *connection,
 }
 
 static gboolean
+handle_player_id (VsxConnection *connection,
+                  const guint8 *payload,
+                  size_t payload_length,
+                  GError **error)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+  guint8 self_num;
+
+  if (!vsx_proto_read_payload (payload + 1,
+                               payload_length - 1,
+
+                               VSX_PROTO_TYPE_UINT64,
+                               &priv->person_id,
+
+                               VSX_PROTO_TYPE_UINT8,
+                               &self_num,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an invalid player_id command");
+      return FALSE;
+    }
+
+  priv->self = get_or_create_player (connection, self_num);
+
+  priv->has_person_id = TRUE;
+
+  if (priv->state == VSX_CONNECTION_STATE_AWAITING_HEADER)
+    vsx_connection_set_state (connection, VSX_CONNECTION_STATE_IN_PROGRESS);
+
+  return TRUE;
+}
+
+static gboolean
 handle_message (VsxConnection *connection,
                 const guint8 *payload,
                 size_t payload_length,
@@ -420,6 +457,8 @@ process_message (VsxConnection *connection,
 
   switch (payload[0])
     {
+    case VSX_PROTO_PLAYER_ID:
+      return handle_player_id (connection, payload, payload_length, error);
     case VSX_PROTO_MESSAGE:
       return handle_message (connection, payload, payload_length, error);
     }
