@@ -1243,8 +1243,9 @@ test_send_long_message (Harness *harness,
 
   size_t expected_start = buf->len;
 
-  for (int i = 0; i < 999; i++)
+  for (int i = 0; i < 997; i++)
     g_string_append_c (buf, 'a');
+  g_string_append (buf, "ĥ");
   g_string_append (buf, "ĉ");
   g_string_append_c (buf, '\0');
 
