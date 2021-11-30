@@ -107,8 +107,7 @@ GType
 vsx_connection_get_type (void) G_GNUC_CONST;
 
 VsxConnection *
-vsx_connection_new (const char *server_base_url,
-                    GSocketAddress *address,
+vsx_connection_new (GSocketAddress *address,
                     const char *room,
                     const char *player_name);
 

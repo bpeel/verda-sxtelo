@@ -37,7 +37,6 @@ enum
 {
   PROP_0,
 
-  PROP_SERVER_BASE_URL,
   PROP_ADDRESS,
   PROP_ROOM,
   PROP_PLAYER_NAME,
@@ -135,7 +134,6 @@ typedef struct
 
 struct _VsxConnectionPrivate
 {
-  char *server_base_url;
   GSocketAddress *address;
   char *room;
   char *player_name;
@@ -299,10 +297,6 @@ vsx_connection_set_property (GObject *object,
 
   switch (prop_id)
     {
-    case PROP_SERVER_BASE_URL:
-      priv->server_base_url = g_strdup (g_value_get_string (value));
-      break;
-
     case PROP_ROOM:
       priv->room = g_strdup (g_value_get_string (value));
       break;
@@ -1494,17 +1488,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
   gobject_class->set_property = vsx_connection_set_property;
   gobject_class->get_property = vsx_connection_get_property;
 
-  pspec = g_param_spec_string ("server-base-url",
-                               "Server base URL",
-                               "The base URL of the server to connect to",
-                               "http://vs.busydoingnothing.co.uk:5142/",
-                               G_PARAM_WRITABLE
-                               | G_PARAM_CONSTRUCT_ONLY
-                               | G_PARAM_STATIC_NAME
-                               | G_PARAM_STATIC_NICK
-                               | G_PARAM_STATIC_BLURB);
-  g_object_class_install_property (gobject_class, PROP_SERVER_BASE_URL, pspec);
-
   pspec = g_param_spec_object ("address",
                                "Server address to connect to",
                                "The address of the server to connect to. "
@@ -1725,7 +1708,6 @@ vsx_connection_finalize (GObject *object)
   VsxConnection *self = (VsxConnection *) object;
   VsxConnectionPrivate *priv = self->priv;
 
-  g_free (priv->server_base_url);
   g_free (priv->room);
   g_free (priv->player_name);
 
@@ -1741,13 +1723,11 @@ vsx_connection_finalize (GObject *object)
 }
 
 VsxConnection *
-vsx_connection_new (const char *server_base_url,
-                    GSocketAddress *address,
+vsx_connection_new (GSocketAddress *address,
                     const char *room,
                     const char *player_name)
 {
   VsxConnection *self = g_object_new (VSX_TYPE_CONNECTION,
-                                      "server-base-url", server_base_url,
                                       "address", address,
                                       "room", room,
                                       "player-name", player_name,
