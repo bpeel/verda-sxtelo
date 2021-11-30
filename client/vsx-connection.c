@@ -67,6 +67,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
   VSX_CONNECTION_DIRTY_FLAG_HEADER = (1 << 1),
   VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE = (1 << 2),
+  VSX_CONNECTION_DIRTY_FLAG_LEAVE = (1 << 3),
 } VsxConnectionDirtyFlag;
 
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
@@ -895,6 +896,19 @@ write_keep_alive (VsxConnection *connection,
                                   VSX_PROTO_TYPE_NONE);
 }
 
+static int
+write_leave (VsxConnection *connection,
+             guint8 *buffer,
+             size_t buffer_size)
+{
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_LEAVE,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
 static void
 fill_output_buffer (VsxConnection *connection)
 {
@@ -909,6 +923,7 @@ fill_output_buffer (VsxConnection *connection)
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_request },
       { VSX_CONNECTION_DIRTY_FLAG_HEADER, write_header },
       { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
+      { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
     };
 
   while (TRUE)
@@ -1482,7 +1497,11 @@ vsx_connection_send_message (VsxConnection *connection,
 void
 vsx_connection_leave (VsxConnection *connection)
 {
-  /* FIXME */
+  VsxConnectionPrivate *priv = connection->priv;
+
+  priv->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LEAVE;
+
+  update_poll (connection);
 }
 
 const VsxPlayer *
