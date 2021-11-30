@@ -617,6 +617,29 @@ handle_player_shouted (VsxConnection *connection,
 }
 
 static gboolean
+handle_end (VsxConnection *connection,
+            const guint8 *payload,
+            size_t payload_length,
+            GError **error)
+{
+  if (!vsx_proto_read_payload (payload + 1,
+                               payload_length - 1,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      g_set_error (error,
+                   VSX_CONNECTION_ERROR,
+                   VSX_CONNECTION_ERROR_BAD_DATA,
+                   "The server sent an invalid end command");
+      return FALSE;
+    }
+
+  vsx_connection_set_state (connection, VSX_CONNECTION_STATE_DONE);
+
+  return TRUE;
+}
+
+static gboolean
 process_message (VsxConnection *connection,
                  const guint8 *payload,
                  size_t payload_length,
@@ -645,6 +668,8 @@ process_message (VsxConnection *connection,
       return handle_player (connection, payload, payload_length, error);
     case VSX_PROTO_PLAYER_SHOUTED:
       return handle_player_shouted (connection, payload, payload_length, error);
+    case VSX_PROTO_END:
+      return handle_end (connection, payload, payload_length, error);
     }
 
   return TRUE;
