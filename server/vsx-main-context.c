@@ -95,6 +95,8 @@ struct _VsxMainContextSource
     {
       VsxMainContextBucket *bucket;
       VsxList timer_link;
+      gboolean busy;
+      gboolean removed;
     };
   };
 
@@ -366,6 +368,8 @@ vsx_main_context_add_timer (VsxMainContext *mc,
   source->callback = callback;
   source->type = VSX_MAIN_CONTEXT_TIMER_SOURCE;
   source->user_data = user_data;
+  source->removed = FALSE;
+  source->busy = FALSE;
 
   vsx_list_insert (&source->bucket->sources, &source->timer_link);
 
@@ -385,28 +389,33 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
     case VSX_MAIN_CONTEXT_POLL_SOURCE:
       if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
         g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
+      g_slice_free (VsxMainContextSource, source);
       break;
 
     case VSX_MAIN_CONTEXT_QUIT_SOURCE:
       vsx_list_remove (&source->quit_link);
+      g_slice_free (VsxMainContextSource, source);
       break;
 
     case VSX_MAIN_CONTEXT_TIMER_SOURCE:
-      {
-        VsxMainContextBucket *bucket = source->bucket;
+      /* Timer sources need to be able to be removed while iterating
+       * the source list to emit, so we need to handle them specially
+       * during iteration. */
 
-        vsx_list_remove (&source->timer_link);
+      g_assert(!source->removed);
 
-        if (vsx_list_empty (&bucket->sources))
-          {
-            vsx_list_remove (&bucket->link);
-            g_slice_free (VsxMainContextBucket, bucket);
-          }
-      }
+      if (source->busy)
+        {
+          source->removed = TRUE;
+        }
+      else
+        {
+          vsx_list_remove (&source->timer_link);
+          g_slice_free (VsxMainContextSource, source);
+        }
+
       break;
     }
-
-  g_slice_free (VsxMainContextSource, source);
 
   mc->n_sources--;
 }
@@ -418,18 +427,21 @@ get_timeout (VsxMainContext *mc)
   int min_minutes;
   gint64 elapsed, elapsed_minutes;
 
-  if (vsx_list_empty (&mc->buckets))
-    return -1;
-
   min_minutes = G_MAXINT;
 
   vsx_list_for_each (bucket, &mc->buckets, link)
     {
+      if (vsx_list_empty (&bucket->sources))
+        continue;
+
       int minutes_to_wait = bucket->minutes - bucket->minutes_passed;
 
       if (minutes_to_wait < min_minutes)
         min_minutes = minutes_to_wait;
     }
+
+  if (min_minutes == G_MAXINT)
+    return -1;
 
   elapsed = vsx_main_context_get_monotonic_clock (mc) - mc->last_timer_time;
   elapsed_minutes = elapsed / 60000000;
@@ -445,24 +457,9 @@ get_timeout (VsxMainContext *mc)
 }
 
 static void
-emit_bucket (VsxMainContextBucket *bucket)
-{
-  VsxMainContextSource *source, *tmp_source;
-
-  vsx_list_for_each_safe (source, tmp_source, &bucket->sources, timer_link)
-    {
-      VsxMainContextTimerCallback callback = source->callback;
-
-      callback (source, source->user_data);
-    }
-
-  bucket->minutes_passed = 0;
-}
-
-static void
 check_timer_sources (VsxMainContext *mc)
 {
-  VsxMainContextBucket *bucket, *tmp_bucket;
+  VsxMainContextBucket *bucket;
   gint64 now;
   gint64 elapsed_minutes;
 
@@ -476,12 +473,61 @@ check_timer_sources (VsxMainContext *mc)
   if (elapsed_minutes < 1)
     return;
 
-  vsx_list_for_each_safe (bucket, tmp_bucket, &mc->buckets, link)
+  /* Collect all of the sources to emit into a list and mark them as
+   * busy. That way if they are removed they will just be marked as
+   * removed instead of actually modifying the bucket’s list. That way
+   * any timers can be removed as a result of invoking any callback.
+   */
+  VsxList to_emit;
+  vsx_list_init (&to_emit);
+
+  vsx_list_for_each (bucket, &mc->buckets, link)
     {
       if (bucket->minutes_passed + elapsed_minutes >= bucket->minutes)
-        emit_bucket (bucket);
+        {
+          vsx_list_insert_list (&to_emit, &bucket->sources);
+          bucket->minutes_passed = 0;
+          vsx_list_init (&bucket->sources);
+        }
       else
-        bucket->minutes_passed += elapsed_minutes;
+        {
+          bucket->minutes_passed += elapsed_minutes;
+        }
+    }
+
+  VsxMainContextSource *source, *tmp_source;
+
+  vsx_list_for_each (source, &to_emit, timer_link)
+    {
+      source->busy = TRUE;
+    }
+
+  vsx_list_for_each (source, &to_emit, timer_link)
+    {
+      if (source->removed)
+        continue;
+      VsxMainContextTimerCallback callback = source->callback;
+      callback (source, source->user_data);
+    }
+
+  vsx_list_for_each_safe (source, tmp_source, &to_emit, timer_link)
+    {
+      if (source->removed)
+        {
+          g_slice_free (VsxMainContextSource, source);
+        }
+      else
+        {
+          /* Remove from tmp_source before inserting into the bucket.
+           * Even though we are just going to discard the to_emit
+           * list, this is still important in order to have the
+           * correct links in the neighbouring nodes.
+           */
+          vsx_list_remove (&source->timer_link);
+          vsx_list_insert (&source->bucket->sources,
+                           &source->timer_link);
+          source->busy = FALSE;
+        }
     }
 }
 
@@ -581,6 +627,18 @@ vsx_main_context_get_monotonic_clock (VsxMainContext *mc)
   return mc->monotonic_time;
 }
 
+static void
+free_buckets (VsxMainContext *mc)
+{
+  VsxMainContextBucket *bucket, *tmp;
+
+  vsx_list_for_each_safe (bucket, tmp, &mc->buckets, link)
+    {
+      g_assert (vsx_list_empty (&bucket->sources));
+      g_slice_free (VsxMainContextBucket, bucket);
+    }
+}
+
 void
 vsx_main_context_free (VsxMainContext *mc)
 {
@@ -597,6 +655,8 @@ vsx_main_context_free (VsxMainContext *mc)
 
   if (mc->n_sources > 0)
     g_warning ("Sources still remain on a main context that is being freed");
+
+  free_buckets (mc);
 
   g_array_free (mc->events, TRUE);
   close (mc->epoll_fd);
