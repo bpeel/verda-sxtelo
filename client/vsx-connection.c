@@ -69,6 +69,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE = (1 << 2),
   VSX_CONNECTION_DIRTY_FLAG_LEAVE = (1 << 3),
   VSX_CONNECTION_DIRTY_FLAG_SHOUT = (1 << 4),
+  VSX_CONNECTION_DIRTY_FLAG_TURN = (1 << 5),
 } VsxConnectionDirtyFlag;
 
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
@@ -323,7 +324,11 @@ vsx_connection_shout (VsxConnection *connection)
 void
 vsx_connection_turn (VsxConnection *connection)
 {
-  /* FIXME */
+  VsxConnectionPrivate *priv = connection->priv;
+
+  priv->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_TURN;
+
+  update_poll (connection);
 }
 
 void
@@ -937,6 +942,19 @@ write_shout (VsxConnection *connection,
                                   VSX_PROTO_TYPE_NONE);
 }
 
+static int
+write_turn (VsxConnection *connection,
+            guint8 *buffer,
+            size_t buffer_size)
+{
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_TURN,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
 static void
 fill_output_buffer (VsxConnection *connection)
 {
@@ -953,6 +971,7 @@ fill_output_buffer (VsxConnection *connection)
       { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
       { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
       { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
+      { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
     };
 
   while (TRUE)
