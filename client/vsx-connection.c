@@ -385,7 +385,6 @@ vsx_connection_set_state (VsxConnection *connection,
   if (priv->state != state)
     {
       priv->state = state;
-      /* FIXME */
       g_object_notify (G_OBJECT (connection), "state");
     }
 }
