@@ -89,12 +89,6 @@ vsx_connection_queue_reconnect (VsxConnection *connection);
 static void
 update_poll (VsxConnection *connection);
 
-G_DEFINE_TYPE (VsxConnection, vsx_connection, G_TYPE_OBJECT);
-
-#define VSX_CONNECTION_GET_PRIVATE(obj) \
-  (G_TYPE_INSTANCE_GET_PRIVATE ((obj), VSX_TYPE_CONNECTION, \
-                                VsxConnectionPrivate))
-
 /* Initial timeout (in seconds) before attempting to reconnect after
    an error. The timeout will be doubled every time there is a
    failure */
@@ -182,6 +176,11 @@ struct _VsxConnectionPrivate
    */
   unsigned int ws_terminator_pos;
 };
+
+G_DEFINE_TYPE_WITH_CODE (VsxConnection,
+                         vsx_connection,
+                         G_TYPE_OBJECT,
+                         G_ADD_PRIVATE (VsxConnection))
 
 static gboolean
 vsx_connection_keep_alive_cb (void *data)
@@ -1616,8 +1615,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                   G_TYPE_NONE,
                   1, /* num arguments */
                   G_TYPE_POINTER);
-
-  g_type_class_add_private (klass, sizeof (VsxConnectionPrivate));
 }
 
 static void
@@ -1642,7 +1639,7 @@ vsx_connection_init (VsxConnection *self)
 {
   VsxConnectionPrivate *priv;
 
-  priv = self->priv = VSX_CONNECTION_GET_PRIVATE (self);
+  priv = self->priv = vsx_connection_get_instance_private (self);
 
   priv->next_message_num = 0;
 
