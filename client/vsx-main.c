@@ -33,7 +33,8 @@
 static void
 format_print (const char *format, ...);
 
-static char *option_server_base_url = "http://vs.busydoingnothing.co.uk:5142/";
+static char *option_server = "gemelo.org";
+int option_server_port = 5144;
 static char *option_room = "default";
 static char *option_player_name = NULL;
 static gboolean option_debug = FALSE;
@@ -46,8 +47,12 @@ static GOptionEntry
 options[] =
   {
     {
-      "url", 'u', 0, G_OPTION_ARG_STRING, &option_server_base_url,
-      "URL of the server", "url"
+      "server", 's', 0, G_OPTION_ARG_STRING, &option_server,
+      "Hostname of the server", "host"
+    },
+    {
+      "server-port", 'p', 0, G_OPTION_ARG_INT, &option_server_port,
+      "Port to connect to on the server", "port"
     },
     {
       "room", 'r', 0, G_OPTION_ARG_STRING, &option_room,
@@ -332,6 +337,34 @@ make_stdin_source (void)
   g_source_attach (stdin_source, NULL);
 }
 
+static GSocketAddress *
+get_socket_address (GError **error)
+{
+  GResolver *resolver = g_resolver_get_default ();
+
+  GList *addresses = g_resolver_lookup_by_name (resolver,
+                                                option_server,
+                                                NULL, /* cancellable */
+                                                error);
+
+  GSocketAddress *address;
+
+  if (addresses)
+    {
+      address = g_inet_socket_address_new (addresses->data,
+                                           option_server_port);
+      g_resolver_free_addresses (addresses);
+    }
+  else
+    {
+      address = NULL;
+    }
+
+  g_object_unref (resolver);
+
+  return address;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -343,14 +376,24 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
+  GSocketAddress *server_address = get_socket_address (&error);
+
+  if (server_address == NULL)
+    {
+      fprintf (stderr, "%s\n", error->message);
+      return EXIT_FAILURE;
+    }
+
   make_stdin_source ();
 
   if (option_player_name == NULL)
     option_player_name = g_strdup (g_get_user_name ());
 
-  connection = vsx_connection_new (NULL,
+  connection = vsx_connection_new (server_address,
                                    option_room,
                                    option_player_name);
+
+  g_object_unref (server_address);
 
   main_loop = g_main_loop_new (NULL, FALSE);
 
