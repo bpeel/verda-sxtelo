@@ -86,7 +86,7 @@ struct _VsxConnectionClass
                            const VsxPlayer *player);
 
   void (* tile_changed) (VsxConnection *connection,
-                         gboolean new_tile,
+                         bool new_tile,
                          const VsxTile *tile);
 };
 
@@ -113,17 +113,17 @@ vsx_connection_new (GSocketAddress *address,
 
 void
 vsx_connection_set_running (VsxConnection *connection,
-                            gboolean running);
+                            bool running);
 
-gboolean
+bool
 vsx_connection_get_running (VsxConnection *connection);
 
-gboolean
+bool
 vsx_connection_get_typing (VsxConnection *connection);
 
 void
 vsx_connection_set_typing (VsxConnection *connection,
-                           gboolean typing);
+                           bool typing);
 
 void
 vsx_connection_shout (VsxConnection *connection);

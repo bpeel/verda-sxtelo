@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Maximum number of bytes allowed in a payload. The server keeps a
  * buffer of this size around for each connection, so we don’t want it
@@ -167,7 +168,7 @@ vsx_proto_read_int16_t (const uint8_t *buffer)
   return GINT16_FROM_LE (value);
 }
 
-gboolean
+bool
 vsx_proto_read_payload (const uint8_t *buffer,
                         size_t length,
                         ...);

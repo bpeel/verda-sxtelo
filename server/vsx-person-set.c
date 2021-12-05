@@ -66,10 +66,10 @@ remove_silent_people_cb (gpointer key,
       if (person->conversation)
         vsx_person_leave_conversation (person);
 
-      return TRUE;
+      return true;
     }
   else
-    return FALSE;
+    return false;
 }
 
 static void

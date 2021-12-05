@@ -134,13 +134,13 @@ struct _VsxConnectionPrivate
   guint reconnect_timeout;
   guint reconnect_handler;
   VsxPlayer *self;
-  gboolean has_person_id;
+  bool has_person_id;
   uint64_t person_id;
   VsxConnectionRunningState running_state;
   VsxConnectionState state;
-  gboolean typing;
-  gboolean sent_typing_state;
-  gboolean write_finished;
+  bool typing;
+  bool sent_typing_state;
+  bool write_finished;
   int next_message_num;
 
   VsxConnectionDirtyFlag dirty_flags;
@@ -194,7 +194,7 @@ vsx_connection_keep_alive_cb (void *data)
 
   update_poll (connection);
 
-  return FALSE;
+  return false;
 }
 
 static void
@@ -318,7 +318,7 @@ vsx_connection_set_property (GObject *object,
 
 void
 vsx_connection_set_typing (VsxConnection *connection,
-                           gboolean typing)
+                           bool typing)
 {
   VsxConnectionPrivate *priv = connection->priv;
 
@@ -412,7 +412,7 @@ get_or_create_player (VsxConnection *connection,
   return player;
 }
 
-static gboolean
+static bool
 handle_player_id (VsxConnection *connection,
                   const uint8_t *payload,
                   size_t payload_length,
@@ -436,20 +436,20 @@ handle_player_id (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid player_id command");
-      return FALSE;
+      return false;
     }
 
   priv->self = get_or_create_player (connection, self_num);
 
-  priv->has_person_id = TRUE;
+  priv->has_person_id = true;
 
   if (priv->state == VSX_CONNECTION_STATE_AWAITING_HEADER)
     vsx_connection_set_state (connection, VSX_CONNECTION_STATE_IN_PROGRESS);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_message (VsxConnection *connection,
                 const uint8_t *payload,
                 size_t payload_length,
@@ -474,7 +474,7 @@ handle_message (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid message command");
-      return FALSE;
+      return false;
     }
 
   priv->next_message_num++;
@@ -485,10 +485,10 @@ handle_message (VsxConnection *connection,
                  get_or_create_player (connection, person),
                  text);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_tile (VsxConnection *connection,
              const uint8_t *payload,
              size_t payload_length,
@@ -524,12 +524,12 @@ handle_tile (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid tile command");
-      return FALSE;
+      return false;
     }
 
   VsxTile *tile = g_hash_table_lookup (priv->tiles,
                                        GINT_TO_POINTER ((int) num));
-  gboolean is_new = FALSE;
+  bool is_new = false;
 
   if (tile == NULL)
     {
@@ -537,7 +537,7 @@ handle_tile (VsxConnection *connection,
       tile->num = num;
 
       g_hash_table_insert (priv->tiles, GINT_TO_POINTER ((int) num), tile);
-      is_new = TRUE;
+      is_new = true;
     }
 
   tile->x = x;
@@ -550,10 +550,10 @@ handle_tile (VsxConnection *connection,
                  is_new,
                  tile);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_player_name (VsxConnection *connection,
                     const uint8_t *payload,
                     size_t payload_length,
@@ -577,7 +577,7 @@ handle_player_name (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid player_name command");
-      return FALSE;
+      return false;
     }
 
   VsxPlayer *player = get_or_create_player (connection, num);
@@ -590,10 +590,10 @@ handle_player_name (VsxConnection *connection,
                  0, /* detail */
                  player);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_player (VsxConnection *connection,
                const uint8_t *payload,
                size_t payload_length,
@@ -616,7 +616,7 @@ handle_player (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid player command");
-      return FALSE;
+      return false;
     }
 
   VsxPlayer *player = get_or_create_player (connection, num);
@@ -628,10 +628,10 @@ handle_player (VsxConnection *connection,
                  0, /* detail */
                  player);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_player_shouted (VsxConnection *connection,
                        const uint8_t *payload,
                        size_t payload_length,
@@ -651,7 +651,7 @@ handle_player_shouted (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid player_shouted command");
-      return FALSE;
+      return false;
     }
 
   VsxPlayer *player = get_or_create_player (connection, player_num);
@@ -661,10 +661,10 @@ handle_player_shouted (VsxConnection *connection,
                  0, /* detail */
                  player);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_end (VsxConnection *connection,
             const uint8_t *payload,
             size_t payload_length,
@@ -679,15 +679,15 @@ handle_end (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an invalid end command");
-      return FALSE;
+      return false;
     }
 
   vsx_connection_set_state (connection, VSX_CONNECTION_STATE_DONE);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 process_message (VsxConnection *connection,
                  const uint8_t *payload,
                  size_t payload_length,
@@ -699,7 +699,7 @@ process_message (VsxConnection *connection,
                    VSX_CONNECTION_ERROR,
                    VSX_CONNECTION_ERROR_BAD_DATA,
                    "The server sent an empty message");
-      return FALSE;
+      return false;
     }
 
   switch (payload[0])
@@ -720,7 +720,7 @@ process_message (VsxConnection *connection,
       return handle_end (connection, payload, payload_length, error);
     }
 
-  return TRUE;
+  return true;
 }
 
 static void
@@ -732,37 +732,37 @@ report_error (VsxConnection *connection,
   vsx_connection_signal_error (connection, error);
 }
 
-static gboolean
+static bool
 get_payload_length (const uint8_t *buf,
                     size_t buf_length,
                     size_t *payload_length_out,
                     const uint8_t **payload_start_out)
 {
   if (buf_length < 2)
-    return FALSE;
+    return false;
 
   switch (buf[1])
     {
     case 0x7e:
       if (buf_length < 4)
-        return FALSE;
+        return false;
 
       *payload_length_out = vsx_proto_read_uint16_t (buf + 2);
       *payload_start_out = buf + 4;
-      return TRUE;
+      return true;
 
     case 0x7f:
       if (buf_length < 6)
-        return FALSE;
+        return false;
 
       *payload_length_out = vsx_proto_read_uint32_t (buf + 2);
       *payload_start_out = buf + 6;
-      return TRUE;
+      return true;
 
     default:
       *payload_length_out = buf[1];
       *payload_start_out = buf + 2;
-      return TRUE;
+      return true;
     }
 }
 
@@ -791,7 +791,7 @@ handle_read (VsxConnection *connection)
     {
       if (priv->state == VSX_CONNECTION_STATE_DONE)
         {
-          vsx_connection_set_running (connection, FALSE);
+          vsx_connection_set_running (connection, false);
         }
       else
         {
@@ -1057,7 +1057,7 @@ write_send_message (VsxConnection *connection,
     {
       /* The server automatically assumes we're not typing anymore
          when the client sends a message */
-      priv->sent_typing_state = FALSE;
+      priv->sent_typing_state = false;
 
       vsx_list_remove (&message->link);
       g_free (message);
@@ -1113,7 +1113,7 @@ fill_output_buffer (VsxConnection *connection)
       { .func = write_typing_state },
     };
 
-  while (TRUE)
+  while (true)
     {
       for (int i = 0; i < G_N_ELEMENTS (write_funcs); i++)
         {
@@ -1201,7 +1201,7 @@ sock_source_cb (GIOChannel *source,
         {
           report_error (connection, error);
           g_error_free (error);
-          return TRUE;
+          return true;
         }
 
       priv->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
@@ -1216,7 +1216,7 @@ sock_source_cb (GIOChannel *source,
   else
     update_poll (connection);
 
-  return TRUE;
+  return true;
 }
 
 static void
@@ -1238,27 +1238,27 @@ set_sock_condition (VsxConnection *connection,
   priv->sock_condition = condition;
 }
 
-static gboolean
+static bool
 has_pending_data (VsxConnection *connection)
 {
   VsxConnectionPrivate *priv = connection->priv;
 
   if (priv->output_length > 0)
-    return TRUE;
+    return true;
 
   if (priv->dirty_flags)
-    return TRUE;
+    return true;
 
   if (!vsx_list_empty (&priv->tiles_to_move))
-    return TRUE;
+    return true;
 
   if (!vsx_list_empty (&priv->messages_to_send))
-    return TRUE;
+    return true;
 
   if (priv->sent_typing_state != priv->typing)
-    return TRUE;
+    return true;
 
-  return FALSE;
+  return false;
 }
 
 static void
@@ -1287,11 +1287,11 @@ update_poll (VsxConnection *connection)
                    && !vsx_player_is_connected (priv->self))
             {
               g_socket_shutdown (priv->sock,
-                                 FALSE, /* shutdown read */
-                                 TRUE, /* shutdown write */
+                                 false, /* shutdown read */
+                                 true, /* shutdown write */
                                  NULL /* error */);
 
-              priv->write_finished = TRUE;
+              priv->write_finished = true;
             }
         }
       break;
@@ -1324,15 +1324,15 @@ vsx_connection_reconnect_cb (gpointer user_data)
     {
       report_error (connection, error);
       g_error_free (error);
-      return FALSE;
+      return false;
     }
 
-  g_socket_set_blocking (priv->sock, FALSE);
+  g_socket_set_blocking (priv->sock, false);
 
-  gboolean connect_ret = g_socket_connect (priv->sock,
-                                           priv->address,
-                                           NULL, /* cancellable */
-                                           &error);
+  bool connect_ret = g_socket_connect (priv->sock,
+                                       priv->address,
+                                       NULL, /* cancellable */
+                                       &error);
 
   GIOCondition condition;
 
@@ -1352,25 +1352,25 @@ vsx_connection_reconnect_cb (gpointer user_data)
     {
       report_error (connection, error);
       g_error_free (error);
-      return FALSE;
+      return false;
     }
 
   priv->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER
                         | VSX_CONNECTION_DIRTY_FLAG_HEADER);
   priv->ws_terminator_pos = 0;
-  priv->write_finished = FALSE;
+  priv->write_finished = false;
 
   priv->sock_channel = g_io_channel_unix_new (g_socket_get_fd (priv->sock));
 
   g_io_channel_set_encoding (priv->sock_channel,
                              NULL /* encoding */,
                              NULL /* error */);
-  g_io_channel_set_buffered (priv->sock_channel, FALSE);
+  g_io_channel_set_buffered (priv->sock_channel, false);
 
   set_sock_condition (connection, condition);
 
   /* Remove the handler */
-  return FALSE;
+  return false;
 }
 
 static void
@@ -1411,7 +1411,7 @@ vsx_connection_constructed (GObject *object)
 
 static void
 vsx_connection_set_running_internal (VsxConnection *connection,
-                                     gboolean running)
+                                     bool running)
 {
   VsxConnectionPrivate *priv = connection->priv;
 
@@ -1457,7 +1457,7 @@ vsx_connection_set_running_internal (VsxConnection *connection,
 
 void
 vsx_connection_set_running (VsxConnection *connection,
-                            gboolean running)
+                            bool running)
 {
   g_return_if_fail (VSX_IS_CONNECTION (connection));
 
@@ -1466,10 +1466,10 @@ vsx_connection_set_running (VsxConnection *connection,
   g_object_notify (G_OBJECT (connection), "running");
 }
 
-gboolean
+bool
 vsx_connection_get_running (VsxConnection *connection)
 {
-  g_return_val_if_fail (VSX_IS_CONNECTION (connection), FALSE);
+  g_return_val_if_fail (VSX_IS_CONNECTION (connection), false);
 
   return (connection->priv->running_state
           != VSX_CONNECTION_RUNNING_STATE_DISCONNECTED);
@@ -1525,7 +1525,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                                 "Running",
                                 "Whether the stream connection should be "
                                 "trying to connect and receive objects",
-                                FALSE,
+                                false,
                                 G_PARAM_READABLE
                                 | G_PARAM_WRITABLE
                                 | G_PARAM_STATIC_NAME
@@ -1536,7 +1536,7 @@ vsx_connection_class_init (VsxConnectionClass *klass)
   pspec = g_param_spec_boolean ("typing",
                                 "Typing",
                                 "Whether the user is typing.",
-                                FALSE,
+                                false,
                                 G_PARAM_READABLE
                                 | G_PARAM_STATIC_NAME
                                 | G_PARAM_STATIC_NICK
@@ -1664,7 +1664,7 @@ vsx_connection_dispose (GObject *object)
   VsxConnection *self = (VsxConnection *) object;
   VsxConnectionPrivate *priv = self->priv;
 
-  vsx_connection_set_running_internal (self, FALSE);
+  vsx_connection_set_running_internal (self, false);
 
   if (priv->address)
     {
@@ -1733,7 +1733,7 @@ vsx_connection_new (GSocketAddress *address,
   return self;
 }
 
-gboolean
+bool
 vsx_connection_get_typing (VsxConnection *connection)
 {
   VsxConnectionPrivate *priv = connection->priv;

@@ -150,7 +150,7 @@ vsx_person_make_noise (VsxPerson *person)
   person->last_noise_time = vsx_main_context_get_monotonic_clock (NULL);
 }
 
-gboolean
+bool
 vsx_person_is_silent (VsxPerson *person)
 {
   return ((vsx_main_context_get_monotonic_clock (NULL)

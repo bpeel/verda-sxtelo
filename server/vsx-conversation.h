@@ -20,6 +20,7 @@
 #define __VSX_CONVERSATION_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 #include "vsx-player.h"
 #include "vsx-signal.h"
@@ -108,7 +109,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
 void
 vsx_conversation_set_typing (VsxConversation *conversation,
                              unsigned int player_num,
-                             gboolean typing);
+                             bool typing);
 
 void
 vsx_conversation_player_left (VsxConversation *conversation,

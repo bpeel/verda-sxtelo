@@ -37,7 +37,7 @@ static char *option_server = "gemelo.org";
 int option_server_port = 5144;
 static char *option_room = "default";
 static char *option_player_name = NULL;
-static gboolean option_debug = FALSE;
+static bool option_debug = false;
 
 static VsxConnection *connection;
 static GMainLoop *main_loop;
@@ -72,12 +72,12 @@ options[] =
 static const char typing_prompt[] = "vs*> ";
 static const char not_typing_prompt[] = "vs > ";
 
-static gboolean
+static bool
 process_arguments (int *argc, char ***argv,
                    GError **error)
 {
   GOptionContext *context;
-  gboolean ret;
+  bool ret;
   GOptionGroup *group;
 
   group = g_option_group_new (NULL, /* name */
@@ -95,7 +95,7 @@ process_arguments (int *argc, char ***argv,
     {
       g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
                    "Unknown option '%s'", (* argv)[1]);
-      ret = FALSE;
+      ret = false;
     }
 
   return ret;
@@ -146,7 +146,7 @@ clear_line (void)
 typedef struct
 {
   const VsxPlayer *self;
-  gboolean is_typing;
+  bool is_typing;
 } CheckTypingData;
 
 static void
@@ -156,7 +156,7 @@ check_typing_cb (const VsxPlayer *player,
   CheckTypingData *data = user_data;
 
   if (player != data->self && vsx_player_is_typing (player))
-    data->is_typing = TRUE;
+    data->is_typing = true;
 }
 
 static void
@@ -166,7 +166,7 @@ player_changed_cb (VsxConnection *connection,
   CheckTypingData data;
 
   data.self = vsx_connection_get_self (connection);
-  data.is_typing = FALSE;
+  data.is_typing = false;
 
   vsx_connection_foreach_player (connection, check_typing_cb, &data);
 
@@ -185,7 +185,7 @@ player_shouted_cb (VsxConnection *connection,
 
 static void
 tile_changed_cb (VsxConnection *connection,
-                 gboolean is_new,
+                 bool is_new,
                  const VsxTile *tile)
 {
   char letter[7];
@@ -246,7 +246,7 @@ stdin_cb (gpointer user_data)
 {
   rl_callback_read_char ();
 
-  return TRUE;
+  return true;
 }
 
 static void
@@ -295,7 +295,7 @@ newline_cb (int count, int key)
       else
         vsx_connection_send_message (connection, rl_line_buffer);
 
-      rl_replace_line ("", TRUE);
+      rl_replace_line ("", true);
     }
 
   return 0;
@@ -395,7 +395,7 @@ main (int argc, char **argv)
 
   g_object_unref (server_address);
 
-  main_loop = g_main_loop_new (NULL, FALSE);
+  main_loop = g_main_loop_new (NULL, false);
 
   g_signal_connect (connection,
                     "got-error",
@@ -426,7 +426,7 @@ main (int argc, char **argv)
                     G_CALLBACK (running_cb),
                     main_loop);
 
-  vsx_connection_set_running (connection, TRUE);
+  vsx_connection_set_running (connection, true);
 
   print_state_message (connection);
 

@@ -20,6 +20,7 @@
 #define __VSX_PLAYER_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 G_BEGIN_DECLS
 
@@ -31,13 +32,13 @@ vsx_player_get_number (const VsxPlayer *player);
 const char *
 vsx_player_get_name (const VsxPlayer *player);
 
-gboolean
+bool
 vsx_player_is_connected (const VsxPlayer *player);
 
-gboolean
+bool
 vsx_player_is_typing (const VsxPlayer *player);
 
-gboolean
+bool
 vsx_player_has_next_turn (const VsxPlayer *player);
 
 G_END_DECLS

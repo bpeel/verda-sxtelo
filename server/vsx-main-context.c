@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <limits.h>
 
 #include "vsx-main-context.h"
@@ -60,7 +61,7 @@ struct _VsxMainContext
   void (* old_int_handler) (int);
   void (* old_term_handler) (int);
 
-  gboolean monotonic_time_valid;
+  bool monotonic_time_valid;
   int64_t monotonic_time;
 
   VsxList buckets;
@@ -96,8 +97,8 @@ struct _VsxMainContextSource
     {
       VsxMainContextBucket *bucket;
       VsxList timer_link;
-      gboolean busy;
-      gboolean removed;
+      bool busy;
+      bool removed;
     };
   };
 
@@ -178,8 +179,8 @@ vsx_main_context_new (GError **error)
 
       mc->epoll_fd = fd;
       mc->n_sources = 0;
-      mc->events = g_array_new (FALSE, FALSE, sizeof (struct epoll_event));
-      mc->monotonic_time_valid = FALSE;
+      mc->events = g_array_new (false, false, sizeof (struct epoll_event));
+      mc->monotonic_time_valid = false;
       vsx_list_init (&mc->quit_sources);
       mc->quit_pipe_source = NULL;
       vsx_list_init (&mc->buckets);
@@ -369,8 +370,8 @@ vsx_main_context_add_timer (VsxMainContext *mc,
   source->callback = callback;
   source->type = VSX_MAIN_CONTEXT_TIMER_SOURCE;
   source->user_data = user_data;
-  source->removed = FALSE;
-  source->busy = FALSE;
+  source->removed = false;
+  source->busy = false;
 
   vsx_list_insert (&source->bucket->sources, &source->timer_link);
 
@@ -407,7 +408,7 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
 
       if (source->busy)
         {
-          source->removed = TRUE;
+          source->removed = true;
         }
       else
         {
@@ -500,7 +501,7 @@ check_timer_sources (VsxMainContext *mc)
 
   vsx_list_for_each (source, &to_emit, timer_link)
     {
-      source->busy = TRUE;
+      source->busy = true;
     }
 
   vsx_list_for_each (source, &to_emit, timer_link)
@@ -527,7 +528,7 @@ check_timer_sources (VsxMainContext *mc)
           vsx_list_remove (&source->timer_link);
           vsx_list_insert (&source->bucket->sources,
                            &source->timer_link);
-          source->busy = FALSE;
+          source->busy = false;
         }
     }
 }
@@ -551,7 +552,7 @@ vsx_main_context_poll (VsxMainContext *mc)
 
   /* Once we've polled we can assume that some time has passed so our
      cached value of the monotonic clock is no longer valid */
-  mc->monotonic_time_valid = FALSE;
+  mc->monotonic_time_valid = false;
 
   if (n_events == -1)
     {
@@ -622,7 +623,7 @@ vsx_main_context_get_monotonic_clock (VsxMainContext *mc)
   if (!mc->monotonic_time_valid)
     {
       mc->monotonic_time = g_get_monotonic_time ();
-      mc->monotonic_time_valid = TRUE;
+      mc->monotonic_time_valid = true;
     }
 
   return mc->monotonic_time;
@@ -659,7 +660,7 @@ vsx_main_context_free (VsxMainContext *mc)
 
   free_buckets (mc);
 
-  g_array_free (mc->events, TRUE);
+  g_array_free (mc->events, true);
   close (mc->epoll_fd);
   g_free (mc);
 

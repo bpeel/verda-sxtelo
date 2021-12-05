@@ -21,6 +21,7 @@
 
 #include <glib.h>
 #include <gio/gio.h>
+#include <stdbool.h>
 
 #include "vsx-config.h"
 
@@ -31,13 +32,13 @@ typedef struct _VsxServer VsxServer;
 VsxServer *
 vsx_server_new (void);
 
-gboolean
+bool
 vsx_server_add_config (VsxServer *server,
                        VsxConfigServer *server_config,
                        int fd_override,
                        GError **error);
 
-gboolean
+bool
 vsx_server_run (VsxServer *server,
                 GError **error);
 

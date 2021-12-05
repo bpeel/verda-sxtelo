@@ -42,16 +42,16 @@ free_hash_data (VsxConversationSetHashData *data)
   g_slice_free (VsxConversationSetHashData, data);
 }
 
-static gboolean
+static bool
 conversation_is_empty (VsxConversation *conversation)
 {
   int i;
 
   for (i = 0; i < conversation->n_players; i++)
     if (vsx_player_is_connected (conversation->players[i]))
-      return FALSE;
+      return false;
 
-  return TRUE;
+  return true;
 }
 
 static void

@@ -40,7 +40,7 @@ get_payload_length (va_list ap)
   /* The payload always at least includes the message ID */
   size_t payload_length = 1;
 
-  while (TRUE)
+  while (true)
     {
       switch (va_arg(ap, VsxProtoType))
         {
@@ -143,7 +143,7 @@ vsx_proto_write_command_v (uint8_t *buffer,
 
   pos = frame_header_length + 1;
 
-  while (TRUE)
+  while (true)
     {
       switch (va_arg(ap, VsxProtoType))
         {
@@ -199,7 +199,7 @@ vsx_proto_write_command (uint8_t *buffer,
 #define VSX_PROTO_TYPE(enum_name, type_name, ap_type_name)      \
   case enum_name:                                               \
   if ((size_t) pos + sizeof (type_name) > length) {             \
-    ret = FALSE;                                                \
+    ret = false;                                                \
     goto done;                                                  \
   }                                                             \
                                                                 \
@@ -212,13 +212,13 @@ vsx_proto_write_command (uint8_t *buffer,
                                                                 \
         break;
 
-gboolean
+bool
 vsx_proto_read_payload (const uint8_t *buffer,
                         size_t length,
                         ...)
 {
   size_t pos = 0;
-  gboolean ret = TRUE;
+  bool ret = true;
   va_list ap;
   const uint8_t **blob_data;
   size_t *blob_size;
@@ -227,7 +227,7 @@ vsx_proto_read_payload (const uint8_t *buffer,
 
   va_start (ap, length);
 
-  while (TRUE)
+  while (true)
     {
       switch (va_arg (ap, VsxProtoType))
         {
@@ -246,13 +246,13 @@ vsx_proto_read_payload (const uint8_t *buffer,
           str_end = memchr (buffer + pos, '\0', length - pos);
           if (str_end == NULL)
             {
-              ret = FALSE;
+              ret = false;
               goto done;
             }
           *str = (const char *) buffer + pos;
           if (!g_utf8_validate (*str, -1, NULL))
             {
-              ret = FALSE;
+              ret = false;
               goto done;
             }
           pos = str_end - buffer + 1;
@@ -260,7 +260,7 @@ vsx_proto_read_payload (const uint8_t *buffer,
 
         case VSX_PROTO_TYPE_NONE:
           if (pos != length)
-            ret = FALSE;
+            ret = false;
           goto done;
         }
     }

@@ -76,16 +76,16 @@ typedef struct
   VsxConnection *ws_connection;
   VsxListener ws_connection_listener;
 
-  /* This becomes TRUE when we've received something from the client
+  /* This becomes true when we've received something from the client
      that we don't understand and we're ignoring any further input */
-  gboolean had_bad_input;
-  /* This becomes TRUE when the client has closed its end of the
+  bool had_bad_input;
+  /* This becomes true when the client has closed its end of the
      connection */
-  gboolean read_finished;
-  /* This becomes TRUE when we've stopped writing data. This will only
+  bool read_finished;
+  /* This becomes true when we've stopped writing data. This will only
      happen after the client closes its connection or we've had bad
      input and we're ignoring further data */
-  gboolean write_finished;
+  bool write_finished;
 
   /* If we’ve already started an SSL_read that needed to block in
    * order to continue, these are the flags needed to complete it. */
@@ -147,7 +147,7 @@ ws_connection_changed_cb (VsxListener *listener,
 static void
 set_bad_input (VsxServerConnection *connection)
 {
-  connection->had_bad_input = TRUE;
+  connection->had_bad_input = true;
 }
 
 static void
@@ -276,7 +276,7 @@ update_poll (VsxServerConnection *connection)
 
           if (ret >= 0)
             {
-              connection->write_finished = TRUE;
+              connection->write_finished = true;
             }
           else
             {
@@ -300,8 +300,8 @@ update_poll (VsxServerConnection *connection)
           GError *error = NULL;
 
           if (!g_socket_shutdown (connection->client_socket,
-                                  FALSE, /* shutdown_read */
-                                  TRUE, /* shutdown_write */
+                                  false, /* shutdown_read */
+                                  true, /* shutdown_write */
                                   &error))
             {
               vsx_log ("shutdown socket failed for %s: %s",
@@ -312,7 +312,7 @@ update_poll (VsxServerConnection *connection)
               return;
             }
 
-          connection->write_finished = TRUE;
+          connection->write_finished = true;
         }
     }
 
@@ -415,7 +415,7 @@ handle_read (VsxServer *server,
             }
         }
 
-      connection->read_finished = TRUE;
+      connection->read_finished = true;
 
       update_poll (connection);
     }
@@ -581,7 +581,7 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
 
 static char *
 get_address_string (GSocketAddress *address,
-                    gboolean include_port)
+                    bool include_port)
 {
   char *address_string = NULL;
 
@@ -621,10 +621,10 @@ get_peer_address_string (GSocket *client_socket)
 {
   GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
 
-  return get_address_string (address, FALSE /* include_port */);
+  return get_address_string (address, false /* include_port */);
 }
 
-static gboolean
+static bool
 init_connection_ssl (VsxServerConnection *connection,
                      SSL_CTX *ssl_ctx,
                      GError **error)
@@ -640,11 +640,11 @@ init_connection_ssl (VsxServerConnection *connection,
                    g_socket_get_fd (connection->client_socket)))
     goto error;
 
-  return TRUE;
+  return true;
 
  error:
   vsx_ssl_error_set (error);
-  return FALSE;
+  return false;
 }
 
 static void
@@ -683,7 +683,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
     {
       VsxServerConnection *connection;
 
-      g_socket_set_blocking (client_socket, FALSE);
+      g_socket_set_blocking (client_socket, false);
 
       connection = g_slice_new (VsxServerConnection);
 
@@ -711,9 +711,9 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                       &connection->ws_connection_listener);
       g_object_unref (remote_address);
 
-      connection->had_bad_input = FALSE;
-      connection->read_finished = FALSE;
-      connection->write_finished = FALSE;
+      connection->had_bad_input = false;
+      connection->read_finished = false;
+      connection->write_finished = false;
       connection->ssl_read_block = 0;
       connection->ssl_write_block = 0;
       connection->ssl = NULL;
@@ -765,9 +765,9 @@ create_server_socket (GSocketAddress *address,
   if (socket == NULL)
     return NULL;
 
-  g_socket_set_blocking (socket, FALSE);
+  g_socket_set_blocking (socket, false);
 
-  if (!g_socket_bind (socket, address, TRUE, error) ||
+  if (!g_socket_bind (socket, address, true, error) ||
       !g_socket_listen (socket, error))
     {
       g_object_unref (socket);
@@ -848,7 +848,7 @@ create_socket_for_config (VsxConfigServer *server_config,
                        G_IO_ERROR_INVALID_DATA,
                        "Invalid address \"%s\"",
                        server_config->address);
-          return FALSE;
+          return false;
         }
 
       GSocketAddress *socket_address =
@@ -873,7 +873,7 @@ create_socket_for_fd (int fd, GError **error)
   GSocket *socket = g_socket_new_from_fd (fd, error);
 
   if (socket)
-    g_socket_set_blocking (socket, FALSE);
+    g_socket_set_blocking (socket, false);
 
   return socket;
 }
@@ -896,7 +896,7 @@ ssl_password_cb (char *buf, int size, int rwflag, void *user_data)
   return length;
 }
 
-static gboolean
+static bool
 init_ssl (VsxServerSocket *ssocket,
           const VsxConfigServer *server_config,
           GError **error)
@@ -921,20 +921,20 @@ init_ssl (VsxServerSocket *ssocket,
 
   SSL_CTX_set_mode (ssocket->ssl_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
-  return TRUE;
+  return true;
 
  error:
   vsx_ssl_error_set (error);
-  return FALSE;
+  return false;
 }
 
-gboolean
+bool
 vsx_server_add_config (VsxServer *server,
                        VsxConfigServer *server_config,
                        int fd_override,
                        GError **error)
 {
-  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, false);
 
   GSocket *socket;
 
@@ -944,7 +944,7 @@ vsx_server_add_config (VsxServer *server,
     socket = create_socket_for_config (server_config, error);
 
   if (socket == NULL)
-    return FALSE;
+    return false;
 
   VsxServerSocket *ssocket = g_new0 (VsxServerSocket, 1);
 
@@ -964,10 +964,10 @@ vsx_server_add_config (VsxServer *server,
       && !init_ssl (ssocket, server_config, error))
     {
       vsx_server_remove_socket (server, ssocket);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
 VsxServer *
@@ -989,9 +989,9 @@ static void
 vsx_server_quit_cb (VsxMainContextSource *source,
                     void *user_data)
 {
-  gboolean *quit_received_ptr = user_data;
+  bool *quit_received_ptr = user_data;
 
-  *quit_received_ptr = TRUE;
+  *quit_received_ptr = true;
 
   vsx_log ("Quit signal received");
 }
@@ -1015,7 +1015,7 @@ log_server_listening (VsxServer *server)
       GSocketAddress *address =
         g_socket_get_local_address (ssocket->socket, NULL);
       char *address_string =
-        get_address_string (address, TRUE /* include_port */);
+        get_address_string (address, true /* include_port */);
 
       g_string_append (buf, address_string);
 
@@ -1024,15 +1024,15 @@ log_server_listening (VsxServer *server)
 
   vsx_log ("Server listening on %s", buf->str);
 
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 }
 
-gboolean
+bool
 vsx_server_run (VsxServer *server,
                 GError **error)
 {
   VsxMainContextSource *quit_source;
-  gboolean quit_received = FALSE;
+  bool quit_received = false;
 
   /* We have to make the quit source here instead of during
      vsx_server_new because if we are daemonized then the process will
@@ -1055,10 +1055,10 @@ vsx_server_run (VsxServer *server,
       g_propagate_error (error, server->fatal_error);
       server->fatal_error = NULL;
 
-      return FALSE;
+      return false;
     }
   else
-    return TRUE;
+    return true;
 }
 
 void

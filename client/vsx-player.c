@@ -24,19 +24,19 @@
 
 #include "vsx-player-private.h"
 
-gboolean
+bool
 vsx_player_is_connected (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_CONNECTED);
 }
 
-gboolean
+bool
 vsx_player_is_typing (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_TYPING);
 }
 
-gboolean
+bool
 vsx_player_has_next_turn (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_NEXT_TURN);

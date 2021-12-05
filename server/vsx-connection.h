@@ -45,20 +45,20 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    uint8_t *buffer,
                                    size_t buffer_size);
 
-gboolean
+bool
 vsx_connection_parse_data (VsxConnection *conn,
                            const uint8_t *buffer,
                            size_t buffer_length,
                            GError **error);
 
-gboolean
+bool
 vsx_connection_parse_eof (VsxConnection *conn,
                           GError **error);
 
-gboolean
+bool
 vsx_connection_is_finished (VsxConnection *conn);
 
-gboolean
+bool
 vsx_connection_has_data (VsxConnection *conn);
 
 VsxSignal *

@@ -269,9 +269,9 @@ vsx_key_value_load (FILE *file,
 
   handle_byte (&data, '\n');
 
-  g_string_free (data.key_buffer, TRUE);
-  g_string_free (data.value_buffer, TRUE);
-  g_string_free (data.error_buffer, TRUE);
+  g_string_free (data.key_buffer, true);
+  g_string_free (data.value_buffer, true);
+  g_string_free (data.error_buffer, true);
 }
 
 bool

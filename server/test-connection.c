@@ -204,7 +204,7 @@ free_harness(Harness *harness)
   g_free (harness);
 }
 
-static gboolean
+static bool
 negotiate_connection (VsxConnection *conn)
 {
   GError *error = NULL;
@@ -219,7 +219,7 @@ negotiate_connection (VsxConnection *conn)
                error->message);
       g_error_free (error);
 
-      return FALSE;
+      return false;
     }
 
   uint8_t buf[(sizeof ws_reply) * 2];
@@ -239,10 +239,10 @@ negotiate_connection (VsxConnection *conn)
                (int) got,
                buf,
                ws_reply);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
 static Harness *
@@ -259,17 +259,17 @@ create_negotiated_harness (void)
   return harness;
 }
 
-static gboolean
+static bool
 test_frame_errors(void)
 {
-  gboolean ret = TRUE;
+  bool ret = true;
 
   for (int i = 0; i < G_N_ELEMENTS (frame_error_tests); i++)
     {
       Harness *harness = create_negotiated_harness ();
 
       if (harness == NULL)
-        return FALSE;
+        return false;
 
       GError *error = NULL;
 
@@ -282,7 +282,7 @@ test_frame_errors(void)
                    "frame error test %i: "
                    "error expected but parsing succeeded\n",
                    i);
-          ret = FALSE;
+          ret = false;
         }
       else
         {
@@ -296,7 +296,7 @@ test_frame_errors(void)
                        i,
                        frame_error_tests[i].expected_message,
                        error->message);
-              ret = FALSE;
+              ret = false;
             }
           g_error_free (error);
         }
@@ -307,12 +307,12 @@ test_frame_errors(void)
   return ret;
 }
 
-static gboolean
+static bool
 test_eof_before_ws (void)
 {
   Harness *harness = create_harness ();
 
-  gboolean ret = TRUE;
+  bool ret = true;
   GError *error = NULL;
 
   if (vsx_connection_parse_eof (harness->conn, &error))
@@ -320,7 +320,7 @@ test_eof_before_ws (void)
       fprintf (stderr,
                "test_eof_before_ws: Parsing EOF succeeded but expected "
                "to fail\n");
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -334,7 +334,7 @@ test_eof_before_ws (void)
                    " Received: %s\n",
                    expected_message,
                    error->message);
-          ret = FALSE;
+          ret = false;
         }
       g_error_free (error);
     }
@@ -344,7 +344,7 @@ test_eof_before_ws (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_close_in_frame (void)
 {
   static const char *tests[] =
@@ -355,14 +355,14 @@ test_close_in_frame (void)
       "\x02\x1!",
     };
 
-  gboolean ret = TRUE;
+  bool ret = true;
 
   for (int i = 0; i < G_N_ELEMENTS (tests); i++)
     {
       Harness *harness = create_negotiated_harness ();
 
       if (harness == NULL)
-        return FALSE;
+        return false;
 
       GError *error = NULL;
 
@@ -377,7 +377,7 @@ test_close_in_frame (void)
                    i,
                    error->message);
           g_error_free (error);
-          ret = FALSE;
+          ret = false;
         }
       else if (vsx_connection_parse_eof (harness->conn, &error))
         {
@@ -385,7 +385,7 @@ test_close_in_frame (void)
                    "test_close_in_frame: %i: Parsing EOF succeeded but "
                    "expected to fail\n",
                    i);
-          ret = FALSE;
+          ret = false;
         }
       else
         {
@@ -401,7 +401,7 @@ test_close_in_frame (void)
                        i,
                        expected_message,
                        error->message);
-              ret = FALSE;
+              ret = false;
             }
           g_error_free (error);
         }
@@ -412,7 +412,7 @@ test_close_in_frame (void)
   return ret;
 }
 
-static gboolean
+static bool
 read_n_tiles (VsxConnection *conn,
               uint8_t *n_tiles_out)
 {
@@ -429,7 +429,7 @@ read_n_tiles (VsxConnection *conn,
                "when trying to read n_tiles\n",
                got,
                sizeof buf);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_N_TILES)
@@ -437,16 +437,16 @@ read_n_tiles (VsxConnection *conn,
       fprintf (stderr,
                "Expected N_TILES command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (n_tiles_out)
       *n_tiles_out = buf[3];
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 read_player_name (VsxConnection *conn,
                   int expected_player_num,
                   const char *expected_name)
@@ -466,7 +466,7 @@ read_player_name (VsxConnection *conn,
                "read_player_name: Expected %zu bytes but received %zu\n",
                buf_size,
                got);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_PLAYER_NAME)
@@ -474,7 +474,7 @@ read_player_name (VsxConnection *conn,
       fprintf (stderr,
                "Expected player name command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (buf[3] != expected_player_num)
@@ -485,7 +485,7 @@ read_player_name (VsxConnection *conn,
                " Received: %i\n",
                expected_player_num,
                buf[3]);
-      return FALSE;
+      return false;
     }
 
   if (memcmp (buf + 4, expected_name, strlen (expected_name) + 1))
@@ -497,13 +497,13 @@ read_player_name (VsxConnection *conn,
                expected_name,
                (int) strlen (expected_name),
                buf + 4);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 read_player (VsxConnection *conn,
              int expected_player_num,
              int expected_flags)
@@ -522,7 +522,7 @@ read_player (VsxConnection *conn,
                "read_player: Expected %zu bytes but received %zu\n",
                sizeof buf,
                got);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_PLAYER)
@@ -530,7 +530,7 @@ read_player (VsxConnection *conn,
       fprintf (stderr,
                "Expected player command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (buf[3] != expected_player_num)
@@ -541,7 +541,7 @@ read_player (VsxConnection *conn,
                " Received: %i\n",
                expected_player_num,
                buf[3]);
-      return FALSE;
+      return false;
     }
 
   if (buf[4] != expected_flags)
@@ -552,13 +552,13 @@ read_player (VsxConnection *conn,
                " Received 0x%x\n",
                expected_flags,
                buf[4]);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 read_connect_header (VsxConnection *conn,
                      uint64_t *person_id_out,
                      uint8_t *player_num_out)
@@ -576,7 +576,7 @@ read_connect_header (VsxConnection *conn,
                "when trying to read the player ID\n",
                got,
                sizeof buf);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_PLAYER_ID)
@@ -584,21 +584,21 @@ read_connect_header (VsxConnection *conn,
       fprintf (stderr,
                "Expected player ID command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
-    return FALSE;
+    return false;
 
   if (!read_player_name (conn,
                          0, /* expected_player_num */
                          "Zamenhof"))
-    return FALSE;
+    return false;
 
   if (!read_player (conn,
                     0, /* expected_player_num */
                     VSX_PLAYER_CONNECTED))
-    return FALSE;
+    return false;
 
   if (person_id_out)
     {
@@ -609,10 +609,10 @@ read_connect_header (VsxConnection *conn,
   if (player_num_out)
     *player_num_out = buf[3 + sizeof (uint64_t)];
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 create_player (Harness *harness,
                const char *room_name,
                const char *player_name,
@@ -628,7 +628,7 @@ create_player (Harness *harness,
   g_string_append (buf, player_name);
   g_string_append_c (buf, 0);
 
-  gboolean ret = TRUE;
+  bool ret = true;
   GError *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
@@ -640,7 +640,7 @@ create_player (Harness *harness,
                "Unexpected error while creating new player: %s\n",
                error->message);
       g_error_free (error);
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -649,7 +649,7 @@ create_player (Harness *harness,
 
       if (!read_connect_header (harness->conn, &person_id, &player_num))
         {
-          ret = FALSE;
+          ret = false;
         }
       else
         {
@@ -662,7 +662,7 @@ create_player (Harness *harness,
                        "Returned person ID (%" PRIu64 ") doesn’t exist after "
                        "creating player\n",
                        person_id);
-              ret = FALSE;
+              ret = false;
             }
           else if (strcmp (person->player->name, player_name))
             {
@@ -672,7 +672,7 @@ create_player (Harness *harness,
                        " Received: %s\n",
                        player_name,
                        person->player->name);
-              ret = FALSE;
+              ret = false;
             }
           else if (person->conversation->n_players - 1 != player_num)
             {
@@ -680,7 +680,7 @@ create_player (Harness *harness,
                        "New player is not last player (%i / %i)\n",
                        player_num,
                        person->conversation->n_players);
-              ret = FALSE;
+              ret = false;
             }
           else
             {
@@ -690,29 +690,29 @@ create_player (Harness *harness,
         }
     }
 
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 
   return ret;
 }
 
-static gboolean
+static bool
 test_new_player (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
-  gboolean ret = create_player (harness,
-                                "default:eo", "Zamenhof",
-                                NULL /* person_out */);
+  bool ret = create_player (harness,
+                            "default:eo", "Zamenhof",
+                            NULL /* person_out */);
 
   free_harness (harness);
 
   return ret;
 }
 
-static gboolean
+static bool
 reconnect_to_player (VsxConnection *conn,
                      uint64_t player_id,
                      uint16_t n_messages_received,
@@ -731,14 +731,14 @@ reconnect_to_player (VsxConnection *conn,
                        (void *) &n_messages_received,
                        sizeof n_messages_received);
 
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!vsx_connection_parse_data (conn,
                                   (uint8_t *) buf->str,
                                   buf->len,
                                   error))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -746,7 +746,7 @@ reconnect_to_player (VsxConnection *conn,
 
       if (!read_connect_header (conn, &person_id, NULL /* player_num */))
         {
-          ret = FALSE;
+          ret = false;
         }
       else
         {
@@ -757,17 +757,17 @@ reconnect_to_player (VsxConnection *conn,
                        "(%" PRIu64 " != %" PRIu64 ")\n",
                        person_id,
                        player_id);
-              ret = FALSE;
+              ret = false;
             }
         }
     }
 
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 
   return ret;
 }
 
-static gboolean
+static bool
 test_reconnect_ok (Harness *harness,
                    uint64_t player_id)
 {
@@ -775,11 +775,11 @@ test_reconnect_ok (Harness *harness,
                                                   harness->conversation_set,
                                                   harness->person_set);
 
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!negotiate_connection (other_conn))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -794,7 +794,7 @@ test_reconnect_ok (Harness *harness,
                    "test_reconnect_ok: Unexpected error: %s\n",
                    error->message);
           g_error_free (error);
-          ret = FALSE;
+          ret = false;
         }
     }
 
@@ -803,7 +803,7 @@ test_reconnect_ok (Harness *harness,
   return ret;
 }
 
-static gboolean
+static bool
 test_reconnect_bad_n_messages_received (Harness *harness,
                                         uint64_t player_id)
 {
@@ -811,11 +811,11 @@ test_reconnect_bad_n_messages_received (Harness *harness,
                                                   harness->conversation_set,
                                                   harness->person_set);
 
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!negotiate_connection (other_conn))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -829,7 +829,7 @@ test_reconnect_bad_n_messages_received (Harness *harness,
           fprintf (stderr,
                    "test_reconnect_bad_n_messages_received: "
                    "Reconnect unexpectedly succeeded\n");
-          ret = FALSE;
+          ret = false;
         }
       else
         {
@@ -846,7 +846,7 @@ test_reconnect_bad_n_messages_received (Harness *harness,
                        " Received: %s\n",
                        expected_message,
                        error->message);
-              ret = FALSE;
+              ret = false;
             }
 
           g_error_free (error);
@@ -858,30 +858,30 @@ test_reconnect_bad_n_messages_received (Harness *harness,
   return ret;
 }
 
-static gboolean
+static bool
 test_reconnect (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
       if (!test_reconnect_ok (harness, person->id))
-        ret = FALSE;
+        ret = false;
 
       if (!test_reconnect_bad_n_messages_received (harness, person->id))
-        ret = FALSE;
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -891,22 +891,22 @@ test_reconnect (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_keep_alive (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -922,7 +922,7 @@ test_keep_alive (void)
                    error->message);
           g_error_free (error);
 
-          ret = FALSE;
+          ret = false;
         }
 
       vsx_object_unref (person);
@@ -933,13 +933,13 @@ test_keep_alive (void)
   return ret;
 }
 
-static gboolean
+static bool
 read_leave_commands (VsxConnection *conn)
 {
   if (!read_player (conn,
                     0, /* expected_player_num */
                     0 /* flags (no longer connected) */))
-    return FALSE;
+    return false;
 
   uint8_t buf[1 /* frame command */
              + 1 /* length */
@@ -953,7 +953,7 @@ read_leave_commands (VsxConnection *conn)
                "read_leave_commands: Expected %zu bytes but received %zu\n",
                sizeof buf,
                got);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_END)
@@ -961,34 +961,34 @@ read_leave_commands (VsxConnection *conn)
       fprintf (stderr,
                "Expected end command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (!vsx_connection_is_finished (conn))
     {
       fprintf (stderr, "Connection is not finished after leaving\n");
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_leave (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1004,7 +1004,7 @@ test_leave (void)
                    error->message);
           g_error_free (error);
 
-          ret = FALSE;
+          ret = false;
         }
       else if (person->conversation->n_connected_players != 0)
         {
@@ -1012,10 +1012,10 @@ test_leave (void)
                    "test_leave: The conversation still has %i players after "
                    "leave command sent\n",
                    person->conversation->n_connected_players);
-          ret = FALSE;
+          ret = false;
         }
       else if (!read_leave_commands (harness->conn))
-        ret = FALSE;
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -1025,7 +1025,7 @@ test_leave (void)
   return ret;
 }
 
-static gboolean
+static bool
 read_message (VsxConnection *conn,
               int expected_player_num,
               const char *expected_message)
@@ -1048,7 +1048,7 @@ read_message (VsxConnection *conn,
                "read_message: Expected %zu bytes but received %zu\n",
                buf_size,
                got);
-      return FALSE;
+      return false;
     }
 
   uint8_t *cmd = buf + 1 + length_length;
@@ -1058,7 +1058,7 @@ read_message (VsxConnection *conn,
       fprintf (stderr,
                "Expected message command but received 0x%02x\n",
                cmd[0]);
-      return FALSE;
+      return false;
     }
 
   if (cmd[1] != expected_player_num)
@@ -1069,7 +1069,7 @@ read_message (VsxConnection *conn,
                " Received: %i\n",
                expected_player_num,
                cmd[1]);
-      return FALSE;
+      return false;
     }
 
   if (memcmp (cmd + 2, expected_message, strlen (expected_message) + 1))
@@ -1081,13 +1081,13 @@ read_message (VsxConnection *conn,
                expected_message,
                (int) strlen (expected_message),
                cmd + 2);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 check_expected_message (VsxPerson *person,
                         const char *expected_message)
 {
@@ -1096,7 +1096,7 @@ check_expected_message (VsxPerson *person,
       fprintf (stderr,
                "There are no messages in the conversation after sending a "
                "message\n");
-      return FALSE;
+      return false;
     }
 
   VsxConversationMessage *message =
@@ -1112,19 +1112,19 @@ check_expected_message (VsxPerson *person,
                " Received: %s\n",
                expected_message,
                message->raw_text);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_send_one_message (Harness *harness,
                        VsxPerson *person,
-                       gboolean was_typing)
+                       bool was_typing)
 {
   GError *error = NULL;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   const char *expected_message = "Hello, world!";
 
@@ -1145,37 +1145,37 @@ test_send_one_message (Harness *harness,
                error->message);
       g_error_free (error);
 
-      ret = FALSE;
+      ret = false;
     }
   else if (!check_expected_message (person, expected_message))
     {
-      ret = FALSE;
+      ret = false;
     }
   else if (was_typing
            && !read_player (harness->conn,
                             0, /* expected_player_num */
                             VSX_PLAYER_CONNECTED))
     {
-      ret = FALSE;
+      ret = false;
     }
   else if (!read_message (harness->conn,
                           0, /* expected_player_num */
                           expected_message))
     {
-      ret = FALSE;
+      ret = false;
     }
 
-    g_string_free (buf, TRUE);
+    g_string_free (buf, true);
 
     return ret;
 }
 
-static gboolean
+static bool
 test_send_fragmented_message (Harness *harness,
                               VsxPerson *person)
 {
   GError *error = NULL;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   const char *expected_message = "Hello, fragmented world!";
 
@@ -1207,31 +1207,31 @@ test_send_fragmented_message (Harness *harness,
                    error->message);
           g_error_free (error);
 
-          ret = FALSE;
+          ret = false;
 
           goto done;
         }
     }
 
   if (!check_expected_message (person, expected_message))
-    ret = FALSE;
+    ret = false;
   else if (!read_message (harness->conn,
                           0, /* expected_player_num */
                           expected_message))
-    ret = FALSE;
+    ret = false;
 
  done:
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 
   return ret;
 }
 
-static gboolean
+static bool
 test_send_long_message (Harness *harness,
                         VsxPerson *person)
 {
   GError *error = NULL;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   GString *buf = g_string_new (NULL);
 
@@ -1258,7 +1258,7 @@ test_send_long_message (Harness *harness,
                error->message);
       g_error_free (error);
 
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1268,48 +1268,48 @@ test_send_long_message (Harness *harness,
 
       if (!check_expected_message (person, expected_message))
         {
-          ret = FALSE;
+          ret = false;
         }
       else if (!read_message (harness->conn,
                               0, /* expected_player_num */
                               expected_message))
         {
-          ret = FALSE;
+          ret = false;
         }
     }
 
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 
   return ret;
 }
 
-static gboolean
+static bool
 test_send_message (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
-      if (!test_send_one_message (harness, person, FALSE /* was_typing */))
-        ret = FALSE;
+      if (!test_send_one_message (harness, person, false /* was_typing */))
+        ret = false;
 
       if (!test_send_fragmented_message (harness, person))
-        ret = FALSE;
+        ret = false;
 
       if (!test_send_long_message (harness, person))
-        ret = FALSE;
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -1319,20 +1319,20 @@ test_send_message (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_typing_commands (Harness *harness, VsxPerson *person)
 {
   static const struct
   {
     uint8_t command;
-    gboolean typing_result;
+    bool typing_result;
   } typing_commands[] =
     {
-      { VSX_PROTO_STOP_TYPING, FALSE },
-      { VSX_PROTO_START_TYPING, TRUE },
-      { VSX_PROTO_START_TYPING, TRUE },
-      { VSX_PROTO_STOP_TYPING, FALSE },
-      { VSX_PROTO_START_TYPING, TRUE },
+      { VSX_PROTO_STOP_TYPING, false },
+      { VSX_PROTO_START_TYPING, true },
+      { VSX_PROTO_START_TYPING, true },
+      { VSX_PROTO_STOP_TYPING, false },
+      { VSX_PROTO_START_TYPING, true },
     };
 
   for (int i = 0; i < G_N_ELEMENTS (typing_commands); i++)
@@ -1351,7 +1351,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
                    error->message);
           g_error_free (error);
 
-          return FALSE;
+          return false;
         }
 
       if (!!(person->player->flags & VSX_PLAYER_TYPING)
@@ -1361,50 +1361,50 @@ test_typing_commands (Harness *harness, VsxPerson *person)
                    "test_typing_commands: %i: "
                    "Typing status is not as expected\n",
                    i);
-          return FALSE;
+          return false;
         }
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_typing (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
       if (!test_typing_commands (harness, person))
         {
-          ret = FALSE;
+          ret = false;
         }
       else
         {
           /* Try sending a message. This should automatically set the
-           * typing status to FALSE.
+           * typing status to false.
            */
-          if (!test_send_one_message (harness, person, TRUE /* was_typing */))
+          if (!test_send_one_message (harness, person, true /* was_typing */))
             {
-              ret = FALSE;
+              ret = false;
             }
           else if ((person->player->flags & VSX_PLAYER_TYPING))
             {
               fprintf (stderr,
                        "Sending a message did not reset the typing status\n");
-              ret = FALSE;
+              ret = false;
             }
        }
 
@@ -1416,7 +1416,7 @@ test_typing (void)
   return ret;
 }
 
-static gboolean
+static bool
 read_tile (VsxConnection *conn,
            int *tile_num_out,
            int *x_out,
@@ -1443,7 +1443,7 @@ read_tile (VsxConnection *conn,
                sizeof buf,
                (sizeof buf) - 1,
                got);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_TILE)
@@ -1451,7 +1451,7 @@ read_tile (VsxConnection *conn,
       fprintf (stderr,
                "Expected tile command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   const uint8_t *letter_start = buf + 8;
@@ -1462,7 +1462,7 @@ read_tile (VsxConnection *conn,
   if (letter_end == NULL)
     {
       fprintf (stderr, "Unterminated string in tile command\n");
-      return FALSE;
+      return false;
     }
 
   if (tile_num_out)
@@ -1482,10 +1482,10 @@ read_tile (VsxConnection *conn,
   if (player_out)
     *player_out = letter_end[1];
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_turn_and_move_commands (Harness *harness, VsxPerson *person)
 {
   GError *error = NULL;
@@ -1500,7 +1500,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                error->message);
       g_error_free (error);
 
-      return FALSE;
+      return false;
     }
 
   if (person->conversation->n_tiles_in_play != 1)
@@ -1508,7 +1508,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       fprintf (stderr,
                "After turning a tile, n_tiles_in_play = %i\n",
                person->conversation->n_tiles_in_play);
-      return FALSE;
+      return false;
     }
 
   /* When a tile is turned the player flags will change to update the
@@ -1517,19 +1517,19 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
   if (!read_player (harness->conn,
                     0, /* expected_player_num */
                     VSX_PLAYER_CONNECTED | VSX_PLAYER_NEXT_TURN))
-    return FALSE;
+    return false;
 
   int tile_num, tile_x, tile_y, tile_player;
 
   if (!read_tile (harness->conn, &tile_num, &tile_x, &tile_y, &tile_player))
-    return FALSE;
+    return false;
 
   if (tile_num != 0)
     {
       fprintf (stderr,
                "Turned one tile but tile_num is %i\n",
                tile_num);
-      return FALSE;
+      return false;
     }
 
   if (tile_player != 255)
@@ -1537,7 +1537,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       fprintf (stderr,
                "Newly turned tile has player_num %i\n",
                tile_player);
-      return FALSE;
+      return false;
     }
 
   if (!vsx_connection_parse_data (harness->conn,
@@ -1550,7 +1550,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                error->message);
       g_error_free (error);
 
-      return FALSE;
+      return false;
     }
 
   if (person->conversation->tiles[0].x != -2 ||
@@ -1560,18 +1560,18 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                "After moving a tile to -2,32, it is at %i,%i\n",
                person->conversation->tiles[0].x,
                person->conversation->tiles[0].y);
-      return FALSE;
+      return false;
     }
 
   if (!read_tile (harness->conn, &tile_num, &tile_x, &tile_y, &tile_player))
-    return FALSE;
+    return false;
 
   if (tile_num != 0)
     {
       fprintf (stderr,
                "Moved first tile but tile_num is %i\n",
                tile_num);
-      return FALSE;
+      return false;
     }
 
   if (tile_player != person->player->num)
@@ -1580,7 +1580,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                "Player %i moved tile but tile command reported %i\n",
                person->player->num,
                tile_player);
-      return FALSE;
+      return false;
     }
 
   if (tile_x != -2 || tile_y != 32)
@@ -1589,7 +1589,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                "After moving a tile to -2,32, the connection reported %i,%i\n",
                tile_x,
                tile_y);
-      return FALSE;
+      return false;
     }
 
   if (vsx_connection_parse_data (harness->conn,
@@ -1599,12 +1599,12 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
     {
       fprintf (stderr,
                "Unexpected success after trying to move an invalid tile\n");
-      return FALSE;
+      return false;
     }
 
   const char *expected_message =
     "Player tried to move a tile that is not in play";
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (strcmp (error->message, expected_message))
     {
@@ -1615,7 +1615,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
                " Received: %s\n",
                expected_message,
                error->message);
-      ret = FALSE;
+      ret = false;
     }
 
   g_error_free (error);
@@ -1623,27 +1623,27 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
   return ret;
 }
 
-static gboolean
+static bool
 test_turn_and_move (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
       if (!test_turn_and_move_commands (harness, person))
-        ret = FALSE;
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -1653,7 +1653,7 @@ test_turn_and_move (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_got_shout (Harness *harness, int shout_player)
 {
   uint8_t buf[1 + 1 + 1 + 1];
@@ -1669,7 +1669,7 @@ test_got_shout (Harness *harness, int shout_player)
                "when trying to read the shout\n",
                got,
                sizeof buf);
-      return FALSE;
+      return false;
     }
 
   if (buf[2] != VSX_PROTO_PLAYER_SHOUTED)
@@ -1677,7 +1677,7 @@ test_got_shout (Harness *harness, int shout_player)
       fprintf (stderr,
                "Expected PLAYER_SHOUTED command but received 0x%02x\n",
                buf[2]);
-      return FALSE;
+      return false;
     }
 
   if (buf[3] != shout_player)
@@ -1686,28 +1686,28 @@ test_got_shout (Harness *harness, int shout_player)
                "test_got_shout: Expected %i but received %i\n",
                shout_player,
                buf[3]);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_shout (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1722,16 +1722,16 @@ test_shout (void)
                    "test_shout: Unexpected error: %s\n",
                    error->message);
           g_error_free (error);
-          ret = FALSE;
+          ret = false;
         }
       else if (person->conversation->last_shout_time == 0)
         {
           fprintf (stderr,
                    "test_shout: last_shout_time is still zero after shouting");
-          ret = FALSE;
+          ret = false;
         }
       else if (!test_got_shout (harness, 0 /* shout_player */))
-        ret = FALSE;
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -1741,22 +1741,22 @@ test_shout (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_set_n_tiles (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1771,7 +1771,7 @@ test_set_n_tiles (void)
                    "test_set_n_tiles: Unexpected error: %s\n",
                    error->message);
           g_error_free (error);
-          ret = FALSE;
+          ret = false;
         }
       else if (person->conversation->total_n_tiles != 5)
         {
@@ -1779,21 +1779,21 @@ test_set_n_tiles (void)
                    "test_set_n_tiles: failed to set total_n_tiles "
                    "(%i != 5)\n",
                    person->conversation->total_n_tiles);
-          ret = FALSE;
+          ret = false;
         }
       else
         {
           uint8_t got_n_tiles;
 
           if (!read_n_tiles (harness->conn, &got_n_tiles))
-            ret = FALSE;
+            ret = false;
           else if (got_n_tiles != 5)
             {
               fprintf (stderr,
                        "test_set_n_tiles: After sending set_n_tiles 5, the "
                        "connection reported %i tiles\n",
                        got_n_tiles);
-              ret = FALSE;
+              ret = false;
             }
         }
 
@@ -1805,22 +1805,22 @@ test_set_n_tiles (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_sync (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1838,21 +1838,21 @@ test_sync (void)
                    "when trying to read the sync\n",
                    got,
                    sizeof buf);
-          ret = FALSE;
+          ret = false;
         }
       else if (buf[2] != VSX_PROTO_SYNC)
         {
           fprintf (stderr,
                    "Expected sync command but received 0x%02x\n",
                    buf[2]);
-          ret = FALSE;
+          ret = false;
         }
       else if (vsx_connection_fill_output_buffer (harness->conn,
                                                   large_buf,
                                                   1024) != 0)
         {
           fprintf (stderr, "Unexpected data after sync command\n");
-          ret = FALSE;
+          ret = false;
         }
 
       g_free (large_buf);
@@ -1865,22 +1865,22 @@ test_sync (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_turn_all_tiles (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
   VsxPerson *person;
-  gboolean ret = TRUE;
+  bool ret = true;
 
   if (!create_player (harness,
                       "default:eo", "Zamenhof",
                       &person))
     {
-      ret = FALSE;
+      ret = false;
     }
   else
     {
@@ -1898,7 +1898,7 @@ test_turn_all_tiles (void)
                        error->message);
               g_error_free (error);
 
-              ret = FALSE;
+              ret = false;
               break;
             }
 
@@ -1911,7 +1911,7 @@ test_turn_all_tiles (void)
                                VSX_PLAYER_CONNECTED |
                                (i == 0 ? VSX_PLAYER_NEXT_TURN : 0)))
             {
-              ret = FALSE;
+              ret = false;
               break;
             }
 
@@ -1919,7 +1919,7 @@ test_turn_all_tiles (void)
 
           if (!read_tile (harness->conn, &tile_num, NULL, NULL, NULL))
             {
-              ret = FALSE;
+              ret = false;
               break;
             }
 
@@ -1929,7 +1929,7 @@ test_turn_all_tiles (void)
                        "After turning tile %i, server updated tile %i\n",
                        i,
                        tile_num);
-              ret = FALSE;
+              ret = false;
               break;
             }
         }
@@ -1942,7 +1942,7 @@ test_turn_all_tiles (void)
   return ret;
 }
 
-static gboolean
+static bool
 test_ping_string (VsxConnection *conn,
                   const char *str)
 {
@@ -1964,7 +1964,7 @@ test_ping_string (VsxConnection *conn,
                error->message);
       g_error_free (error);
 
-      return FALSE;
+      return false;
     }
 
   /* Allocate enough space to receive the pong a second time so that
@@ -1980,7 +1980,7 @@ test_ping_string (VsxConnection *conn,
                "Received %zu bytes for pong frame but %zu were expected\n",
                got,
                frame_len);
-      return FALSE;
+      return false;
     }
 
   if (result[0] != 0x8a)
@@ -1988,7 +1988,7 @@ test_ping_string (VsxConnection *conn,
       fprintf (stderr,
                "Expected pong command (0x8a) but received 0x%02x)\n",
                result[0]);
-      return FALSE;
+      return false;
     }
 
   if (result[1] != str_len)
@@ -1997,7 +1997,7 @@ test_ping_string (VsxConnection *conn,
                "Length of pong command not as expected: %i != %zu\n",
                result[1],
                str_len);
-      return FALSE;
+      return false;
     }
 
   if (memcmp (result + 2, str, str_len))
@@ -2009,25 +2009,25 @@ test_ping_string (VsxConnection *conn,
                str,
                (int) str_len,
                result + 2);
-      return FALSE;
+      return false;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 test_ping (void)
 {
   Harness *harness = create_negotiated_harness ();
 
   if (harness == NULL)
-    return FALSE;
+    return false;
 
-  gboolean ret = TRUE;
+  bool ret = true;
 
   /* Test a simple ping */
   if (!test_ping_string (harness->conn, "poop"))
-    ret = FALSE;
+    ret = false;
 
   /* Test a string with the maximum control frame length */
   if (!test_ping_string (harness->conn,
@@ -2036,7 +2036,7 @@ test_ping (void)
                          "abcdefghijklmnopqrstuvwxyz"
                          "abcdefghijklmnopqrstuvwxyz"
                          "abcdefghijklmnopqrstu"))
-    ret = FALSE;
+    ret = false;
 
   free_harness (harness);
 

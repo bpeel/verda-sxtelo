@@ -20,21 +20,22 @@
 #define __VSX_LOG_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 G_BEGIN_DECLS
 
-gboolean
+bool
 vsx_log_available (void);
 
 void
 vsx_log (const char *format,
          ...) G_GNUC_PRINTF (1, 2);
 
-gboolean
+bool
 vsx_log_set_file (const char *filename,
                   GError **error);
 
-gboolean
+bool
 vsx_log_start (GError **error);
 
 void

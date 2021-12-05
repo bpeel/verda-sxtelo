@@ -22,6 +22,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "vsx-conversation.h"
 #include "vsx-player.h"
@@ -68,7 +69,7 @@ vsx_person_new (VsxPersonId id,
 void
 vsx_person_make_noise (VsxPerson *person);
 
-gboolean
+bool
 vsx_person_is_silent (VsxPerson *person);
 
 void

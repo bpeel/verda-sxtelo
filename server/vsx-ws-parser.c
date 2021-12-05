@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #define VSX_WS_PARSER_MAX_LINE_LENGTH 512
 
@@ -68,7 +69,7 @@ vsx_ws_parser_new (void)
   return parser;
 }
 
-static gboolean
+static bool
 check_http_version (const uint8_t *data, unsigned int length, GError **error)
 {
   static const char prefix[] = "HTTP/1.";
@@ -88,17 +89,17 @@ check_http_version (const uint8_t *data, unsigned int length, GError **error)
         goto bad;
     }
 
-  return TRUE;
+  return true;
 
 bad:
   g_set_error (error,
                VSX_WS_PARSER_ERROR,
                VSX_WS_PARSER_ERROR_UNSUPPORTED,
                "Unsupported HTTP version");
-  return FALSE;
+  return false;
 }
 
-static gboolean
+static bool
 add_bytes_to_buffer (VsxWsParser *parser,
                      const uint8_t *data,
                      unsigned int length,
@@ -110,18 +111,18 @@ add_bytes_to_buffer (VsxWsParser *parser,
                    VSX_WS_PARSER_ERROR,
                    VSX_WS_PARSER_ERROR_UNSUPPORTED,
                    "Unsupported line length in HTTP request");
-      return FALSE;
+      return false;
     }
   else
     {
       memcpy (parser->buf + parser->buf_len, data, length);
       parser->buf_len += length;
 
-      return TRUE;
+      return true;
     }
 }
 
-static gboolean
+static bool
 process_request_line (VsxWsParser *parser,
                       uint8_t *data,
                       unsigned int length,
@@ -135,7 +136,7 @@ process_request_line (VsxWsParser *parser,
                    VSX_WS_PARSER_ERROR,
                    VSX_WS_PARSER_ERROR_INVALID,
                    "Invalid HTTP request received");
-      return FALSE;
+      return false;
     }
 
   /* Replace the space with a zero terminator so we can reuse
@@ -154,7 +155,7 @@ process_request_line (VsxWsParser *parser,
                    VSX_WS_PARSER_ERROR,
                    VSX_WS_PARSER_ERROR_INVALID,
                    "Invalid HTTP request received");
-      return FALSE;
+      return false;
     }
 
   *uri_end = '\0';
@@ -163,12 +164,12 @@ process_request_line (VsxWsParser *parser,
   data = uri_end + 1;
 
   if (!check_http_version (data, length, error))
-    return FALSE;
+    return false;
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 process_header (VsxWsParser *parser, GError **error)
 {
   uint8_t *data = parser->buf;
@@ -184,14 +185,14 @@ process_header (VsxWsParser *parser, GError **error)
                    VSX_WS_PARSER_ERROR,
                    VSX_WS_PARSER_ERROR_INVALID,
                    "Invalid HTTP request received");
-      return FALSE;
+      return false;
     }
 
   static const char key_header[] = "sec-websocket-key:";
 
   /* Ignore any headers apart from the key header */
   if (g_ascii_strncasecmp (field_name, key_header, (sizeof key_header) - 1))
-    return TRUE;
+    return true;
 
   if (parser->key_hash_ctx != NULL)
     {
@@ -200,7 +201,7 @@ process_header (VsxWsParser *parser, GError **error)
                    VSX_WS_PARSER_ERROR_INVALID,
                    "Client sent a WebSocket header with multiple "
                    "Sec-WebSocket-Key headers");
-      return FALSE;
+      return false;
     }
 
   length -= field_name_end - data + 1;
@@ -217,7 +218,7 @@ process_header (VsxWsParser *parser, GError **error)
   EVP_DigestInit_ex (parser->key_hash_ctx, EVP_sha1 (), NULL);
   EVP_DigestUpdate (parser->key_hash_ctx, data, length);
 
-  return TRUE;
+  return true;
 }
 
 typedef struct
@@ -226,7 +227,7 @@ typedef struct
   unsigned int length;
 } VsxWsParserClosure;
 
-static gboolean
+static bool
 handle_reading_request_line (VsxWsParser *parser,
                              VsxWsParserClosure *c,
                              GError **error)
@@ -238,7 +239,7 @@ handle_reading_request_line (VsxWsParser *parser,
     {
       /* Add the data up to the potential terminator */
       if (!add_bytes_to_buffer (parser, c->data, terminator - c->data, error))
-        return FALSE;
+        return false;
 
       /* Consume those bytes */
       c->length -= terminator - c->data + 1;
@@ -250,15 +251,15 @@ handle_reading_request_line (VsxWsParser *parser,
     {
       /* Add and consume all of the data */
       if (!add_bytes_to_buffer (parser, c->data, c->length, error))
-        return FALSE;
+        return false;
 
       c->length = 0;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_terminating_request_line (VsxWsParser *parser,
                                  VsxWsParserClosure *c,
                                  GError **error)
@@ -278,7 +279,7 @@ handle_terminating_request_line (VsxWsParser *parser,
                                      parser->buf,
                                      parser->buf_len,
                                      error))
-            return FALSE;
+            return false;
 
           parser->buf_len = 0;
           /* Start processing headers */
@@ -297,14 +298,14 @@ handle_terminating_request_line (VsxWsParser *parser,
        * line without consuming the char
        */
       if (!add_bytes_to_buffer (parser, &r, 1, error))
-        return FALSE;
+        return false;
       parser->state = VSX_WS_PARSER_READING_REQUEST_LINE;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_reading_header (VsxWsParser *parser,
                        VsxWsParserClosure *c,
                        GError **error)
@@ -316,7 +317,7 @@ handle_reading_header (VsxWsParser *parser,
     {
       /* Add the data up to the potential terminator */
       if (!add_bytes_to_buffer (parser, c->data, terminator - c->data, error))
-        return FALSE;
+        return false;
 
       /* Consume those bytes */
       c->length -= terminator - c->data + 1;
@@ -328,15 +329,15 @@ handle_reading_header (VsxWsParser *parser,
     {
       /* Add and consume all of the data */
       if (!add_bytes_to_buffer (parser, c->data, c->length, error))
-        return FALSE;
+        return false;
 
       c->length = 0;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 finish_key_hash (VsxWsParser *parser,
                  GError **error)
 {
@@ -347,7 +348,7 @@ finish_key_hash (VsxWsParser *parser,
                    VSX_WS_PARSER_ERROR_INVALID,
                    "Client sent a WebSocket header without a "
                    "Sec-WebSocket-Key header");
-      return FALSE;
+      return false;
     }
 
   EVP_DigestUpdate (parser->key_hash_ctx,
@@ -357,10 +358,10 @@ finish_key_hash (VsxWsParser *parser,
                    parser->key_hash,
                    &parser->key_hash_length);
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_terminating_header (VsxWsParser *parser,
                            VsxWsParserClosure *c,
                            GError **error)
@@ -374,7 +375,7 @@ handle_terminating_header (VsxWsParser *parser,
       if (parser->buf_len == 0)
         {
           if (!finish_key_hash (parser, error))
-            return FALSE;
+            return false;
 
           parser->state = VSX_WS_PARSER_DONE;
         }
@@ -396,14 +397,14 @@ handle_terminating_header (VsxWsParser *parser,
        * without consuming the char
        */
       if (!add_bytes_to_buffer (parser, &r, 1, error))
-        return FALSE;
+        return false;
       parser->state = VSX_WS_PARSER_READING_HEADER;
     }
 
-  return TRUE;
+  return true;
 }
 
-static gboolean
+static bool
 handle_checking_header_continuation (VsxWsParser *parser,
                                      VsxWsParserClosure *c,
                                      GError **error)
@@ -421,13 +422,13 @@ handle_checking_header_continuation (VsxWsParser *parser,
     {
       /* We have a complete header */
       if (!process_header (parser, error))
-        return FALSE;
+        return false;
 
       parser->buf_len = 0;
       parser->state = VSX_WS_PARSER_READING_HEADER;
     }
 
-  return TRUE;
+  return true;
 }
 
 VsxWsParserResult

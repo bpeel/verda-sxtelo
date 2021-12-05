@@ -34,9 +34,9 @@ static GString *vsx_log_buffer = NULL;
 static GThread *vsx_log_thread = NULL;
 static GMutex vsx_log_mutex;
 static GCond vsx_log_cond;
-static gboolean vsx_log_finished = FALSE;
+static bool vsx_log_finished = false;
 
-gboolean
+bool
 vsx_log_available (void)
 {
   return vsx_log_file != NULL;
@@ -92,7 +92,7 @@ static gpointer
 vsx_log_thread_func (gpointer data)
 {
   GString *alternate_buffer;
-  gboolean had_error = FALSE;
+  bool had_error = false;
   GString *tmp;
 
   block_sigint ();
@@ -131,7 +131,7 @@ vsx_log_thread_func (gpointer data)
           /* If there was an error then we'll just start ignoring data
              until we're told to quit */
           if (wrote != alternate_buffer->len)
-            had_error = TRUE;
+            had_error = true;
           else
             fflush (vsx_log_file);
 
@@ -143,12 +143,12 @@ vsx_log_thread_func (gpointer data)
 
   g_mutex_unlock (&vsx_log_mutex);
 
-  g_string_free (alternate_buffer, TRUE);
+  g_string_free (alternate_buffer, true);
 
   return NULL;
 }
 
-gboolean
+bool
 vsx_log_set_file (const char *filename,
                   GError **error)
 {
@@ -162,23 +162,23 @@ vsx_log_set_file (const char *filename,
                            G_FILE_ERROR,
                            g_file_error_from_errno (errno),
                            strerror (errno));
-      return FALSE;
+      return false;
     }
 
   vsx_log_close ();
 
   vsx_log_file = file;
   vsx_log_buffer = g_string_new (NULL);
-  vsx_log_finished = FALSE;
+  vsx_log_finished = false;
 
-  return TRUE;
+  return true;
 }
 
-gboolean
+bool
 vsx_log_start (GError **error)
 {
   if (!vsx_log_available () || vsx_log_thread != NULL)
-    return TRUE;
+    return true;
 
   vsx_log_thread = g_thread_try_new ("vsx-log",
                                      vsx_log_thread_func,
@@ -194,7 +194,7 @@ vsx_log_close (void)
   if (vsx_log_thread)
     {
       g_mutex_lock (&vsx_log_mutex);
-      vsx_log_finished = TRUE;
+      vsx_log_finished = true;
       g_cond_signal (&vsx_log_cond);
       g_mutex_unlock (&vsx_log_mutex);
 
@@ -205,7 +205,7 @@ vsx_log_close (void)
 
   if (vsx_log_buffer)
     {
-      g_string_free (vsx_log_buffer, TRUE);
+      g_string_free (vsx_log_buffer, true);
       vsx_log_buffer = NULL;
     }
 

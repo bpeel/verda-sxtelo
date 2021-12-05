@@ -23,6 +23,7 @@
 #include "vsx-ssl-error.h"
 
 #include <openssl/err.h>
+#include <stdbool.h>
 
 VsxSslError
 vsx_ssl_error_from_errno (unsigned long errnum)
@@ -47,7 +48,7 @@ vsx_ssl_error_set (GError **error)
                "%s",
                buf->str);
 
-  g_string_free (buf, TRUE);
+  g_string_free (buf, true);
 }
 
 GQuark

@@ -20,6 +20,7 @@
 #define __VSX_PLAYER_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 G_BEGIN_DECLS
 
@@ -44,19 +45,19 @@ typedef struct
   VsxPlayerFlags flags;
 } VsxPlayer;
 
-static inline gboolean
+static inline bool
 vsx_player_is_connected (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_CONNECTED);
 }
 
-static inline gboolean
+static inline bool
 vsx_player_is_typing (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_TYPING);
 }
 
-static inline gboolean
+static inline bool
 vsx_player_has_next_turn (const VsxPlayer *player)
 {
   return !!(player->flags & VSX_PLAYER_NEXT_TURN);

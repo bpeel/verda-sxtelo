@@ -32,7 +32,7 @@ typedef struct
 {
   const char *filename;
   VsxConfig *config;
-  gboolean had_error;
+  bool had_error;
   GString *error_buffer;
   VsxConfigServer *server;
 } LoadConfigData;
@@ -139,15 +139,15 @@ set_option (LoadConfigData *data,
       }
     case OPTION_TYPE_BOOL:
       {
-        gboolean *ptr = (gboolean *) ((uint8_t *) config_item + option->offset);
+        bool *ptr = (bool *) ((uint8_t *) config_item + option->offset);
 
         if (!strcmp (value, "true"))
           {
-            *ptr = TRUE;
+            *ptr = true;
           }
         else if (!strcmp (value, "false"))
           {
-            *ptr = FALSE;
+            *ptr = false;
           }
         else
           {
@@ -329,7 +329,7 @@ load_config (const char *fn, VsxConfig *config, GError **error)
           ret = false;
         }
 
-      g_string_free (data.error_buffer, TRUE);
+      g_string_free (data.error_buffer, true);
 
       fclose (f);
     }

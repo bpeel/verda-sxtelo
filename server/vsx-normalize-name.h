@@ -20,10 +20,11 @@
 #define __VSX_NORMALIZE_NAME_H__
 
 #include <glib.h>
+#include <stdbool.h>
 
 G_BEGIN_DECLS
 
-gboolean
+bool
 vsx_normalize_name (char *name);
 
 G_END_DECLS

@@ -54,7 +54,7 @@ vsx_conversation_free (void *object)
   for (i = 0; i < self->n_players; i++)
     vsx_player_free (self->players[i]);
 
-  g_array_free (self->messages, TRUE);
+  g_array_free (self->messages, true);
 
   vsx_object_get_class ()->free (object);
 }
@@ -188,7 +188,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
   g_string_append (message_str, "\"}]\r\n");
 
   message->length = message_str->len;
-  message->text = g_string_free (message_str, FALSE);
+  message->text = g_string_free (message_str, false);
 
   vsx_conversation_changed (conversation,
                             VSX_CONVERSATION_MESSAGE_ADDED);
@@ -210,7 +210,7 @@ static void
 vsx_conversation_set_flag (VsxConversation *conversation,
                            VsxPlayer *player,
                            VsxPlayerFlags flag,
-                           gboolean value)
+                           bool value)
 {
   VsxPlayerFlags flags;
 
@@ -225,7 +225,7 @@ vsx_conversation_set_flag (VsxConversation *conversation,
 void
 vsx_conversation_set_typing (VsxConversation *conversation,
                              unsigned int player_num,
-                             gboolean typing)
+                             bool typing)
 {
   VsxPlayer *player = conversation->players[player_num];
 
@@ -249,14 +249,14 @@ set_next_player (VsxConversation *conversation,
       vsx_conversation_set_flag (conversation,
                                  conversation->players[old_player],
                                  VSX_PLAYER_NEXT_TURN,
-                                 FALSE);
+                                 false);
       return;
     }
 
   /* Find the next player that is connected */
   unsigned int next_turn_player = old_player;
 
-  while (TRUE)
+  while (true)
     {
       next_turn_player = (next_turn_player + 1) % conversation->n_players;
 
@@ -272,11 +272,11 @@ set_next_player (VsxConversation *conversation,
           vsx_conversation_set_flag (conversation,
                                      conversation->players[old_player],
                                      VSX_PLAYER_NEXT_TURN,
-                                     FALSE);
+                                     false);
           vsx_conversation_set_flag (conversation,
                                      conversation->players[next_turn_player],
                                      VSX_PLAYER_NEXT_TURN,
-                                     TRUE);
+                                     true);
           break;
         }
     }
@@ -287,7 +287,7 @@ vsx_conversation_player_left (VsxConversation *conversation,
                               unsigned int player_num)
 {
   VsxPlayer *player = conversation->players[player_num];
-  gboolean had_next_turn;
+  bool had_next_turn;
 
   if (!vsx_player_is_connected (player))
     return;
@@ -389,7 +389,7 @@ vsx_conversation_new (const char *room_name)
 
   vsx_signal_init (&self->changed_signal);
 
-  self->messages = g_array_new (FALSE, FALSE, sizeof (VsxConversationMessage));
+  self->messages = g_array_new (false, false, sizeof (VsxConversationMessage));
 
   self->state = VSX_CONVERSATION_AWAITING_START;
 
@@ -443,7 +443,7 @@ vsx_conversation_set_n_tiles (VsxConversation *conversation,
     }
 }
 
-static gboolean
+static bool
 try_location (VsxConversation *conversation,
               int x,
               int y)
@@ -459,10 +459,10 @@ try_location (VsxConversation *conversation,
           x < tile->x + VSX_TILE_SIZE &&
           y + VSX_TILE_SIZE > tile->y &&
           y < tile->y + VSX_TILE_SIZE)
-        return FALSE;
+        return false;
     }
 
-  return TRUE;
+  return true;
 }
 
 static void
@@ -495,7 +495,7 @@ find_free_location (VsxConversation *conversation,
       }
 }
 
-static gboolean
+static bool
 is_shouting (VsxConversation *conversation)
 {
   return (vsx_main_context_get_monotonic_clock (NULL) -
@@ -508,7 +508,7 @@ vsx_conversation_turn (VsxConversation *conversation,
                        unsigned int player_num)
 {
   VsxPlayer *player = conversation->players[player_num];
-  gboolean is_first_turn =
+  bool is_first_turn =
     conversation->n_tiles_in_play == 0;
   VsxTile *tile;
 
@@ -547,7 +547,7 @@ vsx_conversation_turn (VsxConversation *conversation,
     vsx_conversation_set_flag (conversation,
                                player,
                                VSX_PLAYER_NEXT_TURN,
-                               TRUE);
+                               true);
   else
     set_next_player (conversation, player_num);
 }

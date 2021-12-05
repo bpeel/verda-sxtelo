@@ -64,7 +64,7 @@ vsx_player_new (const char *player_name,
   g_string_append (buf, "\"}]\r\n");
 
   player->name_message_len = buf->len;
-  player->name_message = g_string_free (buf, FALSE);
+  player->name_message = g_string_free (buf, false);
 
   return player;
 }

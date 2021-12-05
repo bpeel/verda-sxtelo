@@ -40,7 +40,7 @@
 
 static char *option_log_file = NULL;
 static char *option_config_file = NULL;
-static gboolean option_daemonize = FALSE;
+static bool option_daemonize = false;
 static char *option_user = NULL;
 static char *option_group = NULL;
 
@@ -70,12 +70,12 @@ options[] =
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
 
-static gboolean
+static bool
 process_arguments (int *argc, char ***argv,
                    GError **error)
 {
   GOptionContext *context;
-  gboolean ret;
+  bool ret;
   GOptionGroup *group;
 
   group = g_option_group_new (NULL, /* name */
@@ -94,7 +94,7 @@ process_arguments (int *argc, char ***argv,
     {
       g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
                    "Unknown option '%s'", (* argv)[1]);
-      ret = FALSE;
+      ret = false;
     }
 
   return ret;
@@ -133,7 +133,7 @@ load_config(GError **error)
                "No config file found");
 
  found:
-  g_string_free (filename, TRUE);
+  g_string_free (filename, true);
 
   return config;
 }
@@ -148,7 +148,7 @@ create_server (VsxConfig *config,
 
 #ifdef USE_SYSTEMD
   {
-    int nfds = sd_listen_fds (TRUE /* unset_environment */);
+    int nfds = sd_listen_fds (true /* unset_environment */);
 
     if (nfds < 0)
       {

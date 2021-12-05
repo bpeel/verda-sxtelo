@@ -23,12 +23,12 @@
 #include "vsx-normalize-name.h"
 #include "vsx-proto.h"
 
-gboolean
+bool
 vsx_normalize_name (char *name)
 {
   uint8_t *dst = (uint8_t *) name;
   const uint8_t *src = dst;
-  gboolean got_letter = FALSE;
+  bool got_letter = false;
 
   /* Skip leading whitespace */
   while (*src && g_ascii_isspace (*src))
@@ -46,26 +46,26 @@ vsx_normalize_name (char *name)
         }
       /* Don't allow any control characters */
       else if (*src <= ' ')
-        return FALSE;
+        return false;
       else
         {
           *(dst++) = *src;
-          got_letter = TRUE;
+          got_letter = true;
         }
     }
 
   /* We must have at least one non-whitespace character */
   if (!got_letter)
-    return FALSE;
+    return false;
 
   /* String off any trailing space */
   if (dst[-1] == ' ')
     dst--;
 
   if (dst - (uint8_t *) name > VSX_PROTO_MAX_NAME_LENGTH)
-    return FALSE;
+    return false;
 
   *dst = '\0';
 
-  return TRUE;
+  return true;
 }

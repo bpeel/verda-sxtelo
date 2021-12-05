@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "vsx-ws-parser.h"
 
@@ -226,10 +227,10 @@ success_tests[] =
     },
   };
 
-static gboolean
+static bool
 test_errors (void)
 {
-  gboolean ret = TRUE;
+  bool ret = true;
 
   for (int i = 0; i < G_N_ELEMENTS (error_tests); i++)
     {
@@ -252,7 +253,7 @@ test_errors (void)
               fprintf (stderr,
                        "error test %i: error was from a different domain\n",
                        i);
-              ret = FALSE;
+              ret = false;
             }
           if (error->code != error_tests[i].expected_code)
             {
@@ -261,7 +262,7 @@ test_errors (void)
                        i,
                        (int) error->code,
                        (int) error_tests[i].expected_code);
-              ret = FALSE;
+              ret = false;
             }
           if (strcmp (error->message, error_tests[i].expected_message))
             {
@@ -272,7 +273,7 @@ test_errors (void)
                        i,
                        error_tests[i].expected_message,
                        error->message);
-              ret = FALSE;
+              ret = false;
             }
 
           g_error_free (error);
@@ -283,7 +284,7 @@ test_errors (void)
                    "error test %i: expected failure but result was %i\n",
                    i,
                    (int) res);
-          ret = FALSE;
+          ret = false;
         }
 
       vsx_ws_parser_free (parser);
@@ -292,7 +293,7 @@ test_errors (void)
   return ret;
 }
 
-static gboolean
+static bool
 compare_key_hash (const uint8_t *key_hash,
                   size_t key_hash_length,
                   const char *expected)
@@ -300,16 +301,16 @@ compare_key_hash (const uint8_t *key_hash,
   while (*expected)
     {
       if (expected[1] == '\0')
-        return FALSE;
+        return false;
 
       if (key_hash_length <= 0)
-        return FALSE;
+        return false;
 
       int byte_value = ((g_ascii_xdigit_value (expected[0]) << 4) |
                         g_ascii_xdigit_value (expected[1]));
 
       if (byte_value != *key_hash)
-        return FALSE;
+        return false;
 
       expected += 2;
       key_hash_length--;
@@ -362,10 +363,10 @@ parse_data_byte_at_a_time (VsxWsParser *parser,
   return VSX_WS_PARSER_RESULT_NEED_MORE_DATA;
 }
 
-static gboolean
-test_success (gboolean byte_at_a_time)
+static bool
+test_success (bool byte_at_a_time)
 {
-  gboolean ret = TRUE;
+  bool ret = true;
 
   for (int i = 0; i < G_N_ELEMENTS (success_tests); i++)
     {
@@ -407,7 +408,7 @@ test_success (gboolean byte_at_a_time)
                        i,
                        consumed,
                        headers_length);
-              ret = FALSE;
+              ret = false;
             }
           else if (strcmp ("TRAILING_DATA",
                            success_tests[i].headers + consumed))
@@ -417,7 +418,7 @@ test_success (gboolean byte_at_a_time)
                        "(consumed = %zu)\n",
                        i,
                        consumed);
-              ret = FALSE;
+              ret = false;
             }
 
           size_t key_hash_length;
@@ -436,7 +437,7 @@ test_success (gboolean byte_at_a_time)
                        success_tests[i].expected_hash);
               dump_key_hash (key_hash, key_hash_length);
               fputc ('\n', stderr);
-              ret = FALSE;
+              ret = false;
             }
         }
       else
@@ -452,7 +453,7 @@ test_success (gboolean byte_at_a_time)
                        error->message);
               g_error_free (error);
             }
-          ret = FALSE;
+          ret = false;
         }
 
       vsx_ws_parser_free (parser);
@@ -469,9 +470,9 @@ main (int argc, char **argv)
   if (!test_errors ())
     ret = EXIT_FAILURE;
 
-  if (test_success (FALSE))
+  if (test_success (false))
     {
-      if (!test_success (TRUE))
+      if (!test_success (true))
         ret = EXIT_FAILURE;
     }
   else
