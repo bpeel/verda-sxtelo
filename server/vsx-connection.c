@@ -876,7 +876,7 @@ write_message (VsxConnection *conn,
                                        message->player_num,
 
                                        VSX_PROTO_TYPE_STRING,
-                                       message->raw_text,
+                                       message->text,
 
                                        VSX_PROTO_TYPE_NONE);
 

@@ -66,10 +66,8 @@ typedef struct
 
 typedef struct
 {
-  unsigned int length;
-  char *text;
   unsigned int player_num;
-  char *raw_text;
+  char *text;
 } VsxConversationMessage;
 
 typedef enum

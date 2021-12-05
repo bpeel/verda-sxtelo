@@ -47,7 +47,6 @@ vsx_conversation_free (void *object)
       VsxConversationMessage *message = &g_array_index (self->messages,
                                                         VsxConversationMessage,
                                                         i);
-      g_free (message->raw_text);
       g_free (message->text);
     }
 
@@ -126,7 +125,6 @@ vsx_conversation_add_message (VsxConversation *conversation,
                               unsigned int length)
 {
   VsxConversationMessage *message;
-  GString *message_str;
 
   /* Ignore attempts to add messages for a player that has left */
   if (!vsx_player_is_connected (conversation->players[player_num]))
@@ -152,34 +150,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
         raw_length--;
     }
 
-  message->raw_text = g_strndup (buffer, raw_length);
-
-  message_str = g_string_sized_new (length + 32);
-
-  g_string_append_printf (message_str,
-                          "[\"message\", {\"person\": %u, "
-                          "\"text\": \"",
-                          player_num);
-  while (length-- > 0)
-    {
-      /* Replace any control characters or spaces with a space */
-      if ((uint8_t) *buffer <= ' ')
-        g_string_append_c (message_str, ' ');
-      /* Quote special characters */
-      else if (*buffer == '"' || *buffer == '\\')
-        {
-          g_string_append_c (message_str, '\\');
-          g_string_append_c (message_str, *buffer);
-        }
-      else
-        g_string_append_c (message_str, *buffer);
-
-      buffer++;
-    }
-  g_string_append (message_str, "\"}]\r\n");
-
-  message->length = message_str->len;
-  message->text = g_string_free (message_str, false);
+  message->text = g_strndup (buffer, raw_length);
 
   vsx_conversation_changed (conversation,
                             VSX_CONVERSATION_MESSAGE_ADDED);

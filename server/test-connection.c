@@ -1104,14 +1104,14 @@ check_expected_message (VsxPerson *person,
                     VsxConversationMessage,
                     person->conversation->messages->len - 1);
 
-  if (strcmp (message->raw_text, expected_message))
+  if (strcmp (message->text, expected_message))
     {
       fprintf (stderr,
                "Message in conversation does not match message sent.\n"
                " Expected: %s\n"
                " Received: %s\n",
                expected_message,
-               message->raw_text);
+               message->text);
       return false;
     }
 
