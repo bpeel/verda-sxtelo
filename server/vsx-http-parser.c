@@ -40,7 +40,7 @@ vsx_http_parser_init (VsxHttpParser *parser,
 }
 
 static gboolean
-check_http_version (const guint8 *data,
+check_http_version (const uint8_t *data,
                     unsigned int length,
                     GError **error)
 {
@@ -81,7 +81,7 @@ set_cancelled_error (GError **error)
 
 static gboolean
 add_bytes_to_buffer (VsxHttpParser *parser,
-                     const guint8 *data,
+                     const uint8_t *data,
                      unsigned int length,
                      GError **error)
 {
@@ -106,12 +106,12 @@ add_bytes_to_buffer (VsxHttpParser *parser,
 
 static gboolean
 process_request_line (VsxHttpParser *parser,
-                      guint8 *data,
+                      uint8_t *data,
                       unsigned int length,
                       GError **error)
 {
-  guint8 *method_end;
-  guint8 *uri_end;
+  uint8_t *method_end;
+  uint8_t *uri_end;
   const char *method = (char *) data;
   const char *uri;
 
@@ -168,12 +168,12 @@ static gboolean
 process_header (VsxHttpParser *parser,
                 GError **error)
 {
-  guint8 *data = parser->buf;
+  uint8_t *data = parser->buf;
   unsigned int length = parser->buf_len;
   const char *field_name = (char *) data;
   const char *value;
-  guint8 zero = '\0';
-  guint8 *field_name_end;
+  uint8_t zero = '\0';
+  uint8_t *field_name_end;
 
   if ((field_name_end = memchr (data, ':', length)) == 0)
     {
@@ -252,7 +252,7 @@ process_header (VsxHttpParser *parser,
 
 static gboolean
 process_data (VsxHttpParser *parser,
-              const guint8 *data,
+              const uint8_t *data,
               unsigned int length,
               GError **error)
 {
@@ -280,11 +280,11 @@ process_request_finished (VsxHttpParser *parser,
 
 gboolean
 vsx_http_parser_parse_data (VsxHttpParser *parser,
-                            const guint8 *data,
+                            const uint8_t *data,
                             unsigned int length,
                             GError **error)
 {
-  const guint8 *terminator;
+  const uint8_t *terminator;
 
   while (length > 0)
     {
@@ -342,7 +342,7 @@ vsx_http_parser_parse_data (VsxHttpParser *parser,
             }
           else
             {
-              guint8 r = '\r';
+              uint8_t r = '\r';
               /* Add the \r that we ignored when switching to this
                  state and then switch back to reading the request
                  line without consuming the char */
@@ -412,7 +412,7 @@ vsx_http_parser_parse_data (VsxHttpParser *parser,
             }
           else
             {
-              guint8 r = '\r';
+              uint8_t r = '\r';
               /* Add the \r that we ignored when switching to this
                  state and then switch back to reading the header
                  without consuming the char */

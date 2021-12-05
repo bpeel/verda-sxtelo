@@ -26,8 +26,8 @@
 gboolean
 vsx_normalize_name (char *name)
 {
-  guint8 *dst = (guint8 *) name;
-  const guint8 *src = dst;
+  uint8_t *dst = (uint8_t *) name;
+  const uint8_t *src = dst;
   gboolean got_letter = FALSE;
 
   /* Skip leading whitespace */
@@ -62,7 +62,7 @@ vsx_normalize_name (char *name)
   if (dst[-1] == ' ')
     dst--;
 
-  if (dst - (guint8 *) name > VSX_PROTO_MAX_NAME_LENGTH)
+  if (dst - (uint8_t *) name > VSX_PROTO_MAX_NAME_LENGTH)
     return FALSE;
 
   *dst = '\0';

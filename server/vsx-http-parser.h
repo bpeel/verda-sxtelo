@@ -20,6 +20,7 @@
 #define __VSX_HTTP_PARSER_H__
 
 #include <glib.h>
+#include <stdint.h>
 
 G_BEGIN_DECLS
 
@@ -40,7 +41,7 @@ typedef struct
   gboolean (* header_received) (const char *field_name,
                                 const char *value,
                                 void *user_data);
-  gboolean (* data_received) (const guint8 *data,
+  gboolean (* data_received) (const uint8_t *data,
                               unsigned int length,
                               void *user_data);
   gboolean (* request_finished) (void *user_data);
@@ -49,7 +50,7 @@ typedef struct
 typedef struct
 {
   unsigned int buf_len;
-  guint8 buf[VSX_HTTP_PARSER_MAX_LINE_LENGTH];
+  uint8_t buf[VSX_HTTP_PARSER_MAX_LINE_LENGTH];
 
   enum
   {
@@ -92,7 +93,7 @@ vsx_http_parser_init (VsxHttpParser *parser,
 
 gboolean
 vsx_http_parser_parse_data (VsxHttpParser *parser,
-                            const guint8 *data,
+                            const uint8_t *data,
                             unsigned int length,
                             GError **error);
 

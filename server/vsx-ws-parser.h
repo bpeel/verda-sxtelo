@@ -20,6 +20,7 @@
 #define __VSX_WS_PARSER_H__
 
 #include <glib.h>
+#include <stdint.h>
 
 typedef struct _VsxWsParser VsxWsParser;
 
@@ -42,12 +43,12 @@ VsxWsParser *vsx_ws_parser_new (void);
 
 VsxWsParserResult
 vsx_ws_parser_parse_data (VsxWsParser *parser,
-                          const guint8 *data,
+                          const uint8_t *data,
                           size_t length,
                           size_t *consumed,
                           GError **error);
 
-const guint8 *
+const uint8_t *
 vsx_ws_parser_get_key_hash (VsxWsParser *parser,
                             size_t *key_hash_size);
 

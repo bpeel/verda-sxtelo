@@ -58,7 +58,7 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
-static const guint8
+static const uint8_t
 ws_terminator[] = "\r\n\r\n";
 
 #define WS_TERMINATOR_LENGTH ((sizeof ws_terminator) - 1)
@@ -74,7 +74,7 @@ typedef enum
 } VsxConnectionDirtyFlag;
 
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
-                                             guint8 *buffer,
+                                             uint8_t *buffer,
                                              size_t buffer_size);
 
 static void
@@ -135,7 +135,7 @@ struct _VsxConnectionPrivate
   guint reconnect_handler;
   VsxPlayer *self;
   gboolean has_person_id;
-  guint64 person_id;
+  uint64_t person_id;
   VsxConnectionRunningState running_state;
   VsxConnectionState state;
   gboolean typing;
@@ -163,12 +163,12 @@ struct _VsxConnectionPrivate
   GTimer *keep_alive_time;
 
   unsigned int output_length;
-  guint8 output_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
-                       + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
+  uint8_t output_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
+                        + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
 
   unsigned int input_length;
-  guint8 input_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
-                      + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
+  uint8_t input_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
+                       + VSX_PROTO_MAX_FRAME_HEADER_LENGTH];
 
   /* Position within ws terminator that we have found so far. If this
    * is greater than the terminator length then we’ve finished the
@@ -414,12 +414,12 @@ get_or_create_player (VsxConnection *connection,
 
 static gboolean
 handle_player_id (VsxConnection *connection,
-                  const guint8 *payload,
+                  const uint8_t *payload,
                   size_t payload_length,
                   GError **error)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  guint8 self_num;
+  uint8_t self_num;
 
   if (!vsx_proto_read_payload (payload + 1,
                                payload_length - 1,
@@ -451,12 +451,12 @@ handle_player_id (VsxConnection *connection,
 
 static gboolean
 handle_message (VsxConnection *connection,
-                const guint8 *payload,
+                const uint8_t *payload,
                 size_t payload_length,
                 GError **error)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  guint8 person;
+  uint8_t person;
   const char *text;
 
   if (!vsx_proto_read_payload (payload + 1,
@@ -490,13 +490,13 @@ handle_message (VsxConnection *connection,
 
 static gboolean
 handle_tile (VsxConnection *connection,
-             const guint8 *payload,
+             const uint8_t *payload,
              size_t payload_length,
              GError **error)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  guint8 num, player;
-  gint16 x, y;
+  uint8_t num, player;
+  int16_t x, y;
   const char *letter;
 
   if (!vsx_proto_read_payload (payload + 1,
@@ -555,11 +555,11 @@ handle_tile (VsxConnection *connection,
 
 static gboolean
 handle_player_name (VsxConnection *connection,
-                    const guint8 *payload,
+                    const uint8_t *payload,
                     size_t payload_length,
                     GError **error)
 {
-  guint8 num;
+  uint8_t num;
   const char *name;
 
   if (!vsx_proto_read_payload (payload + 1,
@@ -595,11 +595,11 @@ handle_player_name (VsxConnection *connection,
 
 static gboolean
 handle_player (VsxConnection *connection,
-               const guint8 *payload,
+               const uint8_t *payload,
                size_t payload_length,
                GError **error)
 {
-  guint8 num, flags;
+  uint8_t num, flags;
 
   if (!vsx_proto_read_payload (payload + 1,
                                payload_length - 1,
@@ -633,11 +633,11 @@ handle_player (VsxConnection *connection,
 
 static gboolean
 handle_player_shouted (VsxConnection *connection,
-                       const guint8 *payload,
+                       const uint8_t *payload,
                        size_t payload_length,
                        GError **error)
 {
-  guint8 player_num;
+  uint8_t player_num;
 
   if (!vsx_proto_read_payload (payload + 1,
                                payload_length - 1,
@@ -666,7 +666,7 @@ handle_player_shouted (VsxConnection *connection,
 
 static gboolean
 handle_end (VsxConnection *connection,
-            const guint8 *payload,
+            const uint8_t *payload,
             size_t payload_length,
             GError **error)
 {
@@ -689,7 +689,7 @@ handle_end (VsxConnection *connection,
 
 static gboolean
 process_message (VsxConnection *connection,
-                 const guint8 *payload,
+                 const uint8_t *payload,
                  size_t payload_length,
                  GError **error)
 {
@@ -733,10 +733,10 @@ report_error (VsxConnection *connection,
 }
 
 static gboolean
-get_payload_length (const guint8 *buf,
+get_payload_length (const uint8_t *buf,
                     size_t buf_length,
                     size_t *payload_length_out,
-                    const guint8 **payload_start_out)
+                    const uint8_t **payload_start_out)
 {
   if (buf_length < 2)
     return FALSE;
@@ -747,7 +747,7 @@ get_payload_length (const guint8 *buf,
       if (buf_length < 4)
         return FALSE;
 
-      *payload_length_out = vsx_proto_read_guint16 (buf + 2);
+      *payload_length_out = vsx_proto_read_uint16_t (buf + 2);
       *payload_start_out = buf + 4;
       return TRUE;
 
@@ -755,7 +755,7 @@ get_payload_length (const guint8 *buf,
       if (buf_length < 6)
         return FALSE;
 
-      *payload_length_out = vsx_proto_read_guint32 (buf + 2);
+      *payload_length_out = vsx_proto_read_uint32_t (buf + 2);
       *payload_start_out = buf + 6;
       return TRUE;
 
@@ -804,7 +804,7 @@ handle_read (VsxConnection *connection)
     }
   else
     {
-      const guint8 *p = priv->input_buffer;
+      const uint8_t *p = priv->input_buffer;
 
       priv->input_length += got;
 
@@ -833,7 +833,7 @@ handle_read (VsxConnection *connection)
     terminated: ((void) 0);
 
       size_t payload_length;
-      const guint8 *payload_start;
+      const uint8_t *payload_start;
 
       while (get_payload_length (p,
                                  priv->input_buffer
@@ -881,10 +881,10 @@ handle_read (VsxConnection *connection)
 
 static int
 write_ws_request (VsxConnection *connection,
-                  guint8 *buffer,
+                  uint8_t *buffer,
                   size_t buffer_size)
 {
-  static const guint8 ws_request[] =
+  static const uint8_t ws_request[] =
     "GET / HTTP/1.1\r\n"
     "Upgrade: websocket\r\n"
     "Connection: Upgrade\r\n"
@@ -902,7 +902,7 @@ write_ws_request (VsxConnection *connection,
 
 static int
 write_header (VsxConnection *connection,
-              guint8 *buffer,
+              uint8_t *buffer,
               size_t buffer_size)
 {
   VsxConnectionPrivate *priv = connection->priv;
@@ -941,7 +941,7 @@ write_header (VsxConnection *connection,
 
 static int
 write_keep_alive (VsxConnection *connection,
-                  guint8 *buffer,
+                  uint8_t *buffer,
                   size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -954,7 +954,7 @@ write_keep_alive (VsxConnection *connection,
 
 static int
 write_leave (VsxConnection *connection,
-             guint8 *buffer,
+             uint8_t *buffer,
              size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -967,7 +967,7 @@ write_leave (VsxConnection *connection,
 
 static int
 write_shout (VsxConnection *connection,
-             guint8 *buffer,
+             uint8_t *buffer,
              size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -980,7 +980,7 @@ write_shout (VsxConnection *connection,
 
 static int
 write_turn (VsxConnection *connection,
-            guint8 *buffer,
+            uint8_t *buffer,
             size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -993,7 +993,7 @@ write_turn (VsxConnection *connection,
 
 static int
 write_move_tile (VsxConnection *connection,
-                 guint8 *buffer,
+                 uint8_t *buffer,
                  size_t buffer_size)
 {
   VsxConnectionPrivate *priv = connection->priv;
@@ -1032,7 +1032,7 @@ write_move_tile (VsxConnection *connection,
 
 static int
 write_send_message (VsxConnection *connection,
-                    guint8 *buffer,
+                    uint8_t *buffer,
                     size_t buffer_size)
 {
   VsxConnectionPrivate *priv = connection->priv;
@@ -1068,7 +1068,7 @@ write_send_message (VsxConnection *connection,
 
 static int
 write_typing_state (VsxConnection *connection,
-                    guint8 *buffer,
+                    uint8_t *buffer,
                     size_t buffer_size)
 {
   VsxConnectionPrivate *priv = connection->priv;

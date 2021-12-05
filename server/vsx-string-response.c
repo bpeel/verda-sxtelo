@@ -120,7 +120,7 @@ get_message (VsxStringResponseType type,
 
 static unsigned int
 vsx_string_response_add_data (VsxResponse *response,
-                              guint8 *data,
+                              uint8_t *data,
                               unsigned int length)
 {
   VsxStringResponse *self = (VsxStringResponse *) response;

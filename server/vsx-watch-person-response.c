@@ -29,7 +29,7 @@
 /* Interval in microseconds between keep-alive messages */
 #define VSX_WATCH_PERSON_RESPONSE_KEEP_ALIVE_INTERVAL 60000000 /* 1 minute */
 
-static guint8
+static uint8_t
 header_message[] =
   "HTTP/1.1 200 OK\r\n"
   VSX_RESPONSE_COMMON_HEADERS
@@ -62,19 +62,19 @@ header_message[] =
   "fino kaj nun povas komenci la veraj datumoj. Ĝuu!\"]\r\n"
   "\r\n";
 
-static guint8
+static uint8_t
 keep_alive_message[] =
   "10\r\n"
   "[\"keep-alive\"]\r\n"
   "\r\n";
 
-static guint8
+static uint8_t
 sync_message[] =
   "a\r\n"
   "[\"sync\"]\r\n"
   "\r\n";
 
-static guint8
+static uint8_t
 end_message[] =
   "9\r\n"
   "[\"end\"]\r\n"
@@ -84,14 +84,14 @@ end_message[] =
 
 typedef struct
 {
-  guint8 *data;
+  uint8_t *data;
   unsigned int length;
 } WriteMessageData;
 
 static gboolean
 write_message (VsxWatchPersonResponse *self,
                WriteMessageData *message_data,
-               const guint8 *message,
+               const uint8_t *message,
                unsigned int message_length)
 {
   unsigned int to_write = MIN (message_data->length,
@@ -118,7 +118,7 @@ write_message (VsxWatchPersonResponse *self,
 static gboolean
 write_chunked_message (VsxWatchPersonResponse *self,
                        WriteMessageData *message_data,
-                       const guint8 *message,
+                       const uint8_t *message,
                        unsigned int message_length)
 {
   char length_buf[8 + 2 + 1];
@@ -239,7 +239,7 @@ has_pending_data (VsxWatchPersonResponse *self,
 
 static unsigned int
 vsx_watch_person_response_add_data (VsxResponse *response,
-                                    guint8 *data_in,
+                                    uint8_t *data_in,
                                     unsigned int length_in)
 {
   VsxWatchPersonResponse *self = (VsxWatchPersonResponse *) response;
@@ -276,7 +276,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) buf,
+                                     (const uint8_t *) buf,
                                      length))
             {
               self->message_pos = 0;
@@ -326,7 +326,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) buf,
+                                     (const uint8_t *) buf,
                                      length))
             {
               self->message_pos = 0;
@@ -344,7 +344,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) player->name_message,
+                                     (const uint8_t *) player->name_message,
                                      player->name_message_len))
             {
               self->message_pos = 0;
@@ -394,7 +394,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) buf,
+                                     (const uint8_t *) buf,
                                      length))
             {
               self->message_pos = 0;
@@ -416,7 +416,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) buf,
+                                     (const uint8_t *) buf,
                                      length))
             {
               self->message_pos = 0;
@@ -473,7 +473,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) buf,
+                                     (const uint8_t *) buf,
                                      length))
             {
               self->message_pos = 0;
@@ -495,7 +495,7 @@ vsx_watch_person_response_add_data (VsxResponse *response,
 
           if (write_chunked_message (self,
                                      &message_data,
-                                     (const guint8 *) message->text,
+                                     (const uint8_t *) message->text,
                                      message->length))
             {
               self->message_pos = 0;

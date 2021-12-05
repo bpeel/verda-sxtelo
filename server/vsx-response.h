@@ -20,6 +20,7 @@
 #define __VSX_RESPONSE_H__
 
 #include <glib.h>
+#include <stdint.h>
 
 #include "vsx-signal.h"
 #include "vsx-object.h"
@@ -42,7 +43,7 @@ typedef struct
   /* This should fill the given array with some more data to write and
      return the number of bytes added. */
   unsigned int (* add_data) (VsxResponse *response,
-                             guint8 *buffer,
+                             uint8_t *buffer,
                              unsigned int buffer_size);
   /* This should report TRUE if there is data immediately ready for
      writing (eg, we should block for writing on the
@@ -68,7 +69,7 @@ vsx_response_get_class (void) G_GNUC_CONST;
 
 unsigned int
 vsx_response_add_data (VsxResponse *response,
-                       guint8 *buffer,
+                       uint8_t *buffer,
                        unsigned int buffer_size);
 
 gboolean

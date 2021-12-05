@@ -48,7 +48,7 @@ get_payload_length (va_list ap)
 
         case VSX_PROTO_TYPE_BLOB:
           payload_length += va_arg (ap, size_t);
-          va_arg(ap, const guint8 *);
+          va_arg(ap, const uint8_t *);
           break;
 
         case VSX_PROTO_TYPE_STRING:
@@ -69,15 +69,15 @@ vsx_proto_get_frame_header_length (size_t payload_length)
   size_t frame_header_length = 2;
 
   if (payload_length > 0xffff)
-    frame_header_length += sizeof (guint64);
+    frame_header_length += sizeof (uint64_t);
   else if (payload_length >= 126)
-    frame_header_length += sizeof (guint16);
+    frame_header_length += sizeof (uint16_t);
 
   return frame_header_length;
 }
 
 void
-vsx_proto_write_frame_header (guint8 *buffer,
+vsx_proto_write_frame_header (uint8_t *buffer,
                               size_t payload_length)
 {
   /* opcode (2) (binary) with FIN bit set */
@@ -91,13 +91,13 @@ vsx_proto_write_frame_header (guint8 *buffer,
   if (payload_length > 0xffff)
     {
       buffer[1] = 127;
-      vsx_proto_write_guint64 (buffer + 2,
+      vsx_proto_write_uint64_t (buffer + 2,
                                GUINT64_SWAP_LE_BE (payload_length));
     }
   else if (payload_length >= 126)
     {
       buffer[1] = 126;
-      vsx_proto_write_guint16(buffer + 2,
+      vsx_proto_write_uint16_t(buffer + 2,
                               GUINT16_SWAP_LE_BE (payload_length));
     }
   else
@@ -115,16 +115,16 @@ vsx_proto_write_frame_header (guint8 *buffer,
   break;
 
 int
-vsx_proto_write_command_v (guint8 *buffer,
+vsx_proto_write_command_v (uint8_t *buffer,
                            size_t buffer_length,
-                           guint8 command,
+                           uint8_t command,
                            va_list ap)
 {
   int pos;
   size_t payload_length = 0;
   size_t frame_header_length;
   size_t blob_length;
-  const guint8 *blob_data;
+  const uint8_t *blob_data;
   const char *str;
   va_list ap_copy;
 
@@ -151,7 +151,7 @@ vsx_proto_write_command_v (guint8 *buffer,
 
         case VSX_PROTO_TYPE_BLOB:
           blob_length = va_arg (ap, size_t);
-          blob_data = va_arg (ap, const guint8 *);
+          blob_data = va_arg (ap, const uint8_t *);
           memcpy (buffer + pos, blob_data, blob_length);
           pos += blob_length;
           break;
@@ -179,9 +179,9 @@ vsx_proto_write_command_v (guint8 *buffer,
 #undef VSX_PROTO_TYPE
 
 int
-vsx_proto_write_command (guint8 *buffer,
+vsx_proto_write_command (uint8_t *buffer,
                          size_t buffer_length,
-                         guint8 command,
+                         uint8_t command,
                          ...)
 {
   int ret;
@@ -213,17 +213,17 @@ vsx_proto_write_command (guint8 *buffer,
         break;
 
 gboolean
-vsx_proto_read_payload (const guint8 *buffer,
+vsx_proto_read_payload (const uint8_t *buffer,
                         size_t length,
                         ...)
 {
   size_t pos = 0;
   gboolean ret = TRUE;
   va_list ap;
-  const guint8 **blob_data;
+  const uint8_t **blob_data;
   size_t *blob_size;
   const char **str;
-  const guint8 *str_end;
+  const uint8_t *str_end;
 
   va_start (ap, length);
 
@@ -235,7 +235,7 @@ vsx_proto_read_payload (const guint8 *buffer,
 
         case VSX_PROTO_TYPE_BLOB:
           blob_size = va_arg (ap, size_t *);
-          blob_data = va_arg (ap, const guint8 **);
+          blob_data = va_arg (ap, const uint8_t **);
           *blob_size = length - pos;
           *blob_data = buffer + pos;
           pos = length;

@@ -54,7 +54,7 @@ typedef struct
 
   void
   (* data_received) (VsxRequestHandler *handler,
-                     const guint8 *data,
+                     const uint8_t *data,
                      unsigned int length);
 
   VsxResponse *
@@ -93,7 +93,7 @@ vsx_request_handler_header_received (VsxRequestHandler *handler,
 
 void
 vsx_request_handler_data_received (VsxRequestHandler *handler,
-                                   const guint8 *data,
+                                   const uint8_t *data,
                                    unsigned int length);
 
 VsxResponse *

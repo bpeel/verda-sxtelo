@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 /* Maximum number of bytes allowed in a payload. The server keeps a
  * buffer of this size around for each connection, so we don’t want it
@@ -78,96 +79,96 @@ typedef enum
   } VsxProtoType;
 
 static inline void
-vsx_proto_write_guint8 (guint8 *buffer,
-                        guint8 value)
+vsx_proto_write_uint8_t (uint8_t *buffer,
+                         uint8_t value)
 {
   *buffer = value;
 }
 
 static inline void
-vsx_proto_write_guint16 (guint8 *buffer,
-                         guint16 value)
+vsx_proto_write_uint16_t (uint8_t *buffer,
+                          uint16_t value)
 {
   value = GUINT16_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_guint32 (guint8 *buffer,
-                         guint32 value)
+vsx_proto_write_uint32_t (uint8_t *buffer,
+                          uint32_t value)
 {
   value = GUINT32_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_guint64 (guint8 *buffer,
-                         guint64 value)
+vsx_proto_write_uint64_t (uint8_t *buffer,
+                          uint64_t value)
 {
   value = GUINT64_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_gint16 (guint8 *buffer,
-                       gint16 value)
+vsx_proto_write_int16_t (uint8_t *buffer,
+                         int16_t value)
 {
   value = GINT16_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
 int
-vsx_proto_write_command_v (guint8 *buffer,
+vsx_proto_write_command_v (uint8_t *buffer,
                            size_t buffer_length,
-                           guint8 command,
+                           uint8_t command,
                            va_list ap);
 
 int
-vsx_proto_write_command (guint8 *buffer,
+vsx_proto_write_command (uint8_t *buffer,
                          size_t buffer_length,
-                         guint8 command,
+                         uint8_t command,
                          ...);
 
-static inline guint8
-vsx_proto_read_guint8 (const guint8 *buffer)
+static inline uint8_t
+vsx_proto_read_uint8_t (const uint8_t *buffer)
 {
   return *buffer;
 }
 
-static inline guint16
-vsx_proto_read_guint16 (const guint8 *buffer)
+static inline uint16_t
+vsx_proto_read_uint16_t (const uint8_t *buffer)
 {
-  guint16 value;
+  uint16_t value;
   memcpy (&value, buffer, sizeof value);
   return GUINT16_FROM_LE (value);
 }
 
-static inline guint32
-vsx_proto_read_guint32 (const guint8 *buffer)
+static inline uint32_t
+vsx_proto_read_uint32_t (const uint8_t *buffer)
 {
-  guint32 value;
+  uint32_t value;
   memcpy (&value, buffer, sizeof value);
   return GUINT32_FROM_LE (value);
 }
 
-static inline guint64
-vsx_proto_read_guint64 (const guint8 *buffer)
+static inline uint64_t
+vsx_proto_read_uint64_t (const uint8_t *buffer)
 {
-  guint64 value;
+  uint64_t value;
   memcpy (&value, buffer, sizeof value);
   return GUINT64_FROM_LE (value);
 }
 
-static inline gint16
-vsx_proto_read_gint16 (const guint8 *buffer)
+static inline int16_t
+vsx_proto_read_int16_t (const uint8_t *buffer)
 {
-  gint16 value;
+  int16_t value;
   memcpy (&value, buffer, sizeof value);
   return GINT16_FROM_LE (value);
 }
 
 gboolean
-vsx_proto_read_payload (const guint8 *buffer,
+vsx_proto_read_payload (const uint8_t *buffer,
                         size_t length,
                         ...);
 
@@ -175,7 +176,7 @@ size_t
 vsx_proto_get_frame_header_length (size_t payload_length);
 
 void
-vsx_proto_write_frame_header (guint8 *buffer,
+vsx_proto_write_frame_header (uint8_t *buffer,
                               size_t payload_length);
 
 #endif /* __VSX_PROTO_H__ */

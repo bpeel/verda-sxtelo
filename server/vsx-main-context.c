@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "vsx-main-context.h"
 #include "vsx-list.h"
@@ -60,10 +61,10 @@ struct _VsxMainContext
   void (* old_term_handler) (int);
 
   gboolean monotonic_time_valid;
-  gint64 monotonic_time;
+  int64_t monotonic_time;
 
   VsxList buckets;
-  gint64 last_timer_time;
+  int64_t last_timer_time;
 };
 
 struct _VsxMainContextSource
@@ -260,7 +261,7 @@ vsx_main_context_quit_pipe_cb (VsxMainContextSource *source,
                                void *user_data)
 {
   VsxMainContext *mc = user_data;
-  guint8 byte;
+  uint8_t byte;
 
   if (read (mc->quit_pipe[0], &byte, sizeof (byte)) == -1)
     {
@@ -284,7 +285,7 @@ static void
 vsx_main_context_quit_signal_cb (int signum)
 {
   VsxMainContext *mc = vsx_main_context_get_default_or_abort ();
-  guint8 byte = 42;
+  uint8_t byte = 42;
 
   while (write (mc->quit_pipe[1], &byte, 1) == -1
          && errno == EINTR);
@@ -425,9 +426,9 @@ get_timeout (VsxMainContext *mc)
 {
   VsxMainContextBucket *bucket;
   int min_minutes;
-  gint64 elapsed, elapsed_minutes;
+  int64_t elapsed, elapsed_minutes;
 
-  min_minutes = G_MAXINT;
+  min_minutes = INT_MAX;
 
   vsx_list_for_each (bucket, &mc->buckets, link)
     {
@@ -440,7 +441,7 @@ get_timeout (VsxMainContext *mc)
         min_minutes = minutes_to_wait;
     }
 
-  if (min_minutes == G_MAXINT)
+  if (min_minutes == INT_MAX)
     return -1;
 
   elapsed = vsx_main_context_get_monotonic_clock (mc) - mc->last_timer_time;
@@ -460,8 +461,8 @@ static void
 check_timer_sources (VsxMainContext *mc)
 {
   VsxMainContextBucket *bucket;
-  gint64 now;
-  gint64 elapsed_minutes;
+  int64_t now;
+  int64_t elapsed_minutes;
 
   if (vsx_list_empty (&mc->buckets))
     return;
@@ -608,7 +609,7 @@ vsx_main_context_poll (VsxMainContext *mc)
     }
 }
 
-gint64
+int64_t
 vsx_main_context_get_monotonic_clock (VsxMainContext *mc)
 {
   if (mc == NULL)

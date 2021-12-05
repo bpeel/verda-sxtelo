@@ -20,6 +20,7 @@
 #define __VSX_CHUNKED_ICONV_H__
 
 #include <glib.h>
+#include <stdint.h>
 
 G_BEGIN_DECLS
 
@@ -47,7 +48,7 @@ vsx_chunked_iconv_init (VsxChunkedIconv *self,
 
 gboolean
 vsx_chunked_iconv_add_data (VsxChunkedIconv *self,
-                            const guint8 *data,
+                            const uint8_t *data,
                             unsigned int length);
 
 gboolean

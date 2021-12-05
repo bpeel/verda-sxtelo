@@ -26,7 +26,7 @@
 struct _VsxTile
 {
   int num;
-  gint16 x, y;
+  int16_t x, y;
   gunichar letter;
 };
 

@@ -42,12 +42,12 @@ vsx_connection_new (GSocketAddress *socket_address,
 
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
-                                   guint8 *buffer,
+                                   uint8_t *buffer,
                                    size_t buffer_size);
 
 gboolean
 vsx_connection_parse_data (VsxConnection *conn,
-                           const guint8 *buffer,
+                           const uint8_t *buffer,
                            size_t buffer_length,
                            GError **error);
 
@@ -64,7 +64,7 @@ vsx_connection_has_data (VsxConnection *conn);
 VsxSignal *
 vsx_connection_get_changed_signal (VsxConnection *conn);
 
-gint64
+int64_t
 vsx_connection_get_last_message_time (VsxConnection *conn);
 
 void

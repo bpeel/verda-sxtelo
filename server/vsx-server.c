@@ -118,7 +118,7 @@ typedef struct
   VsxMainContextPollFlags ssl_write_block;
 
   unsigned int output_length;
-  guint8 output_buffer[VSX_SERVER_OUTPUT_BUFFER_SIZE];
+  uint8_t output_buffer[VSX_SERVER_OUTPUT_BUFFER_SIZE];
 
   /* IP address of the connection. This is only filled in if logging
      is enabled */
@@ -126,7 +126,7 @@ typedef struct
 
   /* Time since the response queue became empty. The connection will
    * be removed if this stays empty for too long */
-  gint64 no_response_age;
+  int64_t no_response_age;
 
   SSL *ssl;
 } VsxServerConnection;
@@ -158,7 +158,7 @@ typedef struct
  * connections that open the socket and then don't send any
  * data. These would otherwise hang out indefinitely and use up
  * resources. */
-#define VSX_SERVER_NO_RESPONSE_TIMEOUT (5 * 60 * (gint64) 1000000)
+#define VSX_SERVER_NO_RESPONSE_TIMEOUT (5 * 60 * (int64_t) 1000000)
 
 static const struct
 {
@@ -291,7 +291,7 @@ vsx_server_header_received_cb (const char *field_name,
 }
 
 static gboolean
-vsx_server_data_received_cb (const guint8 *data,
+vsx_server_data_received_cb (const uint8_t *data,
                              unsigned int length,
                              void *user_data)
 {
@@ -427,7 +427,7 @@ check_dead_connection (VsxServerConnection *connection)
   if (!vsx_list_empty (&connection->response_queue))
     return;
 
-  gint64 dead_time =
+  int64_t dead_time =
     connection->ws_connection
     ? vsx_connection_get_last_message_time (connection->ws_connection)
     : connection->no_response_age;
@@ -622,7 +622,7 @@ update_poll (VsxServerConnection *connection)
 
 static gboolean
 parse_data (VsxServerConnection *connection,
-            const guint8 *buffer,
+            const uint8_t *buffer,
             size_t buffer_length,
             GError **error)
 {
@@ -743,7 +743,7 @@ handle_read (VsxServer *server,
     {
       if (!connection->had_bad_input
           && !parse_data (connection,
-                          (guint8 *) buf,
+                          (uint8_t *) buf,
                           got,
                           &error))
         {
@@ -864,7 +864,7 @@ handle_write (VsxServer *server,
   else
     {
       wrote = g_socket_send (connection->client_socket,
-                             (const gchar *) connection->output_buffer,
+                             (const char *) connection->output_buffer,
                              connection->output_length,
                              NULL,
                              &error);
@@ -964,7 +964,7 @@ get_address_string (GSocketAddress *address,
 
           if (include_port)
             {
-              guint16 port =
+              uint16_t port =
                 g_inet_socket_address_get_port (inet_socket_address);
 
               address_string = g_strdup_printf ("%s:%u", host_part, port);

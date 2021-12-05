@@ -21,6 +21,7 @@
 #endif
 
 #include <glib.h>
+#include <stdint.h>
 
 #include "vsx-parse-content-type.h"
 
@@ -41,7 +42,7 @@
 #define HTTP_TYPE_TOKEN 16384
 #define HTTP_TYPE_UPALPHA 32768
 
-static const guint16
+static const uint16_t
 http_char_table[] =
   {
     0x040a,0x040a,0x040a,0x040a,0x040a,0x040a,0x040a,0x040a,
@@ -78,10 +79,10 @@ http_char_table[] =
     0x2400,0x2400,0x2400,0x2400,0x2400,0x2400,0x2400,0x2400
   };
 
-#define HTTP_IS_TOKEN(ch) (http_char_table[(guint8) ch] & HTTP_TYPE_TOKEN)
-#define HTTP_IS_LWS(ch) (http_char_table[(guint8) ch] & HTTP_TYPE_LWS)
-#define HTTP_IS_TEXT(ch) (http_char_table[(guint8) ch] & HTTP_TYPE_TEXT)
-#define HTTP_IS_CHAR(ch) (http_char_table[(guint8) ch] & HTTP_TYPE_CHAR)
+#define HTTP_IS_TOKEN(ch) (http_char_table[(uint8_t) ch] & HTTP_TYPE_TOKEN)
+#define HTTP_IS_LWS(ch) (http_char_table[(uint8_t) ch] & HTTP_TYPE_LWS)
+#define HTTP_IS_TEXT(ch) (http_char_table[(uint8_t) ch] & HTTP_TYPE_TEXT)
+#define HTTP_IS_CHAR(ch) (http_char_table[(uint8_t) ch] & HTTP_TYPE_CHAR)
 
 gboolean
 vsx_parse_content_type (const char *header_value,

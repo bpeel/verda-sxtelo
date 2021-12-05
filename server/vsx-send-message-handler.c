@@ -194,7 +194,7 @@ real_header_received (VsxRequestHandler *handler,
 
 static void
 real_data_received (VsxRequestHandler *handler,
-                    const guint8 *data,
+                    const uint8_t *data,
                     unsigned int length)
 {
   VsxSendMessageHandler *self = (VsxSendMessageHandler *) handler;

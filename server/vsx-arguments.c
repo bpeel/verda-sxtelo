@@ -74,7 +74,7 @@ static gboolean
 parse_int (const char *str,
            int *value)
 {
-  gint64 v;
+  int64_t v;
   char *endptr;
 
   errno = 0;

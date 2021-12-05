@@ -32,7 +32,7 @@
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
 
-static guint16 next_id = 0;
+static uint16_t next_id = 0;
 
 static void
 vsx_conversation_free (void *object)
@@ -172,7 +172,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
   while (length-- > 0)
     {
       /* Replace any control characters or spaces with a space */
-      if ((guint8) *buffer <= ' ')
+      if ((uint8_t) *buffer <= ' ')
         g_string_append_c (message_str, ' ');
       /* Quote special characters */
       else if (*buffer == '"' || *buffer == '\\')
@@ -467,8 +467,8 @@ try_location (VsxConversation *conversation,
 
 static void
 find_free_location (VsxConversation *conversation,
-                    gint16 *x_out,
-                    gint16 *y_out)
+                    int16_t *x_out,
+                    int16_t *y_out)
 {
   int x, y;
 

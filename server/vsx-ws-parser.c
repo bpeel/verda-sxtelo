@@ -35,7 +35,7 @@ struct _VsxWsParser
 {
   unsigned int buf_len;
 
-  guint8 buf[VSX_WS_PARSER_MAX_LINE_LENGTH];
+  uint8_t buf[VSX_WS_PARSER_MAX_LINE_LENGTH];
 
   enum
   {
@@ -47,7 +47,7 @@ struct _VsxWsParser
     VSX_WS_PARSER_DONE
   } state;
 
-  guint8 key_hash[EVP_MAX_MD_SIZE];
+  uint8_t key_hash[EVP_MAX_MD_SIZE];
   unsigned int key_hash_length;
 
   EVP_MD_CTX *key_hash_ctx;
@@ -69,7 +69,7 @@ vsx_ws_parser_new (void)
 }
 
 static gboolean
-check_http_version (const guint8 *data, unsigned int length, GError **error)
+check_http_version (const uint8_t *data, unsigned int length, GError **error)
 {
   static const char prefix[] = "HTTP/1.";
 
@@ -100,7 +100,7 @@ bad:
 
 static gboolean
 add_bytes_to_buffer (VsxWsParser *parser,
-                     const guint8 *data,
+                     const uint8_t *data,
                      unsigned int length,
                      GError **error)
 {
@@ -123,11 +123,11 @@ add_bytes_to_buffer (VsxWsParser *parser,
 
 static gboolean
 process_request_line (VsxWsParser *parser,
-                      guint8 *data,
+                      uint8_t *data,
                       unsigned int length,
                       GError **error)
 {
-  guint8 *method_end = memchr (data, ' ', length);
+  uint8_t *method_end = memchr (data, ' ', length);
 
   if (method_end == NULL)
     {
@@ -146,7 +146,7 @@ process_request_line (VsxWsParser *parser,
   length -= method_end - data + 1;
   data = method_end + 1;
 
-  guint8 *uri_end = memchr (data, ' ', length);
+  uint8_t *uri_end = memchr (data, ' ', length);
 
   if (uri_end == NULL)
     {
@@ -171,10 +171,10 @@ process_request_line (VsxWsParser *parser,
 static gboolean
 process_header (VsxWsParser *parser, GError **error)
 {
-  guint8 *data = parser->buf;
+  uint8_t *data = parser->buf;
   unsigned int length = parser->buf_len;
   const char *field_name = (char *) data;
-  guint8 *field_name_end;
+  uint8_t *field_name_end;
 
   field_name_end = memchr (data, ':', length);
 
@@ -222,7 +222,7 @@ process_header (VsxWsParser *parser, GError **error)
 
 typedef struct
 {
-  const guint8 *data;
+  const uint8_t *data;
   unsigned int length;
 } VsxWsParserClosure;
 
@@ -231,7 +231,7 @@ handle_reading_request_line (VsxWsParser *parser,
                              VsxWsParserClosure *c,
                              GError **error)
 {
-  const guint8 *terminator;
+  const uint8_t *terminator;
 
   /* Could the data contain a terminator? */
   if ((terminator = memchr (c->data, '\r', c->length)))
@@ -291,7 +291,7 @@ handle_terminating_request_line (VsxWsParser *parser,
     }
   else
     {
-      guint8 r = '\r';
+      uint8_t r = '\r';
       /* Add the \r that we ignored when switching to this
        * state and then switch back to reading the request
        * line without consuming the char
@@ -309,7 +309,7 @@ handle_reading_header (VsxWsParser *parser,
                        VsxWsParserClosure *c,
                        GError **error)
 {
-  const guint8 *terminator;
+  const uint8_t *terminator;
 
   /* Could the data contain a terminator? */
   if ((terminator = memchr (c->data, '\r', c->length)))
@@ -390,7 +390,7 @@ handle_terminating_header (VsxWsParser *parser,
     }
   else
     {
-      guint8 r = '\r';
+      uint8_t r = '\r';
       /* Add the \r that we ignored when switching to this
        * state and then switch back to reading the header
        * without consuming the char
@@ -432,7 +432,7 @@ handle_checking_header_continuation (VsxWsParser *parser,
 
 VsxWsParserResult
 vsx_ws_parser_parse_data (VsxWsParser *parser,
-                          const guint8 *data,
+                          const uint8_t *data,
                           size_t length,
                           size_t *consumed,
                           GError **error)
@@ -486,7 +486,7 @@ vsx_ws_parser_parse_data (VsxWsParser *parser,
   return VSX_WS_PARSER_RESULT_NEED_MORE_DATA;
 }
 
-const guint8 *
+const uint8_t *
 vsx_ws_parser_get_key_hash (VsxWsParser *parser,
                             size_t *key_hash_size)
 {

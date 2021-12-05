@@ -78,8 +78,8 @@ typedef struct
     struct
     {
       unsigned int num;
-      gint16 x, y;
-      gint16 last_player;
+      int16_t x, y;
+      int16_t last_player;
     } tile;
   } dirty;
 
@@ -99,7 +99,7 @@ typedef struct
 
   gboolean sync_sent;
 
-  gint64 last_write_time;
+  int64_t last_write_time;
   VsxMainContextSource *keep_alive_timer;
 } VsxWatchPersonResponse;
 

@@ -21,6 +21,7 @@
 
 #include <glib.h>
 #include <gio/gio.h>
+#include <stdint.h>
 
 #include "vsx-conversation.h"
 #include "vsx-player.h"
@@ -28,7 +29,7 @@
 
 G_BEGIN_DECLS
 
-typedef guint64 VsxPersonId;
+typedef uint64_t VsxPersonId;
 
 typedef struct
 {
@@ -40,7 +41,7 @@ typedef struct
 
   VsxPlayer *player;
 
-  gint64 last_noise_time;
+  int64_t last_noise_time;
 
   /* When a player joins this number is set to the current number of
    * messages. Any reference to a message number sent from the client

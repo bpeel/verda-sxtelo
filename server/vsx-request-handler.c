@@ -62,7 +62,7 @@ vsx_request_handler_real_header_received (VsxRequestHandler *handler,
 
 static void
 vsx_request_handler_real_data_received (VsxRequestHandler *handler,
-                                        const guint8 *data,
+                                        const uint8_t *data,
                                         unsigned int length)
 {
   /* Default handler just ignores everything */
@@ -140,7 +140,7 @@ vsx_request_handler_header_received (VsxRequestHandler *handler,
 
 void
 vsx_request_handler_data_received (VsxRequestHandler *handler,
-                                   const guint8 *data,
+                                   const uint8_t *data,
                                    unsigned int length)
 {
   VsxRequestHandlerClass *klass =

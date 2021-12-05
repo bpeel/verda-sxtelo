@@ -28,7 +28,7 @@
 
 /* Time in microseconds after the last request is sent on a person
    before he/she is considered to be silent */
-#define VSX_PERSON_SILENCE_TIME (60 * 5 * (gint64) 1000000)
+#define VSX_PERSON_SILENCE_TIME (60 * 5 * (int64_t) 1000000)
 
 static void
 vsx_person_free (void *object)
@@ -70,7 +70,7 @@ vsx_person_id_equal (gconstpointer v1,
 guint
 vsx_person_id_hash (gconstpointer v)
 {
-  G_STATIC_ASSERT (sizeof (VsxPersonId) == sizeof (gint64));
+  G_STATIC_ASSERT (sizeof (VsxPersonId) == sizeof (int64_t));
 
   return g_int64_hash (v);
 }
@@ -82,13 +82,13 @@ vsx_person_generate_id (GSocketAddress *address)
   int i;
 
   /* Generate enough random numbers to fill the id */
-  for (i = 0; i < sizeof (id) / sizeof (guint32); i++)
-    id |= (VsxPersonId) g_random_int () << (i * sizeof (guint32) * 8);
+  for (i = 0; i < sizeof (id) / sizeof (uint32_t); i++)
+    id |= (VsxPersonId) g_random_int () << (i * sizeof (uint32_t) * 8);
 
   if (address)
     {
       gssize native_size = g_socket_address_get_native_size (address);
-      guint8 address_buf[native_size];
+      uint8_t address_buf[native_size];
 
       /* XOR the bytes of the connection address so that even if
          someone can work out the sequence of random numbers it's
@@ -100,7 +100,7 @@ vsx_person_generate_id (GSocketAddress *address)
                                       NULL /* error */))
         {
           int address_pos = 0;
-          guint8 *p = (guint8 *) &id;
+          uint8_t *p = (uint8_t *) &id;
 
           for (i = 0; i < sizeof (id); i++)
             {

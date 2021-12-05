@@ -60,7 +60,7 @@ struct _VsxConnection
 
   VsxSignal changed_signal;
 
-  gint64 last_message_time;
+  int64_t last_message_time;
 
   GSocketAddress *socket_address;
   VsxConversationSet *conversation_set;
@@ -92,25 +92,25 @@ struct _VsxConnection
 
   int pending_shout;
 
-  guint8 read_buf[1024];
+  uint8_t read_buf[1024];
   size_t read_buf_pos;
 
   /* If VSX_CONNECTION_DIRTY_FLAG_PONG is set then we need to send a
    * pong control frame with the given payload.
    */
-  _Static_assert (VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD <= G_MAXUINT8,
+  _Static_assert (VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD <= UINT8_MAX,
                   "The max pong data length is too for a uint8_t");
-  guint8 pong_data_length;
-  guint8 pong_data[VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD];
+  uint8_t pong_data_length;
+  uint8_t pong_data[VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD];
 
   /* If message_data_length is non-zero then we are part way
    * through reading a message whose payload is stored in
    * message_data.
    */
-  _Static_assert (VSX_PROTO_MAX_PAYLOAD_SIZE <= G_MAXUINT16,
+  _Static_assert (VSX_PROTO_MAX_PAYLOAD_SIZE <= UINT16_MAX,
                   "The message size is too long for a uint16_t");
-  guint16 message_data_length;
-  guint8 message_data[VSX_PROTO_MAX_PAYLOAD_SIZE];
+  uint16_t message_data_length;
+  uint8_t message_data[VSX_PROTO_MAX_PAYLOAD_SIZE];
 };
 
 static const char
@@ -124,7 +124,7 @@ static const char
 ws_header_postfix[] = "\r\n\r\n";
 
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
-                                             guint8 *buffer,
+                                             uint8_t *buffer,
                                              size_t buffer_size);
 
 static void
@@ -483,8 +483,8 @@ static gboolean
 handle_move_tile (VsxConnection *conn,
                   GError **error)
 {
-  guint8 tile_num;
-  gint16 tile_x, tile_y;
+  uint8_t tile_num;
+  int16_t tile_x, tile_y;
 
   if (!vsx_proto_read_payload (conn->message_data + 1,
                                conn->message_data_length - 1,
@@ -564,7 +564,7 @@ static gboolean
 handle_set_n_tiles (VsxConnection *conn,
                     GError **error)
 {
-  guint8 n_tiles;
+  uint8_t n_tiles;
 
   if (!vsx_proto_read_payload (conn->message_data + 1,
                                conn->message_data_length - 1,
@@ -692,7 +692,7 @@ has_pending_data (VsxConnection *conn)
 
 static int
 write_player_name (VsxConnection *conn,
-                   guint8 *buffer,
+                   uint8_t *buffer,
                    size_t buffer_size)
 {
   /* This returns -1 if there wasn’t enough space, 0 if there are no
@@ -738,7 +738,7 @@ write_player_name (VsxConnection *conn,
 
 static int
 write_player (VsxConnection *conn,
-              guint8 *buffer,
+              uint8_t *buffer,
               size_t buffer_size)
 {
   /* This returns -1 if there wasn’t enough space, 0 if there are no
@@ -787,7 +787,7 @@ write_player (VsxConnection *conn,
 
 static int
 write_tile (VsxConnection *conn,
-            guint8 *buffer,
+            uint8_t *buffer,
             size_t buffer_size)
 {
   /* This returns -1 if there wasn’t enough space, 0 if there are no
@@ -845,7 +845,7 @@ write_tile (VsxConnection *conn,
 
 static int
 write_message (VsxConnection *conn,
-               guint8 *buffer,
+               uint8_t *buffer,
                    size_t buffer_size)
 {
   /* This returns -1 if there wasn’t enough space, 0 if there are no
@@ -893,11 +893,11 @@ write_message (VsxConnection *conn,
 
 static int
 write_ws_response (VsxConnection *conn,
-                   guint8 *buffer,
+                   uint8_t *buffer,
                    size_t buffer_size)
 {
   size_t key_hash_size;
-  const guint8 *key_hash = vsx_ws_parser_get_key_hash (conn->ws_parser,
+  const uint8_t *key_hash = vsx_ws_parser_get_key_hash (conn->ws_parser,
                                                        &key_hash_size);
 
   /* Magic formula taken from the docs for g_base64_encode_step */
@@ -915,7 +915,7 @@ write_ws_response (VsxConnection *conn,
       return -1;
     }
 
-  guint8 *p = buffer;
+  uint8_t *p = buffer;
 
   memcpy (p, ws_header_prefix, (sizeof ws_header_prefix) - 1);
   p += (sizeof ws_header_prefix) - 1;
@@ -941,7 +941,7 @@ write_ws_response (VsxConnection *conn,
 
 static int
 write_pong (VsxConnection *conn,
-            guint8 *buffer,
+            uint8_t *buffer,
             size_t buffer_size)
 {
   size_t frame_size = conn->pong_data_length + 2;
@@ -959,7 +959,7 @@ write_pong (VsxConnection *conn,
 
 static int
 write_player_id (VsxConnection *conn,
-                 guint8 *buffer,
+                 uint8_t *buffer,
                  size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -978,7 +978,7 @@ write_player_id (VsxConnection *conn,
 
 static int
 write_n_tiles (VsxConnection *conn,
-               guint8 *buffer,
+               uint8_t *buffer,
                size_t buffer_size)
 {
   uint8_t n_tiles = conn->person->conversation->total_n_tiles;
@@ -996,7 +996,7 @@ write_n_tiles (VsxConnection *conn,
 
 static int
 write_pending_shout (VsxConnection *conn,
-                     guint8 *buffer,
+                     uint8_t *buffer,
                      size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -1012,7 +1012,7 @@ write_pending_shout (VsxConnection *conn,
 
 static int
 write_end (VsxConnection *conn,
-           guint8 *buffer,
+           uint8_t *buffer,
            size_t buffer_size)
 {
   if (conn->person == NULL
@@ -1034,7 +1034,7 @@ write_end (VsxConnection *conn,
 
 static int
 write_sync (VsxConnection *conn,
-            guint8 *buffer,
+            uint8_t *buffer,
             size_t buffer_size)
 {
   return vsx_proto_write_command (buffer,
@@ -1047,7 +1047,7 @@ write_sync (VsxConnection *conn,
 
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
-                                   guint8 *buffer,
+                                   uint8_t *buffer,
                                    size_t buffer_size)
 {
   static const struct
@@ -1173,7 +1173,7 @@ vsx_connection_parse_eof (VsxConnection *conn,
 static gboolean
 process_control_frame (VsxConnection *conn,
                        int opcode,
-                       const guint8 *data,
+                       const uint8_t *data,
                        size_t data_length,
                        GError **error)
 {
@@ -1203,15 +1203,15 @@ process_control_frame (VsxConnection *conn,
 }
 
 static void
-unmask_data (guint32 mask,
-             guint8 *buffer,
+unmask_data (uint32_t mask,
+             uint8_t *buffer,
              size_t buffer_length)
 {
   int i;
 
   for (i = 0; i + sizeof mask <= buffer_length; i += sizeof mask)
     {
-      guint32 val;
+      uint32_t val;
 
       memcpy (&val, buffer + i, sizeof val);
       val ^= mask;
@@ -1219,20 +1219,20 @@ unmask_data (guint32 mask,
     }
 
   for (; i < buffer_length; i++)
-    buffer[i] ^= ((guint8 *) &mask)[i % 4];
+    buffer[i] ^= ((uint8_t *) &mask)[i % 4];
 }
 
 static gboolean
 process_frames (VsxConnection *conn,
                 GError **error)
 {
-  guint8 *data = conn->read_buf;
+  uint8_t *data = conn->read_buf;
   size_t length = conn->read_buf_pos;
   gboolean has_mask;
   gboolean is_fin;
-  guint32 mask;
-  guint64 payload_length;
-  guint8 opcode;
+  uint32_t mask;
+  uint64_t payload_length;
+  uint8_t opcode;
 
   while (TRUE)
     {
@@ -1249,7 +1249,7 @@ process_frames (VsxConnection *conn,
 
       if (payload_length == 126)
         {
-          guint16 word;
+          uint16_t word;
           if (length < header_size + sizeof word)
             break;
           memcpy (&word, data + header_size, sizeof word);
@@ -1397,7 +1397,7 @@ process_frames (VsxConnection *conn,
 
 gboolean
 vsx_connection_parse_data (VsxConnection *conn,
-                           const guint8 *buffer,
+                           const uint8_t *buffer,
                            size_t buffer_length,
                            GError **error)
 {
@@ -1470,7 +1470,7 @@ vsx_connection_get_changed_signal (VsxConnection *conn)
   return &conn->changed_signal;
 }
 
-gint64
+int64_t
 vsx_connection_get_last_message_time (VsxConnection *conn)
 {
   return conn->last_message_time;

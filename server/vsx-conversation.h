@@ -58,7 +58,7 @@ typedef struct
   int total_n_tiles;
   VsxTile tiles[VSX_TILE_DATA_N_TILES];
 
-  gint64 last_shout_time;
+  int64_t last_shout_time;
 
   int id;
 } VsxConversation;

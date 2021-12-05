@@ -19,7 +19,7 @@
 #ifndef __VSX_TILE_H__
 #define __VSX_TILE_H__
 
-#include <glib.h>
+#include <stdint.h>
 
 G_BEGIN_DECLS
 
@@ -33,8 +33,8 @@ G_BEGIN_DECLS
 
 typedef struct
 {
-  gint16 x, y;
-  gint16 last_player;
+  int16_t x, y;
+  int16_t last_player;
   char letter[VSX_TILE_MAX_LETTER_BYTES + 1];
 } VsxTile;
 

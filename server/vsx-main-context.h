@@ -86,7 +86,7 @@ vsx_main_context_remove_source (VsxMainContextSource *source);
 void
 vsx_main_context_poll (VsxMainContext *mc);
 
-gint64
+int64_t
 vsx_main_context_get_monotonic_clock (VsxMainContext *mc);
 
 void

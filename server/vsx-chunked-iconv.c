@@ -51,7 +51,7 @@ prep_string (VsxChunkedIconv *self,
 
 gboolean
 vsx_chunked_iconv_add_data (VsxChunkedIconv *self,
-                            const guint8 *data,
+                            const uint8_t *data,
                             unsigned int length)
 {
   gchar *in_pos;
@@ -157,7 +157,7 @@ vsx_chunked_iconv_add_data (VsxChunkedIconv *self,
                 return FALSE;
               /* Otherwise we'll let the loop continue and it will
                  re-prep the string */
-              data = (guint8 *) in_pos;
+              data = (uint8_t *) in_pos;
               length = inbytes_left;
               self->output_length = out_pos - self->output_string->str;
             }

@@ -210,7 +210,7 @@ negotiate_connection (VsxConnection *conn)
   GError *error = NULL;
 
   if (!vsx_connection_parse_data (conn,
-                                  (guint8 *) ws_request,
+                                  (uint8_t *) ws_request,
                                   (sizeof ws_request) - 1,
                                   &error))
     {
@@ -222,7 +222,7 @@ negotiate_connection (VsxConnection *conn)
       return FALSE;
     }
 
-  guint8 buf[(sizeof ws_reply) * 2];
+  uint8_t buf[(sizeof ws_reply) * 2];
   size_t got = vsx_connection_fill_output_buffer (conn,
                                                   buf,
                                                   sizeof buf);
@@ -274,7 +274,7 @@ test_frame_errors(void)
       GError *error = NULL;
 
       if (vsx_connection_parse_data (harness->conn,
-                                     (guint8 *) frame_error_tests[i].frame,
+                                     (uint8_t *) frame_error_tests[i].frame,
                                      frame_error_tests[i].frame_length,
                                      &error))
         {
@@ -367,7 +367,7 @@ test_close_in_frame (void)
       GError *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
-                                      (guint8 *) tests[i],
+                                      (uint8_t *) tests[i],
                                       strlen (tests[i]),
                                       &error))
         {
@@ -414,9 +414,9 @@ test_close_in_frame (void)
 
 static gboolean
 read_n_tiles (VsxConnection *conn,
-              guint8 *n_tiles_out)
+              uint8_t *n_tiles_out)
 {
-  guint8 buf[1 + 1 + 1 + 1];
+  uint8_t buf[1 + 1 + 1 + 1];
 
   size_t got = vsx_connection_fill_output_buffer (conn,
                                                   buf,
@@ -456,7 +456,7 @@ read_player_name (VsxConnection *conn,
                      + 1 /* command */
                      + 1 /* player_num */
                      + strlen (expected_name) + 1 /* name + terminator */);
-  guint8 *buf = g_alloca (buf_size);
+  uint8_t *buf = g_alloca (buf_size);
 
   size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
 
@@ -508,11 +508,11 @@ read_player (VsxConnection *conn,
              int expected_player_num,
              int expected_flags)
 {
-  guint8 buf[1 /* frame command */
-             + 1 /* length */
-             + 1 /* command */
-             + 1 /* player_num */
-             + 1 /* flags */];
+  uint8_t buf[1 /* frame command */
+              + 1 /* length */
+              + 1 /* command */
+              + 1 /* player_num */
+              + 1 /* flags */];
 
   size_t got = vsx_connection_fill_output_buffer (conn, buf, sizeof buf);
 
@@ -560,10 +560,10 @@ read_player (VsxConnection *conn,
 
 static gboolean
 read_connect_header (VsxConnection *conn,
-                     guint64 *person_id_out,
-                     guint8 *player_num_out)
+                     uint64_t *person_id_out,
+                     uint8_t *player_num_out)
 {
-  guint8 buf[1 + 1 + 1 + sizeof (guint64) + 1];
+  uint8_t buf[1 + 1 + 1 + sizeof (uint64_t) + 1];
 
   size_t got = vsx_connection_fill_output_buffer (conn,
                                                   buf,
@@ -607,7 +607,7 @@ read_connect_header (VsxConnection *conn,
     }
 
   if (player_num_out)
-    *player_num_out = buf[3 + sizeof (guint64)];
+    *player_num_out = buf[3 + sizeof (uint64_t)];
 
   return TRUE;
 }
@@ -632,7 +632,7 @@ create_player (Harness *harness,
   GError *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (guint8 *) buf->str,
+                                  (uint8_t *) buf->str,
                                   buf->len,
                                   &error))
     {
@@ -644,8 +644,8 @@ create_player (Harness *harness,
     }
   else
     {
-      guint64 person_id;
-      guint8 player_num;
+      uint64_t person_id;
+      uint8_t player_num;
 
       if (!read_connect_header (harness->conn, &person_id, &player_num))
         {
@@ -714,8 +714,8 @@ test_new_player (void)
 
 static gboolean
 reconnect_to_player (VsxConnection *conn,
-                     guint64 player_id,
-                     guint16 n_messages_received,
+                     uint64_t player_id,
+                     uint16_t n_messages_received,
                      GError **error)
 {
   GString *buf = g_string_new (NULL);
@@ -724,7 +724,7 @@ reconnect_to_player (VsxConnection *conn,
   n_messages_received = GUINT64_TO_LE (n_messages_received);
 
   g_string_append_c (buf, 0x82);
-  g_string_append_c (buf, 1 + sizeof (guint64) + sizeof (guint16));
+  g_string_append_c (buf, 1 + sizeof (uint64_t) + sizeof (uint16_t));
   g_string_append_c (buf, 0x81);
   g_string_append_len (buf, (void *) &player_id, sizeof player_id);
   g_string_append_len (buf,
@@ -734,7 +734,7 @@ reconnect_to_player (VsxConnection *conn,
   gboolean ret = TRUE;
 
   if (!vsx_connection_parse_data (conn,
-                                  (guint8 *) buf->str,
+                                  (uint8_t *) buf->str,
                                   buf->len,
                                   error))
     {
@@ -742,7 +742,7 @@ reconnect_to_player (VsxConnection *conn,
     }
   else
     {
-      guint64 person_id;
+      uint64_t person_id;
 
       if (!read_connect_header (conn, &person_id, NULL /* player_num */))
         {
@@ -769,7 +769,7 @@ reconnect_to_player (VsxConnection *conn,
 
 static gboolean
 test_reconnect_ok (Harness *harness,
-                   guint64 player_id)
+                   uint64_t player_id)
 {
   VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
                                                   harness->conversation_set,
@@ -805,7 +805,7 @@ test_reconnect_ok (Harness *harness,
 
 static gboolean
 test_reconnect_bad_n_messages_received (Harness *harness,
-                                        guint64 player_id)
+                                        uint64_t player_id)
 {
   VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
                                                   harness->conversation_set,
@@ -913,7 +913,7 @@ test_keep_alive (void)
       GError *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
-                                      (guint8 *) "\x82\x1\x83",
+                                      (uint8_t *) "\x82\x1\x83",
                                       3,
                                       &error))
         {
@@ -941,7 +941,7 @@ read_leave_commands (VsxConnection *conn)
                     0 /* flags (no longer connected) */))
     return FALSE;
 
-  guint8 buf[1 /* frame command */
+  uint8_t buf[1 /* frame command */
              + 1 /* length */
              + 1 /* command */];
 
@@ -995,7 +995,7 @@ test_leave (void)
       GError *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
-                                      (guint8 *) "\x82\x1\x84",
+                                      (uint8_t *) "\x82\x1\x84",
                                       3,
                                       &error))
         {
@@ -1038,7 +1038,7 @@ read_message (VsxConnection *conn,
                      + 1 /* command */
                      + 1 /* player_num */
                      + strlen (expected_message) + 1 /* name + terminator */);
-  guint8 *buf = g_alloca (buf_size);
+  uint8_t *buf = g_alloca (buf_size);
 
   size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
 
@@ -1051,7 +1051,7 @@ read_message (VsxConnection *conn,
       return FALSE;
     }
 
-  guint8 *cmd = buf + 1 + length_length;
+  uint8_t *cmd = buf + 1 + length_length;
 
   if (cmd[0] != VSX_PROTO_MESSAGE)
     {
@@ -1137,7 +1137,7 @@ test_send_one_message (Harness *harness,
   g_string_append_c (buf, '\0');
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (guint8 *) buf->str, buf->len,
+                                  (uint8_t *) buf->str, buf->len,
                                   &error))
     {
       fprintf (stderr,
@@ -1188,7 +1188,7 @@ test_send_fragmented_message (Harness *harness,
   /* Send the message as a series of one-byte fragments */
   for (int i = 0; i < buf->len; i++)
     {
-      guint8 frag[] =
+      uint8_t frag[] =
         {
           i == 0 ? 0x02
           : i == buf->len - 1 ? 0x80
@@ -1250,7 +1250,7 @@ test_send_long_message (Harness *harness,
   g_string_append_c (buf, '\0');
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (guint8 *) buf->str, buf->len,
+                                  (uint8_t *) buf->str, buf->len,
                                   &error))
     {
       fprintf (stderr,
@@ -1324,7 +1324,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
 {
   static const struct
   {
-    guint8 command;
+    uint8_t command;
     gboolean typing_result;
   } typing_commands[] =
     {
@@ -1339,7 +1339,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
     {
       GError *error = NULL;
 
-      guint8 buf[] = { 0x82, 0x1, typing_commands[i].command };
+      uint8_t buf[] = { 0x82, 0x1, typing_commands[i].command };
 
       if (!vsx_connection_parse_data (harness->conn,
                                       buf, sizeof buf,
@@ -1426,7 +1426,7 @@ read_tile (VsxConnection *conn,
   /* The two is for the character. This would break if there were any
    * tiles that have a unicode character that requires >2 UTF-8 bytes.
    */
-  guint8 buf[1 /* frame command */
+  uint8_t buf[1 /* frame command */
              + 1 /* length */
              + 1 /* command */
              + 1 /* tile_num */
@@ -1454,8 +1454,8 @@ read_tile (VsxConnection *conn,
       return FALSE;
     }
 
-  const guint8 *letter_start = buf + 8;
-  const guint8 *letter_end = memchr (letter_start,
+  const uint8_t *letter_start = buf + 8;
+  const uint8_t *letter_end = memchr (letter_start,
                                      '\0',
                                      buf + (sizeof buf) - letter_start);
 
@@ -1469,14 +1469,14 @@ read_tile (VsxConnection *conn,
     *tile_num_out = buf[3];
   if (x_out)
     {
-      gint16 val;
-      memcpy (&val, buf + 4, sizeof (gint16));
+      int16_t val;
+      memcpy (&val, buf + 4, sizeof (int16_t));
       *x_out = GINT16_FROM_LE (val);
     }
   if (y_out)
     {
-      gint16 val;
-      memcpy (&val, buf + 6, sizeof (gint16));
+      int16_t val;
+      memcpy (&val, buf + 6, sizeof (int16_t));
       *y_out = GINT16_FROM_LE (val);
     }
   if (player_out)
@@ -1491,7 +1491,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
   GError *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (guint8 *) "\x82\x1\x89",
+                                  (uint8_t *) "\x82\x1\x89",
                                   3,
                                   &error))
     {
@@ -1541,7 +1541,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
     }
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (guint8 *) "\x82\x6\x88\x0\xfe\xff\x20\x00",
+                                  (uint8_t *) "\x82\x6\x88\x0\xfe\xff\x20\x00",
                                   8,
                                   &error))
     {
@@ -1593,7 +1593,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
     }
 
   if (vsx_connection_parse_data (harness->conn,
-                                 (guint8 *) "\x82\x6\x88\x1\x10\x00\x20\x00",
+                                 (uint8_t *) "\x82\x6\x88\x1\x10\x00\x20\x00",
                                  8,
                                  &error))
     {
@@ -1656,7 +1656,7 @@ test_turn_and_move (void)
 static gboolean
 test_got_shout (Harness *harness, int shout_player)
 {
-  guint8 buf[1 + 1 + 1 + 1];
+  uint8_t buf[1 + 1 + 1 + 1];
 
   size_t got = vsx_connection_fill_output_buffer (harness->conn,
                                                   buf,
@@ -1714,7 +1714,7 @@ test_shout (void)
       GError *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
-                                      (guint8 *) "\x82\x1\x8a",
+                                      (uint8_t *) "\x82\x1\x8a",
                                       3,
                                       &error))
         {
@@ -1763,7 +1763,7 @@ test_set_n_tiles (void)
       GError *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
-                                      (guint8 *) "\x82\x2\x8b\x5",
+                                      (uint8_t *) "\x82\x2\x8b\x5",
                                       4,
                                       &error))
         {
@@ -1783,7 +1783,7 @@ test_set_n_tiles (void)
         }
       else
         {
-          guint8 got_n_tiles;
+          uint8_t got_n_tiles;
 
           if (!read_n_tiles (harness->conn, &got_n_tiles))
             ret = FALSE;
@@ -1824,8 +1824,8 @@ test_sync (void)
     }
   else
     {
-      guint8 buf[3];
-      guint8 *large_buf = g_malloc(1024);
+      uint8_t buf[3];
+      uint8_t *large_buf = g_malloc(1024);
 
       size_t got = vsx_connection_fill_output_buffer (harness->conn,
                                                       buf,
@@ -1889,7 +1889,7 @@ test_turn_all_tiles (void)
           GError *error = NULL;
 
           if (!vsx_connection_parse_data (harness->conn,
-                                          (guint8 *) "\x82\x1\x89",
+                                          (uint8_t *) "\x82\x1\x89",
                                           3,
                                           &error))
             {
@@ -1948,7 +1948,7 @@ test_ping_string (VsxConnection *conn,
 {
   size_t str_len = strlen (str);
   size_t frame_len = str_len + 2;
-  guint8 *frame = g_alloca (frame_len);
+  uint8_t *frame = g_alloca (frame_len);
 
   frame[0] = 0x89;
   frame[1] = str_len;
@@ -1970,7 +1970,7 @@ test_ping_string (VsxConnection *conn,
   /* Allocate enough space to receive the pong a second time so that
    * we can verify that the connection only sends it once.
    */
-  guint8 *result = g_alloca (frame_len * 2);
+  uint8_t *result = g_alloca (frame_len * 2);
 
   size_t got = vsx_connection_fill_output_buffer (conn, result, frame_len * 2);
 

@@ -58,7 +58,7 @@ vsx_response_init (void *object)
 
 unsigned int
 vsx_response_add_data (VsxResponse *response,
-                       guint8 *buffer,
+                       uint8_t *buffer,
                        unsigned int buffer_size)
 {
   VsxResponseClass *klass =

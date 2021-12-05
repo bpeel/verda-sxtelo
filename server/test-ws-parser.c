@@ -240,7 +240,7 @@ test_errors (void)
 
       VsxWsParserResult res =
         vsx_ws_parser_parse_data (parser,
-                                  (const guint8 *) error_tests[i].headers,
+                                  (const uint8_t *) error_tests[i].headers,
                                   strlen (error_tests[i].headers),
                                   &consumed,
                                   &error);
@@ -293,7 +293,7 @@ test_errors (void)
 }
 
 static gboolean
-compare_key_hash (const guint8 *key_hash,
+compare_key_hash (const uint8_t *key_hash,
                   size_t key_hash_length,
                   const char *expected)
 {
@@ -320,7 +320,7 @@ compare_key_hash (const guint8 *key_hash,
 }
 
 static void
-dump_key_hash (const guint8 *key_hash,
+dump_key_hash (const uint8_t *key_hash,
                size_t key_hash_length)
 {
   for (unsigned i = 0; i < key_hash_length; i++)
@@ -329,7 +329,7 @@ dump_key_hash (const guint8 *key_hash,
 
 static VsxWsParserResult
 parse_data_byte_at_a_time (VsxWsParser *parser,
-                           const guint8 *data,
+                           const uint8_t *data,
                            size_t length,
                            size_t *consumed_out,
                            GError **error)
@@ -339,7 +339,7 @@ parse_data_byte_at_a_time (VsxWsParser *parser,
   while (total_consumed < length)
     {
       size_t consumed;
-      guint8 bytes[] = { data[total_consumed], 0xff, 0xff, 0xff };
+      uint8_t bytes[] = { data[total_consumed], 0xff, 0xff, 0xff };
 
       switch (vsx_ws_parser_parse_data (parser,
                                         bytes,
@@ -381,7 +381,7 @@ test_success (gboolean byte_at_a_time)
       if (byte_at_a_time)
         {
           res = parse_data_byte_at_a_time (parser,
-                                           (const guint8 *)
+                                           (const uint8_t *)
                                            success_tests[i].headers,
                                            headers_length,
                                            &consumed,
@@ -390,7 +390,7 @@ test_success (gboolean byte_at_a_time)
       else
         {
           res = vsx_ws_parser_parse_data (parser,
-                                          (const guint8 *)
+                                          (const uint8_t *)
                                           success_tests[i].headers,
                                           headers_length,
                                           &consumed,
@@ -421,7 +421,7 @@ test_success (gboolean byte_at_a_time)
             }
 
           size_t key_hash_length;
-          const guint8 *key_hash =
+          const uint8_t *key_hash =
             vsx_ws_parser_get_key_hash (parser,
                                         &key_hash_length);
 
