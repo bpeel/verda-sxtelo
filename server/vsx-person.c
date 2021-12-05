@@ -116,23 +116,6 @@ vsx_person_generate_id (GSocketAddress *address)
   return id;
 }
 
-gboolean
-vsx_person_parse_id (const char *string,
-                     VsxPersonId *id)
-{
-  const char *p;
-
-  *id = 0;
-
-  for (p = string; *p; p++)
-    if (!g_ascii_isxdigit (*p))
-      return FALSE;
-    else
-      *id = (*id << 4) | g_ascii_xdigit_value (*p);
-
-  return p - string == sizeof (VsxPersonId) * 2;
-}
-
 VsxPerson *
 vsx_person_new (VsxPersonId id,
                 const char *player_name,

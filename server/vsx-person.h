@@ -60,10 +60,6 @@ vsx_person_id_hash (gconstpointer v);
 VsxPersonId
 vsx_person_generate_id (GSocketAddress *address);
 
-gboolean
-vsx_person_parse_id (const char *string,
-                     VsxPersonId *id);
-
 VsxPerson *
 vsx_person_new (VsxPersonId id,
                 const char *player_name,

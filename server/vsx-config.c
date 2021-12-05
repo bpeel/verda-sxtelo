@@ -85,7 +85,6 @@ static const Option server_options[] = {
         }
   OPTION (address, STRING),
   OPTION (port, INT),
-  OPTION (websocket, BOOL),
   OPTION (certificate, STRING),
   OPTION (private_key, STRING),
   OPTION (private_key_password, STRING),

@@ -28,31 +28,16 @@
 
 #include "vsx-server.h"
 #include "vsx-main-context.h"
-#include "vsx-http-parser.h"
 #include "vsx-person-set.h"
-#include "vsx-string-response.h"
 #include "vsx-connection.h"
 #include "vsx-conversation.h"
 #include "vsx-conversation-set.h"
-#include "vsx-move-tile-handler.h"
-#include "vsx-turn-handler.h"
-#include "vsx-new-person-handler.h"
-#include "vsx-leave-handler.h"
-#include "vsx-shout-handler.h"
-#include "vsx-set-n-tiles-handler.h"
-#include "vsx-send-message-handler.h"
-#include "vsx-watch-person-handler.h"
-#include "vsx-start-typing-handler.h"
-#include "vsx-stop-typing-handler.h"
-#include "vsx-keep-alive-handler.h"
 #include "vsx-log.h"
 #include "vsx-ssl-error.h"
 #include "vsx-proto.h"
 
-#define DEFAULT_PORT 5142
+#define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
-#define DEFAULT_WEBSOCKET_PORT (DEFAULT_PORT + 2)
-#define DEFAULT_WEBSOCKET_SSL_PORT (DEFAULT_WEBSOCKET_PORT + 1)
 
 struct _VsxServer
 {
@@ -88,8 +73,6 @@ typedef struct
   /* List node within the list of connections */
   VsxList link;
 
-  VsxHttpParser http_parser;
-
   VsxConnection *ws_connection;
   VsxListener ws_connection_listener;
 
@@ -103,13 +86,6 @@ typedef struct
      happen after the client closes its connection or we've had bad
      input and we're ignoring further data */
   gboolean write_finished;
-
-  /* The current request handler or NULL if we couldn't find an
-     appropriate one when the request line was received */
-  VsxRequestHandler *current_request_handler;
-
-  /* Queue of VsxServerQueuedResponses to send to this client */
-  VsxList response_queue;
 
   /* If we’ve already started an SSL_read that needed to block in
    * order to continue, these are the flags needed to complete it. */
@@ -134,19 +110,10 @@ typedef struct
 typedef struct
 {
   VsxList link;
-  VsxListener response_changed_listener;
-  VsxResponse *response;
-  VsxServerConnection *connection;
-} VsxServerQueuedResponse;
-
-typedef struct
-{
-  VsxList link;
   VsxMainContextSource *source;
   GSocket *socket;
   VsxServer *server;
   SSL_CTX *ssl_ctx;
-  gboolean is_websocket;
 } VsxServerSocket;
 
 /* Interval time in minutes to run the dead person garbage
@@ -160,46 +127,12 @@ typedef struct
  * resources. */
 #define VSX_SERVER_NO_RESPONSE_TIMEOUT (5 * 60 * (int64_t) 1000000)
 
-static const struct
-{
-  const char *url;
-  VsxRequestHandler * (* create_handler_func) (void);
-}
-requests[] =
-  {
-    { "/keep_alive", vsx_keep_alive_handler_new },
-    { "/move_tile", vsx_move_tile_handler_new },
-    { "/turn", vsx_turn_handler_new },
-    { "/start_typing", vsx_start_typing_handler_new },
-    { "/stop_typing", vsx_stop_typing_handler_new },
-    { "/send_message", vsx_send_message_handler_new },
-    { "/watch_person", vsx_watch_person_handler_new },
-    { "/new_person", vsx_new_person_handler_new },
-    { "/shout", vsx_shout_handler_new },
-    { "/set_n_tiles", vsx_set_n_tiles_handler_new },
-    { "/leave", vsx_leave_handler_new }
-  };
-
 static void
 update_poll (VsxServerConnection *connection);
 
 static void
 vsx_server_remove_connection (VsxServer *server,
                               VsxServerConnection *connection);
-
-static void
-response_changed_cb (VsxListener *listener,
-                     void *data)
-{
-  VsxServerQueuedResponse *queued_response =
-    vsx_container_of (listener, queued_response, response_changed_listener);
-
-  /* Update the poll if this is the first response in the queue (ie,
-   * the one that is currently being handled) */
-  if (&queued_response->link ==
-      queued_response->connection->response_queue.next)
-    update_poll (queued_response->connection);
-}
 
 static void
 ws_connection_changed_cb (VsxListener *listener,
@@ -211,228 +144,27 @@ ws_connection_changed_cb (VsxListener *listener,
   update_poll (connection);
 }
 
-static gboolean
-vsx_server_request_line_received_cb (const char *method_str,
-                                     const char *uri,
-                                     void *user_data)
-{
-  VsxServerConnection *connection = user_data;
-  const char *query_string;
-  const char *question_mark;
-  const char *url;
-  VsxRequestHandler *handler;
-  VsxRequestMethod method;
-  char *url_copy = NULL;
-  int i;
-
-  g_warn_if_fail (connection->current_request_handler == NULL);
-
-  if (!strcmp (method_str, "GET"))
-    method = VSX_REQUEST_METHOD_GET;
-  else if (!strcmp (method_str, "POST"))
-    method = VSX_REQUEST_METHOD_POST;
-  else if (!strcmp (method_str, "OPTIONS"))
-    method = VSX_REQUEST_METHOD_OPTIONS;
-  else
-    method = VSX_REQUEST_METHOD_UNKNOWN;
-
-  if ((question_mark = strchr (uri, '?')))
-    {
-      url_copy = strndup (uri, question_mark - uri);
-      url = url_copy;
-      query_string = question_mark + 1;
-    }
-  else
-    {
-      url = uri;
-      query_string = NULL;
-    }
-
-  for (i = 0; i < G_N_ELEMENTS (requests); i++)
-    if (!strcmp (url, requests[i].url))
-      {
-        handler = requests[i].create_handler_func ();
-
-        goto got_handler;
-      }
-
-  /* If we didn't find a handler then construct a default handler
-     which will report an error */
-  handler = vsx_request_handler_new ();
-
- got_handler:
-  handler->socket_address =
-    g_socket_get_remote_address (connection->client_socket, NULL);
-  handler->conversation_set =
-    vsx_object_ref (connection->server->pending_conversations);
-  handler->person_set =
-    vsx_object_ref (connection->server->person_set);
-
-  vsx_request_handler_request_line_received (handler, method, query_string);
-
-  connection->current_request_handler = handler;
-
-  g_free (url_copy);
-
-  return TRUE;
-}
-
-static gboolean
-vsx_server_header_received_cb (const char *field_name,
-                               const char *value,
-                               void *user_data)
-{
-  VsxServerConnection *connection = user_data;
-  VsxRequestHandler *handler = connection->current_request_handler;
-
-  vsx_request_handler_header_received (handler, field_name, value);
-
-  return TRUE;
-}
-
-static gboolean
-vsx_server_data_received_cb (const uint8_t *data,
-                             unsigned int length,
-                             void *user_data)
-{
-  VsxServerConnection *connection = user_data;
-  VsxRequestHandler *handler = connection->current_request_handler;
-
-  vsx_request_handler_data_received (handler, data, length);
-
-  return TRUE;
-}
-
 static void
-queue_response (VsxServerConnection *connection,
-                VsxResponse *response)
+set_bad_input (VsxServerConnection *connection)
 {
-  VsxServerQueuedResponse *queued_response =
-    g_slice_new (VsxServerQueuedResponse);
-
-  /* This steals a reference on the response */
-  queued_response->response = response;
-  queued_response->connection = connection;
-
-  queued_response->response_changed_listener.notify = response_changed_cb;
-  vsx_signal_add (&response->changed_signal,
-                  &queued_response->response_changed_listener);
-
-  vsx_list_insert (connection->response_queue.prev,
-                   &queued_response->link);
-}
-
-static gboolean
-vsx_server_request_finished_cb (void *user_data)
-{
-  VsxServerConnection *connection = user_data;
-  VsxRequestHandler *handler = connection->current_request_handler;
-  VsxResponse *response;
-
-  response = vsx_request_handler_request_finished (handler);
-
-  vsx_object_unref (handler);
-  connection->current_request_handler = NULL;
-
-  queue_response (connection, response);
-
-  return TRUE;
-}
-
-static VsxHttpParserVtable
-vsx_server_http_parser_vtable =
-  {
-    .request_line_received = vsx_server_request_line_received_cb,
-    .header_received = vsx_server_header_received_cb,
-    .data_received = vsx_server_data_received_cb,
-    .request_finished = vsx_server_request_finished_cb
-  };
-
-static void
-vsx_server_connection_pop_response (VsxServerConnection *connection)
-{
-  VsxServerQueuedResponse *queued_response;
-
-  g_return_if_fail (!vsx_list_empty (&connection->response_queue));
-
-  queued_response = vsx_container_of (connection->response_queue.next,
-                                      queued_response,
-                                      link);
-
-  vsx_list_remove (&queued_response->response_changed_listener.link);
-
-  vsx_object_unref (queued_response->response);
-
-  vsx_list_remove (&queued_response->link);
-
-  g_slice_free (VsxServerQueuedResponse, queued_response);
-
-  /* Whenever we end up with an empty response queue will start
-   * counting the time the connection has been idle so that we can
-   * remove it if it gets too old */
-  if (vsx_list_empty (&connection->response_queue))
-    connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
-}
-
-static void
-vsx_server_connection_clear_responses (VsxServerConnection *connection)
-{
-  while (!vsx_list_empty (&connection->response_queue))
-    vsx_server_connection_pop_response (connection);
-
-  if (connection->current_request_handler)
-    {
-      vsx_object_unref (connection->current_request_handler);
-      connection->current_request_handler = NULL;
-    }
-}
-
-static void
-set_bad_input_with_code (VsxServerConnection *connection,
-                         VsxStringResponseType code)
-{
-  if (connection->ws_connection == NULL)
-    {
-      VsxResponse *response;
-
-      /* Replace all of the queued responses with an error response */
-      vsx_server_connection_clear_responses (connection);
-
-      response = vsx_string_response_new (code);
-
-      queue_response (connection, response);
-    }
-
   connection->had_bad_input = TRUE;
 }
 
 static void
-set_bad_input (VsxServerConnection *connection, GError *error)
+set_bad_input_with_error (VsxServerConnection *connection, GError *error)
 {
   vsx_log ("For %s: %s",
            connection->peer_address_string,
            error->message);
 
-  if (error->domain == VSX_HTTP_PARSER_ERROR
-      && error->code == VSX_HTTP_PARSER_ERROR_UNSUPPORTED)
-    set_bad_input_with_code (connection,
-                             VSX_STRING_RESPONSE_UNSUPPORTED_REQUEST);
-  else
-    set_bad_input_with_code (connection, VSX_STRING_RESPONSE_BAD_REQUEST);
+  set_bad_input (connection);
 }
 
 static void
 check_dead_connection (VsxServerConnection *connection)
 {
-  if (!vsx_list_empty (&connection->response_queue))
-    return;
-
-  int64_t dead_time =
-    connection->ws_connection
-    ? vsx_connection_get_last_message_time (connection->ws_connection)
-    : connection->no_response_age;
-
-  if (vsx_main_context_get_monotonic_clock (NULL) - dead_time
+  if (vsx_main_context_get_monotonic_clock (NULL)
+      - vsx_connection_get_last_message_time (connection->ws_connection)
       >= VSX_SERVER_NO_RESPONSE_TIMEOUT)
     {
       /* If we've already had bad input then we'll just remove the
@@ -443,8 +175,7 @@ check_dead_connection (VsxServerConnection *connection)
         vsx_server_remove_connection (connection->server, connection);
       else
         {
-          set_bad_input_with_code (connection,
-                                   VSX_STRING_RESPONSE_REQUEST_TIMEOUT);
+          set_bad_input (connection);
           update_poll (connection);
         }
     }
@@ -465,8 +196,6 @@ static void
 vsx_server_remove_connection (VsxServer *server,
                               VsxServerConnection *connection)
 {
-  vsx_server_connection_clear_responses (connection);
-
   if (connection->ssl)
     SSL_free(connection->ssl);
 
@@ -475,8 +204,7 @@ vsx_server_remove_connection (VsxServer *server,
   vsx_list_remove (&connection->link);
   g_free (connection->peer_address_string);
 
-  if (connection->ws_connection)
-    vsx_connection_free (connection->ws_connection);
+  vsx_connection_free (connection->ws_connection);
 
   g_slice_free (VsxServerConnection, connection);
 
@@ -537,12 +265,10 @@ update_poll (VsxServerConnection *connection)
 
   /* Shutdown the socket if we've finished writing */
   if (!connection->write_finished
-      && (connection->read_finished || connection->had_bad_input)
-      && vsx_list_empty (&connection->response_queue)
       && connection->output_length == 0
-      && (connection->ws_connection == NULL
-          || vsx_connection_is_finished (connection->ws_connection)
-          || connection->had_bad_input))
+      && (connection->had_bad_input
+          || (connection->read_finished
+              && vsx_connection_is_finished (connection->ws_connection))))
     {
       if (connection->ssl)
         {
@@ -596,18 +322,7 @@ update_poll (VsxServerConnection *connection)
         flags |= connection->ssl_write_block;
       else if (connection->output_length > 0)
         flags |= VSX_MAIN_CONTEXT_POLL_OUT;
-      else if (!vsx_list_empty (&connection->response_queue))
-        {
-          VsxServerQueuedResponse *queued_response
-            = vsx_container_of (connection->response_queue.next,
-                                queued_response,
-                                link);
-
-          if (vsx_response_has_data (queued_response->response))
-            flags |= VSX_MAIN_CONTEXT_POLL_OUT;
-        }
-      else if (connection->ws_connection
-               && vsx_connection_has_data (connection->ws_connection))
+      else if (vsx_connection_has_data (connection->ws_connection))
         flags |= VSX_MAIN_CONTEXT_POLL_OUT;
     }
 
@@ -618,28 +333,6 @@ update_poll (VsxServerConnection *connection)
   else
     vsx_main_context_modify_poll (connection->source,
                                   flags);
-}
-
-static gboolean
-parse_data (VsxServerConnection *connection,
-            const uint8_t *buffer,
-            size_t buffer_length,
-            GError **error)
-{
-  if (connection->ws_connection)
-    {
-      return vsx_connection_parse_data (connection->ws_connection,
-                                        buffer,
-                                        buffer_length,
-                                        error);
-    }
-  else
-    {
-      return vsx_http_parser_parse_data (&connection->http_parser,
-                                         buffer,
-                                         buffer_length,
-                                         error);
-    }
 }
 
 static void
@@ -715,22 +408,9 @@ handle_read (VsxServer *server,
     {
       if (!connection->had_bad_input)
         {
-          gboolean ret;
-
-          if (connection->ws_connection == NULL)
+          if (!vsx_connection_parse_eof (connection->ws_connection, &error))
             {
-              ret = vsx_http_parser_parse_eof (&connection->http_parser,
-                                               &error);
-            }
-          else
-            {
-              ret = vsx_connection_parse_eof (connection->ws_connection,
-                                              &error);
-            }
-
-          if (!ret)
-            {
-              set_bad_input (connection, error);
+              set_bad_input_with_error (connection, error);
               g_clear_error (&error);
             }
         }
@@ -742,12 +422,12 @@ handle_read (VsxServer *server,
   else
     {
       if (!connection->had_bad_input
-          && !parse_data (connection,
-                          (uint8_t *) buf,
-                          got,
-                          &error))
+          && !vsx_connection_parse_data (connection->ws_connection,
+                                         (uint8_t *) buf,
+                                         got,
+                                         &error))
         {
-          set_bad_input (connection, error);
+          set_bad_input_with_error (connection, error);
           g_clear_error (&error);
         }
 
@@ -756,45 +436,7 @@ handle_read (VsxServer *server,
 }
 
 static void
-fill_output_buffer_from_responses (VsxServerConnection *connection)
-{
-  /* Try to fill the output buffer as much as possible before
-     initiating a write */
-  while (connection->output_length < VSX_SERVER_OUTPUT_BUFFER_SIZE
-         && !vsx_list_empty (&connection->response_queue))
-    {
-      VsxServerQueuedResponse *queued_response
-        = vsx_container_of (connection->response_queue.next,
-                            queued_response,
-                            link);
-      VsxResponse *response = queued_response->response;
-      unsigned int added;
-
-      if (!vsx_response_has_data (response))
-        break;
-
-      added =
-        vsx_response_add_data (response,
-                               connection->output_buffer
-                               + connection->output_length,
-                               VSX_SERVER_OUTPUT_BUFFER_SIZE
-                               - connection->output_length);
-
-      connection->output_length += added;
-
-      /* If the response is now finished then remove it from the queue */
-      if (vsx_response_is_finished (response))
-        vsx_server_connection_pop_response (connection);
-      /* If the buffer wasn't big enough to fit a chunk in then
-         the response might not will the buffer so we should give
-         up until the buffer is emptied */
-      else
-        break;
-    }
-}
-
-static void
-fill_output_buffer_from_websocket (VsxServerConnection *connection)
+fill_output_buffer (VsxServerConnection *connection)
 {
   size_t added =
     vsx_connection_fill_output_buffer (connection->ws_connection,
@@ -804,15 +446,6 @@ fill_output_buffer_from_websocket (VsxServerConnection *connection)
                                        - connection->output_length);
 
   connection->output_length += added;
-}
-
-static void
-fill_output_buffer (VsxServerConnection *connection)
-{
-  if (connection->ws_connection)
-    fill_output_buffer_from_websocket (connection);
-  else
-    fill_output_buffer_from_responses (connection);
 }
 
 static void
@@ -1064,33 +697,19 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                                    connection);
       vsx_list_insert (&server->connections, &connection->link);
 
-      if (ssocket->is_websocket)
-        {
-          GSocketAddress *remote_address =
-            g_socket_get_remote_address (client_socket, NULL);
-          connection->ws_connection =
-            vsx_connection_new (remote_address,
-                                server->pending_conversations,
-                                server->person_set);
-          VsxSignal *changed_signal =
-            vsx_connection_get_changed_signal (connection->ws_connection);
-          connection->ws_connection_listener.notify =
-            ws_connection_changed_cb;
-          vsx_signal_add (changed_signal,
-                          &connection->ws_connection_listener);
-          g_object_unref (remote_address);
-        }
-      else
-        {
-          connection->ws_connection = NULL;
-
-          vsx_http_parser_init (&connection->http_parser,
-                                &vsx_server_http_parser_vtable,
-                                connection);
-        }
-
-      connection->current_request_handler = NULL;
-      vsx_list_init (&connection->response_queue);
+      GSocketAddress *remote_address =
+        g_socket_get_remote_address (client_socket, NULL);
+      connection->ws_connection =
+        vsx_connection_new (remote_address,
+                            server->pending_conversations,
+                            server->person_set);
+      VsxSignal *changed_signal =
+        vsx_connection_get_changed_signal (connection->ws_connection);
+      connection->ws_connection_listener.notify =
+        ws_connection_changed_cb;
+      vsx_signal_add (changed_signal,
+                      &connection->ws_connection_listener);
+      g_object_unref (remote_address);
 
       connection->had_bad_input = FALSE;
       connection->read_finished = FALSE;
@@ -1107,8 +726,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
         {
           connection->peer_address_string
             = get_peer_address_string (client_socket);
-          vsx_log ("Accepted %s%s connection from %s",
-                   ssocket->is_websocket ? "WebSocket" : "HTTP",
+          vsx_log ("Accepted WebSocket%s connection from %s",
                    ssocket->ssl_ctx ? " SSL" : "",
                    connection->peer_address_string);
         }
@@ -1208,20 +826,10 @@ create_socket_for_config (VsxConfigServer *server_config,
 
   if (server_config->port == -1)
     {
-      if (server_config->websocket)
-        {
-          if (server_config->certificate)
-            port = DEFAULT_WEBSOCKET_SSL_PORT;
-          else
-            port = DEFAULT_WEBSOCKET_PORT;
-        }
+      if (server_config->certificate)
+        port = DEFAULT_SSL_PORT;
       else
-        {
-          if (server_config->certificate)
-            port = DEFAULT_SSL_PORT;
-          else
-            port = DEFAULT_PORT;
-        }
+        port = DEFAULT_PORT;
     }
   else
     {
@@ -1342,7 +950,6 @@ vsx_server_add_config (VsxServer *server,
 
   ssocket->server = server;
   ssocket->socket = socket;
-  ssocket->is_websocket = server_config->websocket;
 
   ssocket->source =
     vsx_main_context_add_poll (NULL /* default context */,

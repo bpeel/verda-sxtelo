@@ -2,8 +2,6 @@
 Description=Activation socket for Verda Ŝtelo
 
 [Socket]
-ListenStream=5142
-ListenStream=5143
 ListenStream=5144
 ListenStream=5145
 
