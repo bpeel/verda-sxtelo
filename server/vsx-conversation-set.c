@@ -94,31 +94,21 @@ vsx_conversation_set_free (void *object)
 
   g_hash_table_destroy (self->hash_table);
 
-  vsx_object_get_class ()->free (object);
+  g_free (self);
 }
 
-static const VsxObjectClass *
-vsx_conversation_set_get_class (void)
+static const VsxObjectClass
+vsx_conversation_set_class =
 {
-  static VsxObjectClass klass;
-
-  if (klass.free == NULL)
-    {
-      klass = *vsx_object_get_class ();
-      klass.instance_size = sizeof (VsxConversationSet);
-      klass.free = vsx_conversation_set_free;
-    }
-
-  return &klass;
-}
+  .free = vsx_conversation_set_free,
+};
 
 VsxConversationSet *
 vsx_conversation_set_new (void)
 {
-  VsxConversationSet *self =
-    vsx_object_allocate (vsx_conversation_set_get_class ());
+  VsxConversationSet *self = g_new0 (VsxConversationSet, 1);
 
-  vsx_object_init (self);
+  vsx_object_init (self, &vsx_conversation_set_class);
 
   /* The hash table doesn't have a destroy function for the key
      because its owned by the hash data */

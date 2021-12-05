@@ -25,45 +25,13 @@
 #include "vsx-object.h"
 
 void
-vsx_object_init (void *object)
+vsx_object_init (void *object,
+                 const VsxObjectClass *klass)
 {
   VsxObject *obj = object;
-
-  obj->ref_count = 1;
-}
-
-void *
-vsx_object_allocate (const void *klass)
-{
-  const VsxObjectClass *object_class = klass;
-  VsxObject *obj = g_slice_alloc0 (object_class->instance_size);
 
   obj->klass = klass;
-
-  return obj;
-}
-
-static void
-vsx_object_free (void *object)
-{
-  VsxObject *obj = object;
-  const VsxObjectClass *klass = obj->klass;
-
-  g_slice_free1 (klass->instance_size, object);
-}
-
-const VsxObjectClass *
-vsx_object_get_class (void)
-{
-  static VsxObjectClass klass;
-
-  if (klass.free == NULL)
-    {
-      klass.instance_size = sizeof (VsxObject);
-      klass.free = vsx_object_free;
-    }
-
-  return &klass;
+  obj->ref_count = 1;
 }
 
 void *

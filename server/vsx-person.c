@@ -42,23 +42,14 @@ vsx_person_free (void *object)
       vsx_object_unref (person->conversation);
     }
 
-  vsx_object_get_class ()->free (object);
+  g_free (person);
 }
 
-static const VsxObjectClass *
-vsx_person_get_class (void)
-{
-  static VsxObjectClass klass;
-
-  if (klass.free == NULL)
-    {
-      klass = *vsx_object_get_class ();
-      klass.instance_size = sizeof (VsxPerson);
-      klass.free = vsx_person_free;
-    }
-
-  return &klass;
-}
+static const VsxObjectClass
+vsx_person_class =
+  {
+    .free = vsx_person_free,
+  };
 
 gboolean
 vsx_person_id_equal (gconstpointer v1,
@@ -121,10 +112,9 @@ vsx_person_new (VsxPersonId id,
                 const char *player_name,
                 VsxConversation *conversation)
 {
-  VsxPerson *person =
-    vsx_object_allocate (vsx_person_get_class ());
+  VsxPerson *person = g_new0 (VsxPerson, 1);
 
-  vsx_object_init (person);
+  vsx_object_init (person, &vsx_person_class);
 
   vsx_person_make_noise (person);
 

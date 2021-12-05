@@ -56,23 +56,14 @@ vsx_conversation_free (void *object)
 
   g_array_free (self->messages, true);
 
-  vsx_object_get_class ()->free (object);
+  g_free (self);
 }
 
-static const VsxObjectClass *
-vsx_conversation_get_class (void)
-{
-  static VsxObjectClass klass;
-
-  if (klass.free == NULL)
-    {
-      klass = *vsx_object_get_class ();
-      klass.instance_size = sizeof (VsxConversation);
-      klass.free = vsx_conversation_free;
-    }
-
-  return &klass;
-}
+static const VsxObjectClass
+vsx_conversation_class =
+  {
+    .free = vsx_conversation_free,
+  };
 
 static void
 vsx_conversation_changed (VsxConversation *conversation,
@@ -376,12 +367,12 @@ shuffle_tiles (VsxConversation *self)
 VsxConversation *
 vsx_conversation_new (const char *room_name)
 {
-  VsxConversation *self = vsx_object_allocate (vsx_conversation_get_class ());
+  VsxConversation *self = g_new0 (VsxConversation, 1);
   const VsxTileData *tile_data = get_tile_data_for_room_name (room_name);
   const char *t;
   int i;
 
-  vsx_object_init (self);
+  vsx_object_init (self, &vsx_conversation_class);
 
   self->id = next_id++;
   self->n_tiles_in_play = 0;

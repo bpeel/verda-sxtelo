@@ -25,8 +25,6 @@ G_BEGIN_DECLS
 
 typedef struct
 {
-  size_t instance_size;
-
   void (* free) (void *object);
 } VsxObjectClass;
 
@@ -38,13 +36,8 @@ typedef struct
 } VsxObject;
 
 void
-vsx_object_init (void *object);
-
-void *
-vsx_object_allocate (const void *klass);
-
-const VsxObjectClass *
-vsx_object_get_class (void) G_GNUC_CONST;
+vsx_object_init (void *object,
+                 const VsxObjectClass *klass);
 
 void *
 vsx_object_ref (void *object);

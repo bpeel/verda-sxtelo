@@ -36,23 +36,14 @@ vsx_person_set_free (void *object)
   if (self->people_timer_source)
     vsx_main_context_remove_source (self->people_timer_source);
 
-  vsx_object_get_class ()->free (object);
+  g_free (self);
 }
 
-static const VsxObjectClass *
-vsx_person_set_get_class (void)
-{
-  static VsxObjectClass klass;
-
-  if (klass.free == NULL)
-    {
-      klass = *vsx_object_get_class ();
-      klass.instance_size = sizeof (VsxPersonSet);
-      klass.free = vsx_person_set_free;
-    }
-
-  return &klass;
-}
+static const VsxObjectClass
+vsx_person_set_class =
+  {
+    .free = vsx_person_set_free,
+  };
 
 static gboolean
 remove_silent_people_cb (gpointer key,
@@ -95,9 +86,9 @@ remove_silent_people_timer_cb (VsxMainContextSource *source,
 VsxPersonSet *
 vsx_person_set_new (void)
 {
-  VsxPersonSet *self = vsx_object_allocate (vsx_person_set_get_class ());
+  VsxPersonSet *self = g_new0 (VsxPersonSet, 1);
 
-  vsx_object_init (self);
+  vsx_object_init (self, &vsx_person_set_class);
 
   self->hash_table = g_hash_table_new_full (vsx_person_id_hash,
                                             vsx_person_id_equal,
