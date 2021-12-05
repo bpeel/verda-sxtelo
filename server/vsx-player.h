@@ -39,9 +39,6 @@ typedef struct
 
   char *name;
 
-  gsize name_message_len;
-  char *name_message;
-
   VsxPlayerFlags flags;
 } VsxPlayer;
 

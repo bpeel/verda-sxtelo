@@ -28,7 +28,6 @@ void
 vsx_player_free (VsxPlayer *player)
 {
   g_free (player->name);
-  g_free (player->name_message);
 
   g_slice_free (VsxPlayer, player);
 }
@@ -38,33 +37,11 @@ vsx_player_new (const char *player_name,
                 unsigned int num)
 {
   VsxPlayer *player = g_slice_new (VsxPlayer);
-  GString *buf = g_string_new (NULL);
-  const char *p;
 
   player->name = g_strdup (player_name);
   player->num = num;
 
   player->flags = VSX_PLAYER_CONNECTED;
-
-  /* Encode the player name in a message so we can easily send it out
-   * to clients */
-  g_string_append_printf (buf,
-                          "[\"player-name\", {\"num\": %i, \"name\": \"",
-                          num);
-
-  for (p = player_name; *p; p++)
-    if (*p == '"' || *p == '\\')
-      {
-        g_string_append_c (buf, '\\');
-        g_string_append_c (buf, *p);
-      }
-    else
-      g_string_append_c (buf, *p);
-
-  g_string_append (buf, "\"}]\r\n");
-
-  player->name_message_len = buf->len;
-  player->name_message = g_string_free (buf, false);
 
   return player;
 }
