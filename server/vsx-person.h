@@ -19,7 +19,6 @@
 #ifndef __VSX_PERSON_H__
 #define __VSX_PERSON_H__
 
-#include <glib.h>
 #include <gio/gio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -27,14 +26,23 @@
 #include "vsx-conversation.h"
 #include "vsx-player.h"
 #include "vsx-signal.h"
+#include "vsx-list.h"
 
 G_BEGIN_DECLS
 
 typedef uint64_t VsxPersonId;
 
-typedef struct
+typedef struct _VsxPerson VsxPerson;
+
+struct _VsxPerson
 {
   VsxObject parent;
+
+  /* Position in the global list of people */
+  VsxList link;
+
+  /* Used to implement the hash table */
+  VsxPerson *hash_next;
 
   VsxPersonId id;
 
@@ -49,14 +57,7 @@ typedef struct
    * is offset by this number so that they can't refer to any messages
    * that were sent before they joined. */
   unsigned int message_offset;
-} VsxPerson;
-
-gboolean
-vsx_person_id_equal (gconstpointer v1,
-                     gconstpointer v2);
-
-guint
-vsx_person_id_hash (gconstpointer v);
+};
 
 VsxPersonId
 vsx_person_generate_id (GSocketAddress *address);

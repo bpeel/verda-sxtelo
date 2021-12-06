@@ -21,8 +21,11 @@
 #endif
 
 #include <glib.h>
+#include <assert.h>
 
 #include "vsx-person-set.h"
+#include "vsx-list.h"
+#include "vsx-util.h"
 
 #define VSX_PERSON_SET_REMOVE_SILENT_PEOPLE_INTERVAL 5
 
@@ -30,17 +33,35 @@ struct _VsxPersonSet
 {
   VsxObject parent;
 
-  GHashTable *hash_table;
+  VsxList people;
+
+  int n_people;
+  int hash_size;
+  VsxPerson **hash_table;
 
   VsxMainContextSource *people_timer_source;
 };
+
+static int
+get_hash_pos (VsxPersonSet *set,
+              uint64_t id)
+{
+  return id % set->hash_size;
+}
 
 static void
 vsx_person_set_free (void *object)
 {
   VsxPersonSet *self = object;
 
-  g_hash_table_destroy (self->hash_table);
+  VsxPerson *person, *tmp;
+
+  vsx_list_for_each_safe (person, tmp, &self->people, link)
+    {
+      vsx_object_unref (person);
+    }
+
+  vsx_free (self->hash_table);
 
   if (self->people_timer_source)
     vsx_main_context_remove_source (self->people_timer_source);
@@ -54,22 +75,32 @@ vsx_person_set_class =
     .free = vsx_person_set_free,
   };
 
-static gboolean
-remove_silent_people_cb (gpointer key,
-                         gpointer value,
-                         gpointer user_data)
+static void
+remove_person (VsxPersonSet *set,
+               VsxPerson *person)
 {
-  VsxPerson *person = value;
+  if (person->conversation)
+    vsx_person_leave_conversation (person);
 
-  if (vsx_person_is_silent (person))
+  vsx_list_remove (&person->link);
+
+  int pos = get_hash_pos (set, person->id);
+  VsxPerson **prev = set->hash_table + pos;
+  while (true)
     {
-      if (person->conversation)
-        vsx_person_leave_conversation (person);
+      assert (*prev);
 
-      return true;
+      if (*prev == person)
+        break;
+
+      prev = &(*prev)->hash_next;
     }
-  else
-    return false;
+
+  *prev = person->hash_next;
+
+  vsx_object_unref (person);
+
+  set->n_people--;
 }
 
 static void
@@ -81,11 +112,16 @@ remove_silent_people_timer_cb (VsxMainContextSource *source,
   /* This is probably relatively expensive because it has to iterate
      the entire list of people, but it only happens infrequently so
      hopefully it's not a problem */
-  g_hash_table_foreach_remove (set->hash_table,
-                               remove_silent_people_cb,
-                               NULL);
 
-  if (g_hash_table_size (set->hash_table) == 0)
+  VsxPerson *person, *tmp;
+
+  vsx_list_for_each_safe (person, tmp, &set->people, link)
+    {
+      if (vsx_person_is_silent (person))
+        remove_person (set, person);
+    }
+
+  if (vsx_list_empty (&set->people))
     {
       vsx_main_context_remove_source (source);
       set->people_timer_source = NULL;
@@ -99,12 +135,40 @@ vsx_person_set_new (void)
 
   vsx_object_init (self, &vsx_person_set_class);
 
-  self->hash_table = g_hash_table_new_full (vsx_person_id_hash,
-                                            vsx_person_id_equal,
-                                            NULL,
-                                            (GDestroyNotify) vsx_object_unref);
+  vsx_list_init (&self->people);
+
+  self->hash_size = 8;
+  self->hash_table = vsx_calloc (self->hash_size
+                                 * sizeof *self->hash_table);
 
   return self;
+}
+
+static void
+add_person_to_hash (VsxPersonSet *set,
+                    VsxPerson *person)
+{
+  int pos = get_hash_pos (set, person->id);
+
+  person->hash_next = set->hash_table[pos];
+  set->hash_table[pos] = person;
+}
+
+static void
+grow_hash_table (VsxPersonSet *set)
+{
+  vsx_free (set->hash_table);
+
+  set->hash_size *= 2;
+
+  set->hash_table = vsx_calloc (set->hash_size * sizeof *set->hash_table);
+
+  VsxPerson *person;
+
+  vsx_list_for_each (person, &set->people, link)
+    {
+      add_person_to_hash (set, person);
+    }
 }
 
 VsxPerson *
@@ -123,7 +187,17 @@ VsxPerson *
 vsx_person_set_get_person (VsxPersonSet *set,
                            VsxPersonId id)
 {
-  return g_hash_table_lookup (set->hash_table, &id);
+  int pos = get_hash_pos (set, id);
+
+  for (VsxPerson *person = set->hash_table[pos];
+       person;
+       person = person->hash_next)
+    {
+      if (person->id == id)
+        return person;
+    }
+
+  return NULL;
 }
 
 VsxPerson *
@@ -143,7 +217,13 @@ vsx_person_set_generate_person (VsxPersonSet *set,
 
   person = vsx_person_new (id, player_name, conversation);
 
-  g_hash_table_insert (set->hash_table, &person->id, vsx_object_ref (person));
+  if ((set->n_people + 1) > set->hash_size * 3 / 4)
+    grow_hash_table (set);
+
+  vsx_list_insert (&set->people, &person->link);
+  add_person_to_hash (set, vsx_object_ref (person));
+
+  set->n_people++;
 
   if (set->people_timer_source == NULL)
     set->people_timer_source =

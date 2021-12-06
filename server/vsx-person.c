@@ -51,21 +51,6 @@ vsx_person_class =
     .free = vsx_person_free,
   };
 
-gboolean
-vsx_person_id_equal (gconstpointer v1,
-                     gconstpointer v2)
-{
-  return *(const VsxPersonId *) v1 == *(const VsxPersonId *) v2;
-}
-
-guint
-vsx_person_id_hash (gconstpointer v)
-{
-  G_STATIC_ASSERT (sizeof (VsxPersonId) == sizeof (int64_t));
-
-  return g_int64_hash (v);
-}
-
 VsxPersonId
 vsx_person_generate_id (GSocketAddress *address)
 {
