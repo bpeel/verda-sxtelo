@@ -48,5 +48,6 @@ if get_option('client')
 endif
 
 subdir('web')
+subdir('common')
 
 configure_file(output : 'config.h', configuration : cdata)
