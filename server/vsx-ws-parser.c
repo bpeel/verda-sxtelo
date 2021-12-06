@@ -90,7 +90,7 @@ check_http_version (const uint8_t *data,
   /* The remaining characters should all be digits */
   while (length > 0)
     {
-      if (!g_ascii_isdigit (data[--length]))
+      if (!vsx_ascii_isdigit (data[--length]))
         goto bad;
     }
 
