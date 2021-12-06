@@ -154,7 +154,8 @@ set_bad_input (VsxServerConnection *connection)
 }
 
 static void
-set_bad_input_with_error (VsxServerConnection *connection, GError *error)
+set_bad_input_with_error (VsxServerConnection *connection,
+                          struct vsx_error *error)
 {
   vsx_log ("For %s: %s",
            connection->peer_address_string,
@@ -411,10 +412,12 @@ handle_read (VsxServer *server,
     {
       if (!connection->had_bad_input)
         {
-          if (!vsx_connection_parse_eof (connection->ws_connection, &error))
+          struct vsx_error *ws_error = NULL;
+
+          if (!vsx_connection_parse_eof (connection->ws_connection, &ws_error))
             {
-              set_bad_input_with_error (connection, error);
-              g_clear_error (&error);
+              set_bad_input_with_error (connection, ws_error);
+              vsx_error_free (ws_error);
             }
         }
 
@@ -424,14 +427,16 @@ handle_read (VsxServer *server,
     }
   else
     {
+      struct vsx_error *ws_error = NULL;
+
       if (!connection->had_bad_input
           && !vsx_connection_parse_data (connection->ws_connection,
                                          (uint8_t *) buf,
                                          got,
-                                         &error))
+                                         &ws_error))
         {
-          set_bad_input_with_error (connection, error);
-          g_clear_error (&error);
+          set_bad_input_with_error (connection, ws_error);
+          vsx_error_free (ws_error);
         }
 
       update_poll (connection);

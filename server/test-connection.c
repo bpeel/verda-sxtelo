@@ -208,7 +208,7 @@ free_harness(Harness *harness)
 static bool
 negotiate_connection (VsxConnection *conn)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   if (!vsx_connection_parse_data (conn,
                                   (uint8_t *) ws_request,
@@ -218,7 +218,7 @@ negotiate_connection (VsxConnection *conn)
       fprintf (stderr,
                "Unexpected error negotiating WebSocket: %s",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       return false;
     }
@@ -272,7 +272,7 @@ test_frame_errors(void)
       if (harness == NULL)
         return false;
 
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (vsx_connection_parse_data (harness->conn,
                                      (uint8_t *) frame_error_tests[i].frame,
@@ -299,7 +299,7 @@ test_frame_errors(void)
                        error->message);
               ret = false;
             }
-          g_error_free (error);
+          vsx_error_free (error);
         }
 
       free_harness (harness);
@@ -314,7 +314,7 @@ test_eof_before_ws (void)
   Harness *harness = create_harness ();
 
   bool ret = true;
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   if (vsx_connection_parse_eof (harness->conn, &error))
     {
@@ -337,7 +337,7 @@ test_eof_before_ws (void)
                    error->message);
           ret = false;
         }
-      g_error_free (error);
+      vsx_error_free (error);
     }
 
   free_harness (harness);
@@ -365,7 +365,7 @@ test_close_in_frame (void)
       if (harness == NULL)
         return false;
 
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
                                       (uint8_t *) tests[i],
@@ -377,7 +377,7 @@ test_close_in_frame (void)
                    "expected: %s",
                    i,
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
           ret = false;
         }
       else if (vsx_connection_parse_eof (harness->conn, &error))
@@ -404,7 +404,7 @@ test_close_in_frame (void)
                        error->message);
               ret = false;
             }
-          g_error_free (error);
+          vsx_error_free (error);
         }
 
       free_harness (harness);
@@ -630,7 +630,7 @@ create_player (Harness *harness,
   vsx_buffer_append_c (&buf, 0);
 
   bool ret = true;
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
                                   buf.data,
@@ -640,7 +640,7 @@ create_player (Harness *harness,
       fprintf (stderr,
                "Unexpected error while creating new player: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
       ret = false;
     }
   else
@@ -717,7 +717,7 @@ static bool
 reconnect_to_player (VsxConnection *conn,
                      uint64_t player_id,
                      uint16_t n_messages_received,
-                     GError **error)
+                     struct vsx_error **error)
 {
   struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
@@ -782,7 +782,7 @@ test_reconnect_ok (Harness *harness,
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!reconnect_to_player (other_conn,
                                 player_id,
@@ -792,7 +792,7 @@ test_reconnect_ok (Harness *harness,
           fprintf (stderr,
                    "test_reconnect_ok: Unexpected error: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
           ret = false;
         }
     }
@@ -818,7 +818,7 @@ test_reconnect_bad_n_messages_received (Harness *harness,
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (reconnect_to_player (other_conn,
                                player_id,
@@ -848,7 +848,7 @@ test_reconnect_bad_n_messages_received (Harness *harness,
               ret = false;
             }
 
-          g_error_free (error);
+          vsx_error_free (error);
         }
     }
 
@@ -909,7 +909,7 @@ test_keep_alive (void)
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
                                       (uint8_t *) "\x82\x1\x83",
@@ -919,7 +919,7 @@ test_keep_alive (void)
           fprintf (stderr,
                    "test_keep_alive: Unexpected error: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
 
           ret = false;
         }
@@ -991,7 +991,7 @@ test_leave (void)
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
                                       (uint8_t *) "\x82\x1\x84",
@@ -1001,7 +1001,7 @@ test_leave (void)
           fprintf (stderr,
                    "test_leave: Unexpected error: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
 
           ret = false;
         }
@@ -1122,7 +1122,7 @@ test_send_one_message (Harness *harness,
                        VsxPerson *person,
                        bool was_typing)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
   bool ret = true;
 
   const char *expected_message = "Hello, world!";
@@ -1143,7 +1143,7 @@ test_send_one_message (Harness *harness,
       fprintf (stderr,
                "Unexpected error when sending message: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       ret = false;
     }
@@ -1174,7 +1174,7 @@ static bool
 test_send_fragmented_message (Harness *harness,
                               VsxPerson *person)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
   bool ret = true;
 
   const char *expected_message = "Hello, fragmented world!";
@@ -1205,7 +1205,7 @@ test_send_fragmented_message (Harness *harness,
           fprintf (stderr,
                    "Unexpected error when sending fragmented message: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
 
           ret = false;
 
@@ -1230,7 +1230,7 @@ static bool
 test_send_long_message (Harness *harness,
                         VsxPerson *person)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
   bool ret = true;
 
   struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
@@ -1256,7 +1256,7 @@ test_send_long_message (Harness *harness,
       fprintf (stderr,
                "Unexpected error when sending message: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       ret = false;
     }
@@ -1337,7 +1337,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
 
   for (int i = 0; i < G_N_ELEMENTS (typing_commands); i++)
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       uint8_t buf[] = { 0x82, 0x1, typing_commands[i].command };
 
@@ -1349,7 +1349,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
                    "test_typing_commands: %i: Unexpected error: %s\n",
                    i,
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
 
           return false;
         }
@@ -1488,7 +1488,7 @@ read_tile (VsxConnection *conn,
 static bool
 test_turn_and_move_commands (Harness *harness, VsxPerson *person)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
                                   (uint8_t *) "\x82\x1\x89",
@@ -1498,7 +1498,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       fprintf (stderr,
                "Unexpected error after turn command: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       return false;
     }
@@ -1548,7 +1548,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       fprintf (stderr,
                "Unexpected error after move command: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       return false;
     }
@@ -1618,7 +1618,7 @@ test_turn_and_move_commands (Harness *harness, VsxPerson *person)
       ret = false;
     }
 
-  g_error_free (error);
+  vsx_error_free (error);
 
   return ret;
 }
@@ -1711,7 +1711,7 @@ test_shout (void)
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
                                       (uint8_t *) "\x82\x1\x8a",
@@ -1721,7 +1721,7 @@ test_shout (void)
           fprintf (stderr,
                    "test_shout: Unexpected error: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
           ret = false;
         }
       else if (person->conversation->last_shout_time == 0)
@@ -1760,7 +1760,7 @@ test_set_n_tiles (void)
     }
   else
     {
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       if (!vsx_connection_parse_data (harness->conn,
                                       (uint8_t *) "\x82\x2\x8b\x5",
@@ -1770,7 +1770,7 @@ test_set_n_tiles (void)
           fprintf (stderr,
                    "test_set_n_tiles: Unexpected error: %s\n",
                    error->message);
-          g_error_free (error);
+          vsx_error_free (error);
           ret = false;
         }
       else if (person->conversation->total_n_tiles != 5)
@@ -1886,7 +1886,7 @@ test_turn_all_tiles (void)
     {
       for (int i = 0; i < 122; i++)
         {
-          GError *error = NULL;
+          struct vsx_error *error = NULL;
 
           if (!vsx_connection_parse_data (harness->conn,
                                           (uint8_t *) "\x82\x1\x89",
@@ -1896,7 +1896,7 @@ test_turn_all_tiles (void)
               fprintf (stderr,
                        "Unexpected error after turn command: %s\n",
                        error->message);
-              g_error_free (error);
+              vsx_error_free (error);
 
               ret = false;
               break;
@@ -1955,14 +1955,14 @@ test_ping_string (VsxConnection *conn,
 
   memcpy (frame + 2, str, str_len);
 
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   if (!vsx_connection_parse_data (conn, frame, str_len + 2, &error))
     {
       fprintf (stderr,
                "Unexpected error sending ping control frame: %s\n",
                error->message);
-      g_error_free (error);
+      vsx_error_free (error);
 
       return false;
     }

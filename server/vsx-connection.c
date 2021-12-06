@@ -123,6 +123,9 @@ ws_header_prefix[] =
 static const char
 ws_header_postfix[] = "\r\n\r\n";
 
+struct vsx_error_domain
+vsx_connection_error;
+
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              uint8_t *buffer,
                                              size_t buffer_size);
@@ -182,7 +185,7 @@ start_following_person (VsxConnection *conn)
 
 static bool
 handle_new_player (VsxConnection *conn,
-                   GError **error)
+                   struct vsx_error **error)
 {
   const char *room_name, *player_name;
 
@@ -197,20 +200,20 @@ handle_new_player (VsxConnection *conn,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid new player command received");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid new player command received");
       return false;
     }
 
   if (conn->person)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent a new player request but already specified "
-                   "a player");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent a new player request but already specified "
+                     "a player");
       return false;
     }
 
@@ -220,18 +223,18 @@ handle_new_player (VsxConnection *conn,
 
   if (!vsx_normalize_name (normalized_room_name))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent an invalid room name");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an invalid room name");
       ret = false;
     }
   else if (!vsx_normalize_name (normalized_player_name))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent an invalid player name");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an invalid player name");
       ret = false;
     }
   else
@@ -274,7 +277,7 @@ handle_new_player (VsxConnection *conn,
 
 static bool
 handle_reconnect (VsxConnection *conn,
-                  GError **error)
+                  struct vsx_error **error)
 {
   uint64_t player_id;
   uint16_t n_messages_received;
@@ -290,20 +293,20 @@ handle_reconnect (VsxConnection *conn,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid reconnect command received");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid reconnect command received");
       return false;
     }
 
   if (conn->person)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent a reconnect request but already specified "
-                   "a player");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent a reconnect request but already specified "
+                     "a player");
       return false;
     }
 
@@ -311,12 +314,12 @@ handle_reconnect (VsxConnection *conn,
 
   if (person == NULL)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client tried to reconnect to non-existant player "
-                   "0x%016" PRIx64,
-                   player_id);
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client tried to reconnect to non-existant player "
+                     "0x%016" PRIx64,
+                     player_id);
       return false;
     }
 
@@ -325,13 +328,13 @@ handle_reconnect (VsxConnection *conn,
 
   if (n_messages_received > n_messages_available)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client claimed to have received %i messages but only %i "
-                   "are available",
-                   n_messages_received,
-                   n_messages_available);
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client claimed to have received %i messages but only %i "
+                     "are available",
+                     n_messages_received,
+                     n_messages_available);
       return false;
     }
 
@@ -346,14 +349,14 @@ handle_reconnect (VsxConnection *conn,
 
 static bool
 activate_person (VsxConnection *conn,
-                 GError **error)
+                 struct vsx_error **error)
 {
   if (conn->person == NULL)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent a command without a person");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent a command without a person");
       return false;
     }
 
@@ -365,15 +368,15 @@ activate_person (VsxConnection *conn,
 static bool
 ensure_empty_payload (VsxConnection *conn,
                       const char *message_type,
-                      GError **error)
+                      struct vsx_error **error)
 {
   if (conn->message_data_length != 1)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid %s message received",
-                   message_type);
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid %s message received",
+                     message_type);
       return false;
     }
 
@@ -382,7 +385,7 @@ ensure_empty_payload (VsxConnection *conn,
 
 static bool
 handle_keep_alive (VsxConnection *conn,
-                   GError **error)
+                   struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "keep alive", error))
     return false;
@@ -395,7 +398,7 @@ handle_keep_alive (VsxConnection *conn,
 
 static bool
 handle_leave (VsxConnection *conn,
-              GError **error)
+              struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "leave", error))
     return false;
@@ -410,7 +413,7 @@ handle_leave (VsxConnection *conn,
 
 static bool
 handle_start_typing (VsxConnection *conn,
-                     GError **error)
+                     struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "start typing", error))
     return false;
@@ -427,7 +430,7 @@ handle_start_typing (VsxConnection *conn,
 
 static bool
 handle_stop_typing (VsxConnection *conn,
-                    GError **error)
+                    struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "stop typing", error))
     return false;
@@ -444,7 +447,7 @@ handle_stop_typing (VsxConnection *conn,
 
 static bool
 handle_send_message (VsxConnection *conn,
-                     GError **error)
+                     struct vsx_error **error)
 {
   const char *message;
 
@@ -456,10 +459,10 @@ handle_send_message (VsxConnection *conn,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid send message command received");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid send message command received");
       return false;
     }
 
@@ -481,7 +484,7 @@ handle_send_message (VsxConnection *conn,
 
 static bool
 handle_move_tile (VsxConnection *conn,
-                  GError **error)
+                  struct vsx_error **error)
 {
   uint8_t tile_num;
   int16_t tile_x, tile_y;
@@ -500,10 +503,10 @@ handle_move_tile (VsxConnection *conn,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid move tile command received");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid move tile command received");
       return false;
     }
 
@@ -512,10 +515,10 @@ handle_move_tile (VsxConnection *conn,
 
   if (tile_num >= conn->person->conversation->n_tiles_in_play)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Player tried to move a tile that is not in play");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Player tried to move a tile that is not in play");
       return false;
     }
 
@@ -530,7 +533,7 @@ handle_move_tile (VsxConnection *conn,
 
 static bool
 handle_turn (VsxConnection *conn,
-             GError **error)
+             struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "turn", error))
     return false;
@@ -546,7 +549,7 @@ handle_turn (VsxConnection *conn,
 
 static bool
 handle_shout (VsxConnection *conn,
-             GError **error)
+             struct vsx_error **error)
 {
   if (!ensure_empty_payload (conn, "shout", error))
     return false;
@@ -562,7 +565,7 @@ handle_shout (VsxConnection *conn,
 
 static bool
 handle_set_n_tiles (VsxConnection *conn,
-                    GError **error)
+                    struct vsx_error **error)
 {
   uint8_t n_tiles;
 
@@ -574,10 +577,10 @@ handle_set_n_tiles (VsxConnection *conn,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Invalid set_n_tiles command received");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid set_n_tiles command received");
       return false;
     }
 
@@ -593,14 +596,14 @@ handle_set_n_tiles (VsxConnection *conn,
 
 static bool
 process_message (VsxConnection *conn,
-                 GError **error)
+                 struct vsx_error **error)
 {
   if (conn->message_data_length < 1)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent an empty message");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an empty message");
       return false;
     }
 
@@ -632,11 +635,11 @@ process_message (VsxConnection *conn,
       return handle_set_n_tiles (conn, error);
     }
 
-  g_set_error (error,
-               VSX_CONNECTION_ERROR,
-               VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-               "Client sent an unknown message ID (0x%x)",
-               conn->message_data[0]);
+  vsx_set_error (error,
+                 &vsx_connection_error,
+                 VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                 "Client sent an unknown message ID (0x%x)",
+                 conn->message_data[0]);
 
   return false;
 }
@@ -1130,24 +1133,24 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
 
 bool
 vsx_connection_parse_eof (VsxConnection *conn,
-                          GError **error)
+                          struct vsx_error **error)
 {
   if (conn->state == VSX_CONNECTION_STATE_READING_WS_HEADERS)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client closed the connection before finishing WebSocket "
-                   "negotiation");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client closed the connection before finishing WebSocket "
+                     "negotiation");
       return false;
     }
 
   if (conn->read_buf_pos > 0 || conn->message_data_length > 0)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client closed the connection in the middle of a frame");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client closed the connection in the middle of a frame");
       return false;
     }
 
@@ -1159,11 +1162,11 @@ vsx_connection_parse_eof (VsxConnection *conn,
   if (conn->person == NULL
       || vsx_player_is_connected (conn->person->player))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client closed the connection before sending a LEAVE "
-                   "command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client closed the connection before sending a LEAVE "
+                     "command");
       return false;
     }
 
@@ -1175,7 +1178,7 @@ process_control_frame (VsxConnection *conn,
                        int opcode,
                        const uint8_t *data,
                        size_t data_length,
-                       GError **error)
+                       struct vsx_error **error)
 {
   switch (opcode)
     {
@@ -1192,10 +1195,10 @@ process_control_frame (VsxConnection *conn,
       /* pong, ignore */
       break;
     default:
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                   "Client sent an unknown control frame");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an unknown control frame");
     return false;
   }
 
@@ -1224,7 +1227,7 @@ unmask_data (uint32_t mask,
 
 static bool
 process_frames (VsxConnection *conn,
-                GError **error)
+                struct vsx_error **error)
 {
   uint8_t *data = conn->read_buf;
   size_t length = conn->read_buf_pos;
@@ -1273,10 +1276,10 @@ process_frames (VsxConnection *conn,
       /* RSV bits must be zero */
       if (data[0] & 0x70)
         {
-          g_set_error (error,
-                       VSX_CONNECTION_ERROR,
-                       VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                       "Client sent a frame with non-zero RSV bits");
+          vsx_set_error (error,
+                         &vsx_connection_error,
+                         VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                         "Client sent a frame with non-zero RSV bits");
           return false;
         }
 
@@ -1285,22 +1288,22 @@ process_frames (VsxConnection *conn,
           /* Control frame */
           if (payload_length > VSX_PROTO_MAX_CONTROL_FRAME_PAYLOAD)
             {
-              g_set_error (error,
-                           VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                           "Client sent a control frame (0x%x) "
-                           "that is too long (%" PRIu64 ")",
-                           opcode,
-                           payload_length);
+              vsx_set_error (error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                             "Client sent a control frame (0x%x) "
+                             "that is too long (%" PRIu64 ")",
+                             opcode,
+                             payload_length);
               return false;
             }
           if (!is_fin)
             {
-              g_set_error (error,
-                           VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                           "Client sent a fragmented "
-                           "control frame");
+              vsx_set_error (error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                             "Client sent a fragmented "
+                             "control frame");
               return false;
             }
         }
@@ -1309,42 +1312,42 @@ process_frames (VsxConnection *conn,
           if (payload_length + conn->message_data_length
               > VSX_PROTO_MAX_PAYLOAD_SIZE)
             {
-              g_set_error (error,
-                           VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                           "Client sent a message (0x%x) "
-                           "that is too long (%" PRIu64 ")",
-                           opcode,
-                           payload_length);
+              vsx_set_error (error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                             "Client sent a message (0x%x) "
+                             "that is too long (%" PRIu64 ")",
+                             opcode,
+                             payload_length);
               return false;
             }
           if (opcode == 0x0 && conn->message_data_length == 0)
             {
-              g_set_error (error,
-                           VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                           "Client sent a continuation frame "
-                           "without starting a message");
+              vsx_set_error (error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                             "Client sent a continuation frame "
+                             "without starting a message");
               return false;
             }
           if (payload_length == 0 && !is_fin)
             {
-              g_set_error (error,
-                           VSX_CONNECTION_ERROR,
-                           VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                           "Client sent an empty fragmented "
-                           "message");
+              vsx_set_error (error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                             "Client sent an empty fragmented "
+                             "message");
               return false;
             }
         }
       else
         {
-          g_set_error (error,
-                       VSX_CONNECTION_ERROR,
-                       VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                       "Client sent a frame opcode (0x%x) which "
-                       "the server doesn’t understand",
-                       opcode);
+          vsx_set_error (error,
+                         &vsx_connection_error,
+                         VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                         "Client sent a frame opcode (0x%x) which "
+                         "the server doesn’t understand",
+                         opcode);
           return false;
         }
 
@@ -1399,29 +1402,21 @@ bool
 vsx_connection_parse_data (VsxConnection *conn,
                            const uint8_t *buffer,
                            size_t buffer_length,
-                           GError **error)
+                           struct vsx_error **error)
 {
   if (conn->state == VSX_CONNECTION_STATE_READING_WS_HEADERS)
     {
       size_t consumed;
 
-      struct vsx_error *ws_error = NULL;
-
       switch (vsx_ws_parser_parse_data (conn->ws_parser,
                                         buffer,
                                         buffer_length,
                                         &consumed,
-                                        &ws_error))
+                                        error))
         {
         case VSX_WS_PARSER_RESULT_NEED_MORE_DATA:
           return true;
         case VSX_WS_PARSER_RESULT_ERROR:
-          /* FIXME */
-          g_set_error_literal (error,
-                               VSX_CONNECTION_ERROR,
-                               VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                               ws_error->message);
-          vsx_error_free (ws_error);
           return false;
         case VSX_WS_PARSER_RESULT_FINISHED:
           conn->state = VSX_CONNECTION_STATE_WRITING_DATA;
@@ -1501,10 +1496,4 @@ vsx_connection_free (VsxConnection *conn)
     vsx_ws_parser_free (conn->ws_parser);
 
   g_free (conn);
-}
-
-GQuark
-vsx_connection_error_quark (void)
-{
-  return g_quark_from_static_string ("vsx-connection-error");
 }

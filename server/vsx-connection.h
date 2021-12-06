@@ -25,6 +25,7 @@
 #include "vsx-person-set.h"
 #include "vsx-conversation-set.h"
 #include "vsx-signal.h"
+#include "vsx-error.h"
 
 typedef struct _VsxConnection VsxConnection;
 
@@ -33,7 +34,8 @@ typedef enum
   VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
 } VsxConnectionError;
 
-#define VSX_CONNECTION_ERROR (vsx_connection_error_quark ())
+extern struct vsx_error_domain
+vsx_connection_error;
 
 VsxConnection *
 vsx_connection_new (GSocketAddress *socket_address,
@@ -49,11 +51,11 @@ bool
 vsx_connection_parse_data (VsxConnection *conn,
                            const uint8_t *buffer,
                            size_t buffer_length,
-                           GError **error);
+                           struct vsx_error **error);
 
 bool
 vsx_connection_parse_eof (VsxConnection *conn,
-                          GError **error);
+                          struct vsx_error **error);
 
 bool
 vsx_connection_is_finished (VsxConnection *conn);
@@ -69,8 +71,5 @@ vsx_connection_get_last_message_time (VsxConnection *conn);
 
 void
 vsx_connection_free (VsxConnection *conn);
-
-GQuark
-vsx_connection_error_quark (void);
 
 #endif /* __VSX_CONNECTION_H__ */
