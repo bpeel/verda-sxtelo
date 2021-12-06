@@ -31,6 +31,7 @@
 #include "vsx-log.h"
 #include "vsx-flags.h"
 #include "vsx-normalize-name.h"
+#include "vsx-base64.h"
 
 /* VsxConnection specifically handles connections using the WebSocket
  * protocol. Connections via the HTTP protocol use an HTTP parser
@@ -906,8 +907,7 @@ write_ws_response (VsxConnection *conn,
   const uint8_t *key_hash = vsx_ws_parser_get_key_hash (conn->ws_parser,
                                                        &key_hash_size);
 
-  /* Magic formula taken from the docs for g_base64_encode_step */
-  size_t base64_size_needed = (key_hash_size / 3 + 1) * 4 + 4;
+  size_t base64_size_needed = VSX_BASE64_ENCODED_SIZE (key_hash_size);
 
   if (base64_size_needed
       + (sizeof ws_header_prefix) - 1
@@ -926,18 +926,13 @@ write_ws_response (VsxConnection *conn,
   memcpy (p, ws_header_prefix, (sizeof ws_header_prefix) - 1);
   p += (sizeof ws_header_prefix) - 1;
 
-  int state = 0, save = 0;
+  size_t encoded_size = vsx_base64_encode (key_hash,
+                                           key_hash_size,
+                                           (char *) p);
 
-  p += g_base64_encode_step (key_hash,
-                             key_hash_size,
-                             false, /* break_lines */
-                             (char *) p,
-                             &state,
-                             &save);
-  p += g_base64_encode_close (false, /* break_lines */
-                              (char *) p,
-                              &state,
-                              &save);
+  assert (encoded_size == base64_size_needed);
+
+  p += base64_size_needed;
 
   memcpy (p, ws_header_postfix, (sizeof ws_header_postfix) - 1);
   p += (sizeof ws_header_postfix) - 1;
