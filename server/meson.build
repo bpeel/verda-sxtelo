@@ -42,6 +42,7 @@ server_src = [
         'vsx-server.c',
         'vsx-slab.c',
         'vsx-slice.c',
+        '../common/vsx-socket.c',
         'vsx-ssl-error.c',
         'vsx-tile-data.c',
         '../common/vsx-util.c',
