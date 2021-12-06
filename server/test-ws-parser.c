@@ -293,6 +293,20 @@ test_errors (void)
   return ret;
 }
 
+static int
+xdigit_value (int digit)
+{
+  if (digit >= '0' && digit <= '9')
+    return digit - '0';
+
+  digit = vsx_ascii_tolower (digit);
+
+  if (digit >= 'a' && digit <= 'f')
+    return digit - 'a' + 10;
+
+  return -1;
+}
+
 static bool
 compare_key_hash (const uint8_t *key_hash,
                   size_t key_hash_length,
@@ -306,8 +320,8 @@ compare_key_hash (const uint8_t *key_hash,
       if (key_hash_length <= 0)
         return false;
 
-      int byte_value = ((g_ascii_xdigit_value (expected[0]) << 4) |
-                        g_ascii_xdigit_value (expected[1]));
+      int byte_value = ((xdigit_value (expected[0]) << 4) |
+                        xdigit_value (expected[1]));
 
       if (byte_value != *key_hash)
         return false;
