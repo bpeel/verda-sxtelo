@@ -1090,7 +1090,10 @@ static bool
 check_expected_message (VsxPerson *person,
                         const char *expected_message)
 {
-  if (person->conversation->messages->len < 1)
+  int n_messages =
+    vsx_conversation_get_n_messages (person->conversation);
+
+  if (n_messages < 1)
     {
       fprintf (stderr,
                "There are no messages in the conversation after sending a "
@@ -1098,10 +1101,8 @@ check_expected_message (VsxPerson *person,
       return false;
     }
 
-  VsxConversationMessage *message =
-    &g_array_index (person->conversation->messages,
-                    VsxConversationMessage,
-                    person->conversation->messages->len - 1);
+  const VsxConversationMessage *message =
+    vsx_conversation_get_message (person->conversation, n_messages - 1);
 
   if (strcmp (message->text, expected_message))
     {

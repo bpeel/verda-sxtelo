@@ -42,11 +42,12 @@ vsx_conversation_free (void *object)
 
   vsx_log ("Game %i destroyed", self->id);
 
-  for (i = 0; i < self->messages->len; i++)
+  int n_messages = vsx_conversation_get_n_messages (self);
+
+  for (i = 0; i < n_messages; i++)
     {
-      VsxConversationMessage *message = &g_array_index (self->messages,
-                                                        VsxConversationMessage,
-                                                        i);
+      const VsxConversationMessage *message =
+        vsx_conversation_get_message (self, i);
       g_free (message->text);
     }
 
@@ -124,17 +125,14 @@ vsx_conversation_add_message (VsxConversation *conversation,
                               const char *buffer,
                               unsigned int length)
 {
-  VsxConversationMessage *message;
-
   /* Ignore attempts to add messages for a player that has left */
   if (!vsx_player_is_connected (conversation->players[player_num]))
     return;
 
-  g_array_set_size (conversation->messages,
-                    conversation->messages->len + 1);
-  message = &g_array_index (conversation->messages,
-                            VsxConversationMessage,
-                            conversation->messages->len - 1);
+  int n_messages = vsx_conversation_get_n_messages (conversation);
+  g_array_set_size (conversation->messages, ++n_messages);
+  VsxConversationMessage *message =
+    vsx_conversation_get_message (conversation, n_messages - 1);
 
   message->player_num = player_num;
 

@@ -323,8 +323,8 @@ handle_reconnect (VsxConnection *conn,
       return false;
     }
 
-  int n_messages_available = (person->conversation->messages->len -
-                              person->message_offset);
+  int total_n_messages = vsx_conversation_get_n_messages (person->conversation);
+  int n_messages_available = total_n_messages - person->message_offset;
 
   if (n_messages_received > n_messages_available)
     {
@@ -687,7 +687,8 @@ has_pending_data (VsxConnection *conn)
     }
 
   if (conn->person
-      && conn->message_num < conn->person->conversation->messages->len)
+      && (conn->message_num
+          < vsx_conversation_get_n_messages (conn->person->conversation)))
     return true;
 
   return false;
@@ -863,12 +864,12 @@ write_message (VsxConnection *conn,
 
   VsxConversation *conversation = conn->person->conversation;
 
-  if (conn->message_num >= conversation->messages->len)
+  if (conn->message_num
+      >= vsx_conversation_get_n_messages (conversation))
     return 0;
 
-  VsxConversationMessage *message = &g_array_index (conversation->messages,
-                                                    VsxConversationMessage,
-                                                    conn->message_num);
+  const VsxConversationMessage *message =
+    vsx_conversation_get_message (conversation, conn->message_num);
 
   int wrote = vsx_proto_write_command (buffer,
                                        buffer_size,

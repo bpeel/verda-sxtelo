@@ -85,6 +85,21 @@ typedef struct
   int num;
 } VsxConversationChangedData;
 
+static inline int
+vsx_conversation_get_n_messages (VsxConversation *conversation)
+{
+  return conversation->messages->len;
+}
+
+static inline VsxConversationMessage *
+vsx_conversation_get_message (VsxConversation *conversation,
+                              int message_num)
+{
+  return &g_array_index (conversation->messages,
+                         VsxConversationMessage,
+                         message_num);
+}
+
 VsxConversation *
 vsx_conversation_new (const char *room_name);
 
