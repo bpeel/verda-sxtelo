@@ -237,7 +237,7 @@ test_errors (void)
       VsxWsParser *parser = vsx_ws_parser_new ();
 
       size_t consumed;
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       VsxWsParserResult res =
         vsx_ws_parser_parse_data (parser,
@@ -248,7 +248,7 @@ test_errors (void)
 
       if (res == VSX_WS_PARSER_RESULT_ERROR)
         {
-          if (error->domain != VSX_WS_PARSER_ERROR)
+          if (error->domain != &vsx_ws_parser_error)
             {
               fprintf (stderr,
                        "error test %i: error was from a different domain\n",
@@ -276,7 +276,7 @@ test_errors (void)
               ret = false;
             }
 
-          g_error_free (error);
+          vsx_error_free (error);
         }
       else
         {
@@ -333,7 +333,7 @@ parse_data_byte_at_a_time (VsxWsParser *parser,
                            const uint8_t *data,
                            size_t length,
                            size_t *consumed_out,
-                           GError **error)
+                           struct vsx_error **error)
 {
   size_t total_consumed = 0;
 
@@ -373,7 +373,7 @@ test_success (bool byte_at_a_time)
       VsxWsParser *parser = vsx_ws_parser_new ();
 
       size_t consumed;
-      GError *error = NULL;
+      struct vsx_error *error = NULL;
 
       size_t headers_length = strlen (success_tests[i].headers);
 
@@ -451,7 +451,7 @@ test_success (bool byte_at_a_time)
               fprintf (stderr,
                        " error: %s\n",
                        error->message);
-              g_error_free (error);
+              vsx_error_free (error);
             }
           ret = false;
         }

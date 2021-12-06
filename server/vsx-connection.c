@@ -1405,15 +1405,23 @@ vsx_connection_parse_data (VsxConnection *conn,
     {
       size_t consumed;
 
+      struct vsx_error *ws_error = NULL;
+
       switch (vsx_ws_parser_parse_data (conn->ws_parser,
                                         buffer,
                                         buffer_length,
                                         &consumed,
-                                        error))
+                                        &ws_error))
         {
         case VSX_WS_PARSER_RESULT_NEED_MORE_DATA:
           return true;
         case VSX_WS_PARSER_RESULT_ERROR:
+          /* FIXME */
+          g_set_error_literal (error,
+                               VSX_CONNECTION_ERROR,
+                               VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                               ws_error->message);
+          vsx_error_free (ws_error);
           return false;
         case VSX_WS_PARSER_RESULT_FINISHED:
           conn->state = VSX_CONNECTION_STATE_WRITING_DATA;

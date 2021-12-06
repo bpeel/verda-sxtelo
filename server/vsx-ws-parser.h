@@ -22,7 +22,12 @@
 #include <glib.h>
 #include <stdint.h>
 
+#include "vsx-error.h"
+
 typedef struct _VsxWsParser VsxWsParser;
+
+extern struct vsx_error_domain
+vsx_ws_parser_error;
 
 typedef enum
 {
@@ -37,8 +42,6 @@ typedef enum
   VSX_WS_PARSER_RESULT_ERROR
 } VsxWsParserResult;
 
-#define VSX_WS_PARSER_ERROR (vsx_ws_parser_error_quark ())
-
 VsxWsParser *vsx_ws_parser_new (void);
 
 VsxWsParserResult
@@ -46,14 +49,12 @@ vsx_ws_parser_parse_data (VsxWsParser *parser,
                           const uint8_t *data,
                           size_t length,
                           size_t *consumed,
-                          GError **error);
+                          struct vsx_error **error);
 
 const uint8_t *
 vsx_ws_parser_get_key_hash (VsxWsParser *parser,
                             size_t *key_hash_size);
 
 void vsx_ws_parser_free (VsxWsParser *parser);
-
-GQuark vsx_ws_parser_error_quark (void);
 
 #endif /* VSX_WS_PARSER_H */

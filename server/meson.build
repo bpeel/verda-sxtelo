@@ -52,6 +52,8 @@ executable('verda-sxtelo', server_src,
            include_directories: inc_dirs)
 
 test_ws_parser_src = [
+        'vsx-error.c',
+        'vsx-util.c',
         'vsx-ws-parser.c',
         'test-ws-parser.c',
 ]
