@@ -252,7 +252,7 @@ handle_byte (VsxKeyValueData *data, int ch)
       return;
     }
 
-  g_critical ("Invalid state reached");
+  vsx_fatal ("Invalid state reached");
 }
 
 void
