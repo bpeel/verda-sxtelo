@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include "vsx-ws-parser.h"
+#include "vsx-util.h"
 
 typedef struct
 {
@@ -233,7 +234,7 @@ test_errors (void)
 {
   bool ret = true;
 
-  for (int i = 0; i < G_N_ELEMENTS (error_tests); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (error_tests); i++)
     {
       VsxWsParser *parser = vsx_ws_parser_new ();
 
@@ -383,7 +384,7 @@ test_success (bool byte_at_a_time)
 {
   bool ret = true;
 
-  for (int i = 0; i < G_N_ELEMENTS (success_tests); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (success_tests); i++)
     {
       VsxWsParser *parser = vsx_ws_parser_new ();
 

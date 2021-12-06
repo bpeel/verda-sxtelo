@@ -19,7 +19,6 @@
 #ifndef __VSX_WS_PARSER_H__
 #define __VSX_WS_PARSER_H__
 
-#include <glib.h>
 #include <stdint.h>
 
 #include "vsx-error.h"
