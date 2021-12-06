@@ -33,6 +33,7 @@
 #include "vsx-log.h"
 #include "vsx-util.h"
 #include "vsx-buffer.h"
+#include "vsx-file-error.h"
 
 static FILE *vsx_log_file = NULL;
 static struct vsx_buffer vsx_log_buffer = VSX_BUFFER_STATIC_INIT;
@@ -159,7 +160,7 @@ vsx_log_thread_func (void *data)
 
 bool
 vsx_log_set_file (const char *filename,
-                  GError **error)
+                  struct vsx_error **error)
 {
   FILE *file;
 
@@ -167,10 +168,11 @@ vsx_log_set_file (const char *filename,
 
   if (file == NULL)
     {
-      g_set_error_literal (error,
-                           G_FILE_ERROR,
-                           g_file_error_from_errno (errno),
-                           strerror (errno));
+      vsx_file_error_set (error,
+                          errno,
+                          "%s: %s",
+                          filename,
+                          strerror (errno));
       return false;
     }
 

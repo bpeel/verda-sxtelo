@@ -22,6 +22,8 @@
 #include <glib.h>
 #include <stdbool.h>
 
+#include "vsx-error.h"
+
 bool
 vsx_log_available (void);
 
@@ -31,7 +33,7 @@ vsx_log (const char *format,
 
 bool
 vsx_log_set_file (const char *filename,
-                  GError **error);
+                  struct vsx_error **error);
 
 void
 vsx_log_start (void);

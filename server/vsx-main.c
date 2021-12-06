@@ -312,14 +312,16 @@ main (int argc, char **argv)
     }
   else
     {
+      struct vsx_error *log_error = NULL;
+
       const char *log_file = (option_log_file ?
                               option_log_file :
                               config->log_file);
 
-      if (log_file && !vsx_log_set_file (log_file, &error))
+      if (log_file && !vsx_log_set_file (log_file, &log_error))
         {
-          fprintf (stderr, "Error setting log file: %s\n", error->message);
-          g_clear_error (&error);
+          fprintf (stderr, "Error setting log file: %s\n", log_error->message);
+          vsx_error_free (log_error);
         }
       else
         {
