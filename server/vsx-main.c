@@ -37,6 +37,7 @@
 #include "vsx-main-context.h"
 #include "vsx-log.h"
 #include "vsx-config.h"
+#include "vsx-buffer.h"
 
 static char *option_log_file = NULL;
 static char *option_config_file = NULL;
@@ -107,22 +108,22 @@ load_config(GError **error)
     return vsx_config_load (option_config_file, error);
 
   const char * const *dirs = g_get_system_config_dirs ();
-  GString *filename = g_string_new (NULL);
+  struct vsx_buffer filename = VSX_BUFFER_STATIC_INIT;
   VsxConfig *config = NULL;
 
   for (int i = 0; dirs[i]; i++)
     {
-      g_string_truncate (filename, 0);
-      g_string_append (filename, dirs[i]);
-      g_string_append (filename,
-                       G_DIR_SEPARATOR_S
-                       "verda-sxtelo"
-                       G_DIR_SEPARATOR_S
-                       "conf.txt");
+      vsx_buffer_set_length (&filename, 0);
+      vsx_buffer_append_string (&filename, dirs[i]);
+      vsx_buffer_append_string (&filename,
+                                G_DIR_SEPARATOR_S
+                                "verda-sxtelo"
+                                G_DIR_SEPARATOR_S
+                                "conf.txt");
 
-      if (g_file_test (filename->str, G_FILE_TEST_EXISTS))
+      if (g_file_test ((const char *) filename.data, G_FILE_TEST_EXISTS))
         {
-          config = vsx_config_load (filename->str, error);
+          config = vsx_config_load ((const char *) filename.data, error);
           goto found;
         }
     }
@@ -133,7 +134,7 @@ load_config(GError **error)
                "No config file found");
 
  found:
-  g_string_free (filename, true);
+  vsx_buffer_destroy (&filename);
 
   return config;
 }
