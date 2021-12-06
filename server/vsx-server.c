@@ -512,7 +512,7 @@ handle_write (VsxServer *server,
         {
           if (!is_would_block_error (errno) && errno != EINTR)
             {
-              g_print ("Error writing to socket for %s: %s",
+              vsx_log ("Error writing to socket for %s: %s",
                        connection->peer_address_string,
                        strerror (errno));
               vsx_server_remove_connection (server, connection);
