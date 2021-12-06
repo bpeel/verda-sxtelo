@@ -37,6 +37,7 @@
 #include "vsx-proto.h"
 #include "vsx-util.h"
 #include "vsx-buffer.h"
+#include "vsx-file-error.h"
 
 #define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -934,19 +935,41 @@ bool
 vsx_server_add_config (VsxServer *server,
                        VsxConfigServer *server_config,
                        int fd_override,
-                       GError **error)
+                       struct vsx_error **error)
 {
   g_return_val_if_fail (error == NULL || *error == NULL, false);
 
   GSocket *socket;
 
+  GError *socket_error = NULL;
+
   if (fd_override >= 0)
-    socket = create_socket_for_fd (fd_override, error);
+    socket = create_socket_for_fd (fd_override, &socket_error);
   else
-    socket = create_socket_for_config (server_config, error);
+    socket = create_socket_for_config (server_config, &socket_error);
 
   if (socket == NULL)
-    return false;
+    {
+      if (socket_error->domain == G_FILE_ERROR)
+        {
+          vsx_file_error_set (error,
+                              socket_error->code,
+                              "%s",
+                              socket_error->message);
+        }
+      else
+        {
+          vsx_set_error (error,
+                         &vsx_file_error,
+                         VSX_FILE_ERROR_OTHER,
+                         "%s",
+                         socket_error->message);
+        }
+
+      g_error_free (socket_error);
+
+      return false;
+    }
 
   VsxServerSocket *ssocket = g_new0 (VsxServerSocket, 1);
 
@@ -963,9 +986,8 @@ vsx_server_add_config (VsxServer *server,
   vsx_list_insert (&server->sockets, &ssocket->link);
 
   if (server_config->certificate
-      && !init_ssl (ssocket, server_config, NULL))
+      && !init_ssl (ssocket, server_config, error))
     {
-      /* FIXME error */
       vsx_server_remove_socket (server, ssocket);
       return false;
     }

@@ -38,6 +38,7 @@
 #include "vsx-log.h"
 #include "vsx-config.h"
 #include "vsx-buffer.h"
+#include "vsx-file-error.h"
 
 static char *option_log_file = NULL;
 static char *option_config_file = NULL;
@@ -141,7 +142,7 @@ load_config(GError **error)
 
 static VsxServer *
 create_server (VsxConfig *config,
-               GError **error)
+               struct vsx_error **error)
 {
   g_assert (!vsx_list_empty (&config->servers));
 
@@ -153,24 +154,23 @@ create_server (VsxConfig *config,
 
     if (nfds < 0)
       {
-        g_set_error (error,
-                     G_FILE_ERROR,
-                     g_file_error_from_errno (-nfds),
-                     "Error getting systemd fds: %s",
-                     strerror (-nfds));
+        vsx_file_error_set (error,
+                            -nfds,
+                            "Error getting systemd fds: %s",
+                            strerror (-nfds));
         return NULL;
       }
     if (nfds > 0)
       {
         if (nfds != vsx_list_length (&config->servers))
           {
-            g_set_error (error,
-                         G_FILE_ERROR,
-                         G_FILE_ERROR_BADF,
-                         "Wrong number of file descriptors received from "
-                         "systemd (expected: %i, got %i)",
-                         vsx_list_length (&config->servers),
-                         nfds);
+            vsx_set_error (error,
+                           &vsx_file_error,
+                           VSX_FILE_ERROR_BADF,
+                           "Wrong number of file descriptors received "
+                           "from systemd (expected: %i, got %i)",
+                           vsx_list_length (&config->servers),
+                           nfds);
             return NULL;
           }
 
@@ -326,12 +326,14 @@ main (int argc, char **argv)
         }
       else
         {
-          server = create_server (config, &error);
+          struct vsx_error *server_error = NULL;
+
+          server = create_server (config, &server_error);
 
           if (server == NULL)
             {
-              fprintf (stderr, "%s\n", error->message);
-              g_clear_error (&error);
+              fprintf (stderr, "%s\n", server_error->message);
+              vsx_error_free (server_error);
             }
           else
             {

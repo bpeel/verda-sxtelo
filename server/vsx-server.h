@@ -24,6 +24,7 @@
 #include <stdbool.h>
 
 #include "vsx-config.h"
+#include "vsx-error.h"
 
 typedef struct _VsxServer VsxServer;
 
@@ -34,7 +35,7 @@ bool
 vsx_server_add_config (VsxServer *server,
                        VsxConfigServer *server_config,
                        int fd_override,
-                       GError **error);
+                       struct vsx_error **error);
 
 bool
 vsx_server_run (VsxServer *server,
