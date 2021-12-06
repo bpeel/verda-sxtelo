@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <string.h>
 
 #include "vsx-connection.h"
 #include "vsx-proto.h"

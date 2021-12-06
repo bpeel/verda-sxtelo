@@ -24,6 +24,7 @@
 
 #include <inttypes.h>
 #include <assert.h>
+#include <string.h>
 
 #include "vsx-ws-parser.h"
 #include "vsx-proto.h"
