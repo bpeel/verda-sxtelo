@@ -132,11 +132,7 @@ load_config(struct vsx_error **error)
     {
       vsx_buffer_set_length (&filename, 0);
       vsx_buffer_append_string (&filename, dirs[i]);
-      vsx_buffer_append_string (&filename,
-                                G_DIR_SEPARATOR_S
-                                "verda-sxtelo"
-                                G_DIR_SEPARATOR_S
-                                "conf.txt");
+      vsx_buffer_append_string (&filename, "/verda-sxtelo/conf.txt");
 
       if (g_file_test ((const char *) filename.data, G_FILE_TEST_EXISTS))
         {
