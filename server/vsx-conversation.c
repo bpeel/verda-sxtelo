@@ -54,7 +54,7 @@ vsx_conversation_free (void *object)
   for (i = 0; i < self->n_players; i++)
     vsx_player_free (self->players[i]);
 
-  g_array_free (self->messages, true);
+  vsx_buffer_destroy (&self->messages);
 
   g_free (self);
 }
@@ -130,7 +130,8 @@ vsx_conversation_add_message (VsxConversation *conversation,
     return;
 
   int n_messages = vsx_conversation_get_n_messages (conversation);
-  g_array_set_size (conversation->messages, ++n_messages);
+  vsx_buffer_set_length (&conversation->messages,
+                         ++n_messages * sizeof (VsxConversationMessage));
   VsxConversationMessage *message =
     vsx_conversation_get_message (conversation, n_messages - 1);
 
@@ -349,7 +350,7 @@ vsx_conversation_new (const char *room_name)
 
   vsx_signal_init (&self->changed_signal);
 
-  self->messages = g_array_new (false, false, sizeof (VsxConversationMessage));
+  vsx_buffer_init (&self->messages);
 
   self->state = VSX_CONVERSATION_AWAITING_START;
 

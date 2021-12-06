@@ -19,13 +19,13 @@
 #ifndef __VSX_CONVERSATION_H__
 #define __VSX_CONVERSATION_H__
 
-#include <glib.h>
 #include <stdbool.h>
 
 #include "vsx-player.h"
 #include "vsx-signal.h"
 #include "vsx-object.h"
 #include "vsx-tile-data.h"
+#include "vsx-buffer.h"
 
 #define VSX_CONVERSATION_MAX_PLAYERS 32
 
@@ -45,7 +45,8 @@ typedef struct
     VSX_CONVERSATION_IN_PROGRESS
   } state;
 
-  GArray *messages;
+  /* Array of VsxConversationMessage */
+  struct vsx_buffer messages;
 
   int n_players;
   int n_connected_players;
@@ -88,16 +89,14 @@ typedef struct
 static inline int
 vsx_conversation_get_n_messages (VsxConversation *conversation)
 {
-  return conversation->messages->len;
+  return conversation->messages.length / sizeof (VsxConversationMessage);
 }
 
 static inline VsxConversationMessage *
 vsx_conversation_get_message (VsxConversation *conversation,
                               int message_num)
 {
-  return &g_array_index (conversation->messages,
-                         VsxConversationMessage,
-                         message_num);
+  return (VsxConversationMessage *) conversation->messages.data + message_num;
 }
 
 VsxConversation *
