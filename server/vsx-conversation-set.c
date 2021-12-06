@@ -23,6 +23,9 @@
 #include <glib.h>
 
 #include "vsx-conversation-set.h"
+
+#include <string.h>
+
 #include "vsx-log.h"
 #include "vsx-list.h"
 
