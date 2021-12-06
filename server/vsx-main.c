@@ -30,6 +30,7 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #ifdef USE_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -158,7 +159,7 @@ static VsxServer *
 create_server (VsxConfig *config,
                struct vsx_error **error)
 {
-  g_assert (!vsx_list_empty (&config->servers));
+  assert (!vsx_list_empty (&config->servers));
 
   int override_fd = -1;
 

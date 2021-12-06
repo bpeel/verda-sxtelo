@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 #include <limits.h>
 
 #include "vsx-main-context.h"
@@ -412,7 +413,7 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
        * the source list to emit, so we need to handle them specially
        * during iteration. */
 
-      g_assert(!source->removed);
+      assert (!source->removed);
 
       if (source->busy)
         {
@@ -642,7 +643,7 @@ free_buckets (VsxMainContext *mc)
 
   vsx_list_for_each_safe (bucket, tmp, &mc->buckets, link)
     {
-      g_assert (vsx_list_empty (&bucket->sources));
+      assert (vsx_list_empty (&bucket->sources));
       vsx_free (bucket);
     }
 }

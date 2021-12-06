@@ -23,6 +23,7 @@
 #include "vsx-connection.h"
 
 #include <inttypes.h>
+#include <assert.h>
 
 #include "vsx-ws-parser.h"
 #include "vsx-proto.h"
@@ -1187,7 +1188,7 @@ process_control_frame (VsxConnection *conn,
       /* Close control frame, ignore */
       return true;
     case 0x9:
-      g_assert (data_length <= sizeof conn->pong_data);
+      assert (data_length <= sizeof conn->pong_data);
       memcpy (conn->pong_data, data, data_length);
       conn->pong_data_length = data_length;
       conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PONG;

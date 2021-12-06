@@ -23,6 +23,7 @@
 #include <glib.h>
 
 #include <string.h>
+#include <assert.h>
 
 #include "vsx-conversation.h"
 #include "vsx-main-context.h"
@@ -276,7 +277,7 @@ vsx_conversation_add_player (VsxConversation *conversation,
 {
   VsxPlayer *player;
 
-  g_assert_cmpint (conversation->n_players, <, VSX_CONVERSATION_MAX_PLAYERS);
+  assert (conversation->n_players < VSX_CONVERSATION_MAX_PLAYERS);
 
   player = vsx_player_new (player_name, conversation->n_players);
   conversation->players[conversation->n_players] = player;
@@ -361,7 +362,7 @@ vsx_conversation_new (const char *room_name)
     {
       const char *t_next = vsx_utf8_next (t);
 
-      g_assert (*t);
+      assert (*t);
 
       memcpy (self->tiles[i].letter, t, t_next - t);
       self->tiles[i].letter[t_next - t] = '\0';
@@ -372,7 +373,7 @@ vsx_conversation_new (const char *room_name)
       t = t_next;
     }
 
-  g_assert_cmpint (*t, ==, 0);
+  assert (*t == 0);
 
   /* Shuffle the tiles */
   shuffle_tiles (self);

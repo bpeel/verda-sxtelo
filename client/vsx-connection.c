@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <gio/gio.h>
+#include <assert.h>
 
 #include "vsx-marshal.h"
 #include "vsx-enum-types.h"
@@ -1378,7 +1379,7 @@ vsx_connection_queue_reconnect (VsxConnection *connection)
 {
   VsxConnectionPrivate *priv = connection->priv;
 
-  g_assert (priv->reconnect_handler == 0);
+  assert (priv->reconnect_handler == 0);
 
   priv->reconnect_handler =
     g_timeout_add_seconds (priv->reconnect_timeout,
@@ -1426,7 +1427,7 @@ vsx_connection_set_running_internal (VsxConnection *connection,
           priv->running_state =
             VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
 
-          g_assert (priv->reconnect_handler == 0);
+          assert (priv->reconnect_handler == 0);
           priv->reconnect_handler = g_idle_add (vsx_connection_reconnect_cb,
                                                 connection);
         }
