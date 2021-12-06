@@ -26,6 +26,7 @@
 
 #include "vsx-connection.h"
 #include "vsx-proto.h"
+#include "vsx-buffer.h"
 
 typedef struct
 {
@@ -618,22 +619,22 @@ create_player (Harness *harness,
                const char *player_name,
                VsxPerson **person_out)
 {
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
-  g_string_append_c (buf, 0x82);
-  g_string_append_c (buf, strlen (room_name) + strlen (player_name) + 3);
-  g_string_append_c (buf, 0x80);
-  g_string_append (buf, room_name);
-  g_string_append_c (buf, 0);
-  g_string_append (buf, player_name);
-  g_string_append_c (buf, 0);
+  vsx_buffer_append_c (&buf, 0x82);
+  vsx_buffer_append_c (&buf, strlen (room_name) + strlen (player_name) + 3);
+  vsx_buffer_append_c (&buf, 0x80);
+  vsx_buffer_append_string (&buf, room_name);
+  vsx_buffer_append_c (&buf, 0);
+  vsx_buffer_append_string (&buf, player_name);
+  vsx_buffer_append_c (&buf, 0);
 
   bool ret = true;
   GError *error = NULL;
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (uint8_t *) buf->str,
-                                  buf->len,
+                                  buf.data,
+                                  buf.length,
                                   &error))
     {
       fprintf (stderr,
@@ -690,7 +691,7 @@ create_player (Harness *harness,
         }
     }
 
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 
   return ret;
 }
@@ -718,24 +719,22 @@ reconnect_to_player (VsxConnection *conn,
                      uint16_t n_messages_received,
                      GError **error)
 {
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
   player_id = GUINT64_TO_LE (player_id);
   n_messages_received = GUINT64_TO_LE (n_messages_received);
 
-  g_string_append_c (buf, 0x82);
-  g_string_append_c (buf, 1 + sizeof (uint64_t) + sizeof (uint16_t));
-  g_string_append_c (buf, 0x81);
-  g_string_append_len (buf, (void *) &player_id, sizeof player_id);
-  g_string_append_len (buf,
-                       (void *) &n_messages_received,
-                       sizeof n_messages_received);
+  vsx_buffer_append_c (&buf, 0x82);
+  vsx_buffer_append_c (&buf, 1 + sizeof (uint64_t) + sizeof (uint16_t));
+  vsx_buffer_append_c (&buf, 0x81);
+  vsx_buffer_append (&buf, &player_id, sizeof player_id);
+  vsx_buffer_append (&buf, &n_messages_received, sizeof n_messages_received);
 
   bool ret = true;
 
   if (!vsx_connection_parse_data (conn,
-                                  (uint8_t *) buf->str,
-                                  buf->len,
+                                  buf.data,
+                                  buf.length,
                                   error))
     {
       ret = false;
@@ -762,7 +761,7 @@ reconnect_to_player (VsxConnection *conn,
         }
     }
 
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 
   return ret;
 }
@@ -1128,16 +1127,17 @@ test_send_one_message (Harness *harness,
 
   const char *expected_message = "Hello, world!";
 
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
-  g_string_append_c (buf, 0x82);
-  g_string_append_c (buf, strlen (expected_message) + 2);
-  g_string_append_c (buf, 0x85);
-  g_string_append (buf, expected_message);
-  g_string_append_c (buf, '\0');
+  vsx_buffer_append_c (&buf, 0x82);
+  vsx_buffer_append_c (&buf, strlen (expected_message) + 2);
+  vsx_buffer_append_c (&buf, 0x85);
+  vsx_buffer_append_string (&buf, expected_message);
+  vsx_buffer_append_c (&buf, '\0');
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (uint8_t *) buf->str, buf->len,
+                                  buf.data,
+                                  buf.length,
                                   &error))
     {
       fprintf (stderr,
@@ -1165,9 +1165,9 @@ test_send_one_message (Harness *harness,
       ret = false;
     }
 
-    g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 
-    return ret;
+  return ret;
 }
 
 static bool
@@ -1179,22 +1179,22 @@ test_send_fragmented_message (Harness *harness,
 
   const char *expected_message = "Hello, fragmented world!";
 
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
-  g_string_append_c (buf, 0x85);
-  g_string_append (buf, expected_message);
-  g_string_append_c (buf, '\0');
+  vsx_buffer_append_c (&buf, 0x85);
+  vsx_buffer_append_string (&buf, expected_message);
+  vsx_buffer_append_c (&buf, '\0');
 
   /* Send the message as a series of one-byte fragments */
-  for (int i = 0; i < buf->len; i++)
+  for (int i = 0; i < buf.length; i++)
     {
       uint8_t frag[] =
         {
           i == 0 ? 0x02
-          : i == buf->len - 1 ? 0x80
+          : i == buf.length - 1 ? 0x80
           : 0x00,
           1,
-          buf->str[i]
+          buf.data[i]
         };
 
       if (!vsx_connection_parse_data (harness->conn,
@@ -1221,7 +1221,7 @@ test_send_fragmented_message (Harness *harness,
     ret = false;
 
  done:
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 
   return ret;
 }
@@ -1233,24 +1233,24 @@ test_send_long_message (Harness *harness,
   GError *error = NULL;
   bool ret = true;
 
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
   /* Send a message that is 999 ASCII characters followed by one
    * 2-byte UTF-8 character. The limit is 1000 bytes and the resulting
    * message should be clipped to remove the whole 2-byte character.
    */
-  g_string_append (buf, "\x82\x7e\x03\xeb\x85");
+  vsx_buffer_append_string (&buf, "\x82\x7e\x03\xeb\x85");
 
-  size_t expected_start = buf->len;
+  size_t expected_start = buf.length;
 
   for (int i = 0; i < 997; i++)
-    g_string_append_c (buf, 'a');
-  g_string_append (buf, "ĥ");
-  g_string_append (buf, "ĉ");
-  g_string_append_c (buf, '\0');
+    vsx_buffer_append_c (&buf, 'a');
+  vsx_buffer_append_string (&buf, "ĥ");
+  vsx_buffer_append_string (&buf, "ĉ");
+  vsx_buffer_append_c (&buf, '\0');
 
   if (!vsx_connection_parse_data (harness->conn,
-                                  (uint8_t *) buf->str, buf->len,
+                                  buf.data, buf.length,
                                   &error))
     {
       fprintf (stderr,
@@ -1262,9 +1262,9 @@ test_send_long_message (Harness *harness,
     }
   else
     {
-      g_string_set_size (buf, buf->len - 3);
+      buf.data[buf.length - 3] = '\0';
 
-      const char *expected_message = buf->str + expected_start;
+      const char *expected_message = (const char *) buf.data + expected_start;
 
       if (!check_expected_message (person, expected_message))
         {
@@ -1278,7 +1278,7 @@ test_send_long_message (Harness *harness,
         }
     }
 
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 
   return ret;
 }
