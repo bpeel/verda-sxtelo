@@ -37,6 +37,7 @@ enum vsx_file_error {
         VSX_FILE_ERROR_PFNOSUPPORT,
         VSX_FILE_ERROR_AFNOSUPPORT,
         VSX_FILE_ERROR_MFILE,
+        VSX_FILE_ERROR_BADF,
 
         VSX_FILE_ERROR_OTHER
 };

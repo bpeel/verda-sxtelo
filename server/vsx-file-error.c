@@ -56,6 +56,8 @@ vsx_file_error_from_errno(int errnum)
                 return VSX_FILE_ERROR_AFNOSUPPORT;
         case EMFILE:
                 return VSX_FILE_ERROR_MFILE;
+        case EBADF:
+                return VSX_FILE_ERROR_BADF;
         }
 
         return VSX_FILE_ERROR_OTHER;
