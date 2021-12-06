@@ -48,60 +48,72 @@ static bool option_daemonize = false;
 static char *option_user = NULL;
 static char *option_group = NULL;
 
-static GOptionEntry
-options[] =
-  {
-    {
-      "config", 'c', 0, G_OPTION_ARG_STRING, &option_config_file,
-      "Config file to use instead of the default", "file"
-    },
-    {
-      "log", 'l', 0, G_OPTION_ARG_STRING, &option_log_file,
-      "File to write log messages to", "file"
-    },
-    {
-      "daemonize", 'd', 0, G_OPTION_ARG_NONE, &option_daemonize,
-      "Launch the server in a separate detached process", NULL
-    },
-    {
-      "user", 'u', 0, G_OPTION_ARG_STRING, &option_user,
-      "Run the daemon as USER", "USER"
-    },
-    {
-      "group", 'g', 0, G_OPTION_ARG_STRING, &option_group,
-      "Run the daemon as GROUP", "GROUP"
-    },
-    { NULL, 0, 0, 0, NULL, NULL, NULL }
-  };
+static const char options[] = "-hl:c:du:g:";
+
+static void
+usage (void)
+{
+  printf ("verda-sxtelo - An anagram game in Esperanto for the web\n"
+          "usage: verda-sxtelo [options]...\n"
+          " -h                   Show this help message\n"
+          " -c <file>            Specify a config file to use instead of\n"
+          "                      the default.\n"
+          " -l <file>            File to write log messages to.\n"
+          " -d                   Fork and detach from terminal\n"
+          "                      (Daemonize)\n"
+          " -u <user>            Drop privileges to user\n"
+          " -g <group>           Drop privileges to group\n");
+}
 
 static bool
-process_arguments (int *argc, char ***argv,
-                   GError **error)
+process_arguments(int argc, char **argv)
 {
-  GOptionContext *context;
-  bool ret;
-  GOptionGroup *group;
+  int opt;
 
-  group = g_option_group_new (NULL, /* name */
-                              NULL, /* description */
-                              NULL, /* help_description */
-                              NULL, /* user_data */
-                              NULL /* destroy notify */);
-  g_option_group_add_entries (group, options);
-  context = g_option_context_new ("- A server for practicing a "
-                                  "foreign language");
-  g_option_context_set_main_group (context, group);
-  ret = g_option_context_parse (context, argc, argv, error);
-  g_option_context_free (context);
+  opterr = false;
 
-  if (ret && *argc > 1)
-    {
-      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
-                   "Unknown option '%s'", (* argv)[1]);
-      ret = false;
+  while ((opt = getopt (argc, argv, options)) != -1) {
+    switch (opt) {
+    case ':':
+    case '?':
+      fprintf (stderr,
+               "invalid option '%c'\n",
+               optopt);
+      return false;
+
+    case '\1':
+      fprintf (stderr,
+               "unexpected argument \"%s\"\n",
+               optarg);
+      return false;
+
+    case 'h':
+      usage ();
+      return false;
+
+    case 'l':
+      option_log_file = optarg;
+      break;
+
+    case 'c':
+      option_config_file = optarg;
+      break;
+
+    case 'd':
+      option_daemonize =  true;
+      break;
+
+    case 'u':
+      option_user = optarg;
+      break;
+
+    case 'g':
+      option_group = optarg;
+      break;
     }
+  }
 
-  return ret;
+  return true;
 }
 
 static VsxConfig *
@@ -286,60 +298,50 @@ set_group (const char *group_name)
 int
 main (int argc, char **argv)
 {
-  GError *error = NULL;
   VsxMainContext *mc;
   VsxServer *server;
   VsxConfig *config;
 
-  if (!process_arguments (&argc, &argv, &error))
-    {
-      fprintf (stderr, "%s\n", error->message);
-      return EXIT_FAILURE;
-    }
+  if (!process_arguments (argc, argv))
+    return EXIT_FAILURE;
 
-  struct vsx_error *config_error = NULL;
+  struct vsx_error *error = NULL;
 
-  config = load_config (&config_error);
+  config = load_config (&error);
 
   if (config == NULL)
     {
-      fprintf (stderr, "%s\n", config_error->message);
-      vsx_error_free (config_error);
+      fprintf (stderr, "%s\n", error->message);
+      vsx_error_free (error);
       return EXIT_FAILURE;
     }
 
-  struct vsx_error *mc_error = NULL;
-
-  mc = vsx_main_context_get_default (&mc_error);
+  mc = vsx_main_context_get_default (&error);
 
   if (mc == NULL)
     {
-      fprintf (stderr, "%s\n", mc_error->message);
-      vsx_error_free (mc_error);
+      fprintf (stderr, "%s\n", error->message);
+      vsx_error_free (error);
     }
   else
     {
-      struct vsx_error *log_error = NULL;
-
       const char *log_file = (option_log_file ?
                               option_log_file :
                               config->log_file);
 
-      if (log_file && !vsx_log_set_file (log_file, &log_error))
+      if (log_file && !vsx_log_set_file (log_file, &error))
         {
-          fprintf (stderr, "Error setting log file: %s\n", log_error->message);
-          vsx_error_free (log_error);
+          fprintf (stderr, "Error setting log file: %s\n", error->message);
+          vsx_error_free (error);
         }
       else
         {
-          struct vsx_error *server_error = NULL;
-
-          server = create_server (config, &server_error);
+          server = create_server (config, &error);
 
           if (server == NULL)
             {
-              fprintf (stderr, "%s\n", server_error->message);
-              vsx_error_free (server_error);
+              fprintf (stderr, "%s\n", error->message);
+              vsx_error_free (error);
             }
           else
             {
@@ -358,10 +360,10 @@ main (int argc, char **argv)
 
               vsx_log_start ();
 
-              if (!vsx_server_run (server, &server_error))
+              if (!vsx_server_run (server, &error))
                 {
-                  vsx_log ("%s", server_error->message);
-                  vsx_error_free (server_error);
+                  vsx_log ("%s", error->message);
+                  vsx_error_free (error);
                 }
 
               vsx_log ("Exiting...");
