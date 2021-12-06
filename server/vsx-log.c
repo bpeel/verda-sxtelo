@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "vsx-log.h"
 
@@ -47,22 +48,25 @@ vsx_log (const char *format,
          ...)
 {
   va_list ap;
-  GTimeVal now;
-  char *now_string;
 
   if (!vsx_log_available ())
     return;
 
   g_mutex_lock (&vsx_log_mutex);
 
-  g_string_append_c (vsx_log_buffer, '[');
+  time_t now;
+  time (&now);
+  struct tm tm;
+  gmtime_r (&now, &tm);
 
-  g_get_current_time (&now);
-  now_string = g_time_val_to_iso8601 (&now);
-  g_string_append (vsx_log_buffer, now_string);
-  g_free (now_string);
-
-  g_string_append (vsx_log_buffer, "] ");
+  g_string_append_printf (vsx_log_buffer,
+                          "[%4d-%02d-%02dT%02d:%02d:%02dZ] ",
+                          tm.tm_year + 1900,
+                          tm.tm_mon + 1,
+                          tm.tm_mday,
+                          tm.tm_hour,
+                          tm.tm_min,
+                          tm.tm_sec);
 
   va_start (ap, format);
   g_string_append_vprintf (vsx_log_buffer, format, ap);
