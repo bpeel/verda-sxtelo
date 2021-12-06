@@ -175,6 +175,24 @@ process_request_line (VsxWsParser *parser,
 }
 
 static bool
+is_key_header (const char *header)
+{
+  static const char key_header[] = "sec-websocket-key:";
+  const char *a = key_header, *b = header;
+
+  while (*a)
+    {
+      if (vsx_ascii_tolower (*a) != vsx_ascii_tolower (*b))
+        return false;
+
+      a++;
+      b++;
+    }
+
+  return true;
+}
+
+static bool
 process_header (VsxWsParser *parser, struct vsx_error **error)
 {
   uint8_t *data = parser->buf;
@@ -193,10 +211,8 @@ process_header (VsxWsParser *parser, struct vsx_error **error)
       return false;
     }
 
-  static const char key_header[] = "sec-websocket-key:";
-
   /* Ignore any headers apart from the key header */
-  if (g_ascii_strncasecmp (field_name, key_header, (sizeof key_header) - 1))
+  if (!is_key_header (field_name))
     return true;
 
   if (parser->key_hash_ctx != NULL)
