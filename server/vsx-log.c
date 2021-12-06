@@ -32,9 +32,10 @@
 
 #include "vsx-log.h"
 #include "vsx-util.h"
+#include "vsx-buffer.h"
 
 static FILE *vsx_log_file = NULL;
-static GString *vsx_log_buffer = NULL;
+static struct vsx_buffer vsx_log_buffer = VSX_BUFFER_STATIC_INIT;
 static pthread_t vsx_log_thread;
 static bool vsx_log_has_thread = false;
 static pthread_mutex_t vsx_log_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -63,20 +64,20 @@ vsx_log (const char *format,
   struct tm tm;
   gmtime_r (&now, &tm);
 
-  g_string_append_printf (vsx_log_buffer,
-                          "[%4d-%02d-%02dT%02d:%02d:%02dZ] ",
-                          tm.tm_year + 1900,
-                          tm.tm_mon + 1,
-                          tm.tm_mday,
-                          tm.tm_hour,
-                          tm.tm_min,
-                          tm.tm_sec);
+  vsx_buffer_append_printf (&vsx_log_buffer,
+                            "[%4d-%02d-%02dT%02d:%02d:%02dZ] ",
+                            tm.tm_year + 1900,
+                            tm.tm_mon + 1,
+                            tm.tm_mday,
+                            tm.tm_hour,
+                            tm.tm_min,
+                            tm.tm_sec);
 
   va_start (ap, format);
-  g_string_append_vprintf (vsx_log_buffer, format, ap);
+  vsx_buffer_append_vprintf (&vsx_log_buffer, format, ap);
   va_end (ap);
 
-  g_string_append_c (vsx_log_buffer, '\n');
+  vsx_buffer_append_c (&vsx_log_buffer, '\n');
 
   pthread_cond_signal (&vsx_log_cond);
 
@@ -99,27 +100,27 @@ block_sigint (void)
 static void *
 vsx_log_thread_func (void *data)
 {
-  GString *alternate_buffer;
+  struct vsx_buffer alternate_buffer;
+  struct vsx_buffer tmp;
   bool had_error = false;
-  GString *tmp;
 
   block_sigint ();
 
-  alternate_buffer = g_string_new (NULL);
+  vsx_buffer_init (&alternate_buffer);
 
   pthread_mutex_lock (&vsx_log_mutex);
 
-  while (!vsx_log_finished || vsx_log_buffer->len > 0)
+  while (!vsx_log_finished || vsx_log_buffer.length > 0)
     {
       size_t wrote;
 
       /* Wait until there's something to do */
-      while (!vsx_log_finished && vsx_log_buffer->len == 0)
+      while (!vsx_log_finished && vsx_log_buffer.length == 0)
         pthread_cond_wait (&vsx_log_cond, &vsx_log_mutex);
 
       if (had_error)
         /* Just ignore the data */
-        g_string_set_size (vsx_log_buffer, 0);
+        vsx_buffer_set_length (&vsx_log_buffer, 0);
       else
         {
           /* Swap the log buffer for an empty alternate buffer so we can
@@ -131,19 +132,19 @@ vsx_log_thread_func (void *data)
           /* Release the mutex while we do a blocking write */
           pthread_mutex_unlock (&vsx_log_mutex);
 
-          wrote = fwrite (alternate_buffer->str,
+          wrote = fwrite (alternate_buffer.data,
                           1 /* size */,
-                          alternate_buffer->len,
+                          alternate_buffer.length,
                           vsx_log_file);
 
           /* If there was an error then we'll just start ignoring data
              until we're told to quit */
-          if (wrote != alternate_buffer->len)
+          if (wrote != alternate_buffer.length)
             had_error = true;
           else
             fflush (vsx_log_file);
 
-          g_string_set_size (alternate_buffer, 0);
+          vsx_buffer_set_length (&alternate_buffer, 0);
 
           pthread_mutex_lock (&vsx_log_mutex);
         }
@@ -151,7 +152,7 @@ vsx_log_thread_func (void *data)
 
   pthread_mutex_unlock (&vsx_log_mutex);
 
-  g_string_free (alternate_buffer, true);
+  vsx_buffer_destroy (&alternate_buffer);
 
   return NULL;
 }
@@ -176,7 +177,6 @@ vsx_log_set_file (const char *filename,
   vsx_log_close ();
 
   vsx_log_file = file;
-  vsx_log_buffer = g_string_new (NULL);
   vsx_log_finished = false;
 
   return true;
@@ -217,11 +217,8 @@ vsx_log_close (void)
       vsx_log_has_thread = false;
     }
 
-  if (vsx_log_buffer)
-    {
-      g_string_free (vsx_log_buffer, true);
-      vsx_log_buffer = NULL;
-    }
+  vsx_buffer_destroy (&vsx_log_buffer);
+  vsx_buffer_init (&vsx_log_buffer);
 
   if (vsx_log_file)
     {
