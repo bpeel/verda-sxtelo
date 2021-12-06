@@ -1256,7 +1256,7 @@ process_frames (VsxConnection *conn,
           if (length < header_size + sizeof word)
             break;
           memcpy (&word, data + header_size, sizeof word);
-          payload_length = GUINT16_FROM_BE (word);
+          payload_length = VSX_UINT16_FROM_BE (word);
           header_size += sizeof word;
         }
       else if (payload_length == 127)
@@ -1266,7 +1266,7 @@ process_frames (VsxConnection *conn,
           memcpy (&payload_length,
                   data + header_size,
                   sizeof payload_length);
-          payload_length = GUINT64_FROM_BE (payload_length);
+          payload_length = VSX_UINT64_FROM_BE (payload_length);
           header_size += sizeof payload_length;
         }
 

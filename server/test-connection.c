@@ -27,6 +27,7 @@
 #include "vsx-connection.h"
 #include "vsx-proto.h"
 #include "vsx-buffer.h"
+#include "vsx-util.h"
 
 typedef struct
 {
@@ -604,7 +605,7 @@ read_connect_header (VsxConnection *conn,
   if (person_id_out)
     {
       memcpy (person_id_out, buf + 3, sizeof *person_id_out);
-      *person_id_out = GUINT64_FROM_LE (*person_id_out);
+      *person_id_out = VSX_UINT64_FROM_LE (*person_id_out);
     }
 
   if (player_num_out)
@@ -721,8 +722,8 @@ reconnect_to_player (VsxConnection *conn,
 {
   struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
-  player_id = GUINT64_TO_LE (player_id);
-  n_messages_received = GUINT64_TO_LE (n_messages_received);
+  player_id = VSX_UINT64_TO_LE (player_id);
+  n_messages_received = VSX_UINT64_TO_LE (n_messages_received);
 
   vsx_buffer_append_c (&buf, 0x82);
   vsx_buffer_append_c (&buf, 1 + sizeof (uint64_t) + sizeof (uint16_t));
@@ -1471,13 +1472,13 @@ read_tile (VsxConnection *conn,
     {
       int16_t val;
       memcpy (&val, buf + 4, sizeof (int16_t));
-      *x_out = GINT16_FROM_LE (val);
+      *x_out = VSX_INT16_FROM_LE (val);
     }
   if (y_out)
     {
       int16_t val;
       memcpy (&val, buf + 6, sizeof (int16_t));
-      *y_out = GINT16_FROM_LE (val);
+      *y_out = VSX_INT16_FROM_LE (val);
     }
   if (player_out)
     *player_out = letter_end[1];
