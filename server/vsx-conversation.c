@@ -24,6 +24,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "vsx-conversation.h"
 #include "vsx-main-context.h"
@@ -327,7 +328,7 @@ shuffle_tiles (VsxConversation *self)
 
   for (i = VSX_TILE_DATA_N_TILES - 1; i > 0; i--)
     {
-      int swap_pos = g_random_int_range (0, i + 1);
+      int swap_pos = rand () % (i + 1);
       VsxTile temp;
 
       temp = self->tiles[swap_pos];
