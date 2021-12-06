@@ -95,7 +95,7 @@ block_sigint (void)
   sigaddset (&sigset, SIGTERM);
 
   if (pthread_sigmask (SIG_BLOCK, &sigset, NULL) == -1)
-    g_warning ("pthread_sigmask failed: %s", strerror (errno));
+    vsx_warning ("pthread_sigmask failed: %s", strerror (errno));
 }
 
 static void *

@@ -1464,7 +1464,7 @@ vsx_connection_has_data (VsxConnection *conn)
       return false;
     }
 
-  g_warn_if_reached ();
+  assert (!"Invalid connection state encountered");
 
   return false;
 }

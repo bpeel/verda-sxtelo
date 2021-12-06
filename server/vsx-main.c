@@ -42,6 +42,7 @@
 #include "vsx-config.h"
 #include "vsx-buffer.h"
 #include "vsx-file-error.h"
+#include "vsx-util.h"
 
 static char *option_log_file = NULL;
 static char *option_config_file = NULL;
@@ -222,7 +223,7 @@ daemonize (void)
 
   if (pid < 0)
     {
-      g_warning ("fork failed: %s", strerror (errno));
+      vsx_warning ("fork failed: %s", strerror (errno));
       exit (EXIT_FAILURE);
     }
   if (pid > 0)
@@ -236,7 +237,7 @@ daemonize (void)
   sid = setsid ();
   if (sid < 0)
     {
-      g_warning ("setsid failed: %s", strerror (errno));
+      vsx_warning ("setsid failed: %s", strerror (errno));
       exit (EXIT_FAILURE);
     }
 
@@ -244,7 +245,7 @@ daemonize (void)
      removed */
   if (chdir ("/") < 0)
     {
-      g_warning ("chdir failed: %s", strerror (errno));
+      vsx_warning ("chdir failed: %s", strerror (errno));
       exit (EXIT_FAILURE);
     }
 

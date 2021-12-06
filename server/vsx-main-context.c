@@ -36,6 +36,7 @@
 #include "vsx-list.h"
 #include "vsx-slice.h"
 #include "vsx-buffer.h"
+#include "vsx-util.h"
 
 /* This is a simple replacement for the GMainLoop which uses
    epoll. The hope is that it will scale to more connections easily
@@ -235,7 +236,7 @@ vsx_main_context_add_poll (VsxMainContext *mc,
   event.data.ptr = source;
 
   if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
-    g_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
+    vsx_warning ("EPOLL_CTL_ADD failed: %s", strerror (errno));
 
   source->current_flags = flags;
 
@@ -259,7 +260,7 @@ vsx_main_context_modify_poll (VsxMainContextSource *source,
   event.data.ptr = source;
 
   if (epoll_ctl (source->mc->epoll_fd, EPOLL_CTL_MOD, source->fd, &event) == -1)
-    g_warning ("EPOLL_CTL_MOD failed: %s", strerror (errno));
+    vsx_warning ("EPOLL_CTL_MOD failed: %s", strerror (errno));
 
   source->current_flags = flags;
 }
@@ -276,7 +277,7 @@ vsx_main_context_quit_pipe_cb (VsxMainContextSource *source,
   if (read (mc->quit_pipe[0], &byte, sizeof (byte)) == -1)
     {
       if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
-        g_warning ("Read from quit pipe failed: %s", strerror (errno));
+        vsx_warning ("Read from quit pipe failed: %s", strerror (errno));
     }
   else
     {
@@ -323,7 +324,7 @@ vsx_main_context_add_quit (VsxMainContext *mc,
   if (mc->quit_pipe_source == NULL)
     {
       if (pipe (mc->quit_pipe) == -1)
-        g_warning ("Failed to create quit pipe: %s", strerror (errno));
+        vsx_warning ("Failed to create quit pipe: %s", strerror (errno));
       else
         {
           mc->quit_pipe_source
@@ -399,7 +400,7 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
     {
     case VSX_MAIN_CONTEXT_POLL_SOURCE:
       if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
-        g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
+        vsx_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
       vsx_slice_free (&mc->source_allocator, source);
       break;
 
@@ -565,7 +566,7 @@ vsx_main_context_poll (VsxMainContext *mc)
   if (n_events == -1)
     {
       if (errno != EINTR)
-        g_warning ("epoll_wait failed: %s", strerror (errno));
+        vsx_warning ("epoll_wait failed: %s", strerror (errno));
     }
   else
     {
@@ -608,7 +609,7 @@ vsx_main_context_poll (VsxMainContext *mc)
 
             case VSX_MAIN_CONTEXT_QUIT_SOURCE:
             case VSX_MAIN_CONTEXT_TIMER_SOURCE:
-              g_warn_if_reached ();
+              assert (!"Timer and quit sources shouldn’t be polled");
               break;
             }
         }
@@ -663,7 +664,7 @@ vsx_main_context_free (VsxMainContext *mc)
     }
 
   if (mc->n_sources > 0)
-    g_warning ("Sources still remain on a main context that is being freed");
+    vsx_warning ("Sources still remain on a main context that is being freed");
 
   free_buckets (mc);
 
