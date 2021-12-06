@@ -28,13 +28,14 @@
 
 #include "vsx-key-value.h"
 #include "vsx-util.h"
+#include "vsx-buffer.h"
 
 typedef struct
 {
   const char *filename;
   VsxConfig *config;
   bool had_error;
-  GString *error_buffer;
+  struct vsx_buffer error_buffer;
   VsxConfigServer *server;
 } LoadConfigData;
 
@@ -44,15 +45,15 @@ load_config_error (LoadConfigData *data, const char *format, ...)
 {
   data->had_error = true;
 
-  if (data->error_buffer->len > 0)
-    g_string_append_c (data->error_buffer, '\n');
+  if (data->error_buffer.length > 0)
+    vsx_buffer_append_c (&data->error_buffer, '\n');
 
-  g_string_append_printf (data->error_buffer, "%s: ", data->filename);
+  vsx_buffer_append_printf (&data->error_buffer, "%s: ", data->filename);
 
   va_list ap;
 
   va_start (ap, format);
-  g_string_append_vprintf (data->error_buffer, format, ap);
+  vsx_buffer_append_vprintf (&data->error_buffer, format, ap);
   va_end (ap);
 }
 
@@ -313,7 +314,7 @@ load_config (const char *fn, VsxConfig *config, GError **error)
         .config = config,
         .had_error = false,
         .server = NULL,
-        .error_buffer = g_string_new (NULL),
+        .error_buffer = VSX_BUFFER_STATIC_INIT,
       };
 
       vsx_key_value_load (f, load_config_func, load_config_error_func, &data);
@@ -322,7 +323,9 @@ load_config (const char *fn, VsxConfig *config, GError **error)
         {
           g_set_error (error,
                        VSX_CONFIG_ERROR,
-                       VSX_CONFIG_ERROR_IO, "%s", data.error_buffer->str);
+                       VSX_CONFIG_ERROR_IO,
+                       "%s",
+                       data.error_buffer.data);
           ret = false;
         }
       else if (!validate_config (config, fn, error))
@@ -330,7 +333,7 @@ load_config (const char *fn, VsxConfig *config, GError **error)
           ret = false;
         }
 
-      g_string_free (data.error_buffer, true);
+      vsx_buffer_destroy (&data.error_buffer);
 
       fclose (f);
     }
