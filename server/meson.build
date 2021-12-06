@@ -19,6 +19,7 @@ if get_option('systemd')
 endif
 
 server_src = [
+        'vsx-buffer.c',
         'vsx-config.c',
         'vsx-connection.c',
         'vsx-conversation.c',
@@ -59,6 +60,7 @@ test_ws_parser = executable('test-ws-parser',
 test('ws-parser', test_ws_parser)
 
 test_connection_src = [
+        'vsx-buffer.c',
         'vsx-connection.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
