@@ -20,7 +20,6 @@
 #include <config.h>
 #endif
 
-#include <glib.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -30,6 +29,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <time.h>
 #include <limits.h>
 
 #include "vsx-main-context.h"
@@ -630,7 +630,13 @@ vsx_main_context_get_monotonic_clock (VsxMainContext *mc)
      do a system call every time we need it */
   if (!mc->monotonic_time_valid)
     {
-      mc->monotonic_time = g_get_monotonic_time ();
+      struct timespec ts;
+
+      clock_gettime (CLOCK_MONOTONIC, &ts);
+
+      mc->monotonic_time = (ts.tv_sec * UINT64_C(1000000) +
+                            ts.tv_nsec / UINT64_C(1000));
+
       mc->monotonic_time_valid = true;
     }
 
