@@ -35,6 +35,7 @@ server_src = [
         'vsx-server.c',
         'vsx-ssl-error.c',
         'vsx-tile-data.c',
+        'vsx-util.c',
         'vsx-ws-parser.c',
 ]
 
