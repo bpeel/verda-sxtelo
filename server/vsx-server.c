@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <openssl/ssl.h>
+#include <unistd.h>
 
 #include "vsx-server.h"
 #include "vsx-main-context.h"
@@ -39,6 +40,7 @@
 #include "vsx-buffer.h"
 #include "vsx-file-error.h"
 #include "vsx-netaddress.h"
+#include "vsx-socket.h"
 
 #define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -50,7 +52,7 @@ struct _VsxServer
 
   /* If this gets set then vsx_server_run will return and report the
      error */
-  GError *fatal_error;
+  struct vsx_error *fatal_error;
 
   /* List of open connections */
   VsxList connections;
@@ -71,7 +73,7 @@ typedef struct
 {
   VsxServer *server;
 
-  GSocket *client_socket;
+  int client_socket;
   VsxMainContextSource *source;
 
   /* List node within the list of connections */
@@ -115,7 +117,7 @@ typedef struct
 {
   VsxList link;
   VsxMainContextSource *source;
-  GSocket *socket;
+  int sock;
   VsxServer *server;
   SSL_CTX *ssl_ctx;
 } VsxServerSocket;
@@ -137,6 +139,9 @@ update_poll (VsxServerConnection *connection);
 static void
 vsx_server_remove_connection (VsxServer *server,
                               VsxServerConnection *connection);
+
+struct vsx_error_domain
+vsx_server_error;
 
 static void
 ws_connection_changed_cb (VsxListener *listener,
@@ -205,7 +210,7 @@ vsx_server_remove_connection (VsxServer *server,
     SSL_free(connection->ssl);
 
   vsx_main_context_remove_source (connection->source);
-  g_object_unref (connection->client_socket);
+  vsx_close (connection->client_socket);
   vsx_list_remove (&connection->link);
   g_free (connection->peer_address_string);
 
@@ -240,8 +245,8 @@ vsx_server_remove_socket (VsxServer *server,
   if (ssocket->source)
     vsx_main_context_remove_source (ssocket->source);
 
-  if (ssocket->socket)
-    g_object_unref (ssocket->socket);
+  if (ssocket->sock != -1)
+    vsx_close (ssocket->sock);
 
   vsx_list_remove (&ssocket->link);
 
@@ -256,6 +261,12 @@ log_ssl_error (VsxServerConnection *connection)
   vsx_ssl_error_set (&error);
   vsx_log ("For %s: %s", connection->peer_address_string, error->message);
   vsx_error_free (error);
+}
+
+static bool
+is_would_block_error (int err)
+{
+  return err == EAGAIN || err == EWOULDBLOCK;
 }
 
 static void
@@ -302,17 +313,11 @@ update_poll (VsxServerConnection *connection)
         }
       else
         {
-          GError *error = NULL;
-
-          if (!g_socket_shutdown (connection->client_socket,
-                                  false, /* shutdown_read */
-                                  true, /* shutdown_write */
-                                  &error))
+          if (shutdown (connection->client_socket, SHUT_WR) == -1)
             {
               vsx_log ("shutdown socket failed for %s: %s",
                        connection->peer_address_string,
-                       error->message);
-              g_clear_error (&error);
+                       strerror (errno));
               vsx_server_remove_connection (connection->server, connection);
               return;
             }
@@ -344,8 +349,6 @@ static void
 handle_read (VsxServer *server,
              VsxServerConnection *connection)
 {
-  GError *error = NULL;
-
   if (connection->read_finished)
     {
       /* This might happen if the SSL_Shutdown command triggered a
@@ -356,7 +359,7 @@ handle_read (VsxServer *server,
 
   char buf[1024];
 
-  gssize got;
+  ssize_t got;
 
   if (connection->ssl)
     {
@@ -388,23 +391,19 @@ handle_read (VsxServer *server,
     }
   else
     {
-      got = g_socket_receive (connection->client_socket,
-                              buf,
-                              sizeof (buf),
-                              NULL, /* cancellable */
-                              &error);
+      got = read (connection->client_socket,
+                  buf,
+                  sizeof (buf));
       if (got == -1)
         {
-          if (error->domain != G_IO_ERROR
-              || error->code != G_IO_ERROR_WOULD_BLOCK)
+          if (!is_would_block_error (errno) && errno != EINTR)
             {
               vsx_log ("Error reading from socket for %s: %s",
                        connection->peer_address_string,
-                       error->message);
+                       strerror (errno));
               vsx_server_remove_connection (server, connection);
             }
 
-          g_clear_error (&error);
           return;
         }
     }
@@ -461,8 +460,7 @@ static void
 handle_write (VsxServer *server,
               VsxServerConnection *connection)
 {
-  GError *error = NULL;
-  gssize wrote;
+  ssize_t wrote;
 
   if (connection->ssl_write_block == 0)
     fill_output_buffer (connection);
@@ -505,24 +503,20 @@ handle_write (VsxServer *server,
     }
   else
     {
-      wrote = g_socket_send (connection->client_socket,
-                             (const char *) connection->output_buffer,
-                             connection->output_length,
-                             NULL,
-                             &error);
+      wrote = write (connection->client_socket,
+                     (const char *) connection->output_buffer,
+                     connection->output_length);
 
       if (wrote == -1)
         {
-          if (error->domain != G_IO_ERROR
-              || error->code != G_IO_ERROR_WOULD_BLOCK)
+          if (!is_would_block_error (errno) && errno != EINTR)
             {
               g_print ("Error writing to socket for %s: %s",
                        connection->peer_address_string,
-                       error->message);
+                       strerror (errno));
               vsx_server_remove_connection (server, connection);
             }
 
-          g_clear_error (&error);
           return;
         }
     }
@@ -550,7 +544,7 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
       int value;
       unsigned int value_len = sizeof (value);
 
-      if (getsockopt (g_socket_get_fd (connection->client_socket),
+      if (getsockopt (connection->client_socket,
                       SOL_SOCKET,
                       SO_ERROR,
                       &value,
@@ -588,77 +582,6 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
     }
 }
 
-static void
-get_socket_address (GSocket *client_socket,
-                    struct vsx_netaddress *netaddress)
-{
-  memset (netaddress, 0, sizeof *netaddress);
-
-  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
-
-  if (address == NULL)
-    return;
-
-  struct vsx_netaddress_native native_address;
-
-  if (g_socket_address_to_native (address,
-                                  &native_address,
-                                  offsetof (struct vsx_netaddress_native,
-                                            length),
-                                  NULL /* error */))
-    {
-      native_address.length = g_socket_address_get_native_size (address);
-      vsx_netaddress_from_native (netaddress, &native_address);
-    }
-
-  g_object_unref (address);
-}
-
-static char *
-get_address_string (GSocketAddress *address,
-                    bool include_port)
-{
-  char *address_string = NULL;
-
-  if (address)
-    {
-      if (G_IS_INET_SOCKET_ADDRESS (address))
-        {
-          GInetSocketAddress *inet_socket_address =
-            (GInetSocketAddress *) address;
-          GInetAddress *inet_address =
-            g_inet_socket_address_get_address (inet_socket_address);
-          char *host_part = g_inet_address_to_string (inet_address);
-
-          if (include_port)
-            {
-              uint16_t port =
-                g_inet_socket_address_get_port (inet_socket_address);
-
-              address_string = g_strdup_printf ("%s:%u", host_part, port);
-              g_free (host_part);
-            }
-          else
-            address_string = host_part;
-        }
-
-      g_object_unref (address);
-    }
-
-  if (address_string == NULL)
-    return g_strdup ("(unknown)");
-  else
-    return address_string;
-}
-
-static char *
-get_peer_address_string (GSocket *client_socket)
-{
-  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
-
-  return get_address_string (address, false /* include_port */);
-}
-
 static bool
 init_connection_ssl (VsxServerConnection *connection,
                      SSL_CTX *ssl_ctx,
@@ -671,8 +594,7 @@ init_connection_ssl (VsxServerConnection *connection,
 
   SSL_set_accept_state (connection->ssl);
 
-  if (!SSL_set_fd (connection->ssl,
-                   g_socket_get_fd (connection->client_socket)))
+  if (!SSL_set_fd (connection->ssl, connection->client_socket))
     goto error;
 
   return true;
@@ -690,228 +612,263 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
 {
   VsxServerSocket *ssocket = user_data;
   VsxServer *server = ssocket->server;
-  GSocket *client_socket;
-  GError *error = NULL;
 
-  client_socket = g_socket_accept (ssocket->socket, NULL, &error);
-
-  if (client_socket == NULL)
+  struct vsx_netaddress_native native_address =
     {
-      /* Ignore WOULD_BLOCK errors */
-      if (error->domain == G_IO_ERROR
-          && error->code == G_IO_ERROR_WOULD_BLOCK)
-        g_clear_error (&error);
-      else if (error->domain == G_IO_ERROR
-               && error->code == G_IO_ERROR_TOO_MANY_OPEN_FILES)
+      .length = offsetof (struct vsx_netaddress_native, length)
+    };
+
+  int client_socket = accept (ssocket->sock,
+                              &native_address.sockaddr,
+                              &native_address.length);
+
+  if (client_socket == -1)
+    {
+      /* Ignore WOULD_BLOCK and EINTR errors */
+      if (is_would_block_error (errno) || errno == EINTR)
+        return;
+
+      if (errno == EMFILE)
         {
           vsx_log ("Too many open files to accept connection");
 
           /* Stop listening for new connections until someone disconnects */
           vsx_main_context_modify_poll (source, 0);
-          g_clear_error (&error);
+          return;
         }
-      else
-        /* This will cause vsx_server_run to return */
-        server->fatal_error = error;
+
+      /* This will cause vsx_server_run to return */
+      vsx_file_error_set (&server->fatal_error,
+                          errno,
+                          "Error accepting connection: %s",
+                          strerror (errno));
+
+      return;
+    }
+
+  struct vsx_error *error = NULL;
+
+  if (!vsx_socket_set_nonblock (client_socket, &error))
+    {
+      vsx_log ("While accepting connection: %s", error->message);
+      vsx_error_free (error);
+      return;
+    }
+
+  VsxServerConnection *connection = vsx_alloc (sizeof *connection);
+
+  connection->server = server;
+  connection->client_socket = client_socket;
+  connection->source =
+    vsx_main_context_add_poll (NULL /* default context */,
+                               client_socket,
+                               VSX_MAIN_CONTEXT_POLL_IN,
+                               vsx_server_connection_poll_cb,
+                               connection);
+  vsx_list_insert (&server->connections, &connection->link);
+
+  struct vsx_netaddress remote_address;
+  vsx_netaddress_from_native (&remote_address, &native_address);
+
+  connection->ws_connection =
+    vsx_connection_new (&remote_address,
+                        server->pending_conversations,
+                        server->person_set);
+
+  VsxSignal *changed_signal =
+    vsx_connection_get_changed_signal (connection->ws_connection);
+  connection->ws_connection_listener.notify =
+    ws_connection_changed_cb;
+  vsx_signal_add (changed_signal,
+                  &connection->ws_connection_listener);
+
+  connection->had_bad_input = false;
+  connection->read_finished = false;
+  connection->write_finished = false;
+  connection->ssl_read_block = 0;
+  connection->ssl_write_block = 0;
+  connection->ssl = NULL;
+
+  connection->output_length = 0;
+
+  /* If logging is available then we'll want to store the peer
+     address as a string so we've got something to refer to */
+  if (vsx_log_available ())
+    {
+      connection->peer_address_string =
+        vsx_netaddress_to_string (&remote_address);
+      vsx_log ("Accepted WebSocket%s connection from %s",
+               ssocket->ssl_ctx ? " SSL" : "",
+               connection->peer_address_string);
+    }
+  else
+    connection->peer_address_string = NULL;
+
+  connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
+
+  if (ssocket->ssl_ctx
+      && !init_connection_ssl (connection, ssocket->ssl_ctx, &error))
+    {
+      vsx_log ("SSL error for %s: %s",
+               connection->peer_address_string,
+               error->message);
+      vsx_error_free (error);
+      vsx_server_remove_connection (server, connection);
+    }
+  else if (server->gc_source == NULL)
+    {
+      server->gc_source =
+        vsx_main_context_add_timer (NULL, /* default context */
+                                    VSX_SERVER_GC_TIMEOUT,
+                                    vsx_server_gc_cb,
+                                    server);
+    }
+}
+
+static int
+create_socket_for_address (const struct vsx_netaddress *address,
+                           struct vsx_error **error)
+{
+  struct vsx_netaddress_native native_address;
+
+  vsx_netaddress_to_native (address, &native_address);
+
+  int sock = socket (native_address.sockaddr.sa_family == AF_INET6
+                     ? PF_INET6
+                     : PF_INET,
+                     SOCK_STREAM,
+                     0);
+
+  if (sock == -1)
+    {
+      vsx_file_error_set (error,
+                          errno,
+                          "Failed to create socket: %s",
+                          strerror (errno));
+      return -1;
+    }
+
+  const int true_value = true;
+
+  setsockopt (sock,
+              SOL_SOCKET, SO_REUSEADDR,
+              &true_value, sizeof true_value);
+
+  if (!vsx_socket_set_nonblock (sock, error))
+    goto error;
+
+  if (bind (sock,
+            &native_address.sockaddr,
+            native_address.length) == -1)
+    {
+      vsx_file_error_set (error,
+                          errno,
+                          "Failed to bind socket: %s",
+                          strerror (errno));
+      goto error;
+    }
+
+  if (listen (sock, 10) == -1)
+    {
+      vsx_file_error_set (error,
+                          errno,
+                          "Failed to make socket listen: %s",
+                          strerror (errno));
+      goto error;
+    }
+
+  return sock;
+
+ error:
+  vsx_close(sock);
+  return -1;
+}
+
+static int
+create_socket_for_port (int port,
+                        struct vsx_error **error)
+{
+  struct vsx_netaddress netaddress;
+
+  memset (&netaddress, 0, sizeof netaddress);
+
+  /* First try binding it with an IPv6 address */
+  netaddress.port = port;
+  netaddress.family = AF_INET6;
+
+  struct vsx_error *local_error = NULL;
+
+  int sock = create_socket_for_address (&netaddress, &local_error);
+
+  if (sock != -1)
+    return sock;
+
+  if (local_error->domain == &vsx_file_error
+      && (local_error->code == VSX_FILE_ERROR_PFNOSUPPORT
+          || local_error->code == VSX_FILE_ERROR_AFNOSUPPORT))
+    {
+      vsx_error_free (local_error);
     }
   else
     {
-      g_socket_set_blocking (client_socket, false);
-
-      VsxServerConnection *connection = vsx_alloc (sizeof *connection);
-
-      connection->server = server;
-      connection->client_socket = client_socket;
-      connection->source =
-        vsx_main_context_add_poll (NULL /* default context */,
-                                   g_socket_get_fd (client_socket),
-                                   VSX_MAIN_CONTEXT_POLL_IN,
-                                   vsx_server_connection_poll_cb,
-                                   connection);
-      vsx_list_insert (&server->connections, &connection->link);
-
-      struct vsx_netaddress remote_address;
-      get_socket_address (client_socket, &remote_address);
-
-      connection->ws_connection =
-        vsx_connection_new (&remote_address,
-                            server->pending_conversations,
-                            server->person_set);
-
-      VsxSignal *changed_signal =
-        vsx_connection_get_changed_signal (connection->ws_connection);
-      connection->ws_connection_listener.notify =
-        ws_connection_changed_cb;
-      vsx_signal_add (changed_signal,
-                      &connection->ws_connection_listener);
-
-      connection->had_bad_input = false;
-      connection->read_finished = false;
-      connection->write_finished = false;
-      connection->ssl_read_block = 0;
-      connection->ssl_write_block = 0;
-      connection->ssl = NULL;
-
-      connection->output_length = 0;
-
-      /* If logging is available then we'll want to store the peer
-         address as a string so we've got something to refer to */
-      if (vsx_log_available ())
-        {
-          connection->peer_address_string
-            = get_peer_address_string (client_socket);
-          vsx_log ("Accepted WebSocket%s connection from %s",
-                   ssocket->ssl_ctx ? " SSL" : "",
-                   connection->peer_address_string);
-        }
-      else
-        connection->peer_address_string = NULL;
-
-      connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
-
-      struct vsx_error *ssl_error = NULL;
-
-      if (ssocket->ssl_ctx
-          && !init_connection_ssl (connection, ssocket->ssl_ctx, &ssl_error))
-        {
-          vsx_log ("SSL error for %s: %s",
-                   connection->peer_address_string,
-                   ssl_error->message);
-          vsx_error_free (ssl_error);
-          vsx_server_remove_connection (server, connection);
-        }
-      else if (server->gc_source == NULL)
-        server->gc_source =
-          vsx_main_context_add_timer (NULL, /* default context */
-                                      VSX_SERVER_GC_TIMEOUT,
-                                      vsx_server_gc_cb,
-                                      server);
-    }
-}
-
-static GSocket *
-create_server_socket (GSocketAddress *address,
-                      GError **error)
-{
-  GSocket *socket = g_socket_new (g_socket_address_get_family (address),
-                                  G_SOCKET_TYPE_STREAM,
-                                  G_SOCKET_PROTOCOL_DEFAULT,
-                                  error);
-
-  if (socket == NULL)
-    return NULL;
-
-  g_socket_set_blocking (socket, false);
-
-  if (!g_socket_bind (socket, address, true, error) ||
-      !g_socket_listen (socket, error))
-    {
-      g_object_unref (socket);
-      return NULL;
+      vsx_error_propagate (error, local_error);
+      return -1;
     }
 
-  return socket;
+  /* Some servers disable IPv6 so try IPv4 */
+  netaddress.family = AF_INET;
+
+  return create_socket_for_address (&netaddress, error);
 }
 
-static GSocket *
-create_socket_for_port (int port,
-                        GError **error)
-{
-  /* First try binding it with an IPv6 address */
-  GInetAddress *any_address_ipv6 =
-    g_inet_address_new_any (G_SOCKET_FAMILY_IPV6);
-  GSocketAddress *address_ipv6 =
-    g_inet_socket_address_new (any_address_ipv6, port);
-
-  GError *local_error = NULL;
-
-  GSocket *socket_ipv6 = create_server_socket (address_ipv6, &local_error);
-
-  g_object_unref (address_ipv6);
-  g_object_unref (any_address_ipv6);
-
-  if (socket_ipv6)
-    return socket_ipv6;
-
-  /* Some server try to disable IPv6 so try IPv4 in that case */
-  if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
-    {
-      g_propagate_error (error, local_error);
-      return NULL;
-    }
-
-  GInetAddress *any_address =
-    g_inet_address_new_any (G_SOCKET_FAMILY_IPV4);
-  GSocketAddress *address =
-    g_inet_socket_address_new (any_address, port);
-
-  GSocket *socket_ipv4 = create_server_socket (address, error);
-
-  g_object_unref (any_address);
-  g_object_unref (address);
-
-  return socket_ipv4;
-}
-
-static GSocket *
+static int
 create_socket_for_config (VsxConfigServer *server_config,
-                          GError **error)
+                          struct vsx_error **error)
 {
-  GSocket *socket;
-  int port;
+  int default_port;
 
   if (server_config->port == -1)
     {
-      if (server_config->certificate)
-        port = DEFAULT_SSL_PORT;
-      else
-        port = DEFAULT_PORT;
+      default_port = (server_config->certificate
+                      ? DEFAULT_SSL_PORT
+                      : DEFAULT_PORT);
     }
   else
     {
-      port = server_config->port;
+      default_port = server_config->port;
     }
 
   if (server_config->address)
     {
-      GInetAddress *address =
-        g_inet_address_new_from_string (server_config->address);
+      struct vsx_netaddress address;
 
-      if (address == NULL)
+      if (!vsx_netaddress_from_string (&address,
+                                       server_config->address,
+                                       default_port))
         {
-          g_set_error (error,
-                       G_IO_ERROR,
-                       G_IO_ERROR_INVALID_DATA,
-                       "Invalid address \"%s\"",
-                       server_config->address);
-          return false;
+          vsx_set_error (error,
+                         &vsx_server_error,
+                         VSX_SERVER_ERROR_INVALID_ADDRESS,
+                         "Invalid address \"%s\"",
+                         server_config->address);
+          return -1;
         }
 
-      GSocketAddress *socket_address =
-        g_inet_socket_address_new (address, port);
-
-      socket = create_server_socket (socket_address, error);
-
-      g_object_unref (socket_address);
-      g_object_unref (address);
+      return create_socket_for_address (&address, error);
     }
   else
     {
-      socket = create_socket_for_port (port, error);
+      return create_socket_for_port (default_port, error);
     }
-
-  return socket;
 }
 
-static GSocket *
-create_socket_for_fd (int fd, GError **error)
+static int
+create_socket_for_fd (int fd, struct vsx_error **error)
 {
-  GSocket *socket = g_socket_new_from_fd (fd, error);
+  if (!vsx_socket_set_nonblock (fd, error))
+    return -1;
 
-  if (socket)
-    g_socket_set_blocking (socket, false);
-
-  return socket;
+  return fd;
 }
 
 static int
@@ -972,46 +929,24 @@ vsx_server_add_config (VsxServer *server,
 {
   g_return_val_if_fail (error == NULL || *error == NULL, false);
 
-  GSocket *socket;
-
-  GError *socket_error = NULL;
+  int sock;
 
   if (fd_override >= 0)
-    socket = create_socket_for_fd (fd_override, &socket_error);
+    sock = create_socket_for_fd (fd_override, error);
   else
-    socket = create_socket_for_config (server_config, &socket_error);
+    sock = create_socket_for_config (server_config, error);
 
-  if (socket == NULL)
-    {
-      if (socket_error->domain == G_FILE_ERROR)
-        {
-          vsx_file_error_set (error,
-                              socket_error->code,
-                              "%s",
-                              socket_error->message);
-        }
-      else
-        {
-          vsx_set_error (error,
-                         &vsx_file_error,
-                         VSX_FILE_ERROR_OTHER,
-                         "%s",
-                         socket_error->message);
-        }
-
-      g_error_free (socket_error);
-
+  if (sock == -1)
       return false;
-    }
 
   VsxServerSocket *ssocket = g_new0 (VsxServerSocket, 1);
 
   ssocket->server = server;
-  ssocket->socket = socket;
+  ssocket->sock = sock;
 
   ssocket->source =
     vsx_main_context_add_poll (NULL /* default context */,
-                               g_socket_get_fd (socket),
+                               sock,
                                VSX_MAIN_CONTEXT_POLL_IN,
                                vsx_server_pending_connection_cb,
                                ssocket);
@@ -1071,14 +1006,26 @@ log_server_listening (VsxServer *server)
             vsx_buffer_append_string (&buf, ", ");
         }
 
-      GSocketAddress *address =
-        g_socket_get_local_address (ssocket->socket, NULL);
-      char *address_string =
-        get_address_string (address, true /* include_port */);
+      struct vsx_netaddress_native native_address =
+        {
+          .length = offsetof (struct vsx_netaddress_native, length),
+        };
 
-      vsx_buffer_append_string (&buf, address_string);
+      if (getsockname (ssocket->sock,
+                       &native_address.sockaddr,
+                       &native_address.length) == -1)
+        {
+          vsx_buffer_append_string (&buf, "?");
+        }
+      else
+        {
+          struct vsx_netaddress address;
+          vsx_netaddress_from_native (&address, &native_address);
 
-      g_free (address_string);
+          char *address_string = vsx_netaddress_to_string (&address);
+          vsx_buffer_append_string (&buf, address_string);
+          vsx_free (address_string);
+        }
     }
 
   vsx_log ("Server listening on %s", (const char *) buf.data);
@@ -1088,7 +1035,7 @@ log_server_listening (VsxServer *server)
 
 bool
 vsx_server_run (VsxServer *server,
-                GError **error)
+                struct vsx_error **error)
 {
   VsxMainContextSource *quit_source;
   bool quit_received = false;
@@ -1111,7 +1058,7 @@ vsx_server_run (VsxServer *server,
 
   if (server->fatal_error)
     {
-      g_propagate_error (error, server->fatal_error);
+      vsx_error_propagate (error, server->fatal_error);
       server->fatal_error = NULL;
 
       return false;

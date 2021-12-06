@@ -28,6 +28,8 @@
 #include <sys/stat.h>
 #include <grp.h>
 #include <pwd.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #ifdef USE_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -352,8 +354,11 @@ main (int argc, char **argv)
 
               vsx_log_start ();
 
-              if (!vsx_server_run (server, &error))
-                vsx_log ("%s", error->message);
+              if (!vsx_server_run (server, &server_error))
+                {
+                  vsx_log ("%s", server_error->message);
+                  vsx_error_free (server_error);
+                }
 
               vsx_log ("Exiting...");
 

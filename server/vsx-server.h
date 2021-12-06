@@ -19,14 +19,20 @@
 #ifndef __VSX_SERVER_H__
 #define __VSX_SERVER_H__
 
-#include <glib.h>
-#include <gio/gio.h>
 #include <stdbool.h>
 
 #include "vsx-config.h"
 #include "vsx-error.h"
 
 typedef struct _VsxServer VsxServer;
+
+typedef enum
+{
+  VSX_SERVER_ERROR_INVALID_ADDRESS,
+} VsxServerError;
+
+extern struct vsx_error_domain
+vsx_server_error;
 
 VsxServer *
 vsx_server_new (void);
@@ -39,7 +45,7 @@ vsx_server_add_config (VsxServer *server,
 
 bool
 vsx_server_run (VsxServer *server,
-                GError **error);
+                struct vsx_error **error);
 
 void
 vsx_server_free (VsxServer *mc);
