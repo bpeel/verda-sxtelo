@@ -28,14 +28,7 @@
 
 G_BEGIN_DECLS
 
-typedef struct
-{
-  VsxObject parent;
-
-  GHashTable *hash_table;
-
-  VsxMainContextSource *people_timer_source;
-} VsxPersonSet;
+typedef struct _VsxPersonSet VsxPersonSet;
 
 VsxPersonSet *
 vsx_person_set_new (void);

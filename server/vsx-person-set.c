@@ -26,6 +26,15 @@
 
 #define VSX_PERSON_SET_REMOVE_SILENT_PEOPLE_INTERVAL 5
 
+struct _VsxPersonSet
+{
+  VsxObject parent;
+
+  GHashTable *hash_table;
+
+  VsxMainContextSource *people_timer_source;
+};
+
 static void
 vsx_person_set_free (void *object)
 {
