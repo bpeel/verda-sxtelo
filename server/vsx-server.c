@@ -36,6 +36,7 @@
 #include "vsx-ssl-error.h"
 #include "vsx-proto.h"
 #include "vsx-util.h"
+#include "vsx-buffer.h"
 
 #define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -998,17 +999,18 @@ vsx_server_quit_cb (VsxMainContextSource *source,
 static void
 log_server_listening (VsxServer *server)
 {
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
   VsxServerSocket *ssocket;
 
   vsx_list_for_each (ssocket, &server->sockets, link)
     {
-      if (buf->len > 0)
+      if (buf.length > 0)
         {
           if (ssocket->link.next == &server->sockets)
-            g_string_append (buf, " and ");
+            vsx_buffer_append_string (&buf, " and ");
           else
-            g_string_append (buf, ", ");
+            vsx_buffer_append_string (&buf, ", ");
         }
 
       GSocketAddress *address =
@@ -1016,14 +1018,14 @@ log_server_listening (VsxServer *server)
       char *address_string =
         get_address_string (address, true /* include_port */);
 
-      g_string_append (buf, address_string);
+      vsx_buffer_append_string (&buf, address_string);
 
       g_free (address_string);
     }
 
-  vsx_log ("Server listening on %s", buf->str);
+  vsx_log ("Server listening on %s", (const char *) buf.data);
 
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 }
 
 bool
