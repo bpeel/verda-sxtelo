@@ -353,7 +353,7 @@ get_bucket (VsxMainContext *mc,
         return bucket;
     }
 
-  bucket = g_slice_new (VsxMainContextBucket);
+  bucket = vsx_alloc (sizeof *bucket);
   vsx_list_init (&bucket->sources);
   bucket->minutes = minutes;
   bucket->minutes_passed = 0;
@@ -645,7 +645,7 @@ free_buckets (VsxMainContext *mc)
   vsx_list_for_each_safe (bucket, tmp, &mc->buckets, link)
     {
       g_assert (vsx_list_empty (&bucket->sources));
-      g_slice_free (VsxMainContextBucket, bucket);
+      vsx_free (bucket);
     }
 }
 
