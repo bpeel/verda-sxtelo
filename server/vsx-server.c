@@ -248,11 +248,11 @@ vsx_server_remove_socket (VsxServer *server,
 static void
 log_ssl_error (VsxServerConnection *connection)
 {
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   vsx_ssl_error_set (&error);
   vsx_log ("For %s: %s", connection->peer_address_string, error->message);
-  g_clear_error (&error);
+  vsx_error_free (error);
 }
 
 static void
@@ -629,7 +629,7 @@ get_peer_address_string (GSocket *client_socket)
 static bool
 init_connection_ssl (VsxServerConnection *connection,
                      SSL_CTX *ssl_ctx,
-                     GError **error)
+                     struct vsx_error **error)
 {
   connection->ssl = SSL_new (ssl_ctx);
 
@@ -735,13 +735,15 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
 
       connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
 
+      struct vsx_error *ssl_error = NULL;
+
       if (ssocket->ssl_ctx
-          && !init_connection_ssl (connection, ssocket->ssl_ctx, &error))
+          && !init_connection_ssl (connection, ssocket->ssl_ctx, &ssl_error))
         {
           vsx_log ("SSL error for %s: %s",
                    connection->peer_address_string,
-                   error->message);
-          g_clear_error (&error);
+                   ssl_error->message);
+          vsx_error_free (ssl_error);
           vsx_server_remove_connection (server, connection);
         }
       else if (server->gc_source == NULL)
@@ -899,7 +901,7 @@ ssl_password_cb (char *buf, int size, int rwflag, void *user_data)
 static bool
 init_ssl (VsxServerSocket *ssocket,
           const VsxConfigServer *server_config,
-          GError **error)
+          struct vsx_error **error)
 {
   ssocket->ssl_ctx = SSL_CTX_new (TLS_server_method ());
   if (ssocket->ssl_ctx == NULL)
@@ -961,8 +963,9 @@ vsx_server_add_config (VsxServer *server,
   vsx_list_insert (&server->sockets, &ssocket->link);
 
   if (server_config->certificate
-      && !init_ssl (ssocket, server_config, error))
+      && !init_ssl (ssocket, server_config, NULL))
     {
+      /* FIXME error */
       vsx_server_remove_socket (server, ssocket);
       return false;
     }

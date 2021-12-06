@@ -26,6 +26,9 @@
 #include <openssl/err.h>
 #include <stdbool.h>
 
+struct vsx_error_domain
+vsx_ssl_error;
+
 VsxSslError
 vsx_ssl_error_from_errno (unsigned long errnum)
 {
@@ -33,7 +36,7 @@ vsx_ssl_error_from_errno (unsigned long errnum)
 }
 
 void
-vsx_ssl_error_set (GError **error)
+vsx_ssl_error_set (struct vsx_error **error)
 {
   struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
   unsigned long errnum = ERR_get_error ();
@@ -42,17 +45,11 @@ vsx_ssl_error_set (GError **error)
   vsx_buffer_ensure_size (&buf, buf.length + 200);
   ERR_error_string (errnum, (char *) buf.data + buf.length);
 
-  g_set_error (error,
-               VSX_SSL_ERROR,
-               vsx_ssl_error_from_errno (errnum),
-               "%s",
-               (char *) buf.data);
+  vsx_set_error (error,
+                 &vsx_ssl_error,
+                 vsx_ssl_error_from_errno (errnum),
+                 "%s",
+                 (char *) buf.data);
 
   vsx_buffer_destroy (&buf);
-}
-
-GQuark
-vsx_ssl_error_quark (void)
-{
-  return g_quark_from_static_string ("vsx-ssl-error");
 }

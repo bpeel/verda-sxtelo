@@ -19,22 +19,20 @@
 #ifndef __VSX_SSL_ERROR_H__
 #define __VSX_SSL_ERROR_H__
 
-#include <glib.h>
+#include "vsx-error.h"
+
+extern struct vsx_error_domain
+vsx_ssl_error;
 
 typedef enum
 {
     VSX_SSL_ERROR_OTHER
 } VsxSslError;
 
-#define VSX_SSL_ERROR (vsx_ssl_error_quark ())
-
 VsxSslError
 vsx_ssl_error_from_errno (unsigned long errnum);
 
 void
-vsx_ssl_error_set (GError **error);
-
-GQuark
-vsx_ssl_error_quark (void);
+vsx_ssl_error_set (struct vsx_error **error);
 
 #endif /* __VSX_SSL_ERROR_H__ */
