@@ -24,36 +24,32 @@
 
 #include "vsx-conversation-set.h"
 #include "vsx-log.h"
+#include "vsx-list.h"
 
 typedef struct
 {
+  VsxList link;
   char *room_name;
-  VsxConversationSet *set;
   VsxConversation *conversation;
+  VsxConversationSet *set;
   VsxListener conversation_changed_listener;
-} VsxConversationSetHashData;
+} VsxConversationSetPending;
 
 struct _VsxConversationSet
 {
   VsxObject parent;
 
-  /* Hash table of pending conversations. This only contains
-     conversations that only have one person. The key is the name of
-     the room and the value is the a VsxServerConversationHashData
-     struct (which contains a pointer to the conversation). The hash
-     table listens for the changed signal on the conversation so that
-     it can remove the conversation if the first person leaves before
-     the second person joins. */
-  GHashTable *hash_table;
+  VsxList pending_conversations;
 };
 
 static void
-free_hash_data (VsxConversationSetHashData *data)
+remove_pending (VsxConversationSetPending *pending)
 {
-  vsx_list_remove (&data->conversation_changed_listener.link);
-  vsx_object_unref (data->conversation);
-  g_free (data->room_name);
-  g_slice_free (VsxConversationSetHashData, data);
+  vsx_list_remove (&pending->link);
+  vsx_list_remove (&pending->conversation_changed_listener.link);
+  vsx_object_unref (pending->conversation);
+  g_free (pending->room_name);
+  g_free (pending);
 }
 
 static bool
@@ -69,24 +65,17 @@ conversation_is_empty (VsxConversation *conversation)
 }
 
 static void
-remove_conversation (VsxConversationSetHashData *hash_data)
-{
-  /* This will also destroy the hash data */
-  g_hash_table_remove (hash_data->set->hash_table, hash_data->room_name);
-}
-
-static void
 conversation_changed_cb (VsxListener *listener,
                          void *user_data)
 {
-  VsxConversationSetHashData *hash_data =
-    vsx_container_of (listener, hash_data, conversation_changed_listener);
+  VsxConversationSetPending *pending =
+    vsx_container_of (listener, pending, conversation_changed_listener);
   VsxConversationChangedData *data = user_data;
 
   /* If the conversation has started then we'll remove it so that no
    * new players can join. */
   if (data->conversation->state != VSX_CONVERSATION_AWAITING_START)
-    remove_conversation (hash_data);
+    remove_pending (pending);
   else if (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
            conversation_is_empty (data->conversation))
     {
@@ -97,7 +86,7 @@ conversation_changed_cb (VsxListener *listener,
       vsx_log ("Game %i abandoned without starting",
                data->conversation->id);
 
-      remove_conversation (hash_data);
+      remove_pending (pending);
     }
 }
 
@@ -106,7 +95,12 @@ vsx_conversation_set_free (void *object)
 {
   VsxConversationSet *self = object;
 
-  g_hash_table_destroy (self->hash_table);
+  VsxConversationSetPending *pending, *tmp;
+
+  vsx_list_for_each_safe (pending, tmp, &self->pending_conversations, link)
+    {
+      remove_pending (pending);
+    }
 
   g_free (self);
 }
@@ -124,14 +118,7 @@ vsx_conversation_set_new (void)
 
   vsx_object_init (self, &vsx_conversation_set_class);
 
-  /* The hash table doesn't have a destroy function for the key
-     because its owned by the hash data */
-  self->hash_table =
-    g_hash_table_new_full (g_str_hash,
-                           g_str_equal,
-                           NULL, /* key_destroy */
-                           /* value_destroy */
-                           (GDestroyNotify) free_hash_data);
+  vsx_list_init (&self->pending_conversations);
 
   return self;
 }
@@ -140,38 +127,31 @@ VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
                                        const char *room_name)
 {
-  VsxConversationSetHashData *data;
-  VsxConversation *conversation;
+  VsxConversationSetPending *pending;
 
-  if ((data = g_hash_table_lookup (set->hash_table, room_name)) == NULL)
+  vsx_list_for_each (pending, &set->pending_conversations, link)
     {
-      /* If there's no conversation with that name then we'll create it */
-      conversation = vsx_conversation_new (room_name);
-
-      data = g_slice_new (VsxConversationSetHashData);
-
-      data->room_name = g_strdup (room_name);
-      data->set = set;
-      data->conversation = conversation;
-
-      /* Listen for the changed signal so we can remove the
-         conversation from the hash table once the game has begun */
-      data->conversation_changed_listener.notify =
-        conversation_changed_cb;
-      vsx_signal_add (&conversation->changed_signal,
-                      &data->conversation_changed_listener);
-
-      /* Take a reference for the hash table */
-      vsx_object_ref (conversation);
-
-      g_hash_table_insert (set->hash_table,
-                           data->room_name,
-                           data);
+      if (!strcmp (pending->room_name, room_name))
+        return vsx_object_ref (pending->conversation);
     }
-  else
-    {
-      conversation = vsx_object_ref (data->conversation);
-    }
+
+  /* If there's no conversation with that name then we'll create it */
+  VsxConversation *conversation = vsx_conversation_new (room_name);
+
+  pending = g_new (VsxConversationSetPending, 1);
+
+  pending->room_name = g_strdup (room_name);
+  pending->set = set;
+  pending->conversation = vsx_object_ref (conversation);
+
+  /* Listen for the changed signal so we can remove the conversation
+     from the list once the game has begun */
+  pending->conversation_changed_listener.notify =
+    conversation_changed_cb;
+  vsx_signal_add (&conversation->changed_signal,
+                  &pending->conversation_changed_listener);
+
+  vsx_list_insert (&set->pending_conversations, &pending->link);
 
   return conversation;
 }
