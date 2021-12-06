@@ -124,14 +124,27 @@ load_config(struct vsx_error **error)
   if (option_config_file)
     return vsx_config_load (option_config_file, error);
 
-  const char * const *dirs = g_get_system_config_dirs ();
+  const char *dirs = getenv ("XDG_CONFIG_DIRS");
+
+  if (dirs == NULL || *dirs == '\0')
+    dirs = "/etc/xdg";
+
   struct vsx_buffer filename = VSX_BUFFER_STATIC_INIT;
   VsxConfig *config = NULL;
 
-  for (int i = 0; dirs[i]; i++)
+  while (true)
     {
+      const char *end = strchr (dirs, ':');
+      bool last_entry = false;
+
+      if (end == NULL)
+        {
+          end = dirs + strlen (dirs);
+          last_entry = true;
+        }
+
       vsx_buffer_set_length (&filename, 0);
-      vsx_buffer_append_string (&filename, dirs[i]);
+      vsx_buffer_append (&filename, dirs, end - dirs);
       vsx_buffer_append_string (&filename, "/verda-sxtelo/conf.txt");
 
       struct vsx_error *local_error = NULL;
@@ -149,6 +162,11 @@ load_config(struct vsx_error **error)
         }
 
       vsx_error_free (local_error);
+
+      if (last_entry)
+        break;
+
+      dirs = end + 1;
     }
 
   vsx_set_error (error,
