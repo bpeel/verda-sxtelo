@@ -19,9 +19,8 @@
 #ifndef __VSX_CONFIG_H__
 #define __VSX_CONFIG_H__
 
-#include <glib.h>
-
 #include "vsx-list.h"
+#include "vsx-error.h"
 
 typedef enum
 {
@@ -46,12 +45,11 @@ typedef struct
   VsxList servers;
 } VsxConfig;
 
-#define VSX_CONFIG_ERROR (vsx_config_error_quark ())
+extern struct vsx_error_domain
+vsx_config_error;
 
-VsxConfig *vsx_config_load (const char *filename, GError **error);
+VsxConfig *vsx_config_load (const char *filename, struct vsx_error **error);
 
 void vsx_config_free (VsxConfig *config);
-
-GQuark vsx_config_error_quark (void);
 
 #endif /* __VSX_CONFIG_H__ */

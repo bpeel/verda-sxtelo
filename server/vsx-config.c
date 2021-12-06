@@ -29,6 +29,7 @@
 #include "vsx-key-value.h"
 #include "vsx-util.h"
 #include "vsx-buffer.h"
+#include "vsx-file-error.h"
 
 typedef struct
 {
@@ -38,6 +39,9 @@ typedef struct
   struct vsx_buffer error_buffer;
   VsxConfigServer *server;
 } LoadConfigData;
+
+struct vsx_error_domain
+vsx_config_error;
 
 VSX_PRINTF_FORMAT (2, 3)
 static void
@@ -231,35 +235,38 @@ load_config_func (VsxKeyValueEvent event,
 static bool
 validate_server (VsxConfigServer *server,
                  const char *filename,
-                 GError **error)
+                 struct vsx_error **error)
 {
   if (server->certificate && server->private_key == NULL)
     {
-      g_set_error (error,
-                   VSX_CONFIG_ERROR,
-                   VSX_CONFIG_ERROR_IO,
-                   "%s: SSL certificate specified without "
-                   "private key", filename);
+      vsx_set_error (error,
+                     &vsx_config_error,
+                     VSX_CONFIG_ERROR_IO,
+                     "%s: SSL certificate specified without "
+                     "private key",
+                     filename);
       return false;
     }
 
   if (server->private_key && server->certificate == NULL)
     {
-      g_set_error (error,
-                   VSX_CONFIG_ERROR,
-                   VSX_CONFIG_ERROR_IO,
-                   "%s: SSL private key speficied without "
-                   "certificate", filename);
+      vsx_set_error (error,
+                     &vsx_config_error,
+                     VSX_CONFIG_ERROR_IO,
+                     "%s: SSL private key speficied without "
+                     "certificate",
+                     filename);
       return false;
     }
 
   if (server->private_key_password && server->private_key == NULL)
     {
-      g_set_error (error,
-                   VSX_CONFIG_ERROR,
-                   VSX_CONFIG_ERROR_IO,
-                   "%s: SSL private key password speficied without "
-                   "private key", filename);
+      vsx_set_error (error,
+                     &vsx_config_error,
+                     VSX_CONFIG_ERROR_IO,
+                     "%s: SSL private key password speficied without "
+                     "private key",
+                     filename);
       return false;
     }
 
@@ -267,7 +274,9 @@ validate_server (VsxConfigServer *server,
 }
 
 static bool
-validate_config (VsxConfig *config, const char *filename, GError **error)
+validate_config (VsxConfig *config,
+                 const char *filename,
+                 struct vsx_error **error)
 {
   bool found_something = false;
 
@@ -282,10 +291,11 @@ validate_config (VsxConfig *config, const char *filename, GError **error)
 
   if (!found_something)
     {
-      g_set_error (error,
-                   VSX_CONFIG_ERROR,
-                   VSX_CONFIG_ERROR_IO,
-                   "%s: no servers configured", filename);
+      vsx_set_error (error,
+                     &vsx_config_error,
+                     VSX_CONFIG_ERROR_IO,
+                     "%s: no servers configured",
+                     filename);
       return false;
     }
 
@@ -293,7 +303,7 @@ validate_config (VsxConfig *config, const char *filename, GError **error)
 }
 
 static bool
-load_config (const char *fn, VsxConfig *config, GError **error)
+load_config (const char *fn, VsxConfig *config, struct vsx_error **error)
 {
   bool ret = true;
 
@@ -301,10 +311,11 @@ load_config (const char *fn, VsxConfig *config, GError **error)
 
   if (f == NULL)
     {
-      g_set_error (error,
-                   G_FILE_ERROR,
-                   g_file_error_from_errno (errno),
-                   "%s: %s", fn, strerror (errno));
+      vsx_file_error_set (error,
+                          errno,
+                          "%s: %s",
+                          fn,
+                          strerror (errno));
       ret = false;
     }
   else
@@ -321,11 +332,11 @@ load_config (const char *fn, VsxConfig *config, GError **error)
 
       if (data.had_error)
         {
-          g_set_error (error,
-                       VSX_CONFIG_ERROR,
-                       VSX_CONFIG_ERROR_IO,
-                       "%s",
-                       data.error_buffer.data);
+          vsx_set_error (error,
+                         &vsx_config_error,
+                         VSX_CONFIG_ERROR_IO,
+                         "%s",
+                         data.error_buffer.data);
           ret = false;
         }
       else if (!validate_config (config, fn, error))
@@ -342,7 +353,7 @@ load_config (const char *fn, VsxConfig *config, GError **error)
 }
 
 VsxConfig *
-vsx_config_load (const char *filename, GError **error)
+vsx_config_load (const char *filename, struct vsx_error **error)
 {
   VsxConfig *config = g_malloc0 (sizeof *config);
 
@@ -384,10 +395,4 @@ vsx_config_free (VsxConfig *config)
   g_free (config->log_file);
 
   g_free (config);
-}
-
-GQuark
-vsx_config_error_quark (void)
-{
-  return g_quark_from_static_string ("vsx-config-error");
 }

@@ -105,7 +105,7 @@ process_arguments (int *argc, char ***argv,
 }
 
 static VsxConfig *
-load_config(GError **error)
+load_config(struct vsx_error **error)
 {
   if (option_config_file)
     return vsx_config_load (option_config_file, error);
@@ -131,10 +131,10 @@ load_config(GError **error)
         }
     }
 
-  g_set_error (error,
-               G_FILE_ERROR,
-               G_FILE_ERROR_NOENT,
-               "No config file found");
+  vsx_set_error (error,
+                 &vsx_file_error,
+                 VSX_FILE_ERROR_NOENT,
+                 "No config file found");
 
  found:
   vsx_buffer_destroy (&filename);
@@ -297,12 +297,14 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-  config = load_config (&error);
+  struct vsx_error *config_error = NULL;
+
+  config = load_config (&config_error);
 
   if (config == NULL)
     {
-      fprintf (stderr, "%s\n", error->message);
-      g_clear_error (&error);
+      fprintf (stderr, "%s\n", config_error->message);
+      vsx_error_free (config_error);
       return EXIT_FAILURE;
     }
 
