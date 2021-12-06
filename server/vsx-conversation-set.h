@@ -31,19 +31,7 @@
 
 G_BEGIN_DECLS
 
-typedef struct
-{
-  VsxObject parent;
-
-  /* Hash table of pending conversations. This only contains
-     conversations that only have one person. The key is the name of
-     the room and the value is the a VsxServerConversationHashData
-     struct (which contains a pointer to the conversation). The hash
-     table listens for the changed signal on the conversation so that
-     it can remove the conversation if the first person leaves before
-     the second person joins. */
-  GHashTable *hash_table;
-} VsxConversationSet;
+typedef struct _VsxConversationSet VsxConversationSet;
 
 VsxConversationSet *
 vsx_conversation_set_new (void);

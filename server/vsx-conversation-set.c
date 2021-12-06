@@ -33,6 +33,20 @@ typedef struct
   VsxListener conversation_changed_listener;
 } VsxConversationSetHashData;
 
+struct _VsxConversationSet
+{
+  VsxObject parent;
+
+  /* Hash table of pending conversations. This only contains
+     conversations that only have one person. The key is the name of
+     the room and the value is the a VsxServerConversationHashData
+     struct (which contains a pointer to the conversation). The hash
+     table listens for the changed signal on the conversation so that
+     it can remove the conversation if the first person leaves before
+     the second person joins. */
+  GHashTable *hash_table;
+};
+
 static void
 free_hash_data (VsxConversationSetHashData *data)
 {
