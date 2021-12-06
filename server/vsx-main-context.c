@@ -34,6 +34,7 @@
 #include "vsx-main-context.h"
 #include "vsx-list.h"
 #include "vsx-slice.h"
+#include "vsx-buffer.h"
 
 /* This is a simple replacement for the GMainLoop which uses
    epoll. The hope is that it will scale to more connections easily
@@ -51,7 +52,7 @@ struct _VsxMainContext
      to process an event for every single source */
   unsigned int n_sources;
   /* Array for receiving events */
-  GArray *events;
+  struct vsx_buffer events;
 
   /* List of quit sources. All of these get invoked when a quit signal
      is received */
@@ -185,7 +186,7 @@ vsx_main_context_new (struct vsx_error **error)
 
       mc->epoll_fd = fd;
       mc->n_sources = 0;
-      mc->events = g_array_new (false, false, sizeof (struct epoll_event));
+      vsx_buffer_init (&mc->events);
       mc->monotonic_time_valid = false;
       vsx_list_init (&mc->quit_sources);
       mc->quit_pipe_source = NULL;
@@ -548,12 +549,11 @@ vsx_main_context_poll (VsxMainContext *mc)
   if (mc == NULL)
     mc = vsx_main_context_get_default_or_abort ();
 
-  g_array_set_size (mc->events, mc->n_sources);
+  vsx_buffer_set_length (&mc->events,
+                         mc->n_sources * sizeof (struct epoll_event));
 
   n_events = epoll_wait (mc->epoll_fd,
-                         &g_array_index (mc->events,
-                                         struct epoll_event,
-                                         0),
+                         (struct epoll_event *) mc->events.data,
                          mc->n_sources,
                          get_timeout (mc));
 
@@ -572,9 +572,8 @@ vsx_main_context_poll (VsxMainContext *mc)
 
       for (i = 0; i < n_events; i++)
         {
-          struct epoll_event *event = &g_array_index (mc->events,
-                                                      struct epoll_event,
-                                                      i);
+          struct epoll_event *event =
+            (struct epoll_event *) mc->events.data + i;
           VsxMainContextSource *source = event->data.ptr;
 
           switch (source->type)
@@ -667,7 +666,7 @@ vsx_main_context_free (VsxMainContext *mc)
 
   free_buckets (mc);
 
-  g_array_free (mc->events, true);
+  vsx_buffer_destroy (&mc->events);
   close (mc->epoll_fd);
 
   vsx_slice_allocator_destroy (&mc->source_allocator);
