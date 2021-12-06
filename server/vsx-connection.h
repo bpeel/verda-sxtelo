@@ -19,13 +19,11 @@
 #ifndef __VSX_CONNECTION_H__
 #define __VSX_CONNECTION_H__
 
-#include <glib.h>
-#include <gio/gio.h>
-
 #include "vsx-person-set.h"
 #include "vsx-conversation-set.h"
 #include "vsx-signal.h"
 #include "vsx-error.h"
+#include "vsx-netaddress.h"
 
 typedef struct _VsxConnection VsxConnection;
 
@@ -38,7 +36,7 @@ extern struct vsx_error_domain
 vsx_connection_error;
 
 VsxConnection *
-vsx_connection_new (GSocketAddress *socket_address,
+vsx_connection_new (const struct vsx_netaddress *socket_address,
                     VsxConversationSet *conversation_set,
                     VsxPersonSet *person_set);
 

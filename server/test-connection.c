@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #include "vsx-connection.h"
 #include "vsx-proto.h"
@@ -31,8 +32,7 @@
 
 typedef struct
 {
-  GInetAddress *inet_address;
-  GSocketAddress *socket_address;
+  struct vsx_netaddress socket_address;
   VsxConversationSet *conversation_set;
   VsxPersonSet *person_set;
   VsxConnection *conn;
@@ -180,14 +180,15 @@ create_harness(void)
 {
   Harness *harness = g_new0 (Harness, 1);
 
-  harness->inet_address = g_inet_address_new_loopback (G_SOCKET_FAMILY_IPV4);
-  harness->socket_address =
-    g_inet_socket_address_new (harness->inet_address, 5344);
+  bool ret = vsx_netaddress_from_string (&harness->socket_address,
+                                         "127.0.0.1",
+                                         5344);
+  assert(ret);
 
   harness->person_set = vsx_person_set_new ();
   harness->conversation_set = vsx_conversation_set_new ();
 
-  harness->conn = vsx_connection_new (harness->socket_address,
+  harness->conn = vsx_connection_new (&harness->socket_address,
                                       harness->conversation_set,
                                       harness->person_set);
 
@@ -200,8 +201,6 @@ free_harness(Harness *harness)
   vsx_connection_free (harness->conn);
   vsx_object_unref (harness->conversation_set);
   vsx_object_unref (harness->person_set);
-  g_object_unref (harness->socket_address);
-  g_object_unref (harness->inet_address);
 
   g_free (harness);
 }
@@ -771,7 +770,7 @@ static bool
 test_reconnect_ok (Harness *harness,
                    uint64_t player_id)
 {
-  VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
+  VsxConnection *other_conn = vsx_connection_new (&harness->socket_address,
                                                   harness->conversation_set,
                                                   harness->person_set);
 
@@ -807,7 +806,7 @@ static bool
 test_reconnect_bad_n_messages_received (Harness *harness,
                                         uint64_t player_id)
 {
-  VsxConnection *other_conn = vsx_connection_new (harness->socket_address,
+  VsxConnection *other_conn = vsx_connection_new (&harness->socket_address,
                                                   harness->conversation_set,
                                                   harness->person_set);
 

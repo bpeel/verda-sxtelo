@@ -38,6 +38,7 @@
 #include "vsx-util.h"
 #include "vsx-buffer.h"
 #include "vsx-file-error.h"
+#include "vsx-netaddress.h"
 
 #define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -587,6 +588,32 @@ vsx_server_connection_poll_cb (VsxMainContextSource *source,
     }
 }
 
+static void
+get_socket_address (GSocket *client_socket,
+                    struct vsx_netaddress *netaddress)
+{
+  memset (netaddress, 0, sizeof *netaddress);
+
+  GSocketAddress *address = g_socket_get_remote_address (client_socket, NULL);
+
+  if (address == NULL)
+    return;
+
+  struct vsx_netaddress_native native_address;
+
+  if (g_socket_address_to_native (address,
+                                  &native_address,
+                                  offsetof (struct vsx_netaddress_native,
+                                            length),
+                                  NULL /* error */))
+    {
+      native_address.length = g_socket_address_get_native_size (address);
+      vsx_netaddress_from_native (netaddress, &native_address);
+    }
+
+  g_object_unref (address);
+}
+
 static char *
 get_address_string (GSocketAddress *address,
                     bool include_port)
@@ -703,19 +730,20 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                                    connection);
       vsx_list_insert (&server->connections, &connection->link);
 
-      GSocketAddress *remote_address =
-        g_socket_get_remote_address (client_socket, NULL);
+      struct vsx_netaddress remote_address;
+      get_socket_address (client_socket, &remote_address);
+
       connection->ws_connection =
-        vsx_connection_new (remote_address,
+        vsx_connection_new (&remote_address,
                             server->pending_conversations,
                             server->person_set);
+
       VsxSignal *changed_signal =
         vsx_connection_get_changed_signal (connection->ws_connection);
       connection->ws_connection_listener.notify =
         ws_connection_changed_cb;
       vsx_signal_add (changed_signal,
                       &connection->ws_connection_listener);
-      g_object_unref (remote_address);
 
       connection->had_bad_input = false;
       connection->read_finished = false;

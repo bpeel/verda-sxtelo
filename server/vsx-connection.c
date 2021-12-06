@@ -62,7 +62,7 @@ struct _VsxConnection
 
   int64_t last_message_time;
 
-  GSocketAddress *socket_address;
+  struct vsx_netaddress socket_address;
   VsxConversationSet *conversation_set;
   VsxPersonSet *person_set;
 
@@ -245,7 +245,7 @@ handle_new_player (VsxConnection *conn,
 
       conn->person = vsx_person_set_generate_person (conn->person_set,
                                                      player_name,
-                                                     conn->socket_address,
+                                                     &conn->socket_address,
                                                      conversation);
 
       vsx_object_unref (conversation);
@@ -645,13 +645,13 @@ process_message (VsxConnection *conn,
 }
 
 VsxConnection *
-vsx_connection_new (GSocketAddress *socket_address,
+vsx_connection_new (const struct vsx_netaddress *socket_address,
                     VsxConversationSet *conversation_set,
                     VsxPersonSet *person_set)
 {
   VsxConnection *conn = g_new0 (VsxConnection, 1);
 
-  conn->socket_address = g_object_ref (socket_address);
+  conn->socket_address = *socket_address;
   conn->conversation_set = vsx_object_ref (conversation_set);
   conn->person_set = vsx_object_ref (person_set);
 
@@ -1488,7 +1488,6 @@ vsx_connection_free (VsxConnection *conn)
       vsx_object_unref (conn->person);
     }
 
-  g_object_unref (conn->socket_address);
   vsx_object_unref (conn->conversation_set);
   vsx_object_unref (conn->person_set);
 

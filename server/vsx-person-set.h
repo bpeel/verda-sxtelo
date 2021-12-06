@@ -19,12 +19,10 @@
 #ifndef __VSX_PERSON_SET_H__
 #define __VSX_PERSON_SET_H__
 
-#include <glib.h>
-#include <gio/gio.h>
-
 #include "vsx-person.h"
 #include "vsx-object.h"
 #include "vsx-main-context.h"
+#include "vsx-netaddress.h"
 
 typedef struct _VsxPersonSet VsxPersonSet;
 
@@ -42,7 +40,7 @@ vsx_person_set_get_person (VsxPersonSet *set,
 VsxPerson *
 vsx_person_set_generate_person (VsxPersonSet *set,
                                 const char *player_name,
-                                GSocketAddress *address,
+                                const struct vsx_netaddress *address,
                                 VsxConversation *conversation);
 
 #endif /* __VSX_PERSON_SET_H__ */

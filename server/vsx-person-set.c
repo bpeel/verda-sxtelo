@@ -24,6 +24,7 @@
 #include <assert.h>
 
 #include "vsx-person-set.h"
+#include "vsx-generate-id.h"
 #include "vsx-list.h"
 #include "vsx-util.h"
 
@@ -203,7 +204,7 @@ vsx_person_set_get_person (VsxPersonSet *set,
 VsxPerson *
 vsx_person_set_generate_person (VsxPersonSet *set,
                                 const char *player_name,
-                                GSocketAddress *address,
+                                const struct vsx_netaddress *address,
                                 VsxConversation *conversation)
 {
   VsxPerson *person;
@@ -212,7 +213,7 @@ vsx_person_set_generate_person (VsxPersonSet *set,
   /* Keep generating ids until we find one that isn't used. It's
      hopefully pretty unlikely that it will generate a clash */
   do
-    id = vsx_person_generate_id (address);
+    id = vsx_generate_id (address);
   while (vsx_person_set_get_person (set, id));
 
   person = vsx_person_new (id, player_name, conversation);

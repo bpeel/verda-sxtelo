@@ -51,47 +51,6 @@ vsx_person_class =
     .free = vsx_person_free,
   };
 
-VsxPersonId
-vsx_person_generate_id (GSocketAddress *address)
-{
-  VsxPersonId id = 0;
-  int i;
-
-  /* Generate enough random numbers to fill the id */
-  for (i = 0; i < sizeof (id) / sizeof (uint32_t); i++)
-    id |= (VsxPersonId) g_random_int () << (i * sizeof (uint32_t) * 8);
-
-  if (address)
-    {
-      gssize native_size = g_socket_address_get_native_size (address);
-      uint8_t address_buf[native_size];
-
-      /* XOR the bytes of the connection address so that even if
-         someone can work out the sequence of random numbers it's
-         still hard to predict what the next id will be */
-
-      if (g_socket_address_to_native (address,
-                                      address_buf,
-                                      native_size,
-                                      NULL /* error */))
-        {
-          int address_pos = 0;
-          uint8_t *p = (uint8_t *) &id;
-
-          for (i = 0; i < sizeof (id); i++)
-            {
-              p[i] ^= address_buf[address_pos];
-              if (++address_pos >= native_size)
-                address_pos = 0;
-            }
-        }
-      else
-        g_warning ("g_socket_address_to_native failed");
-    }
-
-  return id;
-}
-
 VsxPerson *
 vsx_person_new (VsxPersonId id,
                 const char *player_name,

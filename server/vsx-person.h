@@ -19,7 +19,6 @@
 #ifndef __VSX_PERSON_H__
 #define __VSX_PERSON_H__
 
-#include <gio/gio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -56,9 +55,6 @@ struct _VsxPerson
    * that were sent before they joined. */
   unsigned int message_offset;
 };
-
-VsxPersonId
-vsx_person_generate_id (GSocketAddress *address);
 
 VsxPerson *
 vsx_person_new (VsxPersonId id,
