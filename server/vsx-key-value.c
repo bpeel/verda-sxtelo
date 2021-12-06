@@ -35,6 +35,7 @@
 #include <stdarg.h>
 
 #include "vsx-util.h"
+#include "vsx-buffer.h"
 
 typedef enum
 {
@@ -61,9 +62,9 @@ typedef struct
   VsxKeyValueErrorCallback error_func;
   void *user_data;
 
-  GString *key_buffer;
-  GString *value_buffer;
-  GString *error_buffer;
+  struct vsx_buffer key_buffer;
+  struct vsx_buffer value_buffer;
+  struct vsx_buffer error_buffer;
 
   int line_num;
 } VsxKeyValueData;
@@ -72,38 +73,51 @@ VSX_PRINTF_FORMAT (2, 3)
 static void
 log_error (VsxKeyValueData *data, const char *format, ...)
 {
-  g_string_truncate (data->error_buffer, 0);
+  vsx_buffer_set_length (&data->error_buffer, 0);
 
   va_list ap;
 
   va_start (ap, format);
-  g_string_append_vprintf (data->error_buffer, format, ap);
+  vsx_buffer_append_vprintf (&data->error_buffer, format, ap);
   va_end (ap);
 
-  data->error_func (data->error_buffer->str, data->user_data);
+  data->error_func ((char *) data->error_buffer.data, data->user_data);
+}
+
+static void
+ensure_null_buffer (struct vsx_buffer *buffer)
+{
+  vsx_buffer_ensure_size (buffer, buffer->length + 1);
+  buffer->data[buffer->length] = '\0';
 }
 
 static void
 process_header (VsxKeyValueData *data)
 {
-  data->func (VSX_KEY_VALUE_EVENT_HEADER, data->line_num, NULL, /* key */
-              data->value_buffer->str, data->user_data);
+  ensure_null_buffer (&data->value_buffer);
+
+  data->func (VSX_KEY_VALUE_EVENT_HEADER,
+              data->line_num,
+              NULL, /* key */
+              (const char *) data->value_buffer.data,
+              data->user_data);
 }
 
 static void
 process_value (VsxKeyValueData *data)
 {
-  size_t value_length = data->value_buffer->len;
+  ensure_null_buffer (&data->key_buffer);
 
-  while (value_length > 0 && data->value_buffer->str[value_length - 1] == ' ')
-    value_length--;
+  while (data->value_buffer.length > 0 &&
+         data->value_buffer.data[data->value_buffer.length - 1] == ' ')
+    data->value_buffer.length--;
 
-  g_string_truncate (data->value_buffer, value_length);
+  ensure_null_buffer (&data->value_buffer);
 
   data->func (VSX_KEY_VALUE_EVENT_PROPERTY,
               data->line_num,
-              data->key_buffer->str,
-              data->value_buffer->str,
+              (const char *) data->key_buffer.data,
+              (const char *) data->value_buffer.data,
               data->user_data);
 }
 
@@ -116,7 +130,7 @@ handle_byte (VsxKeyValueData *data, int ch)
       if (ch == '[')
         {
           data->state = VSX_KEY_VALUE_STATE_READING_HEADER;
-          g_string_truncate (data->value_buffer, 0);
+          vsx_buffer_set_length (&data->value_buffer, 0);
         }
       else if (ch != ' ' && ch != '\n')
         {
@@ -141,7 +155,7 @@ handle_byte (VsxKeyValueData *data, int ch)
         }
       else
         {
-          g_string_append_c (data->value_buffer, ch);
+          vsx_buffer_append_c (&data->value_buffer, ch);
         }
       return;
     case VSX_KEY_VALUE_STATE_END_HEADER_LINE:
@@ -163,12 +177,12 @@ handle_byte (VsxKeyValueData *data, int ch)
       if (ch == '[')
         {
           data->state = VSX_KEY_VALUE_STATE_READING_HEADER;
-          g_string_truncate (data->value_buffer, 0);
+          vsx_buffer_set_length (&data->value_buffer, 0);
         }
       else if (ch != ' ' && ch != '\n')
         {
-          g_string_truncate (data->key_buffer, 0);
-          g_string_append_c (data->key_buffer, ch);
+          vsx_buffer_set_length (&data->key_buffer, 0);
+          vsx_buffer_append_c (&data->key_buffer, ch);
           data->state = VSX_KEY_VALUE_STATE_READING_FIELD_NAME;
         }
       return;
@@ -188,7 +202,7 @@ handle_byte (VsxKeyValueData *data, int ch)
         }
       else
         {
-          g_string_append_c (data->key_buffer, ch);
+          vsx_buffer_append_c (&data->key_buffer, ch);
         }
       return;
     case VSX_KEY_VALUE_STATE_WAITING_EQUALS:
@@ -210,14 +224,14 @@ handle_byte (VsxKeyValueData *data, int ch)
     case VSX_KEY_VALUE_STATE_WAITING_VALUE_START:
       if (ch == '\n')
         {
-          g_string_truncate (data->value_buffer, 0);
+          vsx_buffer_set_length (&data->value_buffer, 0);
           process_value (data);
           data->state = VSX_KEY_VALUE_STATE_FIELD_START;
         }
       else if (ch != ' ')
         {
-          g_string_truncate (data->value_buffer, 0);
-          g_string_append_c (data->value_buffer, ch);
+          vsx_buffer_set_length (&data->value_buffer, 0);
+          vsx_buffer_append_c (&data->value_buffer, ch);
           data->state = VSX_KEY_VALUE_STATE_READING_VALUE;
         }
       return;
@@ -229,7 +243,7 @@ handle_byte (VsxKeyValueData *data, int ch)
         }
       else
         {
-          g_string_append_c (data->value_buffer, ch);
+          vsx_buffer_append_c (&data->value_buffer, ch);
         }
       return;
     case VSX_KEY_VALUE_STATE_BAD_FIELD:
@@ -253,9 +267,9 @@ vsx_key_value_load (FILE *file,
   data.line_num = 1;
   data.state = VSX_KEY_VALUE_STATE_HEADER_START;
 
-  data.key_buffer = g_string_new (NULL);
-  data.value_buffer = g_string_new (NULL);
-  data.error_buffer = g_string_new (NULL);
+  vsx_buffer_init (&data.key_buffer);
+  vsx_buffer_init (&data.value_buffer);
+  vsx_buffer_init (&data.error_buffer);
 
   data.func = func;
   data.error_func = error_func;
@@ -271,9 +285,9 @@ vsx_key_value_load (FILE *file,
 
   handle_byte (&data, '\n');
 
-  g_string_free (data.key_buffer, true);
-  g_string_free (data.value_buffer, true);
-  g_string_free (data.error_buffer, true);
+  vsx_buffer_destroy (&data.key_buffer);
+  vsx_buffer_destroy (&data.value_buffer);
+  vsx_buffer_destroy (&data.error_buffer);
 }
 
 bool
