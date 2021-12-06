@@ -27,6 +27,7 @@
 #include <stdlib.h>
 
 #include "vsx-key-value.h"
+#include "vsx-util.h"
 
 typedef struct
 {
@@ -37,7 +38,7 @@ typedef struct
   VsxConfigServer *server;
 } LoadConfigData;
 
-G_GNUC_PRINTF (2, 3)
+VSX_PRINTF_FORMAT (2, 3)
 static void
 load_config_error (LoadConfigData *data, const char *format, ...)
 {

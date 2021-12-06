@@ -29,7 +29,7 @@ vsx_log_available (void);
 
 void
 vsx_log (const char *format,
-         ...) G_GNUC_PRINTF (1, 2);
+         ...) VSX_PRINTF_FORMAT (1, 2);
 
 bool
 vsx_log_set_file (const char *filename,

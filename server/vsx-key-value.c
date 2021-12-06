@@ -34,6 +34,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+#include "vsx-util.h"
+
 typedef enum
 {
   VSX_KEY_VALUE_STATE_HEADER_START,
@@ -66,7 +68,7 @@ typedef struct
   int line_num;
 } VsxKeyValueData;
 
-G_GNUC_PRINTF (2, 3)
+VSX_PRINTF_FORMAT (2, 3)
 static void
 log_error (VsxKeyValueData *data, const char *format, ...)
 {
