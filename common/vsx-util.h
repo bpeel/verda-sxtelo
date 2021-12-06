@@ -69,16 +69,20 @@
     (((uint64_t) (x) & (uint64_t) UINT64_C (0xff00000000000000)) >> 56)))
 
 #if defined(HAVE_BIG_ENDIAN)
+#define VSX_INT16_FROM_BE(x) ((int16_t) (x))
 #define VSX_UINT16_FROM_BE(x) ((uint16_t) (x))
 #define VSX_UINT32_FROM_BE(x) ((uint32_t) (x))
 #define VSX_UINT64_FROM_BE(x) ((uint64_t) (x))
+#define VSX_INT16_FROM_LE(x) ((int16_t) VSX_SWAP_UINT16((uint16_t) (x)))
 #define VSX_UINT16_FROM_LE(x) VSX_SWAP_UINT16((uint16_t) (x))
 #define VSX_UINT32_FROM_LE(x) VSX_SWAP_UINT32((uint32_t) (x))
 #define VSX_UINT64_FROM_LE(x) VSX_SWAP_UINT64((uint64_t) (x))
 #elif defined(HAVE_LITTLE_ENDIAN)
+#define VSX_INT16_FROM_LE(x) ((int16_t) (x))
 #define VSX_UINT16_FROM_LE(x) ((uint16_t) (x))
 #define VSX_UINT32_FROM_LE(x) ((uint32_t) (x))
 #define VSX_UINT64_FROM_LE(x) ((uint64_t) (x))
+#define VSX_INT16_FROM_BE(x) ((int16_t) VSX_SWAP_UINT16((uint16_t) (x)))
 #define VSX_UINT16_FROM_BE(x) VSX_SWAP_UINT16((uint16_t) (x))
 #define VSX_UINT32_FROM_BE(x) VSX_SWAP_UINT32((uint32_t) (x))
 #define VSX_UINT64_FROM_BE(x) VSX_SWAP_UINT64((uint64_t) (x))
@@ -86,6 +90,7 @@
 #error Platform is neither little-endian nor big-endian
 #endif
 
+#define VSX_INT16_TO_LE(x) VSX_INT16_FROM_LE(x)
 #define VSX_UINT16_TO_LE(x) VSX_UINT16_FROM_LE(x)
 #define VSX_UINT16_TO_BE(x) VSX_UINT16_FROM_BE(x)
 #define VSX_UINT32_TO_LE(x) VSX_UINT32_FROM_LE(x)
