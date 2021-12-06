@@ -1,4 +1,6 @@
-server_deps = glib_deps + [ openssl_dep ]
+thread_dep = dependency('threads')
+
+server_deps = glib_deps + [ openssl_dep, thread_dep ]
 
 inc_dirs = [ configinc, '../common' ]
 

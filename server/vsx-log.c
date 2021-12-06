@@ -27,14 +27,18 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <pthread.h>
+#include <signal.h>
 
 #include "vsx-log.h"
+#include "vsx-util.h"
 
 static FILE *vsx_log_file = NULL;
 static GString *vsx_log_buffer = NULL;
-static GThread *vsx_log_thread = NULL;
-static GMutex vsx_log_mutex;
-static GCond vsx_log_cond;
+static pthread_t vsx_log_thread;
+static bool vsx_log_has_thread = false;
+static pthread_mutex_t vsx_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t vsx_log_cond = PTHREAD_COND_INITIALIZER;
 static bool vsx_log_finished = false;
 
 bool
@@ -52,7 +56,7 @@ vsx_log (const char *format,
   if (!vsx_log_available ())
     return;
 
-  g_mutex_lock (&vsx_log_mutex);
+  pthread_mutex_lock (&vsx_log_mutex);
 
   time_t now;
   time (&now);
@@ -74,9 +78,9 @@ vsx_log (const char *format,
 
   g_string_append_c (vsx_log_buffer, '\n');
 
-  g_cond_signal (&vsx_log_cond);
+  pthread_cond_signal (&vsx_log_cond);
 
-  g_mutex_unlock (&vsx_log_mutex);
+  pthread_mutex_unlock (&vsx_log_mutex);
 }
 
 static void
@@ -92,8 +96,8 @@ block_sigint (void)
     g_warning ("pthread_sigmask failed: %s", strerror (errno));
 }
 
-static gpointer
-vsx_log_thread_func (gpointer data)
+static void *
+vsx_log_thread_func (void *data)
 {
   GString *alternate_buffer;
   bool had_error = false;
@@ -103,7 +107,7 @@ vsx_log_thread_func (gpointer data)
 
   alternate_buffer = g_string_new (NULL);
 
-  g_mutex_lock (&vsx_log_mutex);
+  pthread_mutex_lock (&vsx_log_mutex);
 
   while (!vsx_log_finished || vsx_log_buffer->len > 0)
     {
@@ -111,7 +115,7 @@ vsx_log_thread_func (gpointer data)
 
       /* Wait until there's something to do */
       while (!vsx_log_finished && vsx_log_buffer->len == 0)
-        g_cond_wait (&vsx_log_cond, &vsx_log_mutex);
+        pthread_cond_wait (&vsx_log_cond, &vsx_log_mutex);
 
       if (had_error)
         /* Just ignore the data */
@@ -125,7 +129,7 @@ vsx_log_thread_func (gpointer data)
           alternate_buffer = tmp;
 
           /* Release the mutex while we do a blocking write */
-          g_mutex_unlock (&vsx_log_mutex);
+          pthread_mutex_unlock (&vsx_log_mutex);
 
           wrote = fwrite (alternate_buffer->str,
                           1 /* size */,
@@ -141,11 +145,11 @@ vsx_log_thread_func (gpointer data)
 
           g_string_set_size (alternate_buffer, 0);
 
-          g_mutex_lock (&vsx_log_mutex);
+          pthread_mutex_lock (&vsx_log_mutex);
         }
     }
 
-  g_mutex_unlock (&vsx_log_mutex);
+  pthread_mutex_unlock (&vsx_log_mutex);
 
   g_string_free (alternate_buffer, true);
 
@@ -178,33 +182,39 @@ vsx_log_set_file (const char *filename,
   return true;
 }
 
-bool
-vsx_log_start (GError **error)
+void
+vsx_log_start (void)
 {
-  if (!vsx_log_available () || vsx_log_thread != NULL)
-    return true;
+  if (!vsx_log_available ())
+    return;
 
-  vsx_log_thread = g_thread_try_new ("vsx-log",
-                                     vsx_log_thread_func,
-                                     NULL, /* data */
-                                     error);
+  if (vsx_log_has_thread)
+    return;
 
-  return vsx_log_thread != NULL;
+  int res = pthread_create (&vsx_log_thread,
+                            NULL, /* attr */
+                            vsx_log_thread_func,
+                            NULL /* thread func arg */);
+
+  if (res)
+      vsx_fatal ("Error creating thread: %s", strerror (res));
+
+  vsx_log_has_thread = true;
 }
 
 void
 vsx_log_close (void)
 {
-  if (vsx_log_thread)
+  if (vsx_log_has_thread)
     {
-      g_mutex_lock (&vsx_log_mutex);
+      pthread_mutex_lock (&vsx_log_mutex);
       vsx_log_finished = true;
-      g_cond_signal (&vsx_log_cond);
-      g_mutex_unlock (&vsx_log_mutex);
+      pthread_cond_signal (&vsx_log_cond);
+      pthread_mutex_unlock (&vsx_log_mutex);
 
-      g_thread_join (vsx_log_thread);
+      pthread_join (vsx_log_thread, NULL);
 
-      vsx_log_thread = NULL;
+      vsx_log_has_thread = false;
     }
 
   if (vsx_log_buffer)

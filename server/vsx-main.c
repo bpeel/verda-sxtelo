@@ -345,21 +345,12 @@ main (int argc, char **argv)
               if (option_daemonize)
                 daemonize ();
 
-              if (!vsx_log_start (&error))
-                {
-                  /* This probably shouldn't happen. By the time we
-                     get here may have daemonized so we can't really
-                     print anything but let's do it anyway. */
-                  g_warning ("Error starting log file: %s\n", error->message);
-                  g_clear_error (&error);
-                }
-              else
-                {
-                  if (!vsx_server_run (server, &error))
-                    vsx_log ("%s", error->message);
+              vsx_log_start ();
 
-                  vsx_log ("Exiting...");
-                }
+              if (!vsx_server_run (server, &error))
+                vsx_log ("%s", error->message);
+
+              vsx_log ("Exiting...");
 
               vsx_server_free (server);
             }

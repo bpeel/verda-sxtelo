@@ -33,8 +33,8 @@ bool
 vsx_log_set_file (const char *filename,
                   GError **error);
 
-bool
-vsx_log_start (GError **error);
+void
+vsx_log_start (void);
 
 void
 vsx_log_close (void);
