@@ -24,10 +24,10 @@
 
 #include "vsx-conversation.h"
 
-/* This class represents a hash table of pending conversations. It
-   only contains conversations that only have one person. As soon as
-   the second person joins the conversation is removed from the hash
-   table */
+/* This class represents a list of pending conversations. It only
+   contains conversations that can still be joined. As soon as the
+   game starts or everyone leaves the conversation then it is removed
+   from the list */
 
 G_BEGIN_DECLS
 
