@@ -92,13 +92,13 @@ vsx_proto_write_frame_header (uint8_t *buffer,
     {
       buffer[1] = 127;
       vsx_proto_write_uint64_t (buffer + 2,
-                               GUINT64_SWAP_LE_BE (payload_length));
+                                VSX_SWAP_UINT64 (payload_length));
     }
   else if (payload_length >= 126)
     {
       buffer[1] = 126;
       vsx_proto_write_uint16_t(buffer + 2,
-                              GUINT16_SWAP_LE_BE (payload_length));
+                               VSX_SWAP_UINT16 (payload_length));
     }
   else
     {

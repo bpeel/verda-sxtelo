@@ -19,12 +19,13 @@
 #ifndef __VSX_PROTO_H__
 #define __VSX_PROTO_H__
 
-#include <glib.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "vsx-util.h"
 
 /* Maximum number of bytes allowed in a payload. The server keeps a
  * buffer of this size around for each connection, so we don’t want it
@@ -90,7 +91,7 @@ static inline void
 vsx_proto_write_uint16_t (uint8_t *buffer,
                           uint16_t value)
 {
-  value = GUINT16_TO_LE (value);
+  value = VSX_UINT16_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
@@ -98,7 +99,7 @@ static inline void
 vsx_proto_write_uint32_t (uint8_t *buffer,
                           uint32_t value)
 {
-  value = GUINT32_TO_LE (value);
+  value = VSX_UINT32_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
@@ -106,7 +107,7 @@ static inline void
 vsx_proto_write_uint64_t (uint8_t *buffer,
                           uint64_t value)
 {
-  value = GUINT64_TO_LE (value);
+  value = VSX_UINT64_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
@@ -114,7 +115,7 @@ static inline void
 vsx_proto_write_int16_t (uint8_t *buffer,
                          int16_t value)
 {
-  value = GINT16_TO_LE (value);
+  value = VSX_INT16_TO_LE (value);
   memcpy (buffer, &value, sizeof value);
 }
 
@@ -141,7 +142,7 @@ vsx_proto_read_uint16_t (const uint8_t *buffer)
 {
   uint16_t value;
   memcpy (&value, buffer, sizeof value);
-  return GUINT16_FROM_LE (value);
+  return VSX_UINT16_FROM_LE (value);
 }
 
 static inline uint32_t
@@ -149,7 +150,7 @@ vsx_proto_read_uint32_t (const uint8_t *buffer)
 {
   uint32_t value;
   memcpy (&value, buffer, sizeof value);
-  return GUINT32_FROM_LE (value);
+  return VSX_UINT32_FROM_LE (value);
 }
 
 static inline uint64_t
@@ -157,7 +158,7 @@ vsx_proto_read_uint64_t (const uint8_t *buffer)
 {
   uint64_t value;
   memcpy (&value, buffer, sizeof value);
-  return GUINT64_FROM_LE (value);
+  return VSX_UINT64_FROM_LE (value);
 }
 
 static inline int16_t
@@ -165,7 +166,7 @@ vsx_proto_read_int16_t (const uint8_t *buffer)
 {
   int16_t value;
   memcpy (&value, buffer, sizeof value);
-  return GINT16_FROM_LE (value);
+  return VSX_INT16_FROM_LE (value);
 }
 
 bool
