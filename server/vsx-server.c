@@ -35,6 +35,7 @@
 #include "vsx-log.h"
 #include "vsx-ssl-error.h"
 #include "vsx-proto.h"
+#include "vsx-util.h"
 
 #define DEFAULT_PORT 5144
 #define DEFAULT_SSL_PORT (DEFAULT_PORT + 1)
@@ -206,7 +207,7 @@ vsx_server_remove_connection (VsxServer *server,
 
   vsx_connection_free (connection->ws_connection);
 
-  g_slice_free (VsxServerConnection, connection);
+  vsx_free (connection);
 
   if (vsx_list_empty (&server->connections))
     {
@@ -681,11 +682,9 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
     }
   else
     {
-      VsxServerConnection *connection;
-
       g_socket_set_blocking (client_socket, false);
 
-      connection = g_slice_new (VsxServerConnection);
+      VsxServerConnection *connection = vsx_alloc (sizeof *connection);
 
       connection->server = server;
       connection->client_socket = client_socket;
