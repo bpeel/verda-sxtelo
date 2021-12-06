@@ -37,9 +37,10 @@ typedef struct
    * 1 and so on */
   unsigned int num;
 
-  char *name;
-
   VsxPlayerFlags flags;
+
+  /* Over-allocated */
+  char name[1];
 } VsxPlayer;
 
 static inline bool

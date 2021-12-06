@@ -23,22 +23,23 @@
 #include <glib.h>
 
 #include "vsx-player.h"
+#include "vsx-util.h"
 
 void
 vsx_player_free (VsxPlayer *player)
 {
-  g_free (player->name);
-
-  g_slice_free (VsxPlayer, player);
+  vsx_free (player);
 }
 
 VsxPlayer *
 vsx_player_new (const char *player_name,
                 unsigned int num)
 {
-  VsxPlayer *player = g_slice_new (VsxPlayer);
+  size_t name_len = strlen (player_name);
+  VsxPlayer *player = vsx_alloc (offsetof (VsxPlayer, name)
+                                 + name_len + 1);
 
-  player->name = g_strdup (player_name);
+  memcpy (player->name, player_name, name_len + 1);
   player->num = num;
 
   player->flags = VSX_PLAYER_CONNECTED;
