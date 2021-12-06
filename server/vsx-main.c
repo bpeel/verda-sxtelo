@@ -134,11 +134,21 @@ load_config(struct vsx_error **error)
       vsx_buffer_append_string (&filename, dirs[i]);
       vsx_buffer_append_string (&filename, "/verda-sxtelo/conf.txt");
 
-      if (g_file_test ((const char *) filename.data, G_FILE_TEST_EXISTS))
+      struct vsx_error *local_error = NULL;
+
+      config = vsx_config_load ((const char *) filename.data, &local_error);
+
+      if (config != NULL)
+        goto found;
+
+      if (local_error->domain != &vsx_file_error
+          || local_error->code != VSX_FILE_ERROR_NOENT)
         {
-          config = vsx_config_load ((const char *) filename.data, error);
+          vsx_error_propagate (error, local_error);
           goto found;
         }
+
+      vsx_error_free (local_error);
     }
 
   vsx_set_error (error,
