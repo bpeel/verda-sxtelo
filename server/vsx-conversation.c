@@ -28,6 +28,7 @@
 #include "vsx-main-context.h"
 #include "vsx-log.h"
 #include "vsx-proto.h"
+#include "vsx-utf8.h"
 
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
@@ -358,7 +359,7 @@ vsx_conversation_new (const char *room_name)
   t = tile_data->letters;
   for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
     {
-      const char *t_next = g_utf8_next_char (t);
+      const char *t_next = vsx_utf8_next (t);
 
       g_assert (*t);
 
