@@ -218,8 +218,8 @@ handle_new_player (VsxConnection *conn,
     }
 
   bool ret = true;
-  char *normalized_room_name = g_strdup (room_name);
-  char *normalized_player_name = g_strdup (player_name);
+  char *normalized_room_name = vsx_strdup (room_name);
+  char *normalized_player_name = vsx_strdup (player_name);
 
   if (!vsx_normalize_name (normalized_room_name))
     {
@@ -269,8 +269,8 @@ handle_new_player (VsxConnection *conn,
       start_following_person (conn);
     }
 
-  g_free (normalized_player_name);
-  g_free (normalized_room_name);
+  vsx_free (normalized_player_name);
+  vsx_free (normalized_room_name);
 
   return ret;
 }
@@ -649,7 +649,7 @@ vsx_connection_new (const struct vsx_netaddress *socket_address,
                     VsxConversationSet *conversation_set,
                     VsxPersonSet *person_set)
 {
-  VsxConnection *conn = g_new0 (VsxConnection, 1);
+  VsxConnection *conn = vsx_calloc (sizeof *conn);
 
   conn->socket_address = *socket_address;
   conn->conversation_set = vsx_object_ref (conversation_set);
@@ -1495,5 +1495,5 @@ vsx_connection_free (VsxConnection *conn)
   if (conn->ws_parser)
     vsx_ws_parser_free (conn->ws_parser);
 
-  g_free (conn);
+  vsx_free (conn);
 }

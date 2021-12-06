@@ -48,8 +48,8 @@ remove_pending (VsxConversationSetPending *pending)
   vsx_list_remove (&pending->link);
   vsx_list_remove (&pending->conversation_changed_listener.link);
   vsx_object_unref (pending->conversation);
-  g_free (pending->room_name);
-  g_free (pending);
+  vsx_free (pending->room_name);
+  vsx_free (pending);
 }
 
 static bool
@@ -102,7 +102,7 @@ vsx_conversation_set_free (void *object)
       remove_pending (pending);
     }
 
-  g_free (self);
+  vsx_free (self);
 }
 
 static const VsxObjectClass
@@ -114,7 +114,7 @@ vsx_conversation_set_class =
 VsxConversationSet *
 vsx_conversation_set_new (void)
 {
-  VsxConversationSet *self = g_new0 (VsxConversationSet, 1);
+  VsxConversationSet *self = vsx_calloc (sizeof *self);
 
   vsx_object_init (self, &vsx_conversation_set_class);
 
@@ -138,9 +138,9 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
   /* If there's no conversation with that name then we'll create it */
   VsxConversation *conversation = vsx_conversation_new (room_name);
 
-  pending = g_new (VsxConversationSetPending, 1);
+  pending = vsx_alloc (sizeof *pending);
 
-  pending->room_name = g_strdup (room_name);
+  pending->room_name = vsx_strdup (room_name);
   pending->set = set;
   pending->conversation = vsx_object_ref (conversation);
 

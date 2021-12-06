@@ -49,7 +49,7 @@ vsx_conversation_free (void *object)
     {
       const VsxConversationMessage *message =
         vsx_conversation_get_message (self, i);
-      g_free (message->text);
+      vsx_free (message->text);
     }
 
   for (i = 0; i < self->n_players; i++)
@@ -57,7 +57,7 @@ vsx_conversation_free (void *object)
 
   vsx_buffer_destroy (&self->messages);
 
-  g_free (self);
+  vsx_free (self);
 }
 
 static const VsxObjectClass
@@ -150,7 +150,7 @@ vsx_conversation_add_message (VsxConversation *conversation,
         raw_length--;
     }
 
-  message->text = g_strndup (buffer, raw_length);
+  message->text = vsx_strndup (buffer, raw_length);
 
   vsx_conversation_changed (conversation,
                             VSX_CONVERSATION_MESSAGE_ADDED);
@@ -338,7 +338,7 @@ shuffle_tiles (VsxConversation *self)
 VsxConversation *
 vsx_conversation_new (const char *room_name)
 {
-  VsxConversation *self = g_new0 (VsxConversation, 1);
+  VsxConversation *self = vsx_calloc (sizeof *self);
   const VsxTileData *tile_data = get_tile_data_for_room_name (room_name);
   const char *t;
   int i;

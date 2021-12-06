@@ -42,7 +42,7 @@ vsx_person_free (void *object)
       vsx_object_unref (person->conversation);
     }
 
-  g_free (person);
+  vsx_free (person);
 }
 
 static const VsxObjectClass
@@ -56,7 +56,7 @@ vsx_person_new (VsxPersonId id,
                 const char *player_name,
                 VsxConversation *conversation)
 {
-  VsxPerson *person = g_new0 (VsxPerson, 1);
+  VsxPerson *person = vsx_calloc (sizeof *person);
 
   vsx_object_init (person, &vsx_person_class);
 

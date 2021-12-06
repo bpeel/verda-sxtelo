@@ -178,7 +178,7 @@ frame_error_tests[] =
 static Harness *
 create_harness(void)
 {
-  Harness *harness = g_new0 (Harness, 1);
+  Harness *harness = vsx_calloc (sizeof *harness);
 
   bool ret = vsx_netaddress_from_string (&harness->socket_address,
                                          "127.0.0.1",
@@ -202,7 +202,7 @@ free_harness(Harness *harness)
   vsx_object_unref (harness->conversation_set);
   vsx_object_unref (harness->person_set);
 
-  g_free (harness);
+  vsx_free (harness);
 }
 
 static bool
@@ -457,7 +457,7 @@ read_player_name (VsxConnection *conn,
                      + 1 /* command */
                      + 1 /* player_num */
                      + strlen (expected_name) + 1 /* name + terminator */);
-  uint8_t *buf = g_alloca (buf_size);
+  uint8_t *buf = alloca (buf_size);
 
   size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
 
@@ -1037,7 +1037,7 @@ read_message (VsxConnection *conn,
                      + 1 /* command */
                      + 1 /* player_num */
                      + strlen (expected_message) + 1 /* name + terminator */);
-  uint8_t *buf = g_alloca (buf_size);
+  uint8_t *buf = alloca (buf_size);
 
   size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_size);
 
@@ -1826,7 +1826,7 @@ test_sync (void)
   else
     {
       uint8_t buf[3];
-      uint8_t *large_buf = g_malloc(1024);
+      uint8_t *large_buf = vsx_alloc(1024);
 
       size_t got = vsx_connection_fill_output_buffer (harness->conn,
                                                       buf,
@@ -1856,7 +1856,7 @@ test_sync (void)
           ret = false;
         }
 
-      g_free (large_buf);
+      vsx_free (large_buf);
 
       vsx_object_unref (person);
     }
@@ -1949,7 +1949,7 @@ test_ping_string (VsxConnection *conn,
 {
   size_t str_len = strlen (str);
   size_t frame_len = str_len + 2;
-  uint8_t *frame = g_alloca (frame_len);
+  uint8_t *frame = alloca (frame_len);
 
   frame[0] = 0x89;
   frame[1] = str_len;
@@ -1971,7 +1971,7 @@ test_ping_string (VsxConnection *conn,
   /* Allocate enough space to receive the pong a second time so that
    * we can verify that the connection only sends it once.
    */
-  uint8_t *result = g_alloca (frame_len * 2);
+  uint8_t *result = alloca (frame_len * 2);
 
   size_t got = vsx_connection_fill_output_buffer (conn, result, frame_len * 2);
 

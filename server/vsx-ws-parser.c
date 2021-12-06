@@ -63,7 +63,7 @@ ws_sec_key_guid[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 VsxWsParser *
 vsx_ws_parser_new (void)
 {
-  VsxWsParser *parser = g_new (VsxWsParser, 1);
+  VsxWsParser *parser = vsx_alloc (sizeof *parser);
 
   parser->buf_len = 0;
   parser->state = VSX_WS_PARSER_READING_REQUEST_LINE;
@@ -506,5 +506,5 @@ vsx_ws_parser_free (VsxWsParser *parser)
   if (parser->key_hash_ctx)
     EVP_MD_CTX_free (parser->key_hash_ctx);
 
-  g_free (parser);
+  vsx_free (parser);
 }

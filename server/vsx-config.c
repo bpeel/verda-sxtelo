@@ -127,7 +127,7 @@ set_option (LoadConfigData *data,
           }
         else
           {
-            *ptr = g_strdup (value);
+            *ptr = vsx_strdup (value);
           }
         break;
       }
@@ -200,7 +200,7 @@ load_config_func (VsxKeyValueEvent event,
     case VSX_KEY_VALUE_EVENT_HEADER:
       if (!strcmp (value, "server"))
         {
-          data->server = g_malloc0 (sizeof *data->server);
+          data->server = vsx_calloc (sizeof *data->server);
           data->server->port = -1;
           vsx_list_insert (data->config->servers.prev, &data->server->link);
         }
@@ -355,7 +355,7 @@ load_config (const char *fn, VsxConfig *config, struct vsx_error **error)
 VsxConfig *
 vsx_config_load (const char *filename, struct vsx_error **error)
 {
-  VsxConfig *config = g_malloc0 (sizeof *config);
+  VsxConfig *config = vsx_calloc (sizeof *config);
 
   vsx_list_init (&config->servers);
 
@@ -376,11 +376,11 @@ free_servers (VsxConfig *config)
 
   vsx_list_for_each_safe (server, tmp, &config->servers, link)
   {
-    g_free (server->certificate);
-    g_free (server->private_key);
-    g_free (server->private_key_password);
-    g_free (server->address);
-    g_free (server);
+    vsx_free (server->certificate);
+    vsx_free (server->private_key);
+    vsx_free (server->private_key_password);
+    vsx_free (server->address);
+    vsx_free (server);
   }
 
 }
@@ -390,9 +390,9 @@ vsx_config_free (VsxConfig *config)
 {
   free_servers (config);
 
-  g_free (config->user);
-  g_free (config->group);
-  g_free (config->log_file);
+  vsx_free (config->user);
+  vsx_free (config->group);
+  vsx_free (config->log_file);
 
-  g_free (config);
+  vsx_free (config);
 }

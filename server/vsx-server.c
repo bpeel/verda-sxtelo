@@ -212,7 +212,7 @@ vsx_server_remove_connection (VsxServer *server,
   vsx_main_context_remove_source (connection->source);
   vsx_close (connection->client_socket);
   vsx_list_remove (&connection->link);
-  g_free (connection->peer_address_string);
+  vsx_free (connection->peer_address_string);
 
   vsx_connection_free (connection->ws_connection);
 
@@ -250,7 +250,7 @@ vsx_server_remove_socket (VsxServer *server,
 
   vsx_list_remove (&ssocket->link);
 
-  g_free (ssocket);
+  vsx_free (ssocket);
 }
 
 static void
@@ -939,7 +939,7 @@ vsx_server_add_config (VsxServer *server,
   if (sock == -1)
       return false;
 
-  VsxServerSocket *ssocket = g_new0 (VsxServerSocket, 1);
+  VsxServerSocket *ssocket = vsx_calloc (sizeof *ssocket);
 
   ssocket->server = server;
   ssocket->sock = sock;
@@ -966,7 +966,7 @@ vsx_server_add_config (VsxServer *server,
 VsxServer *
 vsx_server_new (void)
 {
-  VsxServer *server = g_new0 (VsxServer, 1);
+  VsxServer *server = vsx_calloc (sizeof *server);
 
   server->person_set = vsx_person_set_new ();
 
@@ -1088,5 +1088,5 @@ vsx_server_free (VsxServer *server)
 
   vsx_object_unref (server->pending_conversations);
 
-  g_free (server);
+  vsx_free (server);
 }

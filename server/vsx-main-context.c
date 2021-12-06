@@ -178,7 +178,7 @@ vsx_main_context_new (struct vsx_error **error)
     }
   else
     {
-      VsxMainContext *mc = g_new (VsxMainContext, 1);
+      VsxMainContext *mc = vsx_alloc (sizeof *mc);
 
       vsx_slice_allocator_init (&mc->source_allocator,
                                 sizeof (VsxMainContextSource),
@@ -671,7 +671,7 @@ vsx_main_context_free (VsxMainContext *mc)
 
   vsx_slice_allocator_destroy (&mc->source_allocator);
 
-  g_free (mc);
+  vsx_free (mc);
 
   if (mc == vsx_main_context_default)
     vsx_main_context_default = NULL;

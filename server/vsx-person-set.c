@@ -67,7 +67,7 @@ vsx_person_set_free (void *object)
   if (self->people_timer_source)
     vsx_main_context_remove_source (self->people_timer_source);
 
-  g_free (self);
+  vsx_free (self);
 }
 
 static const VsxObjectClass
@@ -132,7 +132,7 @@ remove_silent_people_timer_cb (VsxMainContextSource *source,
 VsxPersonSet *
 vsx_person_set_new (void)
 {
-  VsxPersonSet *self = g_new0 (VsxPersonSet, 1);
+  VsxPersonSet *self = vsx_calloc (sizeof *self);
 
   vsx_object_init (self, &vsx_person_set_class);
 
