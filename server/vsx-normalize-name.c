@@ -23,6 +23,12 @@
 #include "vsx-normalize-name.h"
 #include "vsx-proto.h"
 
+static bool
+is_space(char ch)
+{
+  return ch && strchr (" \n\r\t", ch) != NULL;
+}
+
 bool
 vsx_normalize_name (char *name)
 {
@@ -31,17 +37,17 @@ vsx_normalize_name (char *name)
   bool got_letter = false;
 
   /* Skip leading whitespace */
-  while (*src && g_ascii_isspace (*src))
+  while (*src && is_space (*src))
     src++;
 
   /* Combine any other sequences of whitespace characters into a
    * single space */
   for (; *src; src++)
     {
-      if (g_ascii_isspace (*src))
+      if (is_space (*src))
         {
           *(dst++) = ' ';
-          while (src[1] && g_ascii_isspace (src[1]))
+          while (src[1] && is_space (src[1]))
             src++;
         }
       /* Don't allow any control characters */
