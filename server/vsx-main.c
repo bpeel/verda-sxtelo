@@ -306,12 +306,14 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-  mc = vsx_main_context_get_default (&error);
+  struct vsx_error *mc_error = NULL;
+
+  mc = vsx_main_context_get_default (&mc_error);
 
   if (mc == NULL)
     {
-      fprintf (stderr, "%s\n", error->message);
-      g_clear_error (&error);
+      fprintf (stderr, "%s\n", mc_error->message);
+      vsx_error_free (mc_error);
     }
   else
     {

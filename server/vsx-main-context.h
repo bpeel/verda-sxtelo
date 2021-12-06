@@ -19,7 +19,7 @@
 #ifndef __VSX_MAIN_CONTEXT_H__
 #define __VSX_MAIN_CONTEXT_H__
 
-#include <glib.h>
+#include "vsx-error.h"
 
 typedef enum
 {
@@ -33,6 +33,9 @@ typedef enum
   VSX_MAIN_CONTEXT_POLL_OUT = 1 << 1,
   VSX_MAIN_CONTEXT_POLL_ERROR = 1 << 2,
 } VsxMainContextPollFlags;
+
+extern struct vsx_error_domain
+vsx_main_context_error;
 
 #define VSX_MAIN_CONTEXT_ERROR (vsx_main_context_error_quark ())
 
@@ -51,10 +54,10 @@ typedef void (* VsxMainContextQuitCallback) (VsxMainContextSource *source,
                                              void *user_data);
 
 VsxMainContext *
-vsx_main_context_new (GError **error);
+vsx_main_context_new (struct vsx_error **error);
 
 VsxMainContext *
-vsx_main_context_get_default (GError **error);
+vsx_main_context_get_default (struct vsx_error **error);
 
 VsxMainContextSource *
 vsx_main_context_add_poll (VsxMainContext *mc,
@@ -89,8 +92,5 @@ vsx_main_context_get_monotonic_clock (VsxMainContext *mc);
 
 void
 vsx_main_context_free (VsxMainContext *mc);
-
-GQuark
-vsx_main_context_error_quark (void);
 
 #endif /* __VSX_MAIN_CONTEXT_H__ */

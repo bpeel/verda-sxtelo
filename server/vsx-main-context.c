@@ -119,13 +119,14 @@ struct _VsxMainContextBucket
   int minutes_passed;
 };
 
+struct vsx_error_domain
+vsx_main_context_error;
+
 static VsxMainContext *vsx_main_context_default = NULL;
 
 VsxMainContext *
-vsx_main_context_get_default (GError **error)
+vsx_main_context_get_default (struct vsx_error **error)
 {
-  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
-
   if (vsx_main_context_default == NULL)
     vsx_main_context_default = vsx_main_context_new (error);
 
@@ -136,7 +137,7 @@ static VsxMainContext *
 vsx_main_context_get_default_or_abort (void)
 {
   VsxMainContext *mc;
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   mc = vsx_main_context_get_default (&error);
 
@@ -144,7 +145,7 @@ vsx_main_context_get_default_or_abort (void)
     {
       fprintf (stderr, "failed to create default main context: %s\n",
                error->message);
-      g_clear_error (&error);
+      vsx_error_free (error);
       exit (1);
     }
 
@@ -152,27 +153,25 @@ vsx_main_context_get_default_or_abort (void)
 }
 
 VsxMainContext *
-vsx_main_context_new (GError **error)
+vsx_main_context_new (struct vsx_error **error)
 {
   int fd;
-
-  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   fd = epoll_create (16);
 
   if (fd == -1)
     {
       if (errno == EINVAL)
-        g_set_error (error,
-                     VSX_MAIN_CONTEXT_ERROR,
-                     VSX_MAIN_CONTEXT_ERROR_UNSUPPORTED,
-                     "epoll is unsupported on this system");
+        vsx_set_error (error,
+                       &vsx_main_context_error,
+                       VSX_MAIN_CONTEXT_ERROR_UNSUPPORTED,
+                       "epoll is unsupported on this system");
       else
-        g_set_error (error,
-                     VSX_MAIN_CONTEXT_ERROR,
-                     VSX_MAIN_CONTEXT_ERROR_UNKNOWN,
-                     "failed to create an epoll descriptor: %s",
-                     strerror (errno));
+        vsx_set_error (error,
+                       &vsx_main_context_error,
+                       VSX_MAIN_CONTEXT_ERROR_UNKNOWN,
+                       "failed to create an epoll descriptor: %s",
+                       strerror (errno));
 
       return NULL;
     }
@@ -677,10 +676,4 @@ vsx_main_context_free (VsxMainContext *mc)
 
   if (mc == vsx_main_context_default)
     vsx_main_context_default = NULL;
-}
-
-GQuark
-vsx_main_context_error_quark (void)
-{
-  return g_quark_from_static_string ("vsx-main-context-error");
 }
