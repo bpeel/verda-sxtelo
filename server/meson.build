@@ -42,7 +42,7 @@ server_src = [
         'vsx-slice.c',
         'vsx-ssl-error.c',
         'vsx-tile-data.c',
-        'vsx-util.c',
+        '../common/vsx-util.c',
         'vsx-ws-parser.c',
 ]
 
@@ -53,7 +53,7 @@ executable('verda-sxtelo', server_src,
 
 test_ws_parser_src = [
         'vsx-error.c',
-        'vsx-util.c',
+        '../common/vsx-util.c',
         'vsx-ws-parser.c',
         'test-ws-parser.c',
 ]
@@ -82,7 +82,7 @@ test_connection_src = [
         'vsx-slab.c',
         'vsx-slice.c',
         'vsx-tile-data.c',
-        'vsx-util.c',
+        '../common/vsx-util.c',
         'vsx-ws-parser.c',
         'test-connection.c',
 ]
