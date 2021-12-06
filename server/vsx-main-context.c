@@ -33,6 +33,7 @@
 
 #include "vsx-main-context.h"
 #include "vsx-list.h"
+#include "vsx-slice.h"
 
 /* This is a simple replacement for the GMainLoop which uses
    epoll. The hope is that it will scale to more connections easily
@@ -66,6 +67,8 @@ struct _VsxMainContext
 
   VsxList buckets;
   int64_t last_timer_time;
+
+  struct vsx_slice_allocator source_allocator;
 };
 
 struct _VsxMainContextSource
@@ -177,6 +180,10 @@ vsx_main_context_new (GError **error)
     {
       VsxMainContext *mc = g_new (VsxMainContext, 1);
 
+      vsx_slice_allocator_init (&mc->source_allocator,
+                                sizeof (VsxMainContextSource),
+                                alignof (VsxMainContextSource));
+
       mc->epoll_fd = fd;
       mc->n_sources = 0;
       mc->events = g_array_new (false, false, sizeof (struct epoll_event));
@@ -210,11 +217,12 @@ vsx_main_context_add_poll (VsxMainContext *mc,
                            VsxMainContextPollCallback callback,
                            void *user_data)
 {
-  VsxMainContextSource *source = g_slice_new (VsxMainContextSource);
   struct epoll_event event;
 
   if (mc == NULL)
     mc = vsx_main_context_get_default_or_abort ();
+
+  VsxMainContextSource *source = vsx_slice_alloc (&mc->source_allocator);
 
   source->mc = mc;
   source->fd = fd;
@@ -297,10 +305,10 @@ vsx_main_context_add_quit (VsxMainContext *mc,
                            VsxMainContextQuitCallback callback,
                            void *user_data)
 {
-  VsxMainContextSource *source = g_slice_new (VsxMainContextSource);
-
   if (mc == NULL)
     mc = vsx_main_context_get_default_or_abort ();
+
+  VsxMainContextSource *source = vsx_slice_alloc (&mc->source_allocator);
 
   source->mc = mc;
   source->callback = callback;
@@ -360,10 +368,10 @@ vsx_main_context_add_timer (VsxMainContext *mc,
                             VsxMainContextTimerCallback callback,
                             void *user_data)
 {
-  VsxMainContextSource *source = g_slice_new (VsxMainContextSource);
-
   if (mc == NULL)
     mc = vsx_main_context_get_default_or_abort ();
+
+  VsxMainContextSource *source = vsx_slice_alloc (&mc->source_allocator);
 
   source->mc = mc;
   source->bucket = get_bucket (mc, minutes);
@@ -391,12 +399,12 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
     case VSX_MAIN_CONTEXT_POLL_SOURCE:
       if (epoll_ctl (mc->epoll_fd, EPOLL_CTL_DEL, source->fd, &event) == -1)
         g_warning ("EPOLL_CTL_DEL failed: %s", strerror (errno));
-      g_slice_free (VsxMainContextSource, source);
+      vsx_slice_free (&mc->source_allocator, source);
       break;
 
     case VSX_MAIN_CONTEXT_QUIT_SOURCE:
       vsx_list_remove (&source->quit_link);
-      g_slice_free (VsxMainContextSource, source);
+      vsx_slice_free (&mc->source_allocator, source);
       break;
 
     case VSX_MAIN_CONTEXT_TIMER_SOURCE:
@@ -413,7 +421,7 @@ vsx_main_context_remove_source (VsxMainContextSource *source)
       else
         {
           vsx_list_remove (&source->timer_link);
-          g_slice_free (VsxMainContextSource, source);
+          vsx_slice_free (&mc->source_allocator, source);
         }
 
       break;
@@ -516,7 +524,7 @@ check_timer_sources (VsxMainContext *mc)
     {
       if (source->removed)
         {
-          g_slice_free (VsxMainContextSource, source);
+          vsx_slice_free (&mc->source_allocator, source);
         }
       else
         {
@@ -662,6 +670,9 @@ vsx_main_context_free (VsxMainContext *mc)
 
   g_array_free (mc->events, true);
   close (mc->epoll_fd);
+
+  vsx_slice_allocator_destroy (&mc->source_allocator);
+
   g_free (mc);
 
   if (mc == vsx_main_context_default)

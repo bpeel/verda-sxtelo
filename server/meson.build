@@ -69,7 +69,10 @@ test_connection_src = [
         'vsx-person-set.c',
         'vsx-player.c',
         '../common/vsx-proto.c',
+        'vsx-slab.c',
+        'vsx-slice.c',
         'vsx-tile-data.c',
+        'vsx-util.c',
         'vsx-ws-parser.c',
         'test-connection.c',
 ]
