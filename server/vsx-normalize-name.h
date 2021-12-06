@@ -22,11 +22,7 @@
 #include <glib.h>
 #include <stdbool.h>
 
-G_BEGIN_DECLS
-
 bool
 vsx_normalize_name (char *name);
-
-G_END_DECLS
 
 #endif /* __VSX_NORMALIZE_NAME_H__ */

@@ -29,8 +29,6 @@
 #include <stdint.h>
 #include <glib.h>
 
-G_BEGIN_DECLS
-
 typedef enum
 {
   VSX_KEY_VALUE_EVENT_HEADER,
@@ -62,7 +60,5 @@ vsx_key_value_parse_int_value (int line_number,
                                const char *value_string,
                                int64_t max,
                                int64_t *result);
-
-G_END_DECLS
 
 #endif /* __VSX_KEY_VALUE_H__ */

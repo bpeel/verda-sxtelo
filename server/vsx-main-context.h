@@ -21,8 +21,6 @@
 
 #include <glib.h>
 
-G_BEGIN_DECLS
-
 typedef enum
 {
   VSX_MAIN_CONTEXT_ERROR_UNSUPPORTED,
@@ -94,7 +92,5 @@ vsx_main_context_free (VsxMainContext *mc);
 
 GQuark
 vsx_main_context_error_quark (void);
-
-G_END_DECLS
 
 #endif /* __VSX_MAIN_CONTEXT_H__ */

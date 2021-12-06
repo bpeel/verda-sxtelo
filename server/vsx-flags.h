@@ -25,8 +25,6 @@
 #include <glib.h>
 #include <string.h>
 
-G_BEGIN_DECLS
-
 /* These are macros used to implement a fixed-size array of bits. This
    should be used instead of CoglBitmask when the maximum bit number
    that will be set is known at compile time, for example when setting
@@ -138,7 +136,5 @@ vsx_flags_find_first_bit (const unsigned long *array)
 
 #define VSX_FLAGS_FOREACH_END                   \
   } } } G_STMT_END
-
-G_END_DECLS
 
 #endif /* __VSX_FLAGS_H */

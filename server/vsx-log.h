@@ -22,8 +22,6 @@
 #include <glib.h>
 #include <stdbool.h>
 
-G_BEGIN_DECLS
-
 bool
 vsx_log_available (void);
 
@@ -40,7 +38,5 @@ vsx_log_start (GError **error);
 
 void
 vsx_log_close (void);
-
-G_END_DECLS
 
 #endif /* __VSX_LOG_H__ */

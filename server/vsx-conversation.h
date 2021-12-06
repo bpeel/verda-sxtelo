@@ -27,8 +27,6 @@
 #include "vsx-object.h"
 #include "vsx-tile-data.h"
 
-G_BEGIN_DECLS
-
 #define VSX_CONVERSATION_MAX_PLAYERS 32
 
 /* Time in microseconds after someone shouts before someone is allowed
@@ -131,7 +129,5 @@ vsx_conversation_shout (VsxConversation *conversation,
 void
 vsx_conversation_turn (VsxConversation *conversation,
                        unsigned int player_num);
-
-G_END_DECLS
 
 #endif /* __VSX_CONVERSATION_H__ */

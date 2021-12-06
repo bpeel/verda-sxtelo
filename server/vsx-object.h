@@ -21,8 +21,6 @@
 
 #include <glib.h>
 
-G_BEGIN_DECLS
-
 typedef struct
 {
   void (* free) (void *object);
@@ -44,7 +42,5 @@ vsx_object_ref (void *object);
 
 void
 vsx_object_unref (void *object);
-
-G_END_DECLS
 
 #endif /* __VSX_OBJECT_H__ */

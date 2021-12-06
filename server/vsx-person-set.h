@@ -26,8 +26,6 @@
 #include "vsx-object.h"
 #include "vsx-main-context.h"
 
-G_BEGIN_DECLS
-
 typedef struct _VsxPersonSet VsxPersonSet;
 
 VsxPersonSet *
@@ -46,7 +44,5 @@ vsx_person_set_generate_person (VsxPersonSet *set,
                                 const char *player_name,
                                 GSocketAddress *address,
                                 VsxConversation *conversation);
-
-G_END_DECLS
 
 #endif /* __VSX_PERSON_SET_H__ */

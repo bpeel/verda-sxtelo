@@ -22,8 +22,6 @@
 #include <glib.h>
 #include <stdbool.h>
 
-G_BEGIN_DECLS
-
 typedef enum
 {
   VSX_PLAYER_CONNECTED = (1 << 0),
@@ -67,7 +65,5 @@ vsx_player_new (const char *player_name,
 
 void
 vsx_player_free (VsxPlayer *player);
-
-G_END_DECLS
 
 #endif /* __VSX_PLAYER_H__ */

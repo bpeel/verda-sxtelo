@@ -28,8 +28,6 @@
 #include "vsx-signal.h"
 #include "vsx-list.h"
 
-G_BEGIN_DECLS
-
 typedef uint64_t VsxPersonId;
 
 typedef struct _VsxPerson VsxPerson;
@@ -75,7 +73,5 @@ vsx_person_is_silent (VsxPerson *person);
 
 void
 vsx_person_leave_conversation (VsxPerson *person);
-
-G_END_DECLS
 
 #endif /* __VSX_PERSON_H__ */

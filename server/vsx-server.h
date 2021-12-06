@@ -25,8 +25,6 @@
 
 #include "vsx-config.h"
 
-G_BEGIN_DECLS
-
 typedef struct _VsxServer VsxServer;
 
 VsxServer *
@@ -44,7 +42,5 @@ vsx_server_run (VsxServer *server,
 
 void
 vsx_server_free (VsxServer *mc);
-
-G_END_DECLS
 
 #endif /* __VSX_SERVER_H__ */

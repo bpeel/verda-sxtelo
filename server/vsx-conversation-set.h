@@ -29,8 +29,6 @@
    game starts or everyone leaves the conversation then it is removed
    from the list */
 
-G_BEGIN_DECLS
-
 typedef struct _VsxConversationSet VsxConversationSet;
 
 VsxConversationSet *
@@ -39,7 +37,5 @@ vsx_conversation_set_new (void);
 VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
                                        const char *room_name);
-
-G_END_DECLS
 
 #endif /* __VSX_CONVERSATION_SET_H__ */

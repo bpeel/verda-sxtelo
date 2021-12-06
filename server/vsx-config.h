@@ -23,8 +23,6 @@
 
 #include "vsx-list.h"
 
-G_BEGIN_DECLS
-
 typedef enum
 {
   VSX_CONFIG_ERROR_IO
@@ -55,7 +53,5 @@ VsxConfig *vsx_config_load (const char *filename, GError **error);
 void vsx_config_free (VsxConfig *config);
 
 GQuark vsx_config_error_quark (void);
-
-G_END_DECLS
 
 #endif /* __VSX_CONFIG_H__ */

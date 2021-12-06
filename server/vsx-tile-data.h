@@ -23,8 +23,6 @@
 
 #include "vsx-tile.h"
 
-G_BEGIN_DECLS
-
 #define VSX_TILE_DATA_N_ROOMS 2
 #define VSX_TILE_DATA_N_TILES 122
 
@@ -36,7 +34,5 @@ typedef struct
 
 extern const VsxTileData
 vsx_tile_data[VSX_TILE_DATA_N_ROOMS];
-
-G_END_DECLS
 
 #endif /* __VSX_TILE_DATA_H__ */

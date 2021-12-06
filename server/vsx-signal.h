@@ -30,8 +30,6 @@
 
 #include "vsx-list.h"
 
-G_BEGIN_DECLS
-
 typedef struct _VsxListener VsxListener;
 
 typedef void
@@ -71,7 +69,5 @@ vsx_signal_emit (VsxSignal *signal,
   vsx_list_for_each_safe (l, next, &signal->listener_list, link)
     l->notify (l, data);
 }
-
-G_END_DECLS
 
 #endif /* __VSX_SIGNAL_H__ */

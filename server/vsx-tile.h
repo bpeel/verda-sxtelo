@@ -21,8 +21,6 @@
 
 #include <stdint.h>
 
-G_BEGIN_DECLS
-
 /* Enough space for any unicode character in UTF-8 */
 #define VSX_TILE_MAX_LETTER_BYTES 6
 
@@ -37,7 +35,5 @@ typedef struct
   int16_t last_player;
   char letter[VSX_TILE_MAX_LETTER_BYTES + 1];
 } VsxTile;
-
-G_END_DECLS
 
 #endif /* __VSX_TILE_H__ */

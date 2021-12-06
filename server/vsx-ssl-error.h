@@ -21,8 +21,6 @@
 
 #include <glib.h>
 
-G_BEGIN_DECLS
-
 typedef enum
 {
     VSX_SSL_ERROR_OTHER
@@ -38,7 +36,5 @@ vsx_ssl_error_set (GError **error);
 
 GQuark
 vsx_ssl_error_quark (void);
-
-G_END_DECLS
 
 #endif /* __VSX_SSL_ERROR_H__ */
