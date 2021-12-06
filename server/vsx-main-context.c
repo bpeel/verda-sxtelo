@@ -108,7 +108,7 @@ struct _VsxMainContextSource
     };
   };
 
-  gpointer user_data;
+  void *user_data;
   void *callback;
 
   VsxMainContext *mc;
