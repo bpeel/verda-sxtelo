@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <openssl/ssl.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "vsx-server.h"
 #include "vsx-main-context.h"
@@ -927,7 +928,7 @@ vsx_server_add_config (VsxServer *server,
                        int fd_override,
                        struct vsx_error **error)
 {
-  g_return_val_if_fail (error == NULL || *error == NULL, false);
+  assert (error == NULL || *error == NULL);
 
   int sock;
 

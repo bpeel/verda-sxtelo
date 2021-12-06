@@ -251,7 +251,7 @@ vsx_main_context_modify_poll (VsxMainContextSource *source,
 {
   struct epoll_event event;
 
-  g_return_if_fail (source->type == VSX_MAIN_CONTEXT_POLL_SOURCE);
+  assert (source->type == VSX_MAIN_CONTEXT_POLL_SOURCE);
 
   if (source->current_flags == flags)
     return;
@@ -652,7 +652,7 @@ free_buckets (VsxMainContext *mc)
 void
 vsx_main_context_free (VsxMainContext *mc)
 {
-  g_return_if_fail (mc != NULL);
+  assert (mc != NULL);
 
   if (mc->quit_pipe_source)
     {
