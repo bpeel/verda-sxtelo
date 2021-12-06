@@ -23,6 +23,9 @@
 #include <glib.h>
 
 #include "vsx-player.h"
+
+#include <string.h>
+
 #include "vsx-util.h"
 
 void
