@@ -21,6 +21,7 @@
 #endif
 
 #include "vsx-ssl-error.h"
+#include "vsx-buffer.h"
 
 #include <openssl/err.h>
 #include <stdbool.h>
@@ -34,21 +35,20 @@ vsx_ssl_error_from_errno (unsigned long errnum)
 void
 vsx_ssl_error_set (GError **error)
 {
-  GString *buf = g_string_new (NULL);
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
   unsigned long errnum = ERR_get_error ();
 
-  g_string_append (buf, "SSL error: ");
-  size_t old_length = buf->len;
-  g_string_set_size (buf, old_length + 200);
-  ERR_error_string (errnum, buf->str + old_length);
+  vsx_buffer_append_string (&buf, "SSL error: ");
+  vsx_buffer_ensure_size (&buf, buf.length + 200);
+  ERR_error_string (errnum, (char *) buf.data + buf.length);
 
   g_set_error (error,
                VSX_SSL_ERROR,
                vsx_ssl_error_from_errno (errnum),
                "%s",
-               buf->str);
+               (char *) buf.data);
 
-  g_string_free (buf, true);
+  vsx_buffer_destroy (&buf);
 }
 
 GQuark
