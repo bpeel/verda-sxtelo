@@ -33,6 +33,8 @@ server_src = [
         'vsx-player.c',
         '../common/vsx-proto.c',
         'vsx-server.c',
+        'vsx-slab.c',
+        'vsx-slice.c',
         'vsx-ssl-error.c',
         'vsx-tile-data.c',
         'vsx-util.c',
