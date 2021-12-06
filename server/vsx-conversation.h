@@ -31,7 +31,7 @@
 
 /* Time in microseconds after someone shouts before someone is allowed
  * to shout again */
-#define VSX_CONVERSATION_SHOUT_TIME (10 * G_USEC_PER_SEC)
+#define VSX_CONVERSATION_SHOUT_TIME (10 * 1000 * 1000)
 
 typedef struct
 {
