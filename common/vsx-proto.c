@@ -24,9 +24,10 @@
 
 #include "vsx-proto.h"
 
-#include <glib.h>
 #include <stdarg.h>
 #include <assert.h>
+
+#include "vsx-utf8.h"
 
 #define VSX_PROTO_TYPE(enum_name, type_name, ap_type_name)      \
   case enum_name:                                               \
@@ -250,7 +251,7 @@ vsx_proto_read_payload (const uint8_t *buffer,
               goto done;
             }
           *str = (const char *) buffer + pos;
-          if (!g_utf8_validate (*str, -1, NULL))
+          if (!vsx_utf8_is_valid_string (*str))
             {
               ret = false;
               goto done;

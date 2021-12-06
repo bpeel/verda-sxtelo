@@ -45,6 +45,7 @@ server_src = [
         '../common/vsx-socket.c',
         'vsx-ssl-error.c',
         'vsx-tile-data.c',
+        '../common/vsx-utf8.c',
         '../common/vsx-util.c',
         'vsx-ws-parser.c',
 ]
@@ -87,6 +88,7 @@ test_connection_src = [
         'vsx-slab.c',
         'vsx-slice.c',
         'vsx-tile-data.c',
+        '../common/vsx-utf8.c',
         '../common/vsx-util.c',
         'vsx-ws-parser.c',
         'test-connection.c',
