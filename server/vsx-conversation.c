@@ -31,6 +31,7 @@
 #include "vsx-log.h"
 #include "vsx-proto.h"
 #include "vsx-utf8.h"
+#include "vsx-util.h"
 
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
@@ -397,7 +398,8 @@ vsx_conversation_set_n_tiles (VsxConversation *conversation,
   if (conversation->state != VSX_CONVERSATION_AWAITING_START)
     return;
 
-  n_tiles = CLAMP (n_tiles, 1, VSX_TILE_DATA_N_TILES);
+  n_tiles = MAX(1, n_tiles);
+  n_tiles = MIN(VSX_TILE_DATA_N_TILES, n_tiles);
 
   if (n_tiles != conversation->total_n_tiles)
     {
