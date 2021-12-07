@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <gio/gio.h>
 #include <assert.h>
+#include <stdalign.h>
 
 #include "vsx-marshal.h"
 #include "vsx-enum-types.h"
@@ -33,6 +34,7 @@
 #include "vsx-list.h"
 #include "vsx-util.h"
 #include "vsx-buffer.h"
+#include "vsx-slab.h"
 
 enum
 {
@@ -159,7 +161,12 @@ struct _VsxConnectionPrivate
   /* Array of pointers to players, indexed by player num. This can
    * have NULL gaps. */
   struct vsx_buffer players;
-  GHashTable *tiles;
+
+  /* Slab allocator for VsxTile */
+  struct vsx_slab_allocator tile_allocator;
+  /* Array of pointers to tiles, indexed by tile num. This can have
+   * NULL gaps. */
+  struct vsx_buffer tiles;
 
   /* A timeout for sending a keep alive message */
   guint keep_alive_timeout;
@@ -555,16 +562,20 @@ handle_tile (VsxConnection *connection,
       return false;
     }
 
-  VsxTile *tile = g_hash_table_lookup (priv->tiles,
-                                       GINT_TO_POINTER ((int) num));
   bool is_new = false;
+
+  VsxTile *tile = get_pointer_from_buffer (&priv->tiles, num);
 
   if (tile == NULL)
     {
-      tile = g_slice_new0 (VsxTile);
+      tile = vsx_slab_allocate (&priv->tile_allocator,
+                                sizeof *tile,
+                                alignof *tile);
+
       tile->num = num;
 
-      g_hash_table_insert (priv->tiles, GINT_TO_POINTER ((int) num), tile);
+      set_pointer_in_buffer (&priv->tiles, num, tile);
+
       is_new = true;
     }
 
@@ -1646,14 +1657,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
 }
 
 static void
-free_tile_cb (void *data)
-{
-  VsxTile *tile = data;
-
-  g_slice_free (VsxTile, tile);
-}
-
-static void
 vsx_connection_init (VsxConnection *self)
 {
   VsxConnectionPrivate *priv;
@@ -1665,10 +1668,9 @@ vsx_connection_init (VsxConnection *self)
   priv->keep_alive_time = g_timer_new ();
 
   vsx_buffer_init (&priv->players);
-  priv->tiles = g_hash_table_new_full (g_direct_hash,
-                                       g_direct_equal,
-                                       NULL, /* key_destroy */
-                                       free_tile_cb);
+
+  vsx_slab_init (&priv->tile_allocator);
+  vsx_buffer_init (&priv->tiles);
 
   vsx_list_init (&priv->tiles_to_move);
   vsx_list_init (&priv->messages_to_send);
@@ -1747,7 +1749,8 @@ vsx_connection_finalize (GObject *object)
 
   free_players (self);
 
-  g_hash_table_destroy (priv->tiles);
+  vsx_buffer_destroy (&priv->tiles);
+  vsx_slab_destroy (&priv->tile_allocator);
 
   free_tiles_to_move (self);
   free_messages_to_send (self);
@@ -1866,24 +1869,7 @@ vsx_connection_get_tile (VsxConnection *connection,
 {
   VsxConnectionPrivate *priv = connection->priv;
 
-  return g_hash_table_lookup (priv->tiles,
-                              GINT_TO_POINTER (tile_num));
-}
-
-typedef struct
-{
-  VsxConnectionForeachTileCallback callback;
-  void *user_data;
-} ForeachTileData;
-
-static void
-foreach_tile_cb (void *key,
-                 void *value,
-                 void *user_data)
-{
-  ForeachTileData *data = user_data;
-
-  data->callback (value, data->user_data);
+  return get_pointer_from_buffer (&priv->tiles, tile_num);
 }
 
 void
@@ -1892,12 +1878,16 @@ vsx_connection_foreach_tile (VsxConnection *connection,
                              void *user_data)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  ForeachTileData data;
 
-  data.callback = callback;
-  data.user_data = user_data;
+  for (int i = 0; i < priv->tiles.length / sizeof (VsxTile *); i++)
+    {
+      VsxTile *tile = ((VsxTile **) priv->tiles.data)[i];
 
-  g_hash_table_foreach (priv->tiles, foreach_tile_cb, &data);
+      if (tile == NULL)
+        continue;
+
+      callback (tile, user_data);
+    }
 }
 
 GQuark

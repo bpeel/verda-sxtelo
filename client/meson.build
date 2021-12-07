@@ -38,6 +38,7 @@ client_src = [
         'vsx-main.c',
         'vsx-player.c',
         '../common/vsx-proto.c',
+        '../common/vsx-slab.c',
         'vsx-tile.c',
         '../common/vsx-utf8.c',
         '../common/vsx-util.c',
