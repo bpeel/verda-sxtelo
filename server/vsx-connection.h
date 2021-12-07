@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_CONNECTION_H__
-#define __VSX_CONNECTION_H__
+#ifndef VSX_CONNECTION_H
+#define VSX_CONNECTION_H
 
 #include "vsx-person-set.h"
 #include "vsx-conversation-set.h"
@@ -70,4 +70,4 @@ vsx_connection_get_last_message_time (VsxConnection *conn);
 void
 vsx_connection_free (VsxConnection *conn);
 
-#endif /* __VSX_CONNECTION_H__ */
+#endif /* VSX_CONNECTION_H */

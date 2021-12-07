@@ -16,12 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_NORMALIZE_NAME_H__
-#define __VSX_NORMALIZE_NAME_H__
+#ifndef VSX_NORMALIZE_NAME_H
+#define VSX_NORMALIZE_NAME_H
 
 #include <stdbool.h>
 
 bool
 vsx_normalize_name (char *name);
 
-#endif /* __VSX_NORMALIZE_NAME_H__ */
+#endif /* VSX_NORMALIZE_NAME_H */

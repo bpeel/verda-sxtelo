@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PLAYER_PRIVATE_H__
-#define __VSX_PLAYER_PRIVATE_H__
+#ifndef VSX_PLAYER_PRIVATE_H
+#define VSX_PLAYER_PRIVATE_H
 
 #include <glib.h>
 
@@ -39,4 +39,4 @@ struct _VsxPlayer
   VsxPlayerFlags flags;
 };
 
-#endif /* __VSX_PLAYER_PRIVATE_H__ */
+#endif /* VSX_PLAYER_PRIVATE_H */

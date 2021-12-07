@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PLAYER_H__
-#define __VSX_PLAYER_H__
+#ifndef VSX_PLAYER_H
+#define VSX_PLAYER_H
 
 #include <glib.h>
 #include <stdbool.h>
@@ -43,4 +43,4 @@ vsx_player_has_next_turn (const VsxPlayer *player);
 
 G_END_DECLS
 
-#endif /* __VSX_PLAYER_H__ */
+#endif /* VSX_PLAYER_H */

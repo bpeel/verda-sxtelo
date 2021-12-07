@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_SSL_ERROR_H__
-#define __VSX_SSL_ERROR_H__
+#ifndef VSX_SSL_ERROR_H
+#define VSX_SSL_ERROR_H
 
 #include "vsx-error.h"
 
@@ -35,4 +35,4 @@ vsx_ssl_error_from_errno (unsigned long errnum);
 void
 vsx_ssl_error_set (struct vsx_error **error);
 
-#endif /* __VSX_SSL_ERROR_H__ */
+#endif /* VSX_SSL_ERROR_H */

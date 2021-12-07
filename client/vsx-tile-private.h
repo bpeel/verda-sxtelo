@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_TILE_PRIVATE_H__
-#define __VSX_TILE_PRIVATE_H__
+#ifndef VSX_TILE_PRIVATE_H
+#define VSX_TILE_PRIVATE_H
 
 #include <glib.h>
 
@@ -30,4 +30,4 @@ struct _VsxTile
   gunichar letter;
 };
 
-#endif /* __VSX_TILE_PRIVATE_H__ */
+#endif /* VSX_TILE_PRIVATE_H */

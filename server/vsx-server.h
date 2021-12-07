@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_SERVER_H__
-#define __VSX_SERVER_H__
+#ifndef VSX_SERVER_H
+#define VSX_SERVER_H
 
 #include <stdbool.h>
 
@@ -50,4 +50,4 @@ vsx_server_run (VsxServer *server,
 void
 vsx_server_free (VsxServer *mc);
 
-#endif /* __VSX_SERVER_H__ */
+#endif /* VSX_SERVER_H */

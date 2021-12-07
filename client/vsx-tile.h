@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_TILE_H__
-#define __VSX_TILE_H__
+#ifndef VSX_TILE_H
+#define VSX_TILE_H
 
 #include <glib.h>
 
@@ -39,4 +39,4 @@ vsx_tile_get_letter (const VsxTile *tile);
 
 G_END_DECLS
 
-#endif /* __VSX_TILE_H__ */
+#endif /* VSX_TILE_H */

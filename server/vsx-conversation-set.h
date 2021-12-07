@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_CONVERSATION_SET_H__
-#define __VSX_CONVERSATION_SET_H__
+#ifndef VSX_CONVERSATION_SET_H
+#define VSX_CONVERSATION_SET_H
 
 #include "vsx-conversation.h"
 
@@ -35,4 +35,4 @@ VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
                                        const char *room_name);
 
-#endif /* __VSX_CONVERSATION_SET_H__ */
+#endif /* VSX_CONVERSATION_SET_H */

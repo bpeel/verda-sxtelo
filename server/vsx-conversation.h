@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_CONVERSATION_H__
-#define __VSX_CONVERSATION_H__
+#ifndef VSX_CONVERSATION_H
+#define VSX_CONVERSATION_H
 
 #include <stdbool.h>
 
@@ -144,4 +144,4 @@ void
 vsx_conversation_turn (VsxConversation *conversation,
                        unsigned int player_num);
 
-#endif /* __VSX_CONVERSATION_H__ */
+#endif /* VSX_CONVERSATION_H */

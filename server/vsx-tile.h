@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_TILE_H__
-#define __VSX_TILE_H__
+#ifndef VSX_TILE_H
+#define VSX_TILE_H
 
 #include <stdint.h>
 
@@ -36,4 +36,4 @@ typedef struct
   char letter[VSX_TILE_MAX_LETTER_BYTES + 1];
 } VsxTile;
 
-#endif /* __VSX_TILE_H__ */
+#endif /* VSX_TILE_H */

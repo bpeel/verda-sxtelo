@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PERSON_H__
-#define __VSX_PERSON_H__
+#ifndef VSX_PERSON_H
+#define VSX_PERSON_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -70,4 +70,4 @@ vsx_person_is_silent (VsxPerson *person);
 void
 vsx_person_leave_conversation (VsxPerson *person);
 
-#endif /* __VSX_PERSON_H__ */
+#endif /* VSX_PERSON_H */

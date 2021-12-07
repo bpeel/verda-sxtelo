@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PROTO_H__
-#define __VSX_PROTO_H__
+#ifndef VSX_PROTO_H
+#define VSX_PROTO_H
 
 #include <string.h>
 #include <stdlib.h>
@@ -181,4 +181,4 @@ void
 vsx_proto_write_frame_header (uint8_t *buffer,
                               size_t payload_length);
 
-#endif /* __VSX_PROTO_H__ */
+#endif /* VSX_PROTO_H */

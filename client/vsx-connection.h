@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_CONNECTION_H__
-#define __VSX_CONNECTION_H__
+#ifndef VSX_CONNECTION_H
+#define VSX_CONNECTION_H
 
 #include <glib-object.h>
 #include <gio/gio.h>
@@ -181,4 +181,4 @@ vsx_connection_error_quark (void);
 
 G_END_DECLS
 
-#endif /* __VSX_CONNECTION_H__ */
+#endif /* VSX_CONNECTION_H */

@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_TILE_DATA_H__
-#define __VSX_TILE_DATA_H__
+#ifndef VSX_TILE_DATA_H
+#define VSX_TILE_DATA_H
 
 #include "vsx-tile.h"
 
@@ -33,4 +33,4 @@ typedef struct
 extern const VsxTileData
 vsx_tile_data[VSX_TILE_DATA_N_ROOMS];
 
-#endif /* __VSX_TILE_DATA_H__ */
+#endif /* VSX_TILE_DATA_H */

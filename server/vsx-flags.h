@@ -19,8 +19,8 @@
 
 /* This file is borrowed from Cogl */
 
-#ifndef __VSX_FLAGS_H
-#define __VSX_FLAGS_H
+#ifndef VSX_FLAGS_H
+#define VSX_FLAGS_H
 
 #include <string.h>
 
@@ -136,4 +136,4 @@ vsx_flags_find_first_bit (const unsigned long *array)
 #define VSX_FLAGS_FOREACH_END                   \
   } } } while (0)
 
-#endif /* __VSX_FLAGS_H */
+#endif /* VSX_FLAGS_H */

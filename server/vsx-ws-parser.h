@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_WS_PARSER_H__
-#define __VSX_WS_PARSER_H__
+#ifndef VSX_WS_PARSER_H
+#define VSX_WS_PARSER_H
 
 #include <stdint.h>
 

@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PERSON_SET_H__
-#define __VSX_PERSON_SET_H__
+#ifndef VSX_PERSON_SET_H
+#define VSX_PERSON_SET_H
 
 #include "vsx-person.h"
 #include "vsx-object.h"
@@ -43,4 +43,4 @@ vsx_person_set_generate_person (VsxPersonSet *set,
                                 const struct vsx_netaddress *address,
                                 VsxConversation *conversation);
 
-#endif /* __VSX_PERSON_SET_H__ */
+#endif /* VSX_PERSON_SET_H */

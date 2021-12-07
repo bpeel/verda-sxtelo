@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_MAIN_CONTEXT_H__
-#define __VSX_MAIN_CONTEXT_H__
+#ifndef VSX_MAIN_CONTEXT_H
+#define VSX_MAIN_CONTEXT_H
 
 #include "vsx-error.h"
 
@@ -93,4 +93,4 @@ vsx_main_context_get_monotonic_clock (VsxMainContext *mc);
 void
 vsx_main_context_free (VsxMainContext *mc);
 
-#endif /* __VSX_MAIN_CONTEXT_H__ */
+#endif /* VSX_MAIN_CONTEXT_H */

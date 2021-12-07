@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_CONFIG_H__
-#define __VSX_CONFIG_H__
+#ifndef VSX_CONFIG_H
+#define VSX_CONFIG_H
 
 #include "vsx-list.h"
 #include "vsx-error.h"
@@ -52,4 +52,4 @@ VsxConfig *vsx_config_load (const char *filename, struct vsx_error **error);
 
 void vsx_config_free (VsxConfig *config);
 
-#endif /* __VSX_CONFIG_H__ */
+#endif /* VSX_CONFIG_H */

@@ -23,8 +23,8 @@
 
 /* This file was originally borrowed from the Wayland source code */
 
-#ifndef __VSX_SIGNAL_H__
-#define __VSX_SIGNAL_H__
+#ifndef VSX_SIGNAL_H
+#define VSX_SIGNAL_H
 
 #include "vsx-list.h"
 
@@ -68,4 +68,4 @@ vsx_signal_emit (VsxSignal *signal,
     l->notify (l, data);
 }
 
-#endif /* __VSX_SIGNAL_H__ */
+#endif /* VSX_SIGNAL_H */

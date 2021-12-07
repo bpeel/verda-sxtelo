@@ -21,8 +21,8 @@
  * OF THIS SOFTWARE.
  */
 
-#ifndef __VSX_KEY_VALUE_H__
-#define __VSX_KEY_VALUE_H__
+#ifndef VSX_KEY_VALUE_H
+#define VSX_KEY_VALUE_H
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -60,4 +60,4 @@ vsx_key_value_parse_int_value (int line_number,
                                int64_t max,
                                int64_t *result);
 
-#endif /* __VSX_KEY_VALUE_H__ */
+#endif /* VSX_KEY_VALUE_H */

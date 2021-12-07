@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_PLAYER_H__
-#define __VSX_PLAYER_H__
+#ifndef VSX_PLAYER_H
+#define VSX_PLAYER_H
 
 #include <stdbool.h>
 
@@ -65,4 +65,4 @@ vsx_player_new (const char *player_name,
 void
 vsx_player_free (VsxPlayer *player);
 
-#endif /* __VSX_PLAYER_H__ */
+#endif /* VSX_PLAYER_H */

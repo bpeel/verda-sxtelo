@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VSX_OBJECT_H__
-#define __VSX_OBJECT_H__
+#ifndef VSX_OBJECT_H
+#define VSX_OBJECT_H
 
 typedef struct
 {
@@ -41,4 +41,4 @@ vsx_object_ref (void *object);
 void
 vsx_object_unref (void *object);
 
-#endif /* __VSX_OBJECT_H__ */
+#endif /* VSX_OBJECT_H */
