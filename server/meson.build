@@ -20,7 +20,7 @@ endif
 
 server_src = [
         'vsx-base64.c',
-        'vsx-buffer.c',
+        '../common/vsx-buffer.c',
         'vsx-config.c',
         'vsx-connection.c',
         'vsx-conversation.c',
@@ -70,7 +70,7 @@ test('ws-parser', test_ws_parser)
 
 test_connection_src = [
         'vsx-base64.c',
-        'vsx-buffer.c',
+        '../common/vsx-buffer.c',
         'vsx-connection.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
