@@ -11,8 +11,6 @@ foreach a : ['-Wall', '-Wuninitialized', '-Wempty-body', '-Wformat',
   endif
 endforeach
 
-add_project_arguments('-DHAVE_CONFIG_H', language : 'c')
-
 configinc = include_directories('.')
 
 cdata = configuration_data()
