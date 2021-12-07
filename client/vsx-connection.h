@@ -19,39 +19,15 @@
 #ifndef VSX_CONNECTION_H
 #define VSX_CONNECTION_H
 
-#include <glib-object.h>
 #include <gio/gio.h>
 
 #include "vsx-player.h"
 #include "vsx-tile.h"
 #include "vsx-signal.h"
 
-#define VSX_TYPE_CONNECTION                                             \
-  (vsx_connection_get_type())
-#define VSX_CONNECTION(obj)                                             \
-  (G_TYPE_CHECK_INSTANCE_CAST ((obj),                                   \
-                               VSX_TYPE_CONNECTION,                     \
-                               VsxConnection))
-#define VSX_CONNECTION_CLASS(klass)                                     \
-  (G_TYPE_CHECK_CLASS_CAST ((klass),                                    \
-                            VSX_TYPE_CONNECTION,                        \
-                            VsxConnectionClass))
-#define VSX_IS_CONNECTION(obj)                                          \
-  (G_TYPE_CHECK_INSTANCE_TYPE ((obj),                                   \
-                               VSX_TYPE_CONNECTION))
-#define VSX_IS_CONNECTION_CLASS(klass)                                  \
-  (G_TYPE_CHECK_CLASS_TYPE ((klass),                                    \
-                            VSX_TYPE_CONNECTION))
-#define VSX_CONNECTION_GET_CLASS(obj)                                   \
-  (G_TYPE_INSTANCE_GET_CLASS ((obj),                                    \
-                              VSX_CONNECTION,                           \
-                              VsxConnectionClass))
-
 #define VSX_CONNECTION_ERROR vsx_connection_error_quark ()
 
 typedef struct _VsxConnection VsxConnection;
-typedef struct _VsxConnectionClass VsxConnectionClass;
-typedef struct _VsxConnectionPrivate VsxConnectionPrivate;
 
 typedef enum
 {
@@ -59,18 +35,6 @@ typedef enum
   VSX_CONNECTION_STATE_IN_PROGRESS,
   VSX_CONNECTION_STATE_DONE
 } VsxConnectionState;
-
-struct _VsxConnectionClass
-{
-  GObjectClass parent_class;
-};
-
-struct _VsxConnection
-{
-  GObject parent;
-
-  VsxConnectionPrivate *priv;
-};
 
 typedef enum
 {
@@ -140,9 +104,6 @@ typedef enum
   VSX_CONNECTION_ERROR_BAD_DATA,
   VSX_CONNECTION_ERROR_CONNECTION_CLOSED
 } VsxConnectionError;
-
-GType
-vsx_connection_get_type (void) G_GNUC_CONST;
 
 VsxConnection *
 vsx_connection_new (GSocketAddress *address,
@@ -219,5 +180,8 @@ vsx_connection_get_event_signal (VsxConnection *connection);
 
 GQuark
 vsx_connection_error_quark (void);
+
+void
+vsx_connection_free (VsxConnection *connection);
 
 #endif /* VSX_CONNECTION_H */

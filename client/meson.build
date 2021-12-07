@@ -1,5 +1,3 @@
-gnome = import('gnome')
-
 glib_parts = ['glib-2.0', 'gobject-2.0', 'gio-2.0', 'gthread-2.0']
 glib_deps = []
 
@@ -44,12 +42,7 @@ client_src = [
         '../common/vsx-util.c',
 ]
 
-enums = gnome.mkenums_simple('vsx-enum-types', sources : client_headers)
-marshals = gnome.genmarshal('vsx-marshal',
-                            sources : ['vsx-marshal.list'],
-                            prefix : 'vsx_marshal')
-
-executable('verda-sxtelo-client', client_src, enums, marshals,
+executable('verda-sxtelo-client', client_src,
            dependencies: client_deps,
            install: true,
            include_directories: inc_dirs)

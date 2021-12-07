@@ -447,7 +447,7 @@ main (int argc, char **argv)
 
   remove_stdin_source ();
 
-  g_object_unref (connection);
+  vsx_connection_free (connection);
 
   return 0;
 }
