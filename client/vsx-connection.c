@@ -35,6 +35,7 @@
 #include "vsx-util.h"
 #include "vsx-buffer.h"
 #include "vsx-slab.h"
+#include "vsx-utf8.h"
 
 enum
 {
@@ -553,7 +554,8 @@ handle_tile (VsxConnection *connection,
                                &player,
 
                                VSX_PROTO_TYPE_NONE)
-      || g_utf8_strlen (letter, -1) != 1)
+      || *letter == 0
+      || *vsx_utf8_next (letter) != 0)
     {
       g_set_error (error,
                    VSX_CONNECTION_ERROR,
@@ -581,7 +583,7 @@ handle_tile (VsxConnection *connection,
 
   tile->x = x;
   tile->y = y;
-  tile->letter = g_utf8_get_char (letter);
+  tile->letter = vsx_utf8_get_char (letter);
 
   g_signal_emit (connection,
                  signals[SIGNAL_TILE_CHANGED],
