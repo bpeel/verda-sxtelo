@@ -63,14 +63,14 @@
 /* The expectation here is that @value will be constant so the if
    statement will be optimised out */
 #define VSX_FLAGS_SET(array, flag, value)       \
-  G_STMT_START {                                \
+  do {                                          \
     if (value)                                  \
       ((array)[VSX_FLAGS_GET_INDEX (flag)] |=   \
        VSX_FLAGS_GET_MASK (flag));              \
     else                                        \
       ((array)[VSX_FLAGS_GET_INDEX (flag)] &=   \
        ~VSX_FLAGS_GET_MASK (flag));             \
-  } G_STMT_END
+  } while (0)
 
 static inline void
 vsx_flags_set_range (unsigned long *array,
@@ -112,7 +112,7 @@ vsx_flags_find_first_bit (const unsigned long *array)
  * VSX_FLAGS_FOREACH_END;
  */
 #define VSX_FLAGS_FOREACH_START(array, n_longs, bit)    \
-  G_STMT_START {                                        \
+  do {                                                  \
   const unsigned long *_p = (array);                    \
   int _n_longs = (n_longs);                             \
   int _i;                                               \
@@ -135,6 +135,6 @@ vsx_flags_find_first_bit (const unsigned long *array)
       _mask = (_mask >> (_next_bit - 1)) >> 1;          \
 
 #define VSX_FLAGS_FOREACH_END                   \
-  } } } G_STMT_END
+  } } } while (0)
 
 #endif /* __VSX_FLAGS_H */
