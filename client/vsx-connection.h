@@ -25,8 +25,6 @@
 #include "vsx-player.h"
 #include "vsx-tile.h"
 
-G_BEGIN_DECLS
-
 #define VSX_TYPE_CONNECTION                                             \
   (vsx_connection_get_type())
 #define VSX_CONNECTION(obj)                                             \
@@ -178,7 +176,5 @@ vsx_connection_foreach_tile (VsxConnection *connection,
 
 GQuark
 vsx_connection_error_quark (void);
-
-G_END_DECLS
 
 #endif /* VSX_CONNECTION_H */

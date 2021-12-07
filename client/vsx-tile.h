@@ -19,10 +19,6 @@
 #ifndef VSX_TILE_H
 #define VSX_TILE_H
 
-#include <glib.h>
-
-G_BEGIN_DECLS
-
 typedef struct _VsxTile VsxTile;
 
 int
@@ -36,7 +32,5 @@ vsx_tile_get_y (const VsxTile *tile);
 
 gunichar
 vsx_tile_get_letter (const VsxTile *tile);
-
-G_END_DECLS
 
 #endif /* VSX_TILE_H */

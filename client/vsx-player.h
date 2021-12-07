@@ -19,10 +19,7 @@
 #ifndef VSX_PLAYER_H
 #define VSX_PLAYER_H
 
-#include <glib.h>
 #include <stdbool.h>
-
-G_BEGIN_DECLS
 
 typedef struct _VsxPlayer VsxPlayer;
 
@@ -40,7 +37,5 @@ vsx_player_is_typing (const VsxPlayer *player);
 
 bool
 vsx_player_has_next_turn (const VsxPlayer *player);
-
-G_END_DECLS
 
 #endif /* VSX_PLAYER_H */
