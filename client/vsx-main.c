@@ -27,6 +27,7 @@
 #include <term.h>
 
 #include "vsx-connection.h"
+#include "vsx-utf8.h"
 
 static void
 format_print (const char *format, ...);
@@ -189,7 +190,7 @@ tile_changed_cb (VsxConnection *connection,
   char letter[7];
   int letter_len;
 
-  letter_len = g_unichar_to_utf8 (vsx_tile_get_letter (tile), letter);
+  letter_len = vsx_utf8_encode (vsx_tile_get_letter (tile), letter);
   letter[letter_len] = '\0';
 
   format_print ("%s: %i (%i,%i) %s\n",
