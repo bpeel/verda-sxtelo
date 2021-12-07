@@ -2095,5 +2095,7 @@ main (int argc, char **argv)
   if (!test_ping ())
     ret = EXIT_FAILURE;
 
+  vsx_main_context_free (vsx_main_context_get_default (NULL /* error */));
+
   return ret;
 }
