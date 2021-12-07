@@ -19,7 +19,6 @@
 #ifndef __VSX_LOG_H__
 #define __VSX_LOG_H__
 
-#include <glib.h>
 #include <stdbool.h>
 
 #include "vsx-error.h"

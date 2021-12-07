@@ -19,8 +19,6 @@
 #ifndef __VSX_OBJECT_H__
 #define __VSX_OBJECT_H__
 
-#include <glib.h>
-
 typedef struct
 {
   void (* free) (void *object);

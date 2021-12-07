@@ -1,5 +1,14 @@
 gnome = import('gnome')
 
+glib_parts = ['glib-2.0', 'gobject-2.0', 'gio-2.0', 'gthread-2.0']
+glib_deps = []
+
+foreach part : glib_parts
+  # gio 2.22 is needed for the socket API
+  # glib 2.28 is needed for g_get_monotonic_time
+  glib_deps += dependency(part, version: '>=2.32')
+endforeach
+
 inc_dirs = [ configinc, '../common' ]
 
 readline_dep = declare_dependency(link_args: '-lreadline -ltermcap')

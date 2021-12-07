@@ -19,7 +19,6 @@
 #ifndef __VSX_PLAYER_H__
 #define __VSX_PLAYER_H__
 
-#include <glib.h>
 #include <stdbool.h>
 
 typedef enum

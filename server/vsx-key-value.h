@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <glib.h>
 
 typedef enum
 {

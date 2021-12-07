@@ -26,8 +26,6 @@
 #ifndef __VSX_SIGNAL_H__
 #define __VSX_SIGNAL_H__
 
-#include <glib.h>
-
 #include "vsx-list.h"
 
 typedef struct _VsxListener VsxListener;

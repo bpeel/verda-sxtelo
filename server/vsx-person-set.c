@@ -20,7 +20,6 @@
 #include <config.h>
 #endif
 
-#include <glib.h>
 #include <assert.h>
 
 #include "vsx-person-set.h"

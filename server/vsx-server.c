@@ -20,7 +20,6 @@
 #include <config.h>
 #endif
 
-#include <glib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <errno.h>

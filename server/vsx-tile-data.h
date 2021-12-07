@@ -19,8 +19,6 @@
 #ifndef __VSX_TILE_DATA_H__
 #define __VSX_TILE_DATA_H__
 
-#include <glib.h>
-
 #include "vsx-tile.h"
 
 #define VSX_TILE_DATA_N_ROOMS 2

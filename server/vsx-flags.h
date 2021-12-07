@@ -22,7 +22,6 @@
 #ifndef __VSX_FLAGS_H
 #define __VSX_FLAGS_H
 
-#include <glib.h>
 #include <string.h>
 
 /* These are macros used to implement a fixed-size array of bits. This

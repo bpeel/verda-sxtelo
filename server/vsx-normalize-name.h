@@ -19,7 +19,6 @@
 #ifndef __VSX_NORMALIZE_NAME_H__
 #define __VSX_NORMALIZE_NAME_H__
 
-#include <glib.h>
 #include <stdbool.h>
 
 bool

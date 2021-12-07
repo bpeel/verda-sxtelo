@@ -20,8 +20,6 @@
 #include <config.h>
 #endif
 
-#include <glib.h>
-
 #include "vsx-object.h"
 
 void
