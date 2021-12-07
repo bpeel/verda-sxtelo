@@ -49,19 +49,6 @@ enum
   PROP_STATE
 };
 
-enum
-{
-  SIGNAL_GOT_ERROR,
-  SIGNAL_MESSAGE,
-  SIGNAL_PLAYER_CHANGED,
-  SIGNAL_PLAYER_SHOUTED,
-  SIGNAL_TILE_CHANGED,
-
-  LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0, };
-
 static const uint8_t
 ws_terminator[] = "\r\n\r\n";
 
@@ -147,6 +134,8 @@ struct _VsxConnectionPrivate
   bool write_finished;
   int next_message_num;
 
+  VsxSignal event_signal;
+
   VsxConnectionDirtyFlag dirty_flags;
   VsxList tiles_to_move;
   VsxList messages_to_send;
@@ -228,10 +217,15 @@ static void
 vsx_connection_signal_error (VsxConnection *connection,
                              GError *error)
 {
-  g_signal_emit (connection,
-                 signals[SIGNAL_GOT_ERROR],
-                 0, /* detail */
-                 error);
+  VsxConnectionPrivate *priv = connection->priv;
+
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_ERROR,
+      .error = { .error = error },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
 }
 
 static void
@@ -515,11 +509,17 @@ handle_message (VsxConnection *connection,
 
   priv->next_message_num++;
 
-  g_signal_emit (connection,
-                 signals[SIGNAL_MESSAGE],
-                 0, /* detail */
-                 get_or_create_player (connection, person),
-                 text);
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_MESSAGE,
+      .message =
+      {
+        .player = get_or_create_player (connection, person),
+        .message = text,
+      },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
 
   return true;
 }
@@ -585,13 +585,34 @@ handle_tile (VsxConnection *connection,
   tile->y = y;
   tile->letter = vsx_utf8_get_char (letter);
 
-  g_signal_emit (connection,
-                 signals[SIGNAL_TILE_CHANGED],
-                 0, /* detail */
-                 is_new,
-                 tile);
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
+      .tile_changed =
+      {
+        .new_tile = is_new,
+        .tile = tile,
+      },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
 
   return true;
+}
+
+static void
+emit_player_changed (VsxConnection *connection,
+                     VsxPlayer *player)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+      .player_changed = { .player = player },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
 }
 
 static bool
@@ -626,10 +647,7 @@ handle_player_name (VsxConnection *connection,
   g_free (player->name);
   player->name = g_strdup (name);
 
-  g_signal_emit (connection,
-                 signals[SIGNAL_PLAYER_CHANGED],
-                 0, /* detail */
-                 player);
+  emit_player_changed (connection, player);
 
   return true;
 }
@@ -664,10 +682,7 @@ handle_player (VsxConnection *connection,
 
   player->flags = flags;
 
-  g_signal_emit (connection,
-                 signals[SIGNAL_PLAYER_CHANGED],
-                 0, /* detail */
-                 player);
+  emit_player_changed (connection, player);
 
   return true;
 }
@@ -678,6 +693,8 @@ handle_player_shouted (VsxConnection *connection,
                        size_t payload_length,
                        GError **error)
 {
+  VsxConnectionPrivate *priv = connection->priv;
+
   uint8_t player_num;
 
   if (!vsx_proto_read_payload (payload + 1,
@@ -695,12 +712,16 @@ handle_player_shouted (VsxConnection *connection,
       return false;
     }
 
-  VsxPlayer *player = get_or_create_player (connection, player_num);
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
+      .player_shouted =
+      {
+        .player = get_or_create_player (connection, player_num)
+      },
+    };
 
-  g_signal_emit (connection,
-                 signals[SIGNAL_PLAYER_SHOUTED],
-                 0, /* detail */
-                 player);
+  vsx_signal_emit (&priv->event_signal, &event);
 
   return true;
 }
@@ -1594,68 +1615,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
                              | G_PARAM_STATIC_NICK
                              | G_PARAM_STATIC_BLURB);
   g_object_class_install_property (gobject_class, PROP_STATE, pspec);
-
-  signals[SIGNAL_GOT_ERROR] =
-    g_signal_new ("got-error",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST,
-                  G_STRUCT_OFFSET (VsxConnectionClass, got_error),
-                  NULL, /* accumulator */
-                  NULL, /* accumulator data */
-                  vsx_marshal_VOID__BOXED,
-                  G_TYPE_NONE,
-                  1, /* num arguments */
-                  G_TYPE_ERROR);
-
-  signals[SIGNAL_MESSAGE] =
-    g_signal_new ("message",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST,
-                  G_STRUCT_OFFSET (VsxConnectionClass, message),
-                  NULL, /* accumulator */
-                  NULL, /* accumulator data */
-                  vsx_marshal_VOID__POINTER_STRING,
-                  G_TYPE_NONE,
-                  2, /* num arguments */
-                  G_TYPE_POINTER,
-                  G_TYPE_STRING);
-
-  signals[SIGNAL_PLAYER_CHANGED] =
-    g_signal_new ("player-changed",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST,
-                  G_STRUCT_OFFSET (VsxConnectionClass, player_changed),
-                  NULL, /* accumulator */
-                  NULL, /* accumulator data */
-                  vsx_marshal_VOID__POINTER,
-                  G_TYPE_NONE,
-                  1, /* num arguments */
-                  G_TYPE_POINTER);
-
-  signals[SIGNAL_TILE_CHANGED] =
-    g_signal_new ("tile-changed",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST,
-                  G_STRUCT_OFFSET (VsxConnectionClass, tile_changed),
-                  NULL, /* accumulator */
-                  NULL, /* accumulator data */
-                  vsx_marshal_VOID__BOOLEAN_POINTER,
-                  G_TYPE_NONE,
-                  2, /* num arguments */
-                  G_TYPE_BOOLEAN,
-                  G_TYPE_POINTER);
-
-  signals[SIGNAL_PLAYER_SHOUTED] =
-    g_signal_new ("player-shouted",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST,
-                  G_STRUCT_OFFSET (VsxConnectionClass, player_shouted),
-                  NULL, /* accumulator */
-                  NULL, /* accumulator data */
-                  vsx_marshal_VOID__POINTER,
-                  G_TYPE_NONE,
-                  1, /* num arguments */
-                  G_TYPE_POINTER);
 }
 
 static void
@@ -1664,6 +1623,8 @@ vsx_connection_init (VsxConnection *self)
   VsxConnectionPrivate *priv;
 
   priv = self->priv = vsx_connection_get_instance_private (self);
+
+  vsx_signal_init (&priv->event_signal);
 
   priv->next_message_num = 0;
 
@@ -1890,6 +1851,14 @@ vsx_connection_foreach_tile (VsxConnection *connection,
 
       callback (tile, user_data);
     }
+}
+
+VsxSignal *
+vsx_connection_get_event_signal (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  return &priv->event_signal;
 }
 
 GQuark

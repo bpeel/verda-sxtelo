@@ -24,6 +24,7 @@
 
 #include "vsx-player.h"
 #include "vsx-tile.h"
+#include "vsx-signal.h"
 
 #define VSX_TYPE_CONNECTION                                             \
   (vsx_connection_get_type())
@@ -62,30 +63,6 @@ typedef enum
 struct _VsxConnectionClass
 {
   GObjectClass parent_class;
-
-  /* Emitted whenever the connection encounters an error. These could
-     be either an I/O error from the underlying socket or a protocol
-     error. Usually the connection will try to recover from the error
-     by reconnecting, but you can prevent this in the signal handler
-     by calling vsx_connection_set_running().*/
-  void (* got_error) (VsxConnection *connection,
-                      GError *error);
-
-  void (* message) (VsxConnection *connection,
-                    const VsxPlayer *player,
-                    const char *message);
-
-  /* Emitted whenever the details of a player have changed or a new
-   * player has been created */
-  void (* player_changed) (VsxConnection *connection,
-                           const VsxPlayer *player);
-
-  void (* player_shouted) (VsxConnection *connection,
-                           const VsxPlayer *player);
-
-  void (* tile_changed) (VsxConnection *connection,
-                         bool new_tile,
-                         const VsxTile *tile);
 };
 
 struct _VsxConnection
@@ -94,6 +71,57 @@ struct _VsxConnection
 
   VsxConnectionPrivate *priv;
 };
+
+typedef enum
+{
+  /* Emitted whenever the connection encounters an error. These could
+     be either an I/O error from the underlying socket or a protocol
+     error. Usually the connection will try to recover from the error
+     by reconnecting, but you can prevent this in the signal handler
+     by calling vsx_connection_set_running().*/
+  VSX_CONNECTION_EVENT_TYPE_ERROR,
+  VSX_CONNECTION_EVENT_TYPE_MESSAGE,
+  /* Emitted whenever the details of a player have changed or a new
+   * player has been created */
+  VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+  VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
+  VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
+} VsxConnectionEventType;
+
+typedef struct
+{
+  VsxConnectionEventType type;
+
+  union
+  {
+    struct
+    {
+      GError *error;
+    } error;
+
+    struct
+    {
+      const VsxPlayer *player;
+      const char *message;
+    } message;
+
+    struct
+    {
+      const VsxPlayer *player;
+    } player_changed;
+
+    struct
+    {
+      const VsxPlayer *player;
+    } player_shouted;
+
+    struct
+    {
+      bool new_tile;
+      const VsxTile *tile;
+    } tile_changed;
+  };
+} VsxConnectionEvent;
 
 typedef enum
 {
@@ -173,6 +201,9 @@ void
 vsx_connection_foreach_tile (VsxConnection *connection,
                              VsxConnectionForeachTileCallback callback,
                              void *user_data);
+
+VsxSignal *
+vsx_connection_get_event_signal (VsxConnection *connection);
 
 GQuark
 vsx_connection_error_quark (void);

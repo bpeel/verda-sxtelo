@@ -101,10 +101,10 @@ process_arguments (int *argc, char ***argv,
 }
 
 static void
-connection_error_cb (VsxConnection *connection,
-                     GError *error)
+handle_error (VsxConnection *connection,
+              const VsxConnectionEvent *event)
 {
-  format_print ("error: %s\n", error->message);
+  format_print ("error: %s\n", event->error.error->message);
 }
 
 static void
@@ -116,13 +116,12 @@ running_cb (VsxConnection *connection,
 }
 
 static void
-message_cb (VsxConnection *connection,
-            const VsxPlayer *player,
-            const char *message)
+handle_message (VsxConnection *connection,
+                const VsxConnectionEvent *event)
 {
   format_print ("%s: %s\n",
-                vsx_player_get_name (player),
-                message);
+                vsx_player_get_name (event->message.player),
+                event->message.message);
 }
 
 static void
@@ -159,8 +158,8 @@ check_typing_cb (const VsxPlayer *player,
 }
 
 static void
-player_changed_cb (VsxConnection *connection,
-                   const VsxPlayer *player)
+handle_player_changed (VsxConnection *connection,
+                       const VsxConnectionEvent *event)
 {
   CheckTypingData data;
 
@@ -175,30 +174,60 @@ player_changed_cb (VsxConnection *connection,
 }
 
 static void
-player_shouted_cb (VsxConnection *connection,
-                   const VsxPlayer *player)
+handle_player_shouted (VsxConnection *connection,
+                       const VsxConnectionEvent *event)
 {
+
+  const VsxPlayer *player = event->player_shouted.player;
+
   format_print ("** %s SHOUTS\n",
                 vsx_player_get_name (player));
 }
 
 static void
-tile_changed_cb (VsxConnection *connection,
-                 bool is_new,
-                 const VsxTile *tile)
+handle_tile_changed (VsxConnection *connection,
+                     const VsxConnectionEvent *event)
 {
   char letter[7];
   int letter_len;
+
+  const VsxTile *tile = event->tile_changed.tile;
 
   letter_len = vsx_utf8_encode (vsx_tile_get_letter (tile), letter);
   letter[letter_len] = '\0';
 
   format_print ("%s: %i (%i,%i) %s\n",
-                is_new ? "new_tile" : "tile changed",
+                event->tile_changed.new_tile ? "new_tile" : "tile changed",
                 vsx_tile_get_number (tile),
                 vsx_tile_get_x (tile),
                 vsx_tile_get_y (tile),
                 letter);
+}
+
+static void
+event_cb (VsxListener *listener,
+          void *data)
+{
+  const VsxConnectionEvent *event = data;
+
+  switch (event->type)
+    {
+    case VSX_CONNECTION_EVENT_TYPE_ERROR:
+      handle_error (connection, event);
+      break;
+    case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+      handle_message (connection, event);
+      break;
+    case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
+      handle_player_changed (connection, event);
+      break;
+    case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
+      handle_player_shouted (connection, event);
+      break;
+    case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+      handle_tile_changed (connection, event);
+      break;
+    }
 }
 
 static void
@@ -396,26 +425,14 @@ main (int argc, char **argv)
 
   main_loop = g_main_loop_new (NULL, false);
 
-  g_signal_connect (connection,
-                    "got-error",
-                    G_CALLBACK (connection_error_cb),
-                    main_loop);
-  g_signal_connect (connection,
-                    "message",
-                    G_CALLBACK (message_cb),
-                    NULL);
-  g_signal_connect (connection,
-                    "player-changed",
-                    G_CALLBACK (player_changed_cb),
-                    NULL);
-  g_signal_connect (connection,
-                    "player-shouted",
-                    G_CALLBACK (player_shouted_cb),
-                    NULL);
-  g_signal_connect (connection,
-                    "tile-changed",
-                    G_CALLBACK (tile_changed_cb),
-                    NULL);
+  VsxSignal *event_signal = vsx_connection_get_event_signal (connection);
+  VsxListener event_listener =
+    {
+      .notify = event_cb,
+    };
+
+  vsx_signal_add (event_signal, &event_listener);
+
   g_signal_connect (connection,
                     "notify::state",
                     G_CALLBACK (state_cb),
