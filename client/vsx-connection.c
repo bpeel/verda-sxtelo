@@ -32,6 +32,7 @@
 #include "vsx-proto.h"
 #include "vsx-list.h"
 #include "vsx-util.h"
+#include "vsx-buffer.h"
 
 enum
 {
@@ -155,7 +156,9 @@ struct _VsxConnectionPrivate
    */
   GIOCondition sock_condition;
 
-  GHashTable *players;
+  /* Array of pointers to players, indexed by player num. This can
+   * have NULL gaps. */
+  struct vsx_buffer players;
   GHashTable *tiles;
 
   /* A timeout for sending a keep alive message */
@@ -390,23 +393,48 @@ vsx_connection_set_state (VsxConnection *connection,
     }
 }
 
+static void *
+get_pointer_from_buffer (struct vsx_buffer *buf,
+                         int num)
+{
+  size_t n_entries = buf->length / sizeof (void *);
+
+  if (num >= n_entries)
+    return NULL;
+
+  return ((void **) buf->data)[num];
+}
+
+static void
+set_pointer_in_buffer (struct vsx_buffer *buf,
+                       int num,
+                       void *value)
+{
+  size_t n_entries = buf->length / sizeof (void *);
+
+  if (num >= n_entries)
+    {
+      size_t old_length = buf->length;
+      vsx_buffer_set_length (buf, (num + 1) * sizeof (void *));
+      memset (buf->data + old_length, 0, num * sizeof (void *) - old_length);
+    }
+
+  ((void **) buf->data)[num] = value;
+}
+
 static VsxPlayer *
 get_or_create_player (VsxConnection *connection,
                       int player_num)
 {
   VsxConnectionPrivate *priv = connection->priv;
   VsxPlayer *player =
-    g_hash_table_lookup (priv->players, GINT_TO_POINTER (player_num));
+    get_pointer_from_buffer (&priv->players, player_num);
 
   if (player == NULL)
     {
-      player = g_slice_new0 (VsxPlayer);
-
+      player = vsx_calloc (sizeof *player);
       player->num = player_num;
-
-      g_hash_table_insert (priv->players,
-                           GINT_TO_POINTER (player_num),
-                           player);
+      set_pointer_in_buffer (&priv->players, player_num, player);
     }
 
   return player;
@@ -1618,15 +1646,6 @@ vsx_connection_class_init (VsxConnectionClass *klass)
 }
 
 static void
-free_player_cb (void *data)
-{
-  VsxPlayer *player = data;
-
-  g_free (player->name);
-  g_slice_free (VsxPlayer, player);
-}
-
-static void
 free_tile_cb (void *data)
 {
   VsxTile *tile = data;
@@ -1645,10 +1664,7 @@ vsx_connection_init (VsxConnection *self)
 
   priv->keep_alive_time = g_timer_new ();
 
-  priv->players = g_hash_table_new_full (g_direct_hash,
-                                         g_direct_equal,
-                                         NULL, /* key_destroy */
-                                         free_player_cb);
+  vsx_buffer_init (&priv->players);
   priv->tiles = g_hash_table_new_full (g_direct_hash,
                                        g_direct_equal,
                                        NULL, /* key_destroy */
@@ -1700,6 +1716,25 @@ free_messages_to_send (VsxConnection *connection)
 }
 
 static void
+free_players (VsxConnection *connection)
+{
+  VsxConnectionPrivate *priv = connection->priv;
+
+  for (int i = 0; i < priv->players.length / sizeof (VsxPlayer *); i++)
+    {
+      VsxPlayer *player = ((VsxPlayer **) priv->players.data)[i];
+
+      if (player == NULL)
+        continue;
+
+      g_free (player->name);
+      vsx_free (player);
+    }
+
+  vsx_buffer_destroy (&priv->players);
+}
+
+static void
 vsx_connection_finalize (GObject *object)
 {
   VsxConnection *self = (VsxConnection *) object;
@@ -1710,7 +1745,8 @@ vsx_connection_finalize (GObject *object)
 
   g_timer_destroy (priv->keep_alive_time);
 
-  g_hash_table_destroy (priv->players);
+  free_players (self);
+
   g_hash_table_destroy (priv->tiles);
 
   free_tiles_to_move (self);
@@ -1795,24 +1831,7 @@ vsx_connection_get_player (VsxConnection *connection,
 {
   VsxConnectionPrivate *priv = connection->priv;
 
-  return g_hash_table_lookup (priv->players,
-                              GINT_TO_POINTER (player_num));
-}
-
-typedef struct
-{
-  VsxConnectionForeachPlayerCallback callback;
-  void *user_data;
-} ForeachPlayerData;
-
-static void
-foreach_player_cb (void *key,
-                   void *value,
-                   void *user_data)
-{
-  ForeachPlayerData *data = user_data;
-
-  data->callback (value, data->user_data);
+  return get_pointer_from_buffer (&priv->players, player_num);
 }
 
 void
@@ -1821,12 +1840,16 @@ vsx_connection_foreach_player (VsxConnection *connection,
                                void *user_data)
 {
   VsxConnectionPrivate *priv = connection->priv;
-  ForeachPlayerData data;
 
-  data.callback = callback;
-  data.user_data = user_data;
+  for (int i = 0; i < priv->players.length / sizeof (VsxPlayer *); i++)
+    {
+      VsxPlayer *player = ((VsxPlayer **) priv->players.data)[i];
 
-  g_hash_table_foreach (priv->players, foreach_player_cb, &data);
+      if (player == NULL)
+        continue;
+
+      callback (player, user_data);
+    }
 }
 
 const VsxPlayer *

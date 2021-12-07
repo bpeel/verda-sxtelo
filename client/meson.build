@@ -32,6 +32,7 @@ client_headers = [
 ]
 
 client_src = [
+        '../common/vsx-buffer.c',
         'vsx-connection.c',
         '../common/vsx-list.c',
         'vsx-main.c',
@@ -39,6 +40,7 @@ client_src = [
         '../common/vsx-proto.c',
         'vsx-tile.c',
         '../common/vsx-utf8.c',
+        '../common/vsx-util.c',
 ]
 
 enums = gnome.mkenums_simple('vsx-enum-types', sources : client_headers)
