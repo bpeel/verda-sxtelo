@@ -25,6 +25,9 @@
 #include <gio/gio.h>
 #include <assert.h>
 #include <stdalign.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <errno.h>
 
 #include "vsx-player-private.h"
 #include "vsx-tile-private.h"
@@ -34,6 +37,9 @@
 #include "vsx-buffer.h"
 #include "vsx-slab.h"
 #include "vsx-utf8.h"
+#include "vsx-netaddress.h"
+#include "vsx-socket.h"
+#include "vsx-error.h"
 
 static const uint8_t
 ws_terminator[] = "\r\n\r\n";
@@ -75,7 +81,7 @@ update_poll (VsxConnection *connection);
 typedef enum
 {
   VSX_CONNECTION_RUNNING_STATE_DISCONNECTED,
-  /* g_socket_connect has been called and we are waiting for it to
+  /* connect has been called and we are waiting for it to
    * become ready for writing */
   VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
   VSX_CONNECTION_RUNNING_STATE_RUNNING,
@@ -120,7 +126,7 @@ struct _VsxConnection
   VsxList tiles_to_move;
   VsxList messages_to_send;
 
-  GSocket *sock;
+  int sock;
   GIOChannel *sock_channel;
   guint sock_source;
   /* The condition that the source was last created with so we can
@@ -220,11 +226,10 @@ close_socket (VsxConnection *connection)
       connection->sock_channel = NULL;
     }
 
-  if (connection->sock)
+  if (connection->sock != -1)
     {
-      g_socket_close (connection->sock, NULL);
-      g_object_unref (connection->sock);
-      connection->sock = NULL;
+      vsx_close (connection->sock);
+      connection->sock = -1;
     }
 }
 
@@ -723,25 +728,38 @@ get_payload_length (const uint8_t *buf,
     }
 }
 
+static bool
+is_would_block_error (int err)
+{
+  return err == EAGAIN || err == EWOULDBLOCK;
+}
+
 static void
 handle_read (VsxConnection *connection)
 {
   GError *error = NULL;
 
-  gssize got = g_socket_receive (connection->sock,
-                                 (char *) connection->input_buffer
-                                 + connection->input_length,
-                                 (sizeof connection->input_buffer)
-                                 - connection->input_length,
-                                 NULL, /* cancellable */
-                                 &error);
+  ssize_t got = read (connection->sock,
+                      connection->input_buffer
+                      + connection->input_length,
+                      (sizeof connection->input_buffer)
+                      - connection->input_length);
   if (got == -1)
     {
-      if (error->domain != G_IO_ERROR
-          || error->code != G_IO_ERROR_WOULD_BLOCK)
+      if (!is_would_block_error (errno) && errno != EINTR)
+        {
+          GError *error = NULL;
+
+          g_set_error (&error,
+                       G_FILE_ERROR,
+                       g_file_error_from_errno (errno),
+                       "Error reading from socket: %s",
+                       strerror (errno));
+
           report_error (connection, error);
 
-      g_clear_error (&error);
+          g_clear_error (&error);
+        }
     }
   else if (got == 0)
     {
@@ -1099,21 +1117,25 @@ handle_write (VsxConnection *connection)
 {
   fill_output_buffer (connection);
 
-  GError *error = NULL;
-
-  gssize wrote = g_socket_send (connection->sock,
-                                (const gchar *) connection->output_buffer,
-                                connection->output_length,
-                                NULL, /* cancellable */
-                                &error);
+  size_t wrote = write (connection->sock,
+                        connection->output_buffer,
+                        connection->output_length);
 
   if (wrote == -1)
     {
-      if (error->domain != G_IO_ERROR
-          || error->code != G_IO_ERROR_WOULD_BLOCK)
+      if (!is_would_block_error (errno) && errno != EINTR)
         {
+          GError *error = NULL;
+
+          g_set_error (&error,
+                       G_FILE_ERROR,
+                       g_file_error_from_errno (errno),
+                       "Error writing to socket: %s",
+                       strerror (errno));
+
           report_error (connection, error);
-          g_error_free (error);
+
+          g_clear_error (&error);
         }
     }
   else
@@ -1137,19 +1159,9 @@ sock_source_cb (GIOChannel *source,
 {
   VsxConnection *connection = data;
 
-  if (connection->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING)
-    {
-      GError *error = NULL;
-
-      if (!g_socket_check_connect_result (connection->sock, &error))
-        {
-          report_error (connection, error);
-          g_error_free (error);
-          return true;
-        }
-
-      connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
-    }
+  if (connection->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING
+      && (condition & G_IO_OUT))
+    connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
 
   if ((condition & (G_IO_IN |
                     G_IO_ERR |
@@ -1224,10 +1236,7 @@ update_poll (VsxConnection *connection)
           else if (connection->self
                    && !vsx_player_is_connected (connection->self))
             {
-              g_socket_shutdown (connection->sock,
-                                 false, /* shutdown read */
-                                 true, /* shutdown write */
-                                 NULL /* error */);
+              shutdown (connection->sock, SHUT_WR);
 
               connection->write_finished = true;
             }
@@ -1252,53 +1261,67 @@ vsx_connection_reconnect_cb (gpointer user_data)
 
   GError *error = NULL;
 
-  connection->sock = g_socket_new (G_SOCKET_FAMILY_IPV4,
-                                   G_SOCKET_TYPE_STREAM,
-                                   G_SOCKET_PROTOCOL_DEFAULT,
-                                   &error);
+  struct vsx_netaddress_native address;
 
-  if (connection->sock == NULL)
+  if (!g_socket_address_to_native (connection->address,
+                                   &address.sockaddr,
+                                   offsetof (struct vsx_netaddress_native,
+                                             length),
+                                   &error))
     {
       report_error (connection, error);
       g_error_free (error);
-      return false;
+      return FALSE;
     }
 
-  g_socket_set_blocking (connection->sock, false);
+  address.length = g_socket_address_get_native_size (connection->address);
 
-  bool connect_ret = g_socket_connect (connection->sock,
-                                       connection->address,
-                                       NULL, /* cancellable */
-                                       &error);
+  connection->sock = socket (address.sockaddr.sa_family == AF_INET6
+                             ? PF_INET6
+                             : PF_INET,
+                             SOCK_STREAM,
+                             0);
+
+  if (connection->sock == -1)
+      goto error;
+
+  struct vsx_error *socket_error = NULL;
+
+  if (!vsx_socket_set_nonblock (connection->sock, &socket_error))
+    {
+      /* FIXME */
+      errno = EINVAL;
+      vsx_error_free (socket_error);
+      goto error;
+    }
+
+  int connect_ret = connect (connection->sock,
+                             &address.sockaddr,
+                             address.length);
 
   GIOCondition condition;
 
-  if (connect_ret)
+  if (connect_ret == 0)
     {
       connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
       condition = G_IO_IN | G_IO_OUT;
     }
-  else if (error->domain == G_IO_ERROR
-           && error->code == G_IO_ERROR_PENDING)
+  else if (errno == EINPROGRESS)
     {
-      g_error_free (error);
       connection->running_state = VSX_CONNECTION_RUNNING_STATE_RECONNECTING;
       condition = G_IO_OUT;
     }
   else
     {
-      report_error (connection, error);
-      g_error_free (error);
-      return false;
+      goto error;
     }
 
   connection->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER
-                        | VSX_CONNECTION_DIRTY_FLAG_HEADER);
+                              | VSX_CONNECTION_DIRTY_FLAG_HEADER);
   connection->ws_terminator_pos = 0;
   connection->write_finished = false;
 
-  connection->sock_channel =
-    g_io_channel_unix_new (g_socket_get_fd (connection->sock));
+  connection->sock_channel = g_io_channel_unix_new (connection->sock);
 
   g_io_channel_set_encoding (connection->sock_channel,
                              NULL /* encoding */,
@@ -1308,6 +1331,19 @@ vsx_connection_reconnect_cb (gpointer user_data)
   set_sock_condition (connection, condition);
 
   /* Remove the handler */
+  return false;
+
+ error:
+  g_set_error (&error,
+               G_FILE_ERROR,
+               g_file_error_from_errno (errno),
+               "Error connecting: %s",
+               strerror (errno));
+
+  report_error (connection, error);
+
+  g_clear_error (&error);
+
   return false;
 }
 
@@ -1418,6 +1454,8 @@ vsx_connection_new (GSocketAddress *address,
     }
 
   vsx_signal_init (&connection->event_signal);
+
+  connection->sock = -1;
 
   connection->room = vsx_strdup (room);
   connection->player_name = vsx_strdup (player_name);
