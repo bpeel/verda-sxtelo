@@ -1523,7 +1523,17 @@ vsx_connection_set_running (VsxConnection *connection,
 {
   g_return_if_fail (VSX_IS_CONNECTION (connection));
 
+  VsxConnectionPrivate *priv = connection->priv;
+
   vsx_connection_set_running_internal (connection, running);
+
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
+      .running_state_changed = { .running = running },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
 
   g_object_notify (G_OBJECT (connection), "running");
 }

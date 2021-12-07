@@ -108,10 +108,10 @@ handle_error (VsxConnection *connection,
 }
 
 static void
-running_cb (VsxConnection *connection,
-            GParamSpec *pspec)
+handle_running_state_changed (VsxConnection *connection,
+                              const VsxConnectionEvent *event)
 {
-  if (!vsx_connection_get_running (connection))
+  if (!event->running_state_changed.running)
     g_main_loop_quit (main_loop);
 }
 
@@ -226,6 +226,9 @@ event_cb (VsxListener *listener,
       break;
     case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
       handle_tile_changed (connection, event);
+      break;
+    case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
+      handle_running_state_changed (connection, event);
       break;
     }
 }
@@ -437,10 +440,6 @@ main (int argc, char **argv)
                     "notify::state",
                     G_CALLBACK (state_cb),
                     NULL);
-  g_signal_connect (connection,
-                    "notify::running",
-                    G_CALLBACK (running_cb),
-                    main_loop);
 
   vsx_connection_set_running (connection, true);
 
