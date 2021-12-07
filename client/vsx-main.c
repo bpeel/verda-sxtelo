@@ -205,6 +205,31 @@ handle_tile_changed (VsxConnection *connection,
 }
 
 static void
+print_state_message (VsxConnection *connection)
+{
+  switch (vsx_connection_get_state (connection))
+    {
+    case VSX_CONNECTION_STATE_AWAITING_HEADER:
+      break;
+
+    case VSX_CONNECTION_STATE_IN_PROGRESS:
+      format_print ("You are now in a conversation with a stranger. Say hi!\n");
+      break;
+
+    case VSX_CONNECTION_STATE_DONE:
+      format_print ("The conversation has finished\n");
+      break;
+    }
+}
+
+static void
+handle_state_changed (VsxConnection *connection,
+                      const VsxConnectionEvent *event)
+{
+  print_state_message (connection);
+}
+
+static void
 event_cb (VsxListener *listener,
           void *data)
 {
@@ -230,34 +255,10 @@ event_cb (VsxListener *listener,
     case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
       handle_running_state_changed (connection, event);
       break;
-    }
-}
-
-static void
-print_state_message (VsxConnection *connection)
-{
-  switch (vsx_connection_get_state (connection))
-    {
-    case VSX_CONNECTION_STATE_AWAITING_HEADER:
-      break;
-
-    case VSX_CONNECTION_STATE_IN_PROGRESS:
-      format_print ("You are now in a conversation with a stranger. Say hi!\n");
-      break;
-
-    case VSX_CONNECTION_STATE_DONE:
-      format_print ("The conversation has finished\n");
+    case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
+      handle_state_changed (connection, event);
       break;
     }
-}
-
-static void
-state_cb (GObject *object,
-          GParamSpec *pspec)
-{
-  VsxConnection *connection = VSX_CONNECTION (object);
-
-  print_state_message (connection);
 }
 
 static void
@@ -435,11 +436,6 @@ main (int argc, char **argv)
     };
 
   vsx_signal_add (event_signal, &event_listener);
-
-  g_signal_connect (connection,
-                    "notify::state",
-                    G_CALLBACK (state_cb),
-                    NULL);
 
   vsx_connection_set_running (connection, true);
 

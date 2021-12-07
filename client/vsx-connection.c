@@ -388,11 +388,20 @@ vsx_connection_set_state (VsxConnection *connection,
 {
   VsxConnectionPrivate *priv = connection->priv;
 
-  if (priv->state != state)
+  if (priv->state == state)
+    return;
+
+  priv->state = state;
+
+  VsxConnectionEvent event =
     {
-      priv->state = state;
-      g_object_notify (G_OBJECT (connection), "state");
-    }
+      .type = VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
+      .state_changed = { .state = state },
+    };
+
+  vsx_signal_emit (&priv->event_signal, &event);
+
+  g_object_notify (G_OBJECT (connection), "state");
 }
 
 static void *

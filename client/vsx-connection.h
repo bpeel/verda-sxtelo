@@ -87,6 +87,7 @@ typedef enum
   VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
   VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
   VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
+  VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
 } VsxConnectionEventType;
 
 typedef struct
@@ -126,6 +127,11 @@ typedef struct
     {
       bool running;
     } running_state_changed;
+
+    struct
+    {
+      VsxConnectionState state;
+    } state_changed;
   };
 } VsxConnectionEvent;
 
