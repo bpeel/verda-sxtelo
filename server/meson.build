@@ -25,7 +25,7 @@ server_src = [
         'vsx-connection.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
-        'vsx-error.c',
+        '../common/vsx-error.c',
         'vsx-file-error.c',
         'vsx-generate-id.c',
         'vsx-key-value.c',
@@ -57,7 +57,7 @@ executable('verda-sxtelo', server_src,
            include_directories: inc_dirs)
 
 test_ws_parser_src = [
-        'vsx-error.c',
+        '../common/vsx-error.c',
         '../common/vsx-util.c',
         'vsx-ws-parser.c',
         'test-ws-parser.c',
@@ -74,7 +74,7 @@ test_connection_src = [
         'vsx-connection.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
-        'vsx-error.c',
+        '../common/vsx-error.c',
         'vsx-file-error.c',
         'vsx-generate-id.c',
         '../common/vsx-list.c',
