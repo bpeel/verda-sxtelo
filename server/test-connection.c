@@ -266,7 +266,7 @@ test_frame_errors(void)
 {
   bool ret = true;
 
-  for (int i = 0; i < G_N_ELEMENTS (frame_error_tests); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (frame_error_tests); i++)
     {
       Harness *harness = create_negotiated_harness ();
 
@@ -359,7 +359,7 @@ test_close_in_frame (void)
 
   bool ret = true;
 
-  for (int i = 0; i < G_N_ELEMENTS (tests); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (tests); i++)
     {
       Harness *harness = create_negotiated_harness ();
 
@@ -1337,7 +1337,7 @@ test_typing_commands (Harness *harness, VsxPerson *person)
       { VSX_PROTO_START_TYPING, true },
     };
 
-  for (int i = 0; i < G_N_ELEMENTS (typing_commands); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (typing_commands); i++)
     {
       struct vsx_error *error = NULL;
 

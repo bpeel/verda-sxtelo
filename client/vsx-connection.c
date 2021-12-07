@@ -33,6 +33,7 @@
 #include "vsx-tile-private.h"
 #include "vsx-proto.h"
 #include "vsx-list.h"
+#include "vsx-util.h"
 
 enum
 {
@@ -1116,7 +1117,7 @@ fill_output_buffer (VsxConnection *connection)
 
   while (true)
     {
-      for (int i = 0; i < G_N_ELEMENTS (write_funcs); i++)
+      for (int i = 0; i < VSX_N_ELEMENTS (write_funcs); i++)
         {
           if (write_funcs[i].flag != 0 &&
               (priv->dirty_flags & write_funcs[i].flag) == 0)

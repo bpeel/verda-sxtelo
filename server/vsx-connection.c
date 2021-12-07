@@ -32,6 +32,7 @@
 #include "vsx-flags.h"
 #include "vsx-normalize-name.h"
 #include "vsx-base64.h"
+#include "vsx-util.h"
 
 /* VsxConnection specifically handles connections using the WebSocket
  * protocol. Connections via the HTTP protocol use an HTTP parser
@@ -677,13 +678,13 @@ has_pending_data (VsxConnection *conn)
       && conn->named_players < conn->person->conversation->n_players)
     return true;
 
-  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_players); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (conn->dirty_players); i++)
     {
       if (conn->dirty_players[i])
         return true;
     }
 
-  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_tiles); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (conn->dirty_tiles); i++)
     {
       if (conn->dirty_tiles[i])
         return true;
@@ -755,7 +756,7 @@ write_player (VsxConnection *conn,
    * more.
    */
 
-  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_players); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (conn->dirty_players); i++)
     {
       if (conn->dirty_players[i] == 0)
         continue;
@@ -804,7 +805,7 @@ write_tile (VsxConnection *conn,
    * more.
    */
 
-  for (int i = 0; i < G_N_ELEMENTS (conn->dirty_tiles); i++)
+  for (int i = 0; i < VSX_N_ELEMENTS (conn->dirty_tiles); i++)
     {
       if (conn->dirty_tiles[i] == 0)
         continue;
@@ -1080,7 +1081,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
           return total_wrote;
 
         case VSX_CONNECTION_STATE_WRITING_DATA:
-          for (int i = 0; i < G_N_ELEMENTS (write_funcs); i++)
+          for (int i = 0; i < VSX_N_ELEMENTS (write_funcs); i++)
             {
               if (write_funcs[i].flag == 0)
                 {

@@ -218,14 +218,14 @@ load_config_func (VsxKeyValueEvent event,
         {
           set_from_options (data,
                             data->server,
-                            G_N_ELEMENTS (server_options),
+                            VSX_N_ELEMENTS (server_options),
                             server_options, key, value);
         }
       else
         {
           set_from_options (data,
                             data->config,
-                            G_N_ELEMENTS (general_options),
+                            VSX_N_ELEMENTS (general_options),
                             general_options, key, value);
         }
       break;
