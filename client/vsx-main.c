@@ -507,7 +507,11 @@ create_connection (void)
   const char *player_name = option_player_name;
 
   if (player_name == NULL)
-    player_name = g_get_user_name ();
+    {
+      player_name = getlogin ();
+      if (player_name == NULL)
+        player_name = "?";
+    }
 
   return vsx_connection_new (&address,
                              option_room,
