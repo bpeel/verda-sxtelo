@@ -54,58 +54,70 @@ static short connection_poll_events = 0;
 static int64_t connection_wakeup_timestamp = INT64_MAX;
 static bool should_quit = false;
 
-static GOptionEntry
-options[] =
-  {
-    {
-      "server", 's', 0, G_OPTION_ARG_STRING, &option_server,
-      "Hostname of the server", "host"
-    },
-    {
-      "server-port", 'p', 0, G_OPTION_ARG_INT, &option_server_port,
-      "Port to connect to on the server", "port"
-    },
-    {
-      "room", 'r', 0, G_OPTION_ARG_STRING, &option_room,
-      "Room to connect to", "room"
-    },
-    {
-      "player-name", 'n', 0, G_OPTION_ARG_STRING, &option_player_name,
-      "Name of the player", "player"
-    },
-    { NULL, 0, 0, 0, NULL, NULL, NULL }
-  };
+static const char options[] = "-hs:p:r:n:";
+
+static void
+usage (void)
+{
+  printf ("verda-sxtelo-client - An anagram game in Esperanto for the web\n"
+          "usage: verda-sxtelo-client [options]...\n"
+          " -h                   Show this help message\n"
+          " -s <hostname>        The name of the server to connect to\n"
+          " -p <port>            The port on the server to connect to\n"
+          " -r <room>            The room to connect to\n"
+          " -n <player>          The player name\n");
+}
 
 static const char typing_prompt[] = "vs*> ";
 static const char not_typing_prompt[] = "vs > ";
 
 static bool
-process_arguments (int *argc, char ***argv,
-                   GError **error)
+process_arguments (int argc, char **argv)
 {
-  GOptionContext *context;
-  bool ret;
-  GOptionGroup *group;
+  int opt;
 
-  group = g_option_group_new (NULL, /* name */
-                              NULL, /* description */
-                              NULL, /* help_description */
-                              NULL, /* user_data */
-                              NULL /* destroy notify */);
-  g_option_group_add_entries (group, options);
-  context = g_option_context_new ("- Chat to a random stranger!");
-  g_option_context_set_main_group (context, group);
-  ret = g_option_context_parse (context, argc, argv, error);
-  g_option_context_free (context);
+  opterr = false;
 
-  if (ret && *argc > 1)
+  while ((opt = getopt (argc, argv, options)) != -1)
     {
-      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
-                   "Unknown option '%s'", (* argv)[1]);
-      ret = false;
+      switch (opt)
+        {
+        case ':':
+        case '?':
+          fprintf (stderr,
+                   "invalid option '%c'\n",
+                   optopt);
+          return false;
+
+        case '\1':
+          fprintf (stderr,
+                   "unexpected argument \"%s\"\n",
+                   optarg);
+          return false;
+
+        case 'h':
+          usage ();
+          return false;
+
+        case 's':
+          option_server = optarg;
+          break;
+
+        case 'p':
+          option_server_port = strtoul (optarg, NULL, 10);
+          break;
+
+        case 'r':
+          option_room = optarg;
+          break;
+
+        case 'n':
+          option_player_name = optarg;
+          break;
+        }
     }
 
-  return ret;
+  return true;
 }
 
 static void
@@ -505,13 +517,8 @@ create_connection (void)
 int
 main (int argc, char **argv)
 {
-  GError *error = NULL;
-
-  if (!process_arguments (&argc, &argv, &error))
-    {
-      fprintf (stderr, "%s\n", error->message);
-      return EXIT_FAILURE;
-    }
+  if (!process_arguments (argc, argv))
+    return EXIT_FAILURE;
 
   connection = create_connection ();
 
