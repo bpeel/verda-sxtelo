@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <readline/readline.h>
 #include <term.h>
@@ -29,10 +31,13 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <poll.h>
+#include <errno.h>
 
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
 #include "vsx-netaddress.h"
+#include "vsx-monotonic.h"
 
 static void
 format_print (const char *format, ...);
@@ -44,8 +49,11 @@ static char *option_player_name = NULL;
 static bool option_debug = false;
 
 static VsxConnection *connection;
-static GMainLoop *main_loop;
-static GSource *stdin_source = NULL;
+static bool had_eof = false;
+static int connection_poll_fd = -1;
+static short connection_poll_events = 0;
+static int64_t connection_wakeup_timestamp = INT64_MAX;
+static bool should_quit = false;
 
 static GOptionEntry
 options[] =
@@ -117,7 +125,7 @@ handle_running_state_changed (VsxConnection *connection,
                               const VsxConnectionEvent *event)
 {
   if (!event->running_state_changed.running)
-    g_main_loop_quit (main_loop);
+    should_quit = true;
 }
 
 static void
@@ -235,6 +243,15 @@ handle_state_changed (VsxConnection *connection,
 }
 
 static void
+handle_poll_changed (VsxConnection *connection,
+                     const VsxConnectionEvent *event)
+{
+  connection_poll_fd = event->poll_changed.fd;
+  connection_poll_events = event->poll_changed.events;
+  connection_wakeup_timestamp = event->poll_changed.wakeup_time;
+}
+
+static void
 event_cb (VsxListener *listener,
           void *data)
 {
@@ -263,27 +280,21 @@ event_cb (VsxListener *listener,
     case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
       handle_state_changed (connection, event);
       break;
+    case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
+      handle_poll_changed (connection, event);
+      break;
     }
 }
 
 static void
-remove_stdin_source (void)
+finish_stdin (void)
 {
-  if (stdin_source)
+  if (!had_eof)
     {
       clear_line ();
       rl_callback_handler_remove ();
-      g_source_destroy (stdin_source);
-      stdin_source = NULL;
+      had_eof = true;
     }
-}
-
-static gboolean
-stdin_cb (gpointer user_data)
-{
-  rl_callback_read_char ();
-
-  return true;
 }
 
 static void
@@ -291,13 +302,13 @@ readline_cb (char *line)
 {
   if (line == NULL)
     {
-      remove_stdin_source ();
+      finish_stdin ();
 
       if (vsx_connection_get_state (connection)
           == VSX_CONNECTION_STATE_IN_PROGRESS)
         vsx_connection_leave (connection);
       else
-        g_main_loop_quit (main_loop);
+        should_quit = true;
     }
 }
 
@@ -312,7 +323,7 @@ format_print (const char *format, ...)
 
   vfprintf (stdout, format, ap);
 
-  if (stdin_source)
+  if (!had_eof)
     rl_forced_update_display ();
 
   va_end (ap);
@@ -354,24 +365,11 @@ redisplay_hook (void)
 }
 
 static void
-make_stdin_source (void)
+start_stdin (void)
 {
-  GIOChannel *io_channel;
-
   rl_callback_handler_install (not_typing_prompt, readline_cb);
   rl_redisplay_function = redisplay_hook;
   rl_bind_key ('\r', newline_cb);
-
-  io_channel = g_io_channel_unix_new (STDIN_FILENO);
-  stdin_source = g_io_create_watch (io_channel, G_IO_IN);
-  g_io_channel_unref (io_channel);
-
-  g_source_set_callback (stdin_source,
-                         stdin_cb,
-                         NULL /* data */,
-                         NULL /* notify */);
-
-  g_source_attach (stdin_source, NULL);
 }
 
 static bool
@@ -424,6 +422,65 @@ lookup_address (const char *hostname,
   return found;
 }
 
+static void
+run_main_loop (void)
+{
+  while (!should_quit)
+    {
+      int timeout;
+
+      if (connection_wakeup_timestamp < INT64_MAX)
+        {
+          int64_t now = vsx_monotonic_get ();
+
+          if (now >= connection_wakeup_timestamp)
+            timeout = 0;
+          else
+            timeout = (connection_wakeup_timestamp - now) / 1000;
+        }
+      else
+        timeout = -1;
+
+      struct pollfd fds[2];
+      int nfds = 0;
+
+      if (!had_eof)
+        {
+          fds[nfds].fd = STDIN_FILENO;
+          fds[nfds].events = POLLIN;
+          fds[nfds].revents = 0;
+          nfds++;
+        }
+
+      if (connection_poll_fd != -1)
+        {
+          fds[nfds].fd = connection_poll_fd;
+          fds[nfds].events = connection_poll_events;
+          fds[nfds].revents = 0;
+          nfds++;
+        }
+
+      if (poll (fds, nfds, timeout) == -1)
+        {
+          fprintf (stderr,
+                   "poll failed: %s\n",
+                   strerror (errno));
+          break;
+        }
+
+      if (!had_eof && fds[0].revents)
+        {
+          rl_callback_read_char ();
+          continue;
+        }
+
+      vsx_connection_wake_up (connection,
+                              connection_poll_fd == -1
+                              ? 0
+                              : fds[nfds - 1].revents);
+    }
+}
+
 static VsxConnection *
 create_connection (void)
 {
@@ -466,9 +523,7 @@ main (int argc, char **argv)
   if (connection == NULL)
     return EXIT_FAILURE;
 
-  make_stdin_source ();
-
-  main_loop = g_main_loop_new (NULL, false);
+  start_stdin ();
 
   VsxSignal *event_signal = vsx_connection_get_event_signal (connection);
   VsxListener event_listener =
@@ -482,11 +537,9 @@ main (int argc, char **argv)
 
   print_state_message (connection);
 
-  g_main_loop_run (main_loop);
+  run_main_loop ();
 
-  g_main_loop_unref (main_loop);
-
-  remove_stdin_source ();
+  finish_stdin ();
 
   vsx_connection_free (connection);
 

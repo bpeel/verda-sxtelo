@@ -27,6 +27,7 @@
 #include <stdalign.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <poll.h>
 #include <errno.h>
 
 #include "vsx-player-private.h"
@@ -40,6 +41,7 @@
 #include "vsx-netaddress.h"
 #include "vsx-socket.h"
 #include "vsx-error.h"
+#include "vsx-monotonic.h"
 
 static const uint8_t
 ws_terminator[] = "\r\n\r\n";
@@ -61,22 +63,20 @@ typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              size_t buffer_size);
 
 static void
-vsx_connection_queue_reconnect (VsxConnection *connection);
+update_poll (VsxConnection *connection,
+             bool always_send);
 
-static void
-update_poll (VsxConnection *connection);
-
-/* Initial timeout (in seconds) before attempting to reconnect after
-   an error. The timeout will be doubled every time there is a
+/* Initial timeout (in microseconds) before attempting to reconnect
+   after an error. The timeout will be doubled every time there is a
    failure */
-#define VSX_CONNECTION_INITIAL_TIMEOUT 16
+#define VSX_CONNECTION_INITIAL_TIMEOUT (16 * 1000 * 1000)
 
 /* If the timeout reaches this maximum then it won't be doubled further */
-#define VSX_CONNECTION_MAX_TIMEOUT 512
+#define VSX_CONNECTION_MAX_TIMEOUT (512 * 1000 * 1000)
 
-/* Time in seconds after the last message before sending a keep alive
-   message (2.5 minutes) */
-#define VSX_CONNECTION_KEEP_ALIVE_TIME 150
+/* Time in microseconds after the last message before sending a keep
+   alive message (2.5 minutes) */
+#define VSX_CONNECTION_KEEP_ALIVE_TIME (150 * 1000 * 1000)
 
 typedef enum
 {
@@ -108,8 +108,6 @@ struct _VsxConnection
   struct vsx_netaddress address;
   char *room;
   char *player_name;
-  guint reconnect_timeout;
-  guint reconnect_handler;
   VsxPlayer *self;
   bool has_person_id;
   uint64_t person_id;
@@ -120,6 +118,13 @@ struct _VsxConnection
   bool write_finished;
   int next_message_num;
 
+  /* Delay in microseconds that the next reconnect timeout will be
+   * scheduled for. */
+  unsigned reconnect_timeout;
+  /* Monotonic time to wake up for reconnection at, or INT64_MAX if no
+   * reconnect is scheduled. */
+  int64_t reconnect_timestamp;
+
   VsxSignal event_signal;
 
   VsxConnectionDirtyFlag dirty_flags;
@@ -127,12 +132,10 @@ struct _VsxConnection
   VsxList messages_to_send;
 
   int sock;
-  GIOChannel *sock_channel;
-  guint sock_source;
   /* The condition that the source was last created with so we can
    * know if we need to recreate it.
    */
-  GIOCondition sock_condition;
+  short sock_events;
 
   /* Array of pointers to players, indexed by player num. This can
    * have NULL gaps. */
@@ -144,8 +147,9 @@ struct _VsxConnection
    * NULL gaps. */
   struct vsx_buffer tiles;
 
-  /* A timeout for sending a keep alive message */
-  guint keep_alive_timeout;
+  /* Monotonic time to wake up at in order to send a keepalive, or
+   * INT64_MAX if no keepalive is scheduled. */
+  int64_t keep_alive_timestamp;
 
   unsigned int output_length;
   uint8_t output_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
@@ -162,30 +166,29 @@ struct _VsxConnection
   unsigned int ws_terminator_pos;
 };
 
-static gboolean
-vsx_connection_keep_alive_cb (void *data)
-{
-  VsxConnection *connection = data;
-
-  connection->keep_alive_timeout = 0;
-
-  connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE;
-
-  update_poll (connection);
-
-  return false;
-}
-
 static void
-vsx_connection_queue_keep_alive (VsxConnection *connection)
+send_poll_changed (VsxConnection *connection)
 {
-  if (connection->keep_alive_timeout)
-    g_source_remove (connection->keep_alive_timeout);
+  int64_t wakeup_time = INT64_MAX;
 
-  connection->keep_alive_timeout
-    = g_timeout_add_seconds (VSX_CONNECTION_KEEP_ALIVE_TIME + 1,
-                             vsx_connection_keep_alive_cb,
-                             connection);
+  if (connection->reconnect_timestamp < wakeup_time)
+    wakeup_time = connection->reconnect_timestamp;
+
+  if (connection->keep_alive_timestamp < wakeup_time)
+    wakeup_time = connection->keep_alive_timestamp;
+
+  VsxConnectionEvent event =
+    {
+      .type = VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+      .poll_changed =
+      {
+        .wakeup_time = wakeup_time,
+        .fd = connection->sock,
+        .events = connection->sock_events,
+      },
+    };
+
+  vsx_signal_emit (&connection->event_signal, &event);
 }
 
 static void
@@ -204,25 +207,6 @@ vsx_connection_signal_error (VsxConnection *connection,
 static void
 close_socket (VsxConnection *connection)
 {
-  if (connection->keep_alive_timeout)
-    {
-      g_source_remove (connection->keep_alive_timeout);
-      connection->keep_alive_timeout = 0;
-    }
-
-  if (connection->sock_source)
-    {
-      g_source_remove (connection->sock_source);
-      connection->sock_source = 0;
-      connection->sock_condition = 0;
-    }
-
-  if (connection->sock_channel)
-    {
-      g_io_channel_unref (connection->sock_channel);
-      connection->sock_channel = NULL;
-    }
-
   if (connection->sock != -1)
     {
       vsx_close (connection->sock);
@@ -237,7 +221,7 @@ vsx_connection_set_typing (VsxConnection *connection,
   if (connection->typing != typing)
     {
       connection->typing = typing;
-      update_poll (connection);
+      update_poll (connection, false /* always_send */);
     }
 }
 
@@ -246,7 +230,7 @@ vsx_connection_shout (VsxConnection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_SHOUT;
 
-  update_poll (connection);
+  update_poll (connection, false /* always_send */);
 }
 
 void
@@ -254,7 +238,7 @@ vsx_connection_turn (VsxConnection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_TURN;
 
-  update_poll (connection);
+  update_poll (connection, false /* always_send */);
 }
 
 void
@@ -279,7 +263,7 @@ vsx_connection_move_tile (VsxConnection *connection,
   tile->x = x;
   tile->y = y;
 
-  update_poll (connection);
+  update_poll (connection, false /* always_send */);
 }
 
 static void
@@ -683,11 +667,32 @@ process_message (VsxConnection *connection,
 }
 
 static void
+set_reconnect_timestamp (VsxConnection *connection)
+{
+  connection->reconnect_timestamp =
+    vsx_monotonic_get () + connection->reconnect_timeout;
+
+  if (connection->reconnect_timeout == 0)
+    {
+      connection->reconnect_timeout = VSX_CONNECTION_INITIAL_TIMEOUT;
+    }
+  else
+    {
+      /* Next time we need to try to reconnect we'll delay for twice
+         as long, up to the maximum timeout */
+      connection->reconnect_timeout *= 2;
+      if (connection->reconnect_timeout > VSX_CONNECTION_MAX_TIMEOUT)
+        connection->reconnect_timeout = VSX_CONNECTION_MAX_TIMEOUT;
+    }
+}
+
+static void
 report_error (VsxConnection *connection,
               GError *error)
 {
   close_socket (connection);
-  vsx_connection_queue_reconnect (connection);
+  set_reconnect_timestamp (connection);
+  send_poll_changed (connection);
   vsx_connection_signal_error (connection, error);
 }
 
@@ -846,7 +851,7 @@ handle_read (VsxConnection *connection)
                connection->input_buffer + connection->input_length - p);
       connection->input_length -= p - connection->input_buffer;
 
-      update_poll (connection);
+      update_poll (connection, false /* always_send */);
     }
 }
 
@@ -1143,116 +1148,17 @@ handle_write (VsxConnection *connection)
                connection->output_length - wrote);
       connection->output_length -= wrote;
 
-      vsx_connection_queue_keep_alive (connection);
+      connection->keep_alive_timestamp =
+        vsx_monotonic_get () + VSX_CONNECTION_KEEP_ALIVE_TIME;
 
-      update_poll (connection);
+      update_poll (connection, true /* always_send */);
     }
 }
 
-static gboolean
-sock_source_cb (GIOChannel *source,
-                GIOCondition condition,
-                gpointer data)
-{
-  VsxConnection *connection = data;
-
-  if (connection->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING
-      && (condition & G_IO_OUT))
-    connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
-
-  if ((condition & (G_IO_IN |
-                    G_IO_ERR |
-                    G_IO_HUP)))
-    handle_read (connection);
-  else if ((condition & G_IO_OUT))
-    handle_write (connection);
-  else
-    update_poll (connection);
-
-  return true;
-}
-
 static void
-set_sock_condition (VsxConnection *connection,
-                    GIOCondition condition)
+try_reconnect (VsxConnection *connection)
 {
-  if (condition == connection->sock_condition)
-    return;
-
-  if (connection->sock_source)
-    g_source_remove (connection->sock_source);
-
-  connection->sock_source = g_io_add_watch (connection->sock_channel,
-                                            condition,
-                                            sock_source_cb,
-                                            connection);
-  connection->sock_condition = condition;
-}
-
-static bool
-has_pending_data (VsxConnection *connection)
-{
-  if (connection->output_length > 0)
-    return true;
-
-  if (connection->dirty_flags)
-    return true;
-
-  if (!vsx_list_empty (&connection->tiles_to_move))
-    return true;
-
-  if (!vsx_list_empty (&connection->messages_to_send))
-    return true;
-
-  if (connection->sent_typing_state != connection->typing)
-    return true;
-
-  return false;
-}
-
-static void
-update_poll (VsxConnection *connection)
-{
-  GIOCondition condition;
-
-  switch (connection->running_state)
-    {
-    case VSX_CONNECTION_RUNNING_STATE_RECONNECTING:
-      condition = G_IO_OUT;
-      break;
-
-    case VSX_CONNECTION_RUNNING_STATE_RUNNING:
-      condition = G_IO_IN;
-
-      if (!connection->write_finished)
-        {
-          if (has_pending_data (connection))
-            {
-              condition = G_IO_OUT;
-            }
-          else if (connection->self
-                   && !vsx_player_is_connected (connection->self))
-            {
-              shutdown (connection->sock, SHUT_WR);
-
-              connection->write_finished = true;
-            }
-        }
-      break;
-
-    default:
-      return;
-    }
-
-  set_sock_condition (connection, condition);
-}
-
-static gboolean
-vsx_connection_reconnect_cb (gpointer user_data)
-{
-  VsxConnection *connection = user_data;
-
-  connection->reconnect_handler = 0;
+  connection->reconnect_timestamp = INT64_MAX;
 
   close_socket (connection);
 
@@ -1285,17 +1191,17 @@ vsx_connection_reconnect_cb (gpointer user_data)
                              &address.sockaddr,
                              address.length);
 
-  GIOCondition condition;
+  short events;
 
   if (connect_ret == 0)
     {
       connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
-      condition = G_IO_IN | G_IO_OUT;
+      events = POLLIN | POLLOUT;
     }
   else if (errno == EINPROGRESS)
     {
       connection->running_state = VSX_CONNECTION_RUNNING_STATE_RECONNECTING;
-      condition = G_IO_OUT;
+      events = POLLOUT;
     }
   else
     {
@@ -1307,17 +1213,10 @@ vsx_connection_reconnect_cb (gpointer user_data)
   connection->ws_terminator_pos = 0;
   connection->write_finished = false;
 
-  connection->sock_channel = g_io_channel_unix_new (connection->sock);
+  connection->sock_events = events;
+  send_poll_changed (connection);
 
-  g_io_channel_set_encoding (connection->sock_channel,
-                             NULL /* encoding */,
-                             NULL /* error */);
-  g_io_channel_set_buffered (connection->sock_channel, false);
-
-  set_sock_condition (connection, condition);
-
-  /* Remove the handler */
-  return false;
+  return;
 
  error:
   g_set_error (&error,
@@ -1329,27 +1228,100 @@ vsx_connection_reconnect_cb (gpointer user_data)
   report_error (connection, error);
 
   g_clear_error (&error);
+}
+
+void
+vsx_connection_wake_up (VsxConnection *connection,
+                        short poll_events)
+{
+  int64_t now = vsx_monotonic_get ();
+
+  if (connection->sock == -1)
+    {
+      if (now >= connection->reconnect_timestamp)
+        try_reconnect (connection);
+      return;
+    }
+
+  if (connection->running_state == VSX_CONNECTION_RUNNING_STATE_RECONNECTING
+      && (poll_events & POLLOUT))
+    connection->running_state = VSX_CONNECTION_RUNNING_STATE_RUNNING;
+
+  if (now >= connection->keep_alive_timestamp)
+    {
+      connection->keep_alive_timestamp = INT64_MAX;
+      connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE;
+    }
+
+  if ((poll_events & (POLLIN | POLLERR | POLLHUP)))
+    handle_read (connection);
+  else if ((poll_events & POLLOUT))
+    handle_write (connection);
+  else
+    update_poll (connection, false /* always_send */);
+}
+
+static bool
+has_pending_data (VsxConnection *connection)
+{
+  if (connection->output_length > 0)
+    return true;
+
+  if (connection->dirty_flags)
+    return true;
+
+  if (!vsx_list_empty (&connection->tiles_to_move))
+    return true;
+
+  if (!vsx_list_empty (&connection->messages_to_send))
+    return true;
+
+  if (connection->sent_typing_state != connection->typing)
+    return true;
 
   return false;
 }
 
 static void
-vsx_connection_queue_reconnect (VsxConnection *connection)
+update_poll (VsxConnection *connection, bool always_send)
 {
-  assert (connection->reconnect_handler == 0);
+  short events = 0;
 
-  connection->reconnect_handler =
-    g_timeout_add_seconds (connection->reconnect_timeout,
-                           vsx_connection_reconnect_cb,
-                           connection);
-  /* Next time we need to try to reconnect we'll delay for twice
-     as long, up to the maximum timeout */
-  connection->reconnect_timeout *= 2;
-  if (connection->reconnect_timeout > VSX_CONNECTION_MAX_TIMEOUT)
-    connection->reconnect_timeout = VSX_CONNECTION_MAX_TIMEOUT;
+  switch (connection->running_state)
+    {
+    case VSX_CONNECTION_RUNNING_STATE_RECONNECTING:
+      events = POLLOUT;
+      break;
 
-  connection->running_state =
-    VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+    case VSX_CONNECTION_RUNNING_STATE_RUNNING:
+      events = POLLIN;
+
+      if (!connection->write_finished)
+        {
+          if (has_pending_data (connection))
+            {
+              events |= POLLOUT;
+            }
+          else if (connection->self
+                   && !vsx_player_is_connected (connection->self))
+            {
+              shutdown (connection->sock, SHUT_WR);
+
+              connection->write_finished = true;
+            }
+        }
+      break;
+
+    default:
+      return;
+    }
+
+  if (always_send || connection->sock_events != events)
+    {
+      connection->sock_events = events;
+
+      send_poll_changed (connection);
+    }
 }
 
 static void
@@ -1363,15 +1335,13 @@ vsx_connection_set_running_internal (VsxConnection *connection,
         {
           /* Reset the retry timeout because this is a first attempt
              at connecting */
-          connection->reconnect_timeout = VSX_CONNECTION_INITIAL_TIMEOUT;
+          connection->reconnect_timeout = 0;
 
           connection->running_state =
             VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
 
-          assert (connection->reconnect_handler == 0);
-          connection->reconnect_handler =
-            g_idle_add (vsx_connection_reconnect_cb,
-                        connection);
+          set_reconnect_timestamp (connection);
+          send_poll_changed (connection);
         }
     }
   else
@@ -1387,12 +1357,14 @@ vsx_connection_set_running_internal (VsxConnection *connection,
           connection->running_state =
             VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
           close_socket (connection);
+          send_poll_changed (connection);
           break;
 
         case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT:
           /* Cancel the timeout */
-          g_source_remove (connection->reconnect_handler);
+          connection->reconnect_timestamp = INT64_MAX;
           connection->running_state = VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
+          send_poll_changed (connection);
           break;
         }
     }
@@ -1432,6 +1404,9 @@ vsx_connection_new (const struct vsx_netaddress *address,
       connection->address = *address;
 
   vsx_signal_init (&connection->event_signal);
+
+  connection->keep_alive_timestamp = INT64_MAX;
+  connection->reconnect_timestamp = INT64_MAX;
 
   connection->sock = -1;
 
@@ -1493,7 +1468,7 @@ free_players (VsxConnection *connection)
 void
 vsx_connection_free (VsxConnection *connection)
 {
-  vsx_connection_set_running_internal (connection, false);
+  close_socket (connection);
 
   vsx_free (connection->room);
   vsx_free (connection->player_name);
@@ -1546,7 +1521,7 @@ vsx_connection_send_message (VsxConnection *connection,
 
   vsx_list_insert (connection->messages_to_send.prev, &message_to_send->link);
 
-  update_poll (connection);
+  update_poll (connection, false /* always_send */);
 }
 
 void
@@ -1554,7 +1529,7 @@ vsx_connection_leave (VsxConnection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LEAVE;
 
-  update_poll (connection);
+  update_poll (connection, false /* always_send */);
 }
 
 const VsxPlayer *

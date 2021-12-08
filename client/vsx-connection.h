@@ -20,6 +20,7 @@
 #define VSX_CONNECTION_H
 
 #include <gio/gio.h>
+#include <stdint.h>
 
 #include "vsx-player.h"
 #include "vsx-tile.h"
@@ -53,6 +54,7 @@ typedef enum
   VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
   VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
   VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
+  VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
 } VsxConnectionEventType;
 
 typedef struct
@@ -97,6 +99,20 @@ typedef struct
     {
       VsxConnectionState state;
     } state_changed;
+
+    struct
+    {
+      /* The next monotonic time that the connection should be woken
+       * up at if nothing else wakes it up beforehand. Otherwise this
+       * will be INT64 if the connection doesn’t need to be woken up
+       * for a timeout.
+       */
+      int64_t wakeup_time;
+      /* A file descriptor to poll on, or -1 if no polling needs to be done. */
+      int fd;
+      /* A set of flags to poll on */
+      short events;
+    } poll_changed;
   };
 } VsxConnectionEvent;
 
@@ -110,6 +126,10 @@ VsxConnection *
 vsx_connection_new (const struct vsx_netaddress *address,
                     const char *room,
                     const char *player_name);
+
+void
+vsx_connection_wake_up (VsxConnection *connection,
+                        short poll_events);
 
 void
 vsx_connection_set_running (VsxConnection *connection,
