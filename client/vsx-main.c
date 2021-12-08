@@ -160,17 +160,17 @@ clear_line (void)
   output_ti ("dl1");
 }
 
-typedef struct
+struct check_typing_data
 {
   const VsxPlayer *self;
   bool is_typing;
-} CheckTypingData;
+};
 
 static void
 check_typing_cb (const VsxPlayer *player,
                  void *user_data)
 {
-  CheckTypingData *data = user_data;
+  struct check_typing_data *data = user_data;
 
   if (player != data->self && vsx_player_is_typing (player))
     data->is_typing = true;
@@ -180,7 +180,7 @@ static void
 handle_player_changed (struct vsx_connection *connection,
                        const struct vsx_connection_event *event)
 {
-  CheckTypingData data;
+  struct check_typing_data data;
 
   data.self = vsx_connection_get_self (connection);
   data.is_typing = false;
