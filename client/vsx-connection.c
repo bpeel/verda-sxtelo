@@ -105,7 +105,7 @@ typedef struct
 
 struct _VsxConnection
 {
-  GSocketAddress *address;
+  struct vsx_netaddress address;
   char *room;
   char *player_name;
   guint reconnect_timeout;
@@ -1263,18 +1263,7 @@ vsx_connection_reconnect_cb (gpointer user_data)
 
   struct vsx_netaddress_native address;
 
-  if (!g_socket_address_to_native (connection->address,
-                                   &address.sockaddr,
-                                   offsetof (struct vsx_netaddress_native,
-                                             length),
-                                   &error))
-    {
-      report_error (connection, error);
-      g_error_free (error);
-      return FALSE;
-    }
-
-  address.length = g_socket_address_get_native_size (connection->address);
+  vsx_netaddress_to_native (&connection->address, &address);
 
   connection->sock = socket (address.sockaddr.sa_family == AF_INET6
                              ? PF_INET6
@@ -1434,24 +1423,16 @@ vsx_connection_get_running (VsxConnection *connection)
 }
 
 VsxConnection *
-vsx_connection_new (GSocketAddress *address,
+vsx_connection_new (const struct vsx_netaddress *address,
                     const char *room,
                     const char *player_name)
 {
   VsxConnection *connection = vsx_calloc (sizeof *connection);
 
   if (address == NULL)
-    {
-      GInetAddress *localhost =
-        g_inet_address_new_loopback (G_SOCKET_FAMILY_IPV4);
-      connection->address = g_inet_socket_address_new (localhost, 5144);
-
-      g_object_unref (localhost);
-    }
+      vsx_netaddress_from_string (&connection->address, "127.0.0.1", 5144);
   else
-    {
-      connection->address = g_object_ref (address);
-    }
+      connection->address = *address;
 
   vsx_signal_init (&connection->event_signal);
 
@@ -1518,12 +1499,6 @@ void
 vsx_connection_free (VsxConnection *connection)
 {
   vsx_connection_set_running_internal (connection, false);
-
-  if (connection->address)
-    {
-      g_object_unref (connection->address);
-      connection->address = NULL;
-    }
 
   vsx_free (connection->room);
   vsx_free (connection->player_name);

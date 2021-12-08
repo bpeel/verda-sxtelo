@@ -24,6 +24,7 @@
 #include "vsx-player.h"
 #include "vsx-tile.h"
 #include "vsx-signal.h"
+#include "vsx-netaddress.h"
 
 #define VSX_CONNECTION_ERROR vsx_connection_error_quark ()
 
@@ -106,7 +107,7 @@ typedef enum
 } VsxConnectionError;
 
 VsxConnection *
-vsx_connection_new (GSocketAddress *address,
+vsx_connection_new (const struct vsx_netaddress *address,
                     const char *room,
                     const char *player_name);
 

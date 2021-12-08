@@ -25,9 +25,14 @@
 #include <unistd.h>
 #include <readline/readline.h>
 #include <term.h>
+#include <stdbool.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
+#include "vsx-netaddress.h"
 
 static void
 format_print (const char *format, ...);
@@ -369,32 +374,80 @@ make_stdin_source (void)
   g_source_attach (stdin_source, NULL);
 }
 
-static GSocketAddress *
-get_socket_address (GError **error)
+static bool
+lookup_address (const char *hostname,
+                int port,
+                struct vsx_netaddress *address)
 {
-  GResolver *resolver = g_resolver_get_default ();
+  struct addrinfo *addrinfo;
 
-  GList *addresses = g_resolver_lookup_by_name (resolver,
-                                                option_server,
-                                                NULL, /* cancellable */
-                                                error);
+  int ret = getaddrinfo (hostname,
+                         NULL, /* service */
+                         NULL, /* hints */
+                         &addrinfo);
 
-  GSocketAddress *address;
+  if (ret)
+    return false;
 
-  if (addresses)
+  bool found = false;
+
+  for (const struct addrinfo *a = addrinfo; a; a = a->ai_next)
     {
-      address = g_inet_socket_address_new (addresses->data,
-                                           option_server_port);
-      g_resolver_free_addresses (addresses);
+      switch (a->ai_family)
+        {
+        case AF_INET:
+          if (a->ai_addrlen != sizeof (struct sockaddr_in))
+            continue;
+          break;
+        case AF_INET6:
+          if (a->ai_addrlen != sizeof (struct sockaddr_in6))
+            continue;
+          break;
+        default:
+          continue;
+        }
+
+      struct vsx_netaddress_native native_address;
+
+      memcpy (&native_address.sockaddr, a->ai_addr, a->ai_addrlen);
+      native_address.length = a->ai_addrlen;
+
+      vsx_netaddress_from_native (address, &native_address);
+      address->port = port;
+
+      found = true;
+      break;
     }
-  else
+
+  freeaddrinfo (addrinfo);
+
+  return found;
+}
+
+static VsxConnection *
+create_connection (void)
+{
+  struct vsx_netaddress address;
+
+  address.port = option_server_port;
+
+  if (!vsx_netaddress_from_string (&address,
+                                   option_server,
+                                   option_server_port)
+      && !lookup_address (option_server, option_server_port, &address))
     {
-      address = NULL;
+      fprintf (stderr, "Failed to resolve %s\n", option_server);
+      return NULL;
     }
 
-  g_object_unref (resolver);
+  const char *player_name = option_player_name;
 
-  return address;
+  if (player_name == NULL)
+    player_name = g_get_user_name ();
+
+  return vsx_connection_new (&address,
+                             option_room,
+                             player_name);
 }
 
 int
@@ -408,24 +461,12 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-  GSocketAddress *server_address = get_socket_address (&error);
+  connection = create_connection ();
 
-  if (server_address == NULL)
-    {
-      fprintf (stderr, "%s\n", error->message);
-      return EXIT_FAILURE;
-    }
+  if (connection == NULL)
+    return EXIT_FAILURE;
 
   make_stdin_source ();
-
-  if (option_player_name == NULL)
-    option_player_name = g_strdup (g_get_user_name ());
-
-  connection = vsx_connection_new (server_address,
-                                   option_room,
-                                   option_player_name);
-
-  g_object_unref (server_address);
 
   main_loop = g_main_loop_new (NULL, false);
 
