@@ -259,7 +259,7 @@ vsx_connection_move_tile (VsxConnection *connection,
         goto found_tile;
     }
 
-  tile = g_new (VsxConnectionTileToMove, 1);
+  tile = vsx_alloc (sizeof *tile);
   tile->num = tile_num;
   vsx_list_insert (connection->tiles_to_move.prev, &tile->link);
 
@@ -531,8 +531,8 @@ handle_player_name (VsxConnection *connection,
 
   VsxPlayer *player = get_or_create_player (connection, num);
 
-  g_free (player->name);
-  player->name = g_strdup (name);
+  vsx_free (player->name);
+  player->name = vsx_strdup (name);
 
   emit_player_changed (connection, player);
 
@@ -1005,7 +1005,7 @@ write_move_tile (VsxConnection *connection,
   if (ret > 0)
     {
       vsx_list_remove (&tile->link);
-      g_free (tile);
+      vsx_free (tile);
     }
 
   return ret;
@@ -1039,7 +1039,7 @@ write_send_message (VsxConnection *connection,
       connection->sent_typing_state = false;
 
       vsx_list_remove (&message->link);
-      g_free (message);
+      vsx_free (message);
     }
 
   return ret;
@@ -1432,7 +1432,7 @@ free_tiles_to_move (VsxConnection *connection)
 
   vsx_list_for_each_safe (tile, tmp, &connection->tiles_to_move, link)
     {
-      g_free (tile);
+      vsx_free (tile);
     }
 }
 
@@ -1443,7 +1443,7 @@ free_messages_to_send (VsxConnection *connection)
 
   vsx_list_for_each_safe (message, tmp, &connection->messages_to_send, link)
     {
-      g_free (message);
+      vsx_free (message);
     }
 }
 
@@ -1457,7 +1457,7 @@ free_players (VsxConnection *connection)
       if (player == NULL)
         continue;
 
-      g_free (player->name);
+      vsx_free (player->name);
       vsx_free (player);
     }
 
@@ -1512,8 +1512,8 @@ vsx_connection_send_message (VsxConnection *connection,
     }
 
   VsxConnectionMessageToSend *message_to_send =
-    g_malloc (offsetof (VsxConnectionMessageToSend, message)
-              + message_length + 1);
+    vsx_alloc (offsetof (VsxConnectionMessageToSend, message)
+               + message_length + 1);
 
   memcpy (message_to_send->message, message, message_length);
   message_to_send->message[message_length] = '\0';
