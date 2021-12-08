@@ -210,7 +210,7 @@ handle_tile_changed (struct vsx_connection *connection,
   char letter[7];
   int letter_len;
 
-  const VsxTile *tile = event->tile_changed.tile;
+  const struct vsx_tile *tile = event->tile_changed.tile;
 
   letter_len = vsx_utf8_encode (vsx_tile_get_letter (tile), letter);
   letter[letter_len] = '\0';

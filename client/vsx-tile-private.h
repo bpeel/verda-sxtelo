@@ -23,7 +23,7 @@
 
 #include "vsx-tile.h"
 
-struct _VsxTile
+struct vsx_tile
 {
   int num;
   int16_t x, y;

@@ -21,18 +21,18 @@
 
 #include <stdint.h>
 
-typedef struct _VsxTile VsxTile;
+struct vsx_tile;
 
 int
-vsx_tile_get_number (const VsxTile *tile);
+vsx_tile_get_number (const struct vsx_tile *tile);
 
 int
-vsx_tile_get_x (const VsxTile *tile);
+vsx_tile_get_x (const struct vsx_tile *tile);
 
 int
-vsx_tile_get_y (const VsxTile *tile);
+vsx_tile_get_y (const struct vsx_tile *tile);
 
 uint32_t
-vsx_tile_get_letter (const VsxTile *tile);
+vsx_tile_get_letter (const struct vsx_tile *tile);
 
 #endif /* VSX_TILE_H */

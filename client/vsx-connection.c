@@ -145,7 +145,7 @@ struct vsx_connection
    * have NULL gaps. */
   struct vsx_buffer players;
 
-  /* Slab allocator for VsxTile */
+  /* Slab allocator for vsx_tile */
   struct vsx_slab_allocator tile_allocator;
   /* Array of pointers to tiles, indexed by tile num. This can have
    * NULL gaps. */
@@ -455,7 +455,7 @@ handle_tile (struct vsx_connection *connection,
 
   bool is_new = false;
 
-  VsxTile *tile = get_pointer_from_buffer (&connection->tiles, num);
+  struct vsx_tile *tile = get_pointer_from_buffer (&connection->tiles, num);
 
   if (tile == NULL)
     {
@@ -1568,7 +1568,7 @@ vsx_connection_get_self (struct vsx_connection *connection)
   return connection->self;
 }
 
-const VsxTile *
+const struct vsx_tile *
 vsx_connection_get_tile (struct vsx_connection *connection,
                          int tile_num)
 {
@@ -1580,9 +1580,11 @@ vsx_connection_foreach_tile (struct vsx_connection *connection,
                              vsx_connection_foreach_tile_cb callback,
                              void *user_data)
 {
-  for (int i = 0; i < connection->tiles.length / sizeof (VsxTile *); i++)
+  for (int i = 0;
+       i < connection->tiles.length / sizeof (struct vsx_tile *);
+       i++)
     {
-      VsxTile *tile = ((VsxTile **) connection->tiles.data)[i];
+      struct vsx_tile *tile = ((struct vsx_tile **) connection->tiles.data)[i];
 
       if (tile == NULL)
         continue;

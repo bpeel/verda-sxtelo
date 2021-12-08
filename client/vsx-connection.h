@@ -85,7 +85,7 @@ struct vsx_connection_event
     struct
     {
       bool new_tile;
-      const VsxTile *tile;
+      const struct vsx_tile *tile;
     } tile_changed;
 
     struct
@@ -184,12 +184,12 @@ vsx_connection_foreach_player (struct vsx_connection *connection,
 const struct vsx_player *
 vsx_connection_get_self (struct vsx_connection *connection);
 
-const VsxTile *
+const struct vsx_tile *
 vsx_connection_get_tile (struct vsx_connection *connection,
                          int tile_num);
 
 typedef void
-(* vsx_connection_foreach_tile_cb) (const VsxTile *tile,
+(* vsx_connection_foreach_tile_cb) (const struct vsx_tile *tile,
                                     void *user_data);
 
 void
