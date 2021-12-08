@@ -46,7 +46,6 @@ static char *option_server = "gemelo.org";
 int option_server_port = 5144;
 static char *option_room = "default";
 static char *option_player_name = NULL;
-static bool option_debug = false;
 
 static VsxConnection *connection;
 static bool had_eof = false;
@@ -73,10 +72,6 @@ options[] =
     {
       "player-name", 'p', 0, G_OPTION_ARG_STRING, &option_player_name,
       "Name of the player", "player"
-    },
-    {
-      "debug", 'd', 0, G_OPTION_ARG_NONE, &option_debug,
-      "Enable HTTP debugging", NULL
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
   };
