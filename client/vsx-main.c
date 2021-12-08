@@ -70,7 +70,7 @@ options[] =
       "Room to connect to", "room"
     },
     {
-      "player-name", 'p', 0, G_OPTION_ARG_STRING, &option_player_name,
+      "player-name", 'n', 0, G_OPTION_ARG_STRING, &option_player_name,
       "Name of the player", "player"
     },
     { NULL, 0, 0, 0, NULL, NULL, NULL }
