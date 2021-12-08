@@ -21,25 +21,25 @@
 #include "vsx-tile-private.h"
 
 int
-vsx_tile_get_number (const struct vsx_tile *tile)
+vsx_tile_get_number(const struct vsx_tile *tile)
 {
-  return tile->num;
+        return tile->num;
 }
 
 int
-vsx_tile_get_x (const struct vsx_tile *tile)
+vsx_tile_get_x(const struct vsx_tile *tile)
 {
-  return tile->x;
+        return tile->x;
 }
 
 int
-vsx_tile_get_y (const struct vsx_tile *tile)
+vsx_tile_get_y(const struct vsx_tile *tile)
 {
-  return tile->y;
+        return tile->y;
 }
 
 uint32_t
-vsx_tile_get_letter (const struct vsx_tile *tile)
+vsx_tile_get_letter(const struct vsx_tile *tile)
 {
-  return tile->letter;
+        return tile->letter;
 }

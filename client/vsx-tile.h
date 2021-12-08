@@ -24,15 +24,15 @@
 struct vsx_tile;
 
 int
-vsx_tile_get_number (const struct vsx_tile *tile);
+vsx_tile_get_number(const struct vsx_tile *tile);
 
 int
-vsx_tile_get_x (const struct vsx_tile *tile);
+vsx_tile_get_x(const struct vsx_tile *tile);
 
 int
-vsx_tile_get_y (const struct vsx_tile *tile);
+vsx_tile_get_y(const struct vsx_tile *tile);
 
 uint32_t
-vsx_tile_get_letter (const struct vsx_tile *tile);
+vsx_tile_get_letter(const struct vsx_tile *tile);
 
 #endif /* VSX_TILE_H */

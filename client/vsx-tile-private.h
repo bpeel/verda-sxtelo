@@ -23,11 +23,10 @@
 
 #include "vsx-tile.h"
 
-struct vsx_tile
-{
-  int num;
-  int16_t x, y;
-  uint32_t letter;
+struct vsx_tile {
+        int num;
+        int16_t x, y;
+        uint32_t letter;
 };
 
 #endif /* VSX_TILE_PRIVATE_H */
