@@ -42,6 +42,7 @@
 #include "vsx-socket.h"
 #include "vsx-error.h"
 #include "vsx-monotonic.h"
+#include "vsx-file-error.h"
 
 static const uint8_t
 ws_terminator[] = "\r\n\r\n";
@@ -61,6 +62,9 @@ typedef enum
 typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              uint8_t *buffer,
                                              size_t buffer_size);
+
+struct vsx_error_domain
+vsx_connection_error;
 
 static void
 update_poll (VsxConnection *connection,
@@ -193,7 +197,7 @@ send_poll_changed (VsxConnection *connection)
 
 static void
 vsx_connection_signal_error (VsxConnection *connection,
-                             GError *error)
+                             struct vsx_error *error)
 {
   VsxConnectionEvent event =
     {
@@ -334,7 +338,7 @@ static bool
 handle_player_id (VsxConnection *connection,
                   const uint8_t *payload,
                   size_t payload_length,
-                  GError **error)
+                  struct vsx_error **error)
 {
   uint8_t self_num;
 
@@ -349,10 +353,10 @@ handle_player_id (VsxConnection *connection,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid player_id command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid player_id command");
       return false;
     }
 
@@ -370,7 +374,7 @@ static bool
 handle_message (VsxConnection *connection,
                 const uint8_t *payload,
                 size_t payload_length,
-                GError **error)
+                struct vsx_error **error)
 {
   uint8_t person;
   const char *text;
@@ -386,10 +390,10 @@ handle_message (VsxConnection *connection,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid message command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid message command");
       return false;
     }
 
@@ -414,7 +418,7 @@ static bool
 handle_tile (VsxConnection *connection,
              const uint8_t *payload,
              size_t payload_length,
-             GError **error)
+             struct vsx_error **error)
 {
   uint8_t num, player;
   int16_t x, y;
@@ -442,10 +446,10 @@ handle_tile (VsxConnection *connection,
       || *letter == 0
       || *vsx_utf8_next (letter) != 0)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid tile command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid tile command");
       return false;
     }
 
@@ -502,7 +506,7 @@ static bool
 handle_player_name (VsxConnection *connection,
                     const uint8_t *payload,
                     size_t payload_length,
-                    GError **error)
+                    struct vsx_error **error)
 {
   uint8_t num;
   const char *name;
@@ -518,10 +522,10 @@ handle_player_name (VsxConnection *connection,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid player_name command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid player_name command");
       return false;
     }
 
@@ -539,7 +543,7 @@ static bool
 handle_player (VsxConnection *connection,
                const uint8_t *payload,
                size_t payload_length,
-               GError **error)
+               struct vsx_error **error)
 {
   uint8_t num, flags;
 
@@ -554,10 +558,10 @@ handle_player (VsxConnection *connection,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid player command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid player command");
       return false;
     }
 
@@ -574,7 +578,7 @@ static bool
 handle_player_shouted (VsxConnection *connection,
                        const uint8_t *payload,
                        size_t payload_length,
-                       GError **error)
+                       struct vsx_error **error)
 {
   uint8_t player_num;
 
@@ -586,10 +590,10 @@ handle_player_shouted (VsxConnection *connection,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid player_shouted command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid player_shouted command");
       return false;
     }
 
@@ -611,17 +615,17 @@ static bool
 handle_end (VsxConnection *connection,
             const uint8_t *payload,
             size_t payload_length,
-            GError **error)
+            struct vsx_error **error)
 {
   if (!vsx_proto_read_payload (payload + 1,
                                payload_length - 1,
 
                                VSX_PROTO_TYPE_NONE))
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an invalid end command");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an invalid end command");
       return false;
     }
 
@@ -634,14 +638,14 @@ static bool
 process_message (VsxConnection *connection,
                  const uint8_t *payload,
                  size_t payload_length,
-                 GError **error)
+                 struct vsx_error **error)
 {
   if (payload_length < 1)
     {
-      g_set_error (error,
-                   VSX_CONNECTION_ERROR,
-                   VSX_CONNECTION_ERROR_BAD_DATA,
-                   "The server sent an empty message");
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_BAD_DATA,
+                     "The server sent an empty message");
       return false;
     }
 
@@ -688,7 +692,7 @@ set_reconnect_timestamp (VsxConnection *connection)
 
 static void
 report_error (VsxConnection *connection,
-              GError *error)
+              struct vsx_error *error)
 {
   close_socket (connection);
   set_reconnect_timestamp (connection);
@@ -739,8 +743,6 @@ is_would_block_error (int err)
 static void
 handle_read (VsxConnection *connection)
 {
-  GError *error = NULL;
-
   ssize_t got = read (connection->sock,
                       connection->input_buffer
                       + connection->input_length,
@@ -750,17 +752,16 @@ handle_read (VsxConnection *connection)
     {
       if (!is_would_block_error (errno) && errno != EINTR)
         {
-          GError *error = NULL;
+          struct vsx_error *error = NULL;
 
-          g_set_error (&error,
-                       G_FILE_ERROR,
-                       g_file_error_from_errno (errno),
-                       "Error reading from socket: %s",
-                       strerror (errno));
+          vsx_file_error_set (&error,
+                              errno,
+                              "Error reading from socket: %s",
+                              strerror (errno));
 
           report_error (connection, error);
 
-          g_clear_error (&error);
+          vsx_error_free (error);
         }
     }
   else if (got == 0)
@@ -771,11 +772,14 @@ handle_read (VsxConnection *connection)
         }
       else
         {
-          error = g_error_new (VSX_CONNECTION_ERROR,
-                               VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
-                               "The server unexpectedly closed the connection");
+          struct vsx_error *error = NULL;
+
+          vsx_set_error (&error,
+                         &vsx_connection_error,
+                         VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                         "The server unexpectedly closed the connection");
           report_error (connection, error);
-          g_error_free (error);
+          vsx_error_free (error);
         }
     }
   else
@@ -818,13 +822,17 @@ handle_read (VsxConnection *connection)
                                  &payload_length,
                                  &payload_start))
         {
+          struct vsx_error *error = NULL;
+
           if (payload_length > VSX_PROTO_MAX_PAYLOAD_SIZE)
             {
-              error = g_error_new (VSX_CONNECTION_ERROR,
-                                   VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
-                                   "The server sent a frame that is too long");
+              vsx_set_error (&error,
+                             &vsx_connection_error,
+                             VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                             "The server sent a frame that is too long");
               report_error (connection, error);
-              g_error_free (error);
+              vsx_error_free (error);
+
               return;
             }
 
@@ -839,7 +847,7 @@ handle_read (VsxConnection *connection)
                                    &error))
             {
               report_error (connection, error);
-              g_error_free (error);
+              vsx_error_free (error);
               return;
             }
 
@@ -1127,17 +1135,16 @@ handle_write (VsxConnection *connection)
     {
       if (!is_would_block_error (errno) && errno != EINTR)
         {
-          GError *error = NULL;
+          struct vsx_error *error = NULL;
 
-          g_set_error (&error,
-                       G_FILE_ERROR,
-                       g_file_error_from_errno (errno),
-                       "Error writing to socket: %s",
-                       strerror (errno));
+          vsx_file_error_set (&error,
+                              errno,
+                              "Error writing to socket: %s",
+                              strerror (errno));
 
           report_error (connection, error);
 
-          g_clear_error (&error);
+          vsx_error_free (error);
         }
     }
   else
@@ -1162,7 +1169,7 @@ try_reconnect (VsxConnection *connection)
 
   close_socket (connection);
 
-  GError *error = NULL;
+  struct vsx_error *error = NULL;
 
   struct vsx_netaddress_native address;
 
@@ -1175,17 +1182,10 @@ try_reconnect (VsxConnection *connection)
                              0);
 
   if (connection->sock == -1)
-      goto error;
+    goto file_error;
 
-  struct vsx_error *socket_error = NULL;
-
-  if (!vsx_socket_set_nonblock (connection->sock, &socket_error))
-    {
-      /* FIXME */
-      errno = EINVAL;
-      vsx_error_free (socket_error);
-      goto error;
-    }
+  if (!vsx_socket_set_nonblock (connection->sock, &error))
+    goto error;
 
   int connect_ret = connect (connection->sock,
                              &address.sockaddr,
@@ -1205,7 +1205,7 @@ try_reconnect (VsxConnection *connection)
     }
   else
     {
-      goto error;
+      goto file_error;
     }
 
   connection->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER
@@ -1218,16 +1218,15 @@ try_reconnect (VsxConnection *connection)
 
   return;
 
+ file_error:
+  vsx_file_error_set (&error,
+                      errno,
+                      "Error connecting: %s",
+                      strerror (errno));
  error:
-  g_set_error (&error,
-               G_FILE_ERROR,
-               g_file_error_from_errno (errno),
-               "Error connecting: %s",
-               strerror (errno));
-
   report_error (connection, error);
 
-  g_clear_error (&error);
+  vsx_error_free (error);
 }
 
 void
@@ -1588,10 +1587,4 @@ VsxSignal *
 vsx_connection_get_event_signal (VsxConnection *connection)
 {
   return &connection->event_signal;
-}
-
-GQuark
-vsx_connection_error_quark (void)
-{
-  return g_quark_from_static_string ("vsx-connection-error-quark");
 }

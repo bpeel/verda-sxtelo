@@ -26,8 +26,7 @@
 #include "vsx-tile.h"
 #include "vsx-signal.h"
 #include "vsx-netaddress.h"
-
-#define VSX_CONNECTION_ERROR vsx_connection_error_quark ()
+#include "vsx-error.h"
 
 typedef struct _VsxConnection VsxConnection;
 
@@ -65,7 +64,7 @@ typedef struct
   {
     struct
     {
-      GError *error;
+      struct vsx_error *error;
     } error;
 
     struct
@@ -121,6 +120,9 @@ typedef enum
   VSX_CONNECTION_ERROR_BAD_DATA,
   VSX_CONNECTION_ERROR_CONNECTION_CLOSED
 } VsxConnectionError;
+
+extern struct vsx_error_domain
+vsx_connection_error;
 
 VsxConnection *
 vsx_connection_new (const struct vsx_netaddress *address,
@@ -198,9 +200,6 @@ vsx_connection_foreach_tile (VsxConnection *connection,
 
 VsxSignal *
 vsx_connection_get_event_signal (VsxConnection *connection);
-
-GQuark
-vsx_connection_error_quark (void);
 
 void
 vsx_connection_free (VsxConnection *connection);
