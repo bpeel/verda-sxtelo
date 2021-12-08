@@ -46,7 +46,7 @@ int option_server_port = 5144;
 static char *option_room = "default";
 static char *option_player_name = NULL;
 
-static VsxConnection *connection;
+static struct vsx_connection *connection;
 static bool had_eof = false;
 static int connection_poll_fd = -1;
 static short connection_poll_events = 0;
@@ -120,23 +120,23 @@ process_arguments (int argc, char **argv)
 }
 
 static void
-handle_error (VsxConnection *connection,
-              const VsxConnectionEvent *event)
+handle_error (struct vsx_connection *connection,
+              const struct vsx_connection_event *event)
 {
   format_print ("error: %s\n", event->error.error->message);
 }
 
 static void
-handle_running_state_changed (VsxConnection *connection,
-                              const VsxConnectionEvent *event)
+handle_running_state_changed (struct vsx_connection *connection,
+                              const struct vsx_connection_event *event)
 {
   if (!event->running_state_changed.running)
     should_quit = true;
 }
 
 static void
-handle_message (VsxConnection *connection,
-                const VsxConnectionEvent *event)
+handle_message (struct vsx_connection *connection,
+                const struct vsx_connection_event *event)
 {
   format_print ("%s: %s\n",
                 vsx_player_get_name (event->message.player),
@@ -177,8 +177,8 @@ check_typing_cb (const VsxPlayer *player,
 }
 
 static void
-handle_player_changed (VsxConnection *connection,
-                       const VsxConnectionEvent *event)
+handle_player_changed (struct vsx_connection *connection,
+                       const struct vsx_connection_event *event)
 {
   CheckTypingData data;
 
@@ -193,8 +193,8 @@ handle_player_changed (VsxConnection *connection,
 }
 
 static void
-handle_player_shouted (VsxConnection *connection,
-                       const VsxConnectionEvent *event)
+handle_player_shouted (struct vsx_connection *connection,
+                       const struct vsx_connection_event *event)
 {
 
   const VsxPlayer *player = event->player_shouted.player;
@@ -204,8 +204,8 @@ handle_player_shouted (VsxConnection *connection,
 }
 
 static void
-handle_tile_changed (VsxConnection *connection,
-                     const VsxConnectionEvent *event)
+handle_tile_changed (struct vsx_connection *connection,
+                     const struct vsx_connection_event *event)
 {
   char letter[7];
   int letter_len;
@@ -224,7 +224,7 @@ handle_tile_changed (VsxConnection *connection,
 }
 
 static void
-print_state_message (VsxConnection *connection)
+print_state_message (struct vsx_connection *connection)
 {
   switch (vsx_connection_get_state (connection))
     {
@@ -242,15 +242,15 @@ print_state_message (VsxConnection *connection)
 }
 
 static void
-handle_state_changed (VsxConnection *connection,
-                      const VsxConnectionEvent *event)
+handle_state_changed (struct vsx_connection *connection,
+                      const struct vsx_connection_event *event)
 {
   print_state_message (connection);
 }
 
 static void
-handle_poll_changed (VsxConnection *connection,
-                     const VsxConnectionEvent *event)
+handle_poll_changed (struct vsx_connection *connection,
+                     const struct vsx_connection_event *event)
 {
   connection_poll_fd = event->poll_changed.fd;
   connection_poll_events = event->poll_changed.events;
@@ -261,7 +261,7 @@ static void
 event_cb (VsxListener *listener,
           void *data)
 {
-  const VsxConnectionEvent *event = data;
+  const struct vsx_connection_event *event = data;
 
   switch (event->type)
     {
@@ -487,7 +487,7 @@ run_main_loop (void)
     }
 }
 
-static VsxConnection *
+static struct vsx_connection *
 create_connection (void)
 {
   struct vsx_netaddress address;

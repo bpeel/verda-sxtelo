@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2021  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,16 +27,16 @@
 #include "vsx-netaddress.h"
 #include "vsx-error.h"
 
-typedef struct _VsxConnection VsxConnection;
+struct vsx_connection;
 
-typedef enum
+enum vsx_connection_state
 {
   VSX_CONNECTION_STATE_AWAITING_HEADER,
   VSX_CONNECTION_STATE_IN_PROGRESS,
   VSX_CONNECTION_STATE_DONE
-} VsxConnectionState;
+};
 
-typedef enum
+enum vsx_connection_event_type
 {
   /* Emitted whenever the connection encounters an error. These could
      be either an I/O error from the underlying socket or a protocol
@@ -53,11 +53,11 @@ typedef enum
   VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
   VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
   VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
-} VsxConnectionEventType;
+};
 
-typedef struct
+struct vsx_connection_event
 {
-  VsxConnectionEventType type;
+  enum vsx_connection_event_type type;
 
   union
   {
@@ -95,7 +95,7 @@ typedef struct
 
     struct
     {
-      VsxConnectionState state;
+      enum vsx_connection_state state;
     } state_changed;
 
     struct
@@ -112,95 +112,95 @@ typedef struct
       short events;
     } poll_changed;
   };
-} VsxConnectionEvent;
+};
 
-typedef enum
+enum vsx_connection_error
 {
   VSX_CONNECTION_ERROR_BAD_DATA,
   VSX_CONNECTION_ERROR_CONNECTION_CLOSED
-} VsxConnectionError;
+};
 
 extern struct vsx_error_domain
 vsx_connection_error;
 
-VsxConnection *
+struct vsx_connection *
 vsx_connection_new (const struct vsx_netaddress *address,
                     const char *room,
                     const char *player_name);
 
 void
-vsx_connection_wake_up (VsxConnection *connection,
+vsx_connection_wake_up (struct vsx_connection *connection,
                         short poll_events);
 
 void
-vsx_connection_set_running (VsxConnection *connection,
+vsx_connection_set_running (struct vsx_connection *connection,
                             bool running);
 
 bool
-vsx_connection_get_running (VsxConnection *connection);
+vsx_connection_get_running (struct vsx_connection *connection);
 
 bool
-vsx_connection_get_typing (VsxConnection *connection);
+vsx_connection_get_typing (struct vsx_connection *connection);
 
 void
-vsx_connection_set_typing (VsxConnection *connection,
+vsx_connection_set_typing (struct vsx_connection *connection,
                            bool typing);
 
 void
-vsx_connection_shout (VsxConnection *connection);
+vsx_connection_shout (struct vsx_connection *connection);
 
 void
-vsx_connection_turn (VsxConnection *connection);
+vsx_connection_turn (struct vsx_connection *connection);
 
 void
-vsx_connection_move_tile (VsxConnection *connection,
+vsx_connection_move_tile (struct vsx_connection *connection,
                           int tile_num,
                           int x,
                           int y);
 
-VsxConnectionState
-vsx_connection_get_state (VsxConnection *connection);
+enum vsx_connection_state
+vsx_connection_get_state (struct vsx_connection *connection);
 
 void
-vsx_connection_send_message (VsxConnection *connection,
+vsx_connection_send_message (struct vsx_connection *connection,
                              const char *message);
 
 void
-vsx_connection_leave (VsxConnection *connection);
+vsx_connection_leave (struct vsx_connection *connection);
 
 const VsxPlayer *
-vsx_connection_get_player (VsxConnection *connection,
+vsx_connection_get_player (struct vsx_connection *connection,
                            int player_num);
 
 typedef void
-(* VsxConnectionForeachPlayerCallback) (const VsxPlayer *player,
-                                        void *user_data);
-
-void
-vsx_connection_foreach_player (VsxConnection *connection,
-                               VsxConnectionForeachPlayerCallback callback,
-                               void *user_data);
-
-const VsxPlayer *
-vsx_connection_get_self (VsxConnection *connection);
-
-const VsxTile *
-vsx_connection_get_tile (VsxConnection *connection,
-                         int tile_num);
-
-typedef void
-(* VsxConnectionForeachTileCallback) (const VsxTile *tile,
+(* vsx_connection_foreach_player_cb) (const VsxPlayer *player,
                                       void *user_data);
 
 void
-vsx_connection_foreach_tile (VsxConnection *connection,
-                             VsxConnectionForeachTileCallback callback,
+vsx_connection_foreach_player (struct vsx_connection *connection,
+                               vsx_connection_foreach_player_cb callback,
+                               void *user_data);
+
+const VsxPlayer *
+vsx_connection_get_self (struct vsx_connection *connection);
+
+const VsxTile *
+vsx_connection_get_tile (struct vsx_connection *connection,
+                         int tile_num);
+
+typedef void
+(* vsx_connection_foreach_tile_cb) (const VsxTile *tile,
+                                    void *user_data);
+
+void
+vsx_connection_foreach_tile (struct vsx_connection *connection,
+                             vsx_connection_foreach_tile_cb callback,
                              void *user_data);
 
 VsxSignal *
-vsx_connection_get_event_signal (VsxConnection *connection);
+vsx_connection_get_event_signal (struct vsx_connection *connection);
 
 void
-vsx_connection_free (VsxConnection *connection);
+vsx_connection_free (struct vsx_connection *connection);
 
 #endif /* VSX_CONNECTION_H */

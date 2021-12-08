@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2021  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ ws_terminator[] = "\r\n\r\n";
 
 #define WS_TERMINATOR_LENGTH ((sizeof ws_terminator) - 1)
 
-typedef enum
+enum vsx_connection_dirty_flag
 {
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
   VSX_CONNECTION_DIRTY_FLAG_HEADER = (1 << 1),
@@ -56,17 +56,18 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_LEAVE = (1 << 3),
   VSX_CONNECTION_DIRTY_FLAG_SHOUT = (1 << 4),
   VSX_CONNECTION_DIRTY_FLAG_TURN = (1 << 5),
-} VsxConnectionDirtyFlag;
+};
 
-typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
-                                             uint8_t *buffer,
-                                             size_t buffer_size);
+typedef int
+(* vsx_connection_write_state_func) (struct vsx_connection *conn,
+                                     uint8_t *buffer,
+                                     size_t buffer_size);
 
 struct vsx_error_domain
 vsx_connection_error;
 
 static void
-update_poll (VsxConnection *connection,
+update_poll (struct vsx_connection *connection,
              bool always_send);
 
 /* Initial timeout (in microseconds) before attempting to reconnect
@@ -81,7 +82,7 @@ update_poll (VsxConnection *connection,
    alive message (2.5 minutes) */
 #define VSX_CONNECTION_KEEP_ALIVE_TIME (150 * 1000 * 1000)
 
-typedef enum
+enum vsx_connection_running_state
 {
   VSX_CONNECTION_RUNNING_STATE_DISCONNECTED,
   /* connect has been called and we are waiting for it to
@@ -89,24 +90,24 @@ typedef enum
   VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
   VSX_CONNECTION_RUNNING_STATE_RUNNING,
   VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT
-} VsxConnectionRunningState;
+};
 
-typedef struct
+struct vsx_connection_tile_to_move
 {
   int num;
   int x;
   int y;
   VsxList link;
-} VsxConnectionTileToMove;
+};
 
-typedef struct
+struct vsx_connection_message_to_send
 {
   VsxList link;
   /* Over-allocated */
   char message[1];
-} VsxConnectionMessageToSend;
+};
 
-struct _VsxConnection
+struct vsx_connection
 {
   struct vsx_netaddress address;
   char *room;
@@ -114,8 +115,8 @@ struct _VsxConnection
   VsxPlayer *self;
   bool has_person_id;
   uint64_t person_id;
-  VsxConnectionRunningState running_state;
-  VsxConnectionState state;
+  enum vsx_connection_running_state running_state;
+  enum vsx_connection_state state;
   bool typing;
   bool sent_typing_state;
   bool write_finished;
@@ -130,7 +131,7 @@ struct _VsxConnection
 
   VsxSignal event_signal;
 
-  VsxConnectionDirtyFlag dirty_flags;
+  enum vsx_connection_dirty_flag dirty_flags;
   VsxList tiles_to_move;
   VsxList messages_to_send;
 
@@ -170,7 +171,7 @@ struct _VsxConnection
 };
 
 static void
-send_poll_changed (VsxConnection *connection)
+send_poll_changed (struct vsx_connection *connection)
 {
   int64_t wakeup_time = INT64_MAX;
 
@@ -180,7 +181,7 @@ send_poll_changed (VsxConnection *connection)
   if (connection->keep_alive_timestamp < wakeup_time)
     wakeup_time = connection->keep_alive_timestamp;
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
       .poll_changed =
@@ -195,10 +196,10 @@ send_poll_changed (VsxConnection *connection)
 }
 
 static void
-vsx_connection_signal_error (VsxConnection *connection,
+vsx_connection_signal_error (struct vsx_connection *connection,
                              struct vsx_error *error)
 {
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_ERROR,
       .error = { .error = error },
@@ -208,7 +209,7 @@ vsx_connection_signal_error (VsxConnection *connection,
 }
 
 static void
-close_socket (VsxConnection *connection)
+close_socket (struct vsx_connection *connection)
 {
   if (connection->sock != -1)
     {
@@ -218,7 +219,7 @@ close_socket (VsxConnection *connection)
 }
 
 void
-vsx_connection_set_typing (VsxConnection *connection,
+vsx_connection_set_typing (struct vsx_connection *connection,
                            bool typing)
 {
   if (connection->typing != typing)
@@ -229,7 +230,7 @@ vsx_connection_set_typing (VsxConnection *connection,
 }
 
 void
-vsx_connection_shout (VsxConnection *connection)
+vsx_connection_shout (struct vsx_connection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_SHOUT;
 
@@ -237,7 +238,7 @@ vsx_connection_shout (VsxConnection *connection)
 }
 
 void
-vsx_connection_turn (VsxConnection *connection)
+vsx_connection_turn (struct vsx_connection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_TURN;
 
@@ -245,12 +246,12 @@ vsx_connection_turn (VsxConnection *connection)
 }
 
 void
-vsx_connection_move_tile (VsxConnection *connection,
+vsx_connection_move_tile (struct vsx_connection *connection,
                           int tile_num,
                           int x,
                           int y)
 {
-  VsxConnectionTileToMove *tile;
+  struct vsx_connection_tile_to_move *tile;
 
   vsx_list_for_each (tile, &connection->tiles_to_move, link)
     {
@@ -270,15 +271,15 @@ vsx_connection_move_tile (VsxConnection *connection,
 }
 
 static void
-vsx_connection_set_state (VsxConnection *connection,
-                          VsxConnectionState state)
+vsx_connection_set_state (struct vsx_connection *connection,
+                          enum vsx_connection_state state)
 {
   if (connection->state == state)
     return;
 
   connection->state = state;
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
       .state_changed = { .state = state },
@@ -317,7 +318,7 @@ set_pointer_in_buffer (struct vsx_buffer *buf,
 }
 
 static VsxPlayer *
-get_or_create_player (VsxConnection *connection,
+get_or_create_player (struct vsx_connection *connection,
                       int player_num)
 {
   VsxPlayer *player =
@@ -334,7 +335,7 @@ get_or_create_player (VsxConnection *connection,
 }
 
 static bool
-handle_player_id (VsxConnection *connection,
+handle_player_id (struct vsx_connection *connection,
                   const uint8_t *payload,
                   size_t payload_length,
                   struct vsx_error **error)
@@ -370,7 +371,7 @@ handle_player_id (VsxConnection *connection,
 }
 
 static bool
-handle_message (VsxConnection *connection,
+handle_message (struct vsx_connection *connection,
                 const uint8_t *payload,
                 size_t payload_length,
                 struct vsx_error **error)
@@ -398,7 +399,7 @@ handle_message (VsxConnection *connection,
 
   connection->next_message_num++;
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_MESSAGE,
       .message =
@@ -414,7 +415,7 @@ handle_message (VsxConnection *connection,
 }
 
 static bool
-handle_tile (VsxConnection *connection,
+handle_tile (struct vsx_connection *connection,
              const uint8_t *payload,
              size_t payload_length,
              struct vsx_error **error)
@@ -473,7 +474,7 @@ handle_tile (VsxConnection *connection,
   tile->y = y;
   tile->letter = vsx_utf8_get_char (letter);
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
       .tile_changed =
@@ -489,10 +490,10 @@ handle_tile (VsxConnection *connection,
 }
 
 static void
-emit_player_changed (VsxConnection *connection,
+emit_player_changed (struct vsx_connection *connection,
                      VsxPlayer *player)
 {
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
       .player_changed = { .player = player },
@@ -502,7 +503,7 @@ emit_player_changed (VsxConnection *connection,
 }
 
 static bool
-handle_player_name (VsxConnection *connection,
+handle_player_name (struct vsx_connection *connection,
                     const uint8_t *payload,
                     size_t payload_length,
                     struct vsx_error **error)
@@ -539,7 +540,7 @@ handle_player_name (VsxConnection *connection,
 }
 
 static bool
-handle_player (VsxConnection *connection,
+handle_player (struct vsx_connection *connection,
                const uint8_t *payload,
                size_t payload_length,
                struct vsx_error **error)
@@ -574,7 +575,7 @@ handle_player (VsxConnection *connection,
 }
 
 static bool
-handle_player_shouted (VsxConnection *connection,
+handle_player_shouted (struct vsx_connection *connection,
                        const uint8_t *payload,
                        size_t payload_length,
                        struct vsx_error **error)
@@ -596,7 +597,7 @@ handle_player_shouted (VsxConnection *connection,
       return false;
     }
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
       .player_shouted =
@@ -611,7 +612,7 @@ handle_player_shouted (VsxConnection *connection,
 }
 
 static bool
-handle_end (VsxConnection *connection,
+handle_end (struct vsx_connection *connection,
             const uint8_t *payload,
             size_t payload_length,
             struct vsx_error **error)
@@ -634,7 +635,7 @@ handle_end (VsxConnection *connection,
 }
 
 static bool
-process_message (VsxConnection *connection,
+process_message (struct vsx_connection *connection,
                  const uint8_t *payload,
                  size_t payload_length,
                  struct vsx_error **error)
@@ -670,7 +671,7 @@ process_message (VsxConnection *connection,
 }
 
 static void
-set_reconnect_timestamp (VsxConnection *connection)
+set_reconnect_timestamp (struct vsx_connection *connection)
 {
   connection->reconnect_timestamp =
     vsx_monotonic_get () + connection->reconnect_timeout;
@@ -690,7 +691,7 @@ set_reconnect_timestamp (VsxConnection *connection)
 }
 
 static void
-report_error (VsxConnection *connection,
+report_error (struct vsx_connection *connection,
               struct vsx_error *error)
 {
   close_socket (connection);
@@ -740,7 +741,7 @@ is_would_block_error (int err)
 }
 
 static void
-handle_read (VsxConnection *connection)
+handle_read (struct vsx_connection *connection)
 {
   ssize_t got = read (connection->sock,
                       connection->input_buffer
@@ -863,7 +864,7 @@ handle_read (VsxConnection *connection)
 }
 
 static int
-write_ws_request (VsxConnection *connection,
+write_ws_request (struct vsx_connection *connection,
                   uint8_t *buffer,
                   size_t buffer_size)
 {
@@ -884,7 +885,7 @@ write_ws_request (VsxConnection *connection,
 }
 
 static int
-write_header (VsxConnection *connection,
+write_header (struct vsx_connection *connection,
               uint8_t *buffer,
               size_t buffer_size)
 {
@@ -921,7 +922,7 @@ write_header (VsxConnection *connection,
 }
 
 static int
-write_keep_alive (VsxConnection *connection,
+write_keep_alive (struct vsx_connection *connection,
                   uint8_t *buffer,
                   size_t buffer_size)
 {
@@ -934,7 +935,7 @@ write_keep_alive (VsxConnection *connection,
 }
 
 static int
-write_leave (VsxConnection *connection,
+write_leave (struct vsx_connection *connection,
              uint8_t *buffer,
              size_t buffer_size)
 {
@@ -947,7 +948,7 @@ write_leave (VsxConnection *connection,
 }
 
 static int
-write_shout (VsxConnection *connection,
+write_shout (struct vsx_connection *connection,
              uint8_t *buffer,
              size_t buffer_size)
 {
@@ -960,7 +961,7 @@ write_shout (VsxConnection *connection,
 }
 
 static int
-write_turn (VsxConnection *connection,
+write_turn (struct vsx_connection *connection,
             uint8_t *buffer,
             size_t buffer_size)
 {
@@ -973,14 +974,14 @@ write_turn (VsxConnection *connection,
 }
 
 static int
-write_move_tile (VsxConnection *connection,
+write_move_tile (struct vsx_connection *connection,
                  uint8_t *buffer,
                  size_t buffer_size)
 {
   if (vsx_list_empty (&connection->tiles_to_move))
     return 0;
 
-  VsxConnectionTileToMove *tile =
+  struct vsx_connection_tile_to_move *tile =
     vsx_container_of (connection->tiles_to_move.next,
                       tile,
                       link);
@@ -1011,14 +1012,14 @@ write_move_tile (VsxConnection *connection,
 }
 
 static int
-write_send_message (VsxConnection *connection,
+write_send_message (struct vsx_connection *connection,
                     uint8_t *buffer,
                     size_t buffer_size)
 {
   if (vsx_list_empty (&connection->messages_to_send))
     return 0;
 
-  VsxConnectionMessageToSend *message =
+  struct vsx_connection_message_to_send *message =
     vsx_container_of (connection->messages_to_send.next, message, link);
 
   int ret = vsx_proto_write_command (buffer,
@@ -1045,7 +1046,7 @@ write_send_message (VsxConnection *connection,
 }
 
 static int
-write_typing_state (VsxConnection *connection,
+write_typing_state (struct vsx_connection *connection,
                     uint8_t *buffer,
                     size_t buffer_size)
 {
@@ -1068,12 +1069,12 @@ write_typing_state (VsxConnection *connection,
 }
 
 static void
-fill_output_buffer (VsxConnection *connection)
+fill_output_buffer (struct vsx_connection *connection)
 {
   static const struct
   {
-    VsxConnectionDirtyFlag flag;
-    VsxConnectionWriteStateFunc func;
+    enum vsx_connection_dirty_flag flag;
+    vsx_connection_write_state_func func;
   } write_funcs[] =
     {
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_request },
@@ -1122,7 +1123,7 @@ fill_output_buffer (VsxConnection *connection)
 }
 
 static void
-handle_write (VsxConnection *connection)
+handle_write (struct vsx_connection *connection)
 {
   fill_output_buffer (connection);
 
@@ -1162,7 +1163,7 @@ handle_write (VsxConnection *connection)
 }
 
 static void
-try_reconnect (VsxConnection *connection)
+try_reconnect (struct vsx_connection *connection)
 {
   connection->reconnect_timestamp = INT64_MAX;
 
@@ -1229,7 +1230,7 @@ try_reconnect (VsxConnection *connection)
 }
 
 void
-vsx_connection_wake_up (VsxConnection *connection,
+vsx_connection_wake_up (struct vsx_connection *connection,
                         short poll_events)
 {
   int64_t now = vsx_monotonic_get ();
@@ -1260,7 +1261,7 @@ vsx_connection_wake_up (VsxConnection *connection,
 }
 
 static bool
-has_pending_data (VsxConnection *connection)
+has_pending_data (struct vsx_connection *connection)
 {
   if (connection->output_length > 0)
     return true;
@@ -1281,7 +1282,7 @@ has_pending_data (VsxConnection *connection)
 }
 
 static void
-update_poll (VsxConnection *connection, bool always_send)
+update_poll (struct vsx_connection *connection, bool always_send)
 {
   short events = 0;
 
@@ -1323,7 +1324,7 @@ update_poll (VsxConnection *connection, bool always_send)
 }
 
 static void
-vsx_connection_set_running_internal (VsxConnection *connection,
+vsx_connection_set_running_internal (struct vsx_connection *connection,
                                      bool running)
 {
   if (running)
@@ -1369,12 +1370,12 @@ vsx_connection_set_running_internal (VsxConnection *connection,
 }
 
 void
-vsx_connection_set_running (VsxConnection *connection,
+vsx_connection_set_running (struct vsx_connection *connection,
                             bool running)
 {
   vsx_connection_set_running_internal (connection, running);
 
-  VsxConnectionEvent event =
+  struct vsx_connection_event event =
     {
       .type = VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
       .running_state_changed = { .running = running },
@@ -1384,17 +1385,17 @@ vsx_connection_set_running (VsxConnection *connection,
 }
 
 bool
-vsx_connection_get_running (VsxConnection *connection)
+vsx_connection_get_running (struct vsx_connection *connection)
 {
   return connection->running_state != VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
 }
 
-VsxConnection *
+struct vsx_connection *
 vsx_connection_new (const struct vsx_netaddress *address,
                     const char *room,
                     const char *player_name)
 {
-  VsxConnection *connection = vsx_calloc (sizeof *connection);
+  struct vsx_connection *connection = vsx_calloc (sizeof *connection);
 
   if (address == NULL)
       vsx_netaddress_from_string (&connection->address, "127.0.0.1", 5144);
@@ -1425,9 +1426,9 @@ vsx_connection_new (const struct vsx_netaddress *address,
 }
 
 static void
-free_tiles_to_move (VsxConnection *connection)
+free_tiles_to_move (struct vsx_connection *connection)
 {
-  VsxConnectionTileToMove *tile, *tmp;
+  struct vsx_connection_tile_to_move *tile, *tmp;
 
   vsx_list_for_each_safe (tile, tmp, &connection->tiles_to_move, link)
     {
@@ -1436,9 +1437,9 @@ free_tiles_to_move (VsxConnection *connection)
 }
 
 static void
-free_messages_to_send (VsxConnection *connection)
+free_messages_to_send (struct vsx_connection *connection)
 {
-  VsxConnectionMessageToSend *message, *tmp;
+  struct vsx_connection_message_to_send *message, *tmp;
 
   vsx_list_for_each_safe (message, tmp, &connection->messages_to_send, link)
     {
@@ -1447,7 +1448,7 @@ free_messages_to_send (VsxConnection *connection)
 }
 
 static void
-free_players (VsxConnection *connection)
+free_players (struct vsx_connection *connection)
 {
   for (int i = 0; i < connection->players.length / sizeof (VsxPlayer *); i++)
     {
@@ -1464,7 +1465,7 @@ free_players (VsxConnection *connection)
 }
 
 void
-vsx_connection_free (VsxConnection *connection)
+vsx_connection_free (struct vsx_connection *connection)
 {
   close_socket (connection);
 
@@ -1483,19 +1484,19 @@ vsx_connection_free (VsxConnection *connection)
 }
 
 bool
-vsx_connection_get_typing (VsxConnection *connection)
+vsx_connection_get_typing (struct vsx_connection *connection)
 {
   return connection->typing;
 }
 
-VsxConnectionState
-vsx_connection_get_state (VsxConnection *connection)
+enum vsx_connection_state
+vsx_connection_get_state (struct vsx_connection *connection)
 {
   return connection->state;
 }
 
 void
-vsx_connection_send_message (VsxConnection *connection,
+vsx_connection_send_message (struct vsx_connection *connection,
                              const char *message)
 {
   size_t message_length = strlen (message);
@@ -1510,8 +1511,8 @@ vsx_connection_send_message (VsxConnection *connection,
         message_length--;
     }
 
-  VsxConnectionMessageToSend *message_to_send =
-    vsx_alloc (offsetof (VsxConnectionMessageToSend, message)
+  struct vsx_connection_message_to_send *message_to_send =
+    vsx_alloc (offsetof (struct vsx_connection_message_to_send, message)
                + message_length + 1);
 
   memcpy (message_to_send->message, message, message_length);
@@ -1523,7 +1524,7 @@ vsx_connection_send_message (VsxConnection *connection,
 }
 
 void
-vsx_connection_leave (VsxConnection *connection)
+vsx_connection_leave (struct vsx_connection *connection)
 {
   connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LEAVE;
 
@@ -1531,15 +1532,15 @@ vsx_connection_leave (VsxConnection *connection)
 }
 
 const VsxPlayer *
-vsx_connection_get_player (VsxConnection *connection,
+vsx_connection_get_player (struct vsx_connection *connection,
                            int player_num)
 {
   return get_pointer_from_buffer (&connection->players, player_num);
 }
 
 void
-vsx_connection_foreach_player (VsxConnection *connection,
-                               VsxConnectionForeachPlayerCallback callback,
+vsx_connection_foreach_player (struct vsx_connection *connection,
+                               vsx_connection_foreach_player_cb callback,
                                void *user_data)
 {
   for (int i = 0; i < connection->players.length / sizeof (VsxPlayer *); i++)
@@ -1554,21 +1555,21 @@ vsx_connection_foreach_player (VsxConnection *connection,
 }
 
 const VsxPlayer *
-vsx_connection_get_self (VsxConnection *connection)
+vsx_connection_get_self (struct vsx_connection *connection)
 {
   return connection->self;
 }
 
 const VsxTile *
-vsx_connection_get_tile (VsxConnection *connection,
+vsx_connection_get_tile (struct vsx_connection *connection,
                          int tile_num)
 {
   return get_pointer_from_buffer (&connection->tiles, tile_num);
 }
 
 void
-vsx_connection_foreach_tile (VsxConnection *connection,
-                             VsxConnectionForeachTileCallback callback,
+vsx_connection_foreach_tile (struct vsx_connection *connection,
+                             vsx_connection_foreach_tile_cb callback,
                              void *user_data)
 {
   for (int i = 0; i < connection->tiles.length / sizeof (VsxTile *); i++)
@@ -1583,7 +1584,7 @@ vsx_connection_foreach_tile (VsxConnection *connection,
 }
 
 VsxSignal *
-vsx_connection_get_event_signal (VsxConnection *connection)
+vsx_connection_get_event_signal (struct vsx_connection *connection)
 {
   return &connection->event_signal;
 }
