@@ -19,6 +19,8 @@
 #ifndef VSX_TILE_H
 #define VSX_TILE_H
 
+#include <stdint.h>
+
 typedef struct _VsxTile VsxTile;
 
 int
@@ -30,7 +32,7 @@ vsx_tile_get_x (const VsxTile *tile);
 int
 vsx_tile_get_y (const VsxTile *tile);
 
-gunichar
+uint32_t
 vsx_tile_get_letter (const VsxTile *tile);
 
 #endif /* VSX_TILE_H */

@@ -20,6 +20,7 @@
 #define VSX_TILE_PRIVATE_H
 
 #include <glib.h>
+#include <stdint.h>
 
 #include "vsx-tile.h"
 
@@ -27,7 +28,7 @@ struct _VsxTile
 {
   int num;
   int16_t x, y;
-  gunichar letter;
+  uint32_t letter;
 };
 
 #endif /* VSX_TILE_PRIVATE_H */

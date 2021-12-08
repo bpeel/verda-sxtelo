@@ -40,7 +40,7 @@ vsx_tile_get_y (const VsxTile *tile)
   return tile->y;
 }
 
-gunichar
+uint32_t
 vsx_tile_get_letter (const VsxTile *tile)
 {
   return tile->letter;
