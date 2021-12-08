@@ -18,8 +18,6 @@
 
 #include "config.h"
 
-#include <glib.h>
-
 #include "vsx-tile-private.h"
 
 int

@@ -19,7 +19,6 @@
 #ifndef VSX_CONNECTION_H
 #define VSX_CONNECTION_H
 
-#include <gio/gio.h>
 #include <stdint.h>
 
 #include "vsx-player.h"

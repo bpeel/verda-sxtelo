@@ -19,8 +19,6 @@
 #ifndef VSX_PLAYER_PRIVATE_H
 #define VSX_PLAYER_PRIVATE_H
 
-#include <glib.h>
-
 #include "vsx-player.h"
 
 typedef enum

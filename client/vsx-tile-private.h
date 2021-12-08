@@ -19,7 +19,6 @@
 #ifndef VSX_TILE_PRIVATE_H
 #define VSX_TILE_PRIVATE_H
 
-#include <glib.h>
 #include <stdint.h>
 
 #include "vsx-tile.h"

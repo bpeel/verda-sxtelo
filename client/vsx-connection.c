@@ -22,7 +22,6 @@
 
 #include <string.h>
 #include <stdarg.h>
-#include <gio/gio.h>
 #include <assert.h>
 #include <stdalign.h>
 #include <sys/socket.h>
