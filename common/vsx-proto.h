@@ -68,7 +68,7 @@
 #define VSX_PROTO_SYNC 0x07
 #define VSX_PROTO_END 0x08
 
-typedef enum
+enum vsx_proto_type
   {
     VSX_PROTO_TYPE_UINT8,
     VSX_PROTO_TYPE_UINT16,
@@ -78,7 +78,7 @@ typedef enum
     VSX_PROTO_TYPE_BLOB,
     VSX_PROTO_TYPE_STRING,
     VSX_PROTO_TYPE_NONE
-  } VsxProtoType;
+  };
 
 static inline void
 vsx_proto_write_uint8_t (uint8_t *buffer,

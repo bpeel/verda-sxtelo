@@ -41,7 +41,7 @@ get_payload_length (va_list ap)
 
   while (true)
     {
-      switch (va_arg(ap, VsxProtoType))
+      switch (va_arg(ap, enum vsx_proto_type))
         {
 #include "vsx-proto-types.h"
 
@@ -144,7 +144,7 @@ vsx_proto_write_command_v (uint8_t *buffer,
 
   while (true)
     {
-      switch (va_arg(ap, VsxProtoType))
+      switch (va_arg(ap, enum vsx_proto_type))
         {
 #include "vsx-proto-types.h"
 
@@ -228,7 +228,7 @@ vsx_proto_read_payload (const uint8_t *buffer,
 
   while (true)
     {
-      switch (va_arg (ap, VsxProtoType))
+      switch (va_arg (ap, enum vsx_proto_type))
         {
 #include "vsx-proto-types.h"
 
