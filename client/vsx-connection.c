@@ -146,7 +146,6 @@ struct _VsxConnection
 
   /* A timeout for sending a keep alive message */
   guint keep_alive_timeout;
-  GTimer *keep_alive_time;
 
   unsigned int output_length;
   uint8_t output_buffer[VSX_PROTO_MAX_PAYLOAD_SIZE
@@ -187,8 +186,6 @@ vsx_connection_queue_keep_alive (VsxConnection *connection)
     = g_timeout_add_seconds (VSX_CONNECTION_KEEP_ALIVE_TIME + 1,
                              vsx_connection_keep_alive_cb,
                              connection);
-
-  g_timer_start (connection->keep_alive_time);
 }
 
 static void
@@ -1443,8 +1440,6 @@ vsx_connection_new (const struct vsx_netaddress *address,
 
   connection->next_message_num = 0;
 
-  connection->keep_alive_time = g_timer_new ();
-
   vsx_buffer_init (&connection->players);
 
   vsx_slab_init (&connection->tile_allocator);
@@ -1502,8 +1497,6 @@ vsx_connection_free (VsxConnection *connection)
 
   vsx_free (connection->room);
   vsx_free (connection->player_name);
-
-  g_timer_destroy (connection->keep_alive_time);
 
   free_players (connection);
 
