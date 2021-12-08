@@ -68,117 +68,111 @@
 #define VSX_PROTO_SYNC 0x07
 #define VSX_PROTO_END 0x08
 
-enum vsx_proto_type
-  {
-    VSX_PROTO_TYPE_UINT8,
-    VSX_PROTO_TYPE_UINT16,
-    VSX_PROTO_TYPE_UINT32,
-    VSX_PROTO_TYPE_UINT64,
-    VSX_PROTO_TYPE_INT16,
-    VSX_PROTO_TYPE_BLOB,
-    VSX_PROTO_TYPE_STRING,
-    VSX_PROTO_TYPE_NONE
-  };
+enum vsx_proto_type {
+        VSX_PROTO_TYPE_UINT8,
+        VSX_PROTO_TYPE_UINT16,
+        VSX_PROTO_TYPE_UINT32,
+        VSX_PROTO_TYPE_UINT64,
+        VSX_PROTO_TYPE_INT16,
+        VSX_PROTO_TYPE_BLOB,
+        VSX_PROTO_TYPE_STRING,
+        VSX_PROTO_TYPE_NONE
+};
 
 static inline void
-vsx_proto_write_uint8_t (uint8_t *buffer,
-                         uint8_t value)
+vsx_proto_write_uint8_t(uint8_t *buffer, uint8_t value)
 {
-  *buffer = value;
+        *buffer = value;
 }
 
 static inline void
-vsx_proto_write_uint16_t (uint8_t *buffer,
-                          uint16_t value)
+vsx_proto_write_uint16_t(uint8_t *buffer, uint16_t value)
 {
-  value = VSX_UINT16_TO_LE (value);
-  memcpy (buffer, &value, sizeof value);
+        value = VSX_UINT16_TO_LE(value);
+        memcpy(buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_uint32_t (uint8_t *buffer,
-                          uint32_t value)
+vsx_proto_write_uint32_t(uint8_t *buffer, uint32_t value)
 {
-  value = VSX_UINT32_TO_LE (value);
-  memcpy (buffer, &value, sizeof value);
+        value = VSX_UINT32_TO_LE(value);
+        memcpy(buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_uint64_t (uint8_t *buffer,
-                          uint64_t value)
+vsx_proto_write_uint64_t(uint8_t *buffer, uint64_t value)
 {
-  value = VSX_UINT64_TO_LE (value);
-  memcpy (buffer, &value, sizeof value);
+        value = VSX_UINT64_TO_LE(value);
+        memcpy(buffer, &value, sizeof value);
 }
 
 static inline void
-vsx_proto_write_int16_t (uint8_t *buffer,
-                         int16_t value)
+vsx_proto_write_int16_t(uint8_t *buffer, int16_t value)
 {
-  value = VSX_INT16_TO_LE (value);
-  memcpy (buffer, &value, sizeof value);
+        value = VSX_INT16_TO_LE(value);
+        memcpy(buffer, &value, sizeof value);
 }
 
 int
-vsx_proto_write_command_v (uint8_t *buffer,
-                           size_t buffer_length,
-                           uint8_t command,
-                           va_list ap);
+vsx_proto_write_command_v(uint8_t *buffer,
+                          size_t buffer_length,
+                          uint8_t command,
+                          va_list ap);
 
 int
-vsx_proto_write_command (uint8_t *buffer,
-                         size_t buffer_length,
-                         uint8_t command,
-                         ...);
+vsx_proto_write_command(uint8_t *buffer,
+                        size_t buffer_length,
+                        uint8_t command,
+                        ...);
 
 static inline uint8_t
-vsx_proto_read_uint8_t (const uint8_t *buffer)
+vsx_proto_read_uint8_t(const uint8_t *buffer)
 {
-  return *buffer;
+        return *buffer;
 }
 
 static inline uint16_t
-vsx_proto_read_uint16_t (const uint8_t *buffer)
+vsx_proto_read_uint16_t(const uint8_t *buffer)
 {
-  uint16_t value;
-  memcpy (&value, buffer, sizeof value);
-  return VSX_UINT16_FROM_LE (value);
+        uint16_t value;
+        memcpy(&value, buffer, sizeof value);
+        return VSX_UINT16_FROM_LE(value);
 }
 
 static inline uint32_t
-vsx_proto_read_uint32_t (const uint8_t *buffer)
+vsx_proto_read_uint32_t(const uint8_t *buffer)
 {
-  uint32_t value;
-  memcpy (&value, buffer, sizeof value);
-  return VSX_UINT32_FROM_LE (value);
+        uint32_t value;
+        memcpy(&value, buffer, sizeof value);
+        return VSX_UINT32_FROM_LE(value);
 }
 
 static inline uint64_t
-vsx_proto_read_uint64_t (const uint8_t *buffer)
+vsx_proto_read_uint64_t(const uint8_t *buffer)
 {
-  uint64_t value;
-  memcpy (&value, buffer, sizeof value);
-  return VSX_UINT64_FROM_LE (value);
+        uint64_t value;
+        memcpy(&value, buffer, sizeof value);
+        return VSX_UINT64_FROM_LE(value);
 }
 
 static inline int16_t
-vsx_proto_read_int16_t (const uint8_t *buffer)
+vsx_proto_read_int16_t(const uint8_t *buffer)
 {
-  int16_t value;
-  memcpy (&value, buffer, sizeof value);
-  return VSX_INT16_FROM_LE (value);
+        int16_t value;
+        memcpy(&value, buffer, sizeof value);
+        return VSX_INT16_FROM_LE(value);
 }
 
 bool
-vsx_proto_read_payload (const uint8_t *buffer,
-                        size_t length,
-                        ...);
+vsx_proto_read_payload(const uint8_t *buffer,
+                       size_t length,
+                       ...);
 
 size_t
-vsx_proto_get_frame_header_length (size_t payload_length);
+vsx_proto_get_frame_header_length(size_t payload_length);
 
 void
-vsx_proto_write_frame_header (uint8_t *buffer,
-                              size_t payload_length);
+vsx_proto_write_frame_header(uint8_t *buffer,
+                             size_t payload_length);
 
 #endif /* VSX_PROTO_H */
