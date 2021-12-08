@@ -36,6 +36,7 @@ client_src = [
         '../common/vsx-file-error.c',
         '../common/vsx-list.c',
         'vsx-main.c',
+        'vsx-monotonic.c',
         '../common/vsx-netaddress.c',
         'vsx-player.c',
         '../common/vsx-proto.c',
