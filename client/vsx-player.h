@@ -21,21 +21,21 @@
 
 #include <stdbool.h>
 
-typedef struct _VsxPlayer VsxPlayer;
+struct vsx_player;
 
 int
-vsx_player_get_number (const VsxPlayer *player);
+vsx_player_get_number (const struct vsx_player *player);
 
 const char *
-vsx_player_get_name (const VsxPlayer *player);
+vsx_player_get_name (const struct vsx_player *player);
 
 bool
-vsx_player_is_connected (const VsxPlayer *player);
+vsx_player_is_connected (const struct vsx_player *player);
 
 bool
-vsx_player_is_typing (const VsxPlayer *player);
+vsx_player_is_typing (const struct vsx_player *player);
 
 bool
-vsx_player_has_next_turn (const VsxPlayer *player);
+vsx_player_has_next_turn (const struct vsx_player *player);
 
 #endif /* VSX_PLAYER_H */

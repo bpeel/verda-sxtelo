@@ -21,20 +21,20 @@
 
 #include "vsx-player.h"
 
-typedef enum
+enum vsx_player_flags
 {
   VSX_PLAYER_CONNECTED = (1 << 0),
   VSX_PLAYER_TYPING = (1 << 1),
   VSX_PLAYER_NEXT_TURN = (1 << 2)
-} VsxPlayerFlags;
+};
 
-struct _VsxPlayer
+struct vsx_player
 {
   int num;
 
   char *name;
 
-  VsxPlayerFlags flags;
+  enum vsx_player_flags flags;
 };
 
 #endif /* VSX_PLAYER_PRIVATE_H */

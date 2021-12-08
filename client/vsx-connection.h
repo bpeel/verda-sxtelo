@@ -68,18 +68,18 @@ struct vsx_connection_event
 
     struct
     {
-      const VsxPlayer *player;
+      const struct vsx_player *player;
       const char *message;
     } message;
 
     struct
     {
-      const VsxPlayer *player;
+      const struct vsx_player *player;
     } player_changed;
 
     struct
     {
-      const VsxPlayer *player;
+      const struct vsx_player *player;
     } player_shouted;
 
     struct
@@ -168,12 +168,12 @@ vsx_connection_send_message (struct vsx_connection *connection,
 void
 vsx_connection_leave (struct vsx_connection *connection);
 
-const VsxPlayer *
+const struct vsx_player *
 vsx_connection_get_player (struct vsx_connection *connection,
                            int player_num);
 
 typedef void
-(* vsx_connection_foreach_player_cb) (const VsxPlayer *player,
+(* vsx_connection_foreach_player_cb) (const struct vsx_player *player,
                                       void *user_data);
 
 void
@@ -181,7 +181,7 @@ vsx_connection_foreach_player (struct vsx_connection *connection,
                                vsx_connection_foreach_player_cb callback,
                                void *user_data);
 
-const VsxPlayer *
+const struct vsx_player *
 vsx_connection_get_self (struct vsx_connection *connection);
 
 const VsxTile *

@@ -112,7 +112,7 @@ struct vsx_connection
   struct vsx_netaddress address;
   char *room;
   char *player_name;
-  VsxPlayer *self;
+  struct vsx_player *self;
   bool has_person_id;
   uint64_t person_id;
   enum vsx_connection_running_state running_state;
@@ -317,11 +317,11 @@ set_pointer_in_buffer (struct vsx_buffer *buf,
   ((void **) buf->data)[num] = value;
 }
 
-static VsxPlayer *
+static struct vsx_player *
 get_or_create_player (struct vsx_connection *connection,
                       int player_num)
 {
-  VsxPlayer *player =
+  struct vsx_player *player =
     get_pointer_from_buffer (&connection->players, player_num);
 
   if (player == NULL)
@@ -491,7 +491,7 @@ handle_tile (struct vsx_connection *connection,
 
 static void
 emit_player_changed (struct vsx_connection *connection,
-                     VsxPlayer *player)
+                     struct vsx_player *player)
 {
   struct vsx_connection_event event =
     {
@@ -529,7 +529,7 @@ handle_player_name (struct vsx_connection *connection,
       return false;
     }
 
-  VsxPlayer *player = get_or_create_player (connection, num);
+  struct vsx_player *player = get_or_create_player (connection, num);
 
   vsx_free (player->name);
   player->name = vsx_strdup (name);
@@ -565,7 +565,7 @@ handle_player (struct vsx_connection *connection,
       return false;
     }
 
-  VsxPlayer *player = get_or_create_player (connection, num);
+  struct vsx_player *player = get_or_create_player (connection, num);
 
   player->flags = flags;
 
@@ -1452,9 +1452,12 @@ free_messages_to_send (struct vsx_connection *connection)
 static void
 free_players (struct vsx_connection *connection)
 {
-  for (int i = 0; i < connection->players.length / sizeof (VsxPlayer *); i++)
+  for (int i = 0;
+       i < connection->players.length / sizeof (struct vsx_player *);
+       i++)
     {
-      VsxPlayer *player = ((VsxPlayer **) connection->players.data)[i];
+      struct vsx_player *player =
+        ((struct vsx_player **) connection->players.data)[i];
 
       if (player == NULL)
         continue;
@@ -1533,7 +1536,7 @@ vsx_connection_leave (struct vsx_connection *connection)
   update_poll (connection, false /* always_send */);
 }
 
-const VsxPlayer *
+const struct vsx_player *
 vsx_connection_get_player (struct vsx_connection *connection,
                            int player_num)
 {
@@ -1545,9 +1548,12 @@ vsx_connection_foreach_player (struct vsx_connection *connection,
                                vsx_connection_foreach_player_cb callback,
                                void *user_data)
 {
-  for (int i = 0; i < connection->players.length / sizeof (VsxPlayer *); i++)
+  for (int i = 0;
+       i < connection->players.length / sizeof (struct vsx_player *);
+       i++)
     {
-      VsxPlayer *player = ((VsxPlayer **) connection->players.data)[i];
+      struct vsx_player *player =
+        ((struct vsx_player **) connection->players.data)[i];
 
       if (player == NULL)
         continue;
@@ -1556,7 +1562,7 @@ vsx_connection_foreach_player (struct vsx_connection *connection,
     }
 }
 
-const VsxPlayer *
+const struct vsx_player *
 vsx_connection_get_self (struct vsx_connection *connection)
 {
   return connection->self;

@@ -162,12 +162,12 @@ clear_line (void)
 
 struct check_typing_data
 {
-  const VsxPlayer *self;
+  const struct vsx_player *self;
   bool is_typing;
 };
 
 static void
-check_typing_cb (const VsxPlayer *player,
+check_typing_cb (const struct vsx_player *player,
                  void *user_data)
 {
   struct check_typing_data *data = user_data;
@@ -197,7 +197,7 @@ handle_player_shouted (struct vsx_connection *connection,
                        const struct vsx_connection_event *event)
 {
 
-  const VsxPlayer *player = event->player_shouted.player;
+  const struct vsx_player *player = event->player_shouted.player;
 
   format_print ("** %s SHOUTS\n",
                 vsx_player_get_name (player));
