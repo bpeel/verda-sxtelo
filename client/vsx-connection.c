@@ -97,12 +97,12 @@ struct vsx_connection_tile_to_move
   int num;
   int x;
   int y;
-  VsxList link;
+  struct vsx_list link;
 };
 
 struct vsx_connection_message_to_send
 {
-  VsxList link;
+  struct vsx_list link;
   /* Over-allocated */
   char message[1];
 };
@@ -132,8 +132,8 @@ struct vsx_connection
   VsxSignal event_signal;
 
   enum vsx_connection_dirty_flag dirty_flags;
-  VsxList tiles_to_move;
-  VsxList messages_to_send;
+  struct vsx_list tiles_to_move;
+  struct vsx_list messages_to_send;
 
   int sock;
   /* The condition that the source was last created with so we can
@@ -983,7 +983,7 @@ write_move_tile (struct vsx_connection *connection,
 
   struct vsx_connection_tile_to_move *tile =
     vsx_container_of (connection->tiles_to_move.next,
-                      tile,
+                      struct vsx_connection_tile_to_move,
                       link);
 
   int ret = vsx_proto_write_command (buffer,
@@ -1020,7 +1020,9 @@ write_send_message (struct vsx_connection *connection,
     return 0;
 
   struct vsx_connection_message_to_send *message =
-    vsx_container_of (connection->messages_to_send.next, message, link);
+    vsx_container_of (connection->messages_to_send.next,
+                      struct vsx_connection_message_to_send,
+                      link);
 
   int ret = vsx_proto_write_command (buffer,
                                      buffer_size,

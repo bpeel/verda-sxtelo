@@ -29,7 +29,7 @@ typedef enum
 
 typedef struct
 {
-  VsxList link;
+  struct vsx_list link;
   char *address;
   int port;
   char *certificate;
@@ -42,7 +42,7 @@ typedef struct
   char *log_file;
   char *user;
   char *group;
-  VsxList servers;
+  struct vsx_list servers;
 } VsxConfig;
 
 extern struct vsx_error_domain

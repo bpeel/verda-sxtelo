@@ -27,7 +27,7 @@
 
 typedef struct
 {
-  VsxList link;
+  struct vsx_list link;
   char *room_name;
   VsxConversation *conversation;
   VsxConversationSet *set;
@@ -38,7 +38,7 @@ struct _VsxConversationSet
 {
   VsxObject parent;
 
-  VsxList pending_conversations;
+  struct vsx_list pending_conversations;
 };
 
 static void
@@ -68,7 +68,9 @@ conversation_changed_cb (VsxListener *listener,
                          void *user_data)
 {
   VsxConversationSetPending *pending =
-    vsx_container_of (listener, pending, conversation_changed_listener);
+    vsx_container_of (listener,
+                      VsxConversationSetPending,
+                      conversation_changed_listener);
   VsxConversationChangedData *data = user_data;
 
   /* If the conversation has started then we'll remove it so that no

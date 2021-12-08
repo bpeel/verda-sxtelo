@@ -137,7 +137,7 @@ conversation_changed_cb (VsxListener *listener,
                          void *user_data)
 {
   VsxConnection *conn =
-    vsx_container_of (listener, conn, conversation_changed_listener);
+    vsx_container_of (listener, VsxConnection, conversation_changed_listener);
   VsxConversationChangedData *data = user_data;
 
   switch (data->type)

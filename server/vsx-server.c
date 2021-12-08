@@ -46,14 +46,14 @@
 struct _VsxServer
 {
   /* List of VsxServerSockets */
-  VsxList sockets;
+  struct vsx_list sockets;
 
   /* If this gets set then vsx_server_run will return and report the
      error */
   struct vsx_error *fatal_error;
 
   /* List of open connections */
-  VsxList connections;
+  struct vsx_list connections;
 
   VsxConversationSet *pending_conversations;
 
@@ -75,7 +75,7 @@ typedef struct
   VsxMainContextSource *source;
 
   /* List node within the list of connections */
-  VsxList link;
+  struct vsx_list link;
 
   VsxConnection *ws_connection;
   VsxListener ws_connection_listener;
@@ -113,7 +113,7 @@ typedef struct
 
 typedef struct
 {
-  VsxList link;
+  struct vsx_list link;
   VsxMainContextSource *source;
   int sock;
   VsxServer *server;
@@ -146,7 +146,7 @@ ws_connection_changed_cb (VsxListener *listener,
                           void *data)
 {
   VsxServerConnection *connection =
-    vsx_container_of (listener, connection, ws_connection_listener);
+    vsx_container_of (listener, VsxServerConnection, ws_connection_listener);
 
   update_poll (connection);
 }
@@ -1071,14 +1071,14 @@ vsx_server_free (VsxServer *server)
   while (!vsx_list_empty (&server->connections))
     {
       VsxServerConnection *connection =
-        vsx_container_of (server->connections.next, connection, link);
+        vsx_container_of (server->connections.next, VsxServerConnection, link);
       vsx_server_remove_connection (server, connection);
     }
 
   while (!vsx_list_empty (&server->sockets))
     {
       VsxServerSocket *ssocket =
-        vsx_container_of (server->sockets.next, ssocket, link);
+        vsx_container_of (server->sockets.next, VsxServerSocket, link);
       vsx_server_remove_socket (server, ssocket);
     }
 

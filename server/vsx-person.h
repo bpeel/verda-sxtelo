@@ -36,7 +36,7 @@ struct _VsxPerson
   VsxObject parent;
 
   /* Position in the global list of people */
-  VsxList link;
+  struct vsx_list link;
 
   /* Used to implement the hash table */
   VsxPerson *hash_next;

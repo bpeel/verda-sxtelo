@@ -36,12 +36,12 @@ typedef void
 
 typedef struct
 {
-  VsxList listener_list;
+  struct vsx_list listener_list;
 } VsxSignal;
 
 struct _VsxListener
 {
-  VsxList link;
+  struct vsx_list link;
   VsxNotifyFunc notify;
 };
 

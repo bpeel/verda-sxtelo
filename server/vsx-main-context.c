@@ -56,7 +56,7 @@ struct _VsxMainContext
 
   /* List of quit sources. All of these get invoked when a quit signal
      is received */
-  VsxList quit_sources;
+  struct vsx_list quit_sources;
 
   VsxMainContextSource *quit_pipe_source;
   int quit_pipe[2];
@@ -66,7 +66,7 @@ struct _VsxMainContext
   bool monotonic_time_valid;
   int64_t monotonic_time;
 
-  VsxList buckets;
+  struct vsx_list buckets;
   int64_t last_timer_time;
 
   struct vsx_slice_allocator source_allocator;
@@ -93,14 +93,14 @@ struct _VsxMainContextSource
     /* Quit sources */
     struct
     {
-      VsxList quit_link;
+      struct vsx_list quit_link;
     };
 
     /* Timer sources */
     struct
     {
       VsxMainContextBucket *bucket;
-      VsxList timer_link;
+      struct vsx_list timer_link;
       bool busy;
       bool removed;
     };
@@ -114,8 +114,8 @@ struct _VsxMainContextSource
 
 struct _VsxMainContextBucket
 {
-  VsxList link;
-  VsxList sources;
+  struct vsx_list link;
+  struct vsx_list sources;
   int minutes;
   int minutes_passed;
 };
@@ -488,7 +488,7 @@ check_timer_sources (VsxMainContext *mc)
    * removed instead of actually modifying the bucket’s list. That way
    * any timers can be removed as a result of invoking any callback.
    */
-  VsxList to_emit;
+  struct vsx_list to_emit;
   vsx_list_init (&to_emit);
 
   vsx_list_for_each (bucket, &mc->buckets, link)

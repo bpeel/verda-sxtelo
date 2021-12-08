@@ -31,7 +31,7 @@ struct _VsxPersonSet
 {
   VsxObject parent;
 
-  VsxList people;
+  struct vsx_list people;
 
   int n_people;
   int hash_size;
