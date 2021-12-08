@@ -21,31 +21,31 @@
 #include "vsx-player-private.h"
 
 bool
-vsx_player_is_connected (const struct vsx_player *player)
+vsx_player_is_connected(const struct vsx_player *player)
 {
-  return !!(player->flags & VSX_PLAYER_CONNECTED);
+        return !!(player->flags & VSX_PLAYER_CONNECTED);
 }
 
 bool
-vsx_player_is_typing (const struct vsx_player *player)
+vsx_player_is_typing(const struct vsx_player *player)
 {
-  return !!(player->flags & VSX_PLAYER_TYPING);
+        return !!(player->flags & VSX_PLAYER_TYPING);
 }
 
 bool
-vsx_player_has_next_turn (const struct vsx_player *player)
+vsx_player_has_next_turn(const struct vsx_player *player)
 {
-  return !!(player->flags & VSX_PLAYER_NEXT_TURN);
+        return !!(player->flags & VSX_PLAYER_NEXT_TURN);
 }
 
 int
-vsx_player_get_number (const struct vsx_player *player)
+vsx_player_get_number(const struct vsx_player *player)
 {
-  return player->num;
+        return player->num;
 }
 
 const char *
-vsx_player_get_name (const struct vsx_player *player)
+vsx_player_get_name(const struct vsx_player *player)
 {
-  return player->name ? player->name : "";
+        return player->name ? player->name : "";
 }
