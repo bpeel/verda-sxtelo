@@ -61,7 +61,7 @@ vsx_connection_is_finished (VsxConnection *conn);
 bool
 vsx_connection_has_data (VsxConnection *conn);
 
-VsxSignal *
+struct vsx_signal *
 vsx_connection_get_changed_signal (VsxConnection *conn);
 
 int64_t

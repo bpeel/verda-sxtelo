@@ -31,7 +31,7 @@ typedef struct
   char *room_name;
   VsxConversation *conversation;
   VsxConversationSet *set;
-  VsxListener conversation_changed_listener;
+  struct vsx_listener conversation_changed_listener;
 } VsxConversationSetPending;
 
 struct _VsxConversationSet
@@ -64,7 +64,7 @@ conversation_is_empty (VsxConversation *conversation)
 }
 
 static void
-conversation_changed_cb (VsxListener *listener,
+conversation_changed_cb (struct vsx_listener *listener,
                          void *user_data)
 {
   VsxConversationSetPending *pending =

@@ -197,7 +197,7 @@ vsx_connection_foreach_tile (struct vsx_connection *connection,
                              vsx_connection_foreach_tile_cb callback,
                              void *user_data);
 
-VsxSignal *
+struct vsx_signal *
 vsx_connection_get_event_signal (struct vsx_connection *connection);
 
 void

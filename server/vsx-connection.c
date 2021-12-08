@@ -60,7 +60,7 @@ struct _VsxConnection
 {
   VsxConnectionState state;
 
-  VsxSignal changed_signal;
+  struct vsx_signal changed_signal;
 
   int64_t last_message_time;
 
@@ -75,7 +75,7 @@ struct _VsxConnection
 
   VsxPerson *person;
 
-  VsxListener conversation_changed_listener;
+  struct vsx_listener conversation_changed_listener;
 
   unsigned int message_num;
 
@@ -133,7 +133,7 @@ typedef int (* VsxConnectionWriteStateFunc) (VsxConnection *conn,
                                              size_t buffer_size);
 
 static void
-conversation_changed_cb (VsxListener *listener,
+conversation_changed_cb (struct vsx_listener *listener,
                          void *user_data)
 {
   VsxConnection *conn =
@@ -1464,7 +1464,7 @@ vsx_connection_has_data (VsxConnection *conn)
   return false;
 }
 
-VsxSignal *
+struct vsx_signal *
 vsx_connection_get_changed_signal (VsxConnection *conn)
 {
   return &conn->changed_signal;

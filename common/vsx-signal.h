@@ -1,6 +1,6 @@
 /*
  * Copyright © 2008 Kristian Høgsberg
- * Copyright © 2013 Neil Roberts
+ * Copyright © 2013, 2021 Neil Roberts
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -28,44 +28,40 @@
 
 #include "vsx-list.h"
 
-typedef struct _VsxListener VsxListener;
+struct vsx_listener;
 
 typedef void
-(* VsxNotifyFunc) (VsxListener *listener,
-                   void *data);
+(* vsx_notify_func)(struct vsx_listener *listener, void *data);
 
-typedef struct
-{
-  struct vsx_list listener_list;
-} VsxSignal;
+struct vsx_signal {
+        struct vsx_list listener_list;
+};
 
-struct _VsxListener
-{
-  struct vsx_list link;
-  VsxNotifyFunc notify;
+struct vsx_listener {
+        struct vsx_list link;
+        vsx_notify_func notify;
 };
 
 static inline void
-vsx_signal_init (VsxSignal *signal)
+vsx_signal_init(struct vsx_signal *signal)
 {
-  vsx_list_init (&signal->listener_list);
+        vsx_list_init(&signal->listener_list);
 }
 
 static inline void
-vsx_signal_add (VsxSignal *signal,
-                VsxListener *listener)
+vsx_signal_add(struct vsx_signal *signal,
+               struct vsx_listener *listener)
 {
-  vsx_list_insert (signal->listener_list.prev, &listener->link);
+        vsx_list_insert(signal->listener_list.prev, &listener->link);
 }
 
 static inline void
-vsx_signal_emit (VsxSignal *signal,
-                 void *data)
+vsx_signal_emit(struct vsx_signal *signal, void *data)
 {
-  VsxListener *l, *next;
+        struct vsx_listener *l, *next;
 
-  vsx_list_for_each_safe (l, next, &signal->listener_list, link)
-    l->notify (l, data);
+        vsx_list_for_each_safe(l, next, &signal->listener_list, link)
+                l->notify(l, data);
 }
 
 #endif /* VSX_SIGNAL_H */

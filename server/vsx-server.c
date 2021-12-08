@@ -78,7 +78,7 @@ typedef struct
   struct vsx_list link;
 
   VsxConnection *ws_connection;
-  VsxListener ws_connection_listener;
+  struct vsx_listener ws_connection_listener;
 
   /* This becomes true when we've received something from the client
      that we don't understand and we're ignoring any further input */
@@ -142,7 +142,7 @@ struct vsx_error_domain
 vsx_server_error;
 
 static void
-ws_connection_changed_cb (VsxListener *listener,
+ws_connection_changed_cb (struct vsx_listener *listener,
                           void *data)
 {
   VsxServerConnection *connection =
@@ -673,7 +673,7 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
                         server->pending_conversations,
                         server->person_set);
 
-  VsxSignal *changed_signal =
+  struct vsx_signal *changed_signal =
     vsx_connection_get_changed_signal (connection->ws_connection);
   connection->ws_connection_listener.notify =
     ws_connection_changed_cb;

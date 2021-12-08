@@ -129,7 +129,7 @@ struct vsx_connection
    * reconnect is scheduled. */
   int64_t reconnect_timestamp;
 
-  VsxSignal event_signal;
+  struct vsx_signal event_signal;
 
   enum vsx_connection_dirty_flag dirty_flags;
   struct vsx_list tiles_to_move;
@@ -1585,7 +1585,7 @@ vsx_connection_foreach_tile (struct vsx_connection *connection,
     }
 }
 
-VsxSignal *
+struct vsx_signal *
 vsx_connection_get_event_signal (struct vsx_connection *connection)
 {
   return &connection->event_signal;

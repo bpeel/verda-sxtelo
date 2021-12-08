@@ -258,7 +258,7 @@ handle_poll_changed (struct vsx_connection *connection,
 }
 
 static void
-event_cb (VsxListener *listener,
+event_cb (struct vsx_listener *listener,
           void *data)
 {
   const struct vsx_connection_event *event = data;
@@ -530,8 +530,9 @@ main (int argc, char **argv)
 
   start_stdin ();
 
-  VsxSignal *event_signal = vsx_connection_get_event_signal (connection);
-  VsxListener event_listener =
+  struct vsx_signal *event_signal =
+    vsx_connection_get_event_signal (connection);
+  struct vsx_listener event_listener =
     {
       .notify = event_cb,
     };
