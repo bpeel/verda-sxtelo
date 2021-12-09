@@ -780,7 +780,7 @@ process_frames(struct vsx_connection *connection,
                 if (payload_length > VSX_PROTO_MAX_PAYLOAD_SIZE) {
                         vsx_set_error(error,
                                       &vsx_connection_error,
-                                      VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
+                                      VSX_CONNECTION_ERROR_BAD_DATA,
                                       "The server sent a frame that is too "
                                       "long");
                         return NULL;
