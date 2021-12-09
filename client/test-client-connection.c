@@ -119,6 +119,26 @@ frame_error_tests[] = {
         },
 };
 
+/* Hack to replace vsx_monotonic_get for the tests so we can fake the
+ * passage of time and still make the test run instantly.
+ */
+#define vsx_monotonic_get original_vsx_monotonic_get
+#undef VSX_MONOTONIC_H
+#include "vsx-monotonic.c"
+#undef vsx_monotonic_get
+
+static bool replace_monotonic_time = false;
+static int64_t replacement_monotonic_time = 0;
+
+int64_t
+vsx_monotonic_get(void)
+{
+        if (replace_monotonic_time)
+                return replacement_monotonic_time;
+        else
+                return original_vsx_monotonic_get();
+}
+
 static void
 handle_error(struct harness *harness,
              struct vsx_error *error)
@@ -750,26 +770,8 @@ error:
 }
 
 static bool
-test_reconnect(void)
+do_unexpected_close(struct harness *harness)
 {
-        struct harness *harness = create_negotiated_harness();
-        bool ret = true;
-
-        if (harness == NULL)
-                return false;
-
-        /* Send a few messages so we verify that the connection sends
-         * the message num in the reconnect message.
-         */
-        static const uint8_t messages[] =
-                "\x82\x05\x01ghi\0"
-                "\x82\x05\x01jkl\0";
-
-        if (!write_data(harness, messages, sizeof messages - 1)) {
-                ret = false;
-                goto out;
-        }
-
         /* Close the server end of the socket so that the client will
          * need to reconnect.
          */
@@ -781,27 +783,74 @@ test_reconnect(void)
         harness->expected_error_message =
                 "The server unexpectedly closed the connection";
 
-        if (!wake_up_connection(harness)) {
-                ret = false;
-                goto out;
-        }
+        if (!wake_up_connection(harness))
+                return false;
 
         if (harness->expected_error_domain) {
                 fprintf(stderr,
                         "The connection didn’t report an error after the "
                         "server socket was closed\n");
-                ret = false;
-                goto out;
+                return false;
         }
+
+        return true;
+}
+
+static struct harness *
+prepare_reconnect_test(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        /* Send a few messages so we verify that the connection sends
+         * the message num in the reconnect message.
+         */
+        static const uint8_t messages[] =
+                "\x82\x05\x01ghi\0"
+                "\x82\x05\x01jkl\0";
+
+        if (!write_data(harness, messages, sizeof messages - 1))
+                goto error;
+
+        if (!do_unexpected_close(harness))
+                goto error;
 
         /* The first reconnect should be immediate */
         if (harness->wakeup_time > vsx_monotonic_get()) {
                 fprintf(stderr,
                         "The connection isn’t ready to be woken up immediately "
                         "after recognising the connection has closed.\n");
-                ret = false;
-                goto out;
+                goto error;
         }
+
+        return harness;
+
+error:
+        free_harness(harness);
+        return NULL;
+}
+
+static bool
+read_reconnect_message(struct harness *harness)
+{
+        static const uint8_t reconnect_message[] =
+                "\x82\x0b\x81ghijklmn\x02\x00";
+
+        return expect_data(harness,
+                           reconnect_message,
+                           sizeof reconnect_message - 1);
+}
+
+static bool
+test_immediate_reconnect(void)
+{
+        struct harness *harness = prepare_reconnect_test();
+        bool ret = true;
+
+        if (harness == NULL)
+                return false;
 
         if (!wake_up_connection(harness)) {
                 ret = false;
@@ -819,16 +868,108 @@ test_reconnect(void)
                 goto out;
         }
 
-        static const uint8_t reconnect_message[] =
-                "\x82\x0b\x81ghijklmn\x02\x00";
-        if (!expect_data(harness,
-                         reconnect_message,
-                         sizeof reconnect_message - 1)) {
+        if (!read_reconnect_message(harness)) {
                 ret = false;
                 goto out;
         }
 
 out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+test_reconnect_delay(void)
+{
+        struct harness *harness = prepare_reconnect_test();
+        bool ret = true;
+
+        if (harness == NULL)
+                return false;
+
+        replacement_monotonic_time = vsx_monotonic_get();
+        replace_monotonic_time = true;
+
+        int64_t delay = 16000000;
+
+        for (int i = 0; i < 3; i++) {
+                if (!wake_up_connection(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!accept_connection(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!read_ws_request(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!read_reconnect_message(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!do_unexpected_close(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (harness->wakeup_time <
+                    vsx_monotonic_get() + delay - 1000000) {
+                        fprintf(stderr,
+                                "Expected connection to delay for at least "
+                                "%f seconds but only %f are requested\n",
+                                delay / 1000000.0,
+                                (harness->wakeup_time - vsx_monotonic_get()) /
+                                1000000.0);
+                        ret = false;
+                        goto out;
+                }
+
+                /* Advance time to 1 second before the delay */
+                replacement_monotonic_time += delay - 1000000;
+
+                if (!wake_up_connection(harness)) {
+                        ret = false;
+                        goto out;
+                }
+
+                /* Make sure the connection didn’t try to connect */
+                struct pollfd fd = {
+                        .fd = harness->server_sock,
+                        .events = POLLIN,
+                        .revents = 0,
+                };
+
+                if (poll(&fd, 1 /* nfds */, 0 /* timeout */) == -1) {
+                        fprintf(stderr,
+                                "poll failed: %s\n",
+                                strerror(errno));
+                        ret = false;
+                        goto out;
+                }
+
+                if (fd.revents) {
+                        fprintf(stderr,
+                                "Connection tried to connect before timeout is "
+                                "up\n");
+                        ret = false;
+                        goto out;
+                }
+
+                /* Advance enough time to trigger the reconnect */
+                replacement_monotonic_time += 1000001;
+
+                delay *= 2;
+        }
+
+out:
+        replace_monotonic_time = false;
         free_harness(harness);
 
         return ret;
@@ -1085,7 +1226,10 @@ main(int argc, char **argv)
         if (!test_slow_ws_response())
                 ret = EXIT_FAILURE;
 
-        if (!test_reconnect())
+        if (!test_immediate_reconnect())
+                ret = EXIT_FAILURE;
+
+        if (!test_reconnect_delay())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())
