@@ -42,3 +42,25 @@ executable('verda-sxtelo-client', client_src,
            dependencies: client_deps,
            install: true,
            include_directories: inc_dirs)
+
+test_client_connection_src = [
+        'test-client-connection.c',
+        '../common/vsx-buffer.c',
+        'vsx-connection.c',
+        '../common/vsx-error.c',
+        '../common/vsx-file-error.c',
+        '../common/vsx-list.c',
+        'vsx-monotonic.c',
+        '../common/vsx-netaddress.c',
+        'vsx-player.c',
+        '../common/vsx-proto.c',
+        '../common/vsx-slab.c',
+        '../common/vsx-socket.c',
+        'vsx-tile.c',
+        '../common/vsx-utf8.c',
+        '../common/vsx-util.c',
+]
+test_client_connection = executable('test-client-connection',
+                                    test_client_connection_src,
+                                    include_directories: inc_dirs)
+test('client-connection', test_client_connection)
