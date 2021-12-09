@@ -29,6 +29,7 @@
 #include "vsx-connection.h"
 #include "vsx-util.h"
 #include "vsx-proto.h"
+#include "vsx-monotonic.h"
 
 #define TEST_PORT 6132
 
@@ -720,6 +721,98 @@ error:
 }
 
 static bool
+test_reconnect(void)
+{
+        struct harness *harness = create_negotiated_harness();
+        bool ret = true;
+
+        if (harness == NULL)
+                return false;
+
+        /* Send a few messages so we verify that the connection sends
+         * the message num in the reconnect message.
+         */
+        static const uint8_t messages[] =
+                "\x82\x05\x01ghi\0"
+                "\x82\x05\x01jkl\0";
+
+        if (!write_data(harness, messages, sizeof messages - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Close the server end of the socket so that the client will
+         * need to reconnect.
+         */
+        vsx_close(harness->server_fd);
+        harness->server_fd = -1;
+
+        harness->expected_error_domain = &vsx_connection_error;
+        harness->expected_error_code = VSX_CONNECTION_ERROR_CONNECTION_CLOSED;
+        harness->expected_error_message =
+                "The server unexpectedly closed the connection";
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (harness->expected_error_domain) {
+                fprintf(stderr,
+                        "The connection didn’t report an error after the "
+                        "server socket was closed\n");
+                ret = false;
+                goto out;
+        }
+
+        /* The first reconnect should be immediate */
+        if (harness->wakeup_time > vsx_monotonic_get()) {
+                fprintf(stderr,
+                        "The connection isn’t ready to be woken up immediately "
+                        "after recognising the connection has closed.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        harness->server_fd = accept(harness->server_sock,
+                                    NULL, /* addr */
+                                    NULL /* addrlen */);
+
+        if (harness->server_fd == -1) {
+                fprintf(stderr,
+                        "accept failed: %s\n",
+                        strerror(errno));
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t reconnect_message[] =
+                "\x82\x0b\x81ghijklmn\x02\x00";
+        if (!expect_data(harness,
+                         reconnect_message,
+                         sizeof reconnect_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 check_player_added_cb(struct harness *harness,
                       const struct vsx_connection_event *event)
 {
@@ -968,6 +1061,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_slow_ws_response())
+                ret = EXIT_FAILURE;
+
+        if (!test_reconnect())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())
