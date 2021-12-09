@@ -702,21 +702,29 @@ get_payload_length(const uint8_t *buf,
                 return false;
 
         switch (buf[1]) {
-        case 0x7e:
+        case 0x7e: {
                 if (buf_length < 4)
                         return false;
 
-                *payload_length_out = vsx_proto_read_uint16_t(buf + 2);
+                uint16_t length;
+                memcpy(&length, buf + 2, sizeof length);
+
+                *payload_length_out = VSX_UINT16_FROM_BE(length);
                 *payload_start_out = buf + 4;
                 return true;
+        }
 
-        case 0x7f:
+        case 0x7f: {
                 if (buf_length < 6)
                         return false;
 
-                *payload_length_out = vsx_proto_read_uint32_t(buf + 2);
+                uint32_t length;
+                memcpy(&length, buf + 2, sizeof length);
+
+                *payload_length_out = VSX_UINT32_FROM_BE(length);
                 *payload_start_out = buf + 6;
                 return true;
+        }
 
         default:
                 *payload_length_out = buf[1];
