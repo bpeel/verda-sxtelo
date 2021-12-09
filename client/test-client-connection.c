@@ -45,8 +45,98 @@ struct harness {
 
         int events_triggered;
 
-        struct vsx_error *error;
+        const struct vsx_error_domain *expected_error_domain;
+        int expected_error_code;
+        const char *expected_error_message;
 };
+
+struct frame_error_test
+{
+        const uint8_t *frame;
+        size_t frame_length;
+        const char *expected_message;
+};
+
+#define BIN_STR(x) ((const uint8_t *) (x)), (sizeof (x)) - 1
+
+static const struct frame_error_test
+frame_error_tests[] = {
+        {
+                BIN_STR("\x82\x09\x00\x00ghijklm"),
+                "The server sent an invalid player_id command"
+        },
+        {
+                BIN_STR("\x82\x09\x01\x00ghijklm"),
+                "The server sent an invalid message command"
+        },
+        {
+                BIN_STR("\x82\x02\x03g"),
+                "The server sent an invalid tile command"
+        },
+        {
+                BIN_STR("\x82\x04\x04!\0?"),
+                "The server sent an invalid player_name command"
+        },
+        {
+                BIN_STR("\x82\x01\x05"),
+                "The server sent an invalid player command"
+        },
+        {
+                BIN_STR("\x82\x01\x06"),
+                "The server sent an invalid player_shouted command"
+        },
+        {
+                BIN_STR("\x82\x04\x08!!!"),
+                "The server sent an invalid end command"
+        },
+        {
+                BIN_STR("\x82\x00"),
+                "The server sent an empty message"
+        },
+        {
+                BIN_STR("\x82\x7e\x04\x01 This has a length of 1025 …"),
+                "The server sent a frame that is too long"
+        },
+};
+
+static void
+handle_error(struct harness *harness,
+             struct vsx_error *error)
+{
+        if (harness->expected_error_domain == NULL) {
+                fprintf(stderr, "Unexpected error reported\n");
+        }
+        assert(harness->expected_error_domain);
+
+        if (harness->expected_error_domain != error->domain) {
+                fprintf(stderr,
+                        "Error does not have the expected domain\n");
+        }
+        assert(harness->expected_error_domain == error->domain);
+
+        if (harness->expected_error_code != error->code) {
+                fprintf(stderr,
+                        "Error does not have expected code (%i != %i)\n",
+                        harness->expected_error_code,
+                        error->code);
+        }
+        assert(harness->expected_error_code == error->code);
+
+        if (strcmp(harness->expected_error_message,
+                   error->message)) {
+                fprintf(stderr,
+                        "Error does not have expected message\n"
+                        "Expected: %s\n"
+                        "Received: %s\n",
+                        harness->expected_error_message,
+                        error->message);
+        }
+        assert(!strcmp(harness->expected_error_message, error->message));
+
+        harness->expected_error_domain = NULL;
+        harness->expected_error_code = 0;
+        harness->expected_error_message = NULL;
+}
 
 static void
 event_cb(struct vsx_listener *listener,
@@ -61,12 +151,7 @@ event_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_ERROR:
-                assert(harness->error == NULL);
-                vsx_set_error(&harness->error,
-                              event->error.error->domain,
-                              event->error.error->code,
-                              "%s",
-                              event->error.error->message);
+                handle_error(harness, event->error.error);
                 break;
 
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
@@ -112,9 +197,6 @@ free_harness(struct harness *harness)
 
         if (harness->connection)
                 vsx_connection_free(harness->connection);
-
-        if (harness->error)
-                vsx_error_free(harness->error);
 
         vsx_free(harness);
 }
@@ -310,6 +392,55 @@ write_data(struct harness *harness,
 }
 
 static bool
+write_string(struct harness *harness,
+             const char *str)
+{
+        return write_data(harness, (const uint8_t *) str, strlen(str));
+}
+
+static bool
+test_frame_error(struct harness *harness,
+                 const struct frame_error_test *test)
+{
+        if (!write_string(harness, "\r\n\r\n"))
+                return false;
+
+        harness->expected_error_domain = &vsx_connection_error;
+        harness->expected_error_code = VSX_CONNECTION_ERROR_BAD_DATA;
+        harness->expected_error_message = test->expected_message;
+
+        if (!write_data(harness, test->frame, test->frame_length))
+                return false;
+
+        if (harness->expected_error_domain != NULL) {
+                fprintf(stderr,
+                        "Expected error but non received\n"
+                        " Expected: %s\n",
+                        test->expected_message);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_frame_errors(void)
+{
+        bool ret = true;
+
+        for (unsigned i = 0; i < VSX_N_ELEMENTS(frame_error_tests); i++) {
+                struct harness *harness = create_harness();
+
+                if (!test_frame_error(harness, frame_error_tests + i))
+                        ret = false;
+
+                free_harness(harness);
+        }
+
+        return ret;
+}
+
+static bool
 test_slow_ws_response(void)
 {
         struct harness *harness = create_harness();
@@ -378,6 +509,9 @@ int
 main(int argc, char **argv)
 {
         int ret = EXIT_SUCCESS;
+
+        if (!test_frame_errors())
+                ret = EXIT_FAILURE;
 
         if (!test_slow_ws_response())
                 ret = EXIT_FAILURE;
