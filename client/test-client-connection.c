@@ -968,6 +968,70 @@ out:
 }
 
 static bool
+test_keep_alive(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        replacement_monotonic_time = vsx_monotonic_get();
+        replace_monotonic_time = true;
+
+        /* The next wakeup time should be at least 2.5 minutes in the future */
+        if (harness->wakeup_time == INT64_MAX ||
+            harness->wakeup_time <
+            replacement_monotonic_time + (2 * 60 + 30 - 1) * 1000000) {
+                fprintf(stderr,
+                        "Next wakeup time for newly negotiated connection "
+                        "should be at least 2.5 minutes in the future but it "
+                        "is %f seconds\n",
+                        (harness->wakeup_time - replacement_monotonic_time) /
+                        1000000.0);
+                ret = false;
+                goto out;
+        }
+
+        /* Advance time to nearly enough */
+        replacement_monotonic_time += (2 * 60 + 30 - 1) * 1000000;
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Check that nothing was written */
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "The vsx_connection wrote something before the "
+                        "keep up delay.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* Now advance actually enough time */
+        replacement_monotonic_time += 1000001;
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness, (const uint8_t *) "\x82\x01\x83", 3)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        replace_monotonic_time = false;
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 check_player_added_cb(struct harness *harness,
                       const struct vsx_connection_event *event)
 {
@@ -1222,6 +1286,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_reconnect_delay())
+                ret = EXIT_FAILURE;
+
+        if (!test_keep_alive())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())
