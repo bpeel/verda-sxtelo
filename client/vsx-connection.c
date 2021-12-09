@@ -355,6 +355,9 @@ handle_player_id(struct vsx_connection *connection,
 
         connection->self = get_or_create_player(connection, self_num);
 
+        /* Assume that self is connected until told otherwise */
+        connection->self->flags |= VSX_PLAYER_CONNECTED;
+
         connection->has_person_id = true;
 
         if (connection->state == VSX_CONNECTION_STATE_AWAITING_HEADER) {
