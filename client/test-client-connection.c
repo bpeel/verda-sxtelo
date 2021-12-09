@@ -242,22 +242,28 @@ free_harness(struct harness *harness)
 }
 
 static bool
-accept_connection(struct harness *harness)
+fd_ready_for_read(int fd)
 {
-        struct pollfd fd = {
-                .fd = harness->server_sock,
+        struct pollfd pfd = {
+                .fd = fd,
                 .events = POLLIN,
                 .revents = 0,
         };
 
-        if (poll(&fd, 1 /* nfds */, 0 /* timeout */) == -1) {
+        if (poll(&pfd, 1 /* nfds */, 0 /* timeout */) == -1) {
                 fprintf(stderr,
-                        "poll on server socket failed: %s\n",
+                        "poll failed: %s\n",
                         strerror(errno));
-                return false;
+                assert(!"poll failed");
         }
 
-        if ((fd.revents & (POLLIN | POLLHUP | POLLERR)) == 0) {
+        return pfd.revents;
+}
+
+static bool
+accept_connection(struct harness *harness)
+{
+        if (!fd_ready_for_read(harness->server_sock)) {
                 fprintf(stderr,
                         "The test wants to accept a connection but the "
                         "server socket is not ready for reading.\n");
@@ -940,21 +946,7 @@ test_reconnect_delay(void)
                 }
 
                 /* Make sure the connection didn’t try to connect */
-                struct pollfd fd = {
-                        .fd = harness->server_sock,
-                        .events = POLLIN,
-                        .revents = 0,
-                };
-
-                if (poll(&fd, 1 /* nfds */, 0 /* timeout */) == -1) {
-                        fprintf(stderr,
-                                "poll failed: %s\n",
-                                strerror(errno));
-                        ret = false;
-                        goto out;
-                }
-
-                if (fd.revents) {
+                if (fd_ready_for_read(harness->server_sock)) {
                         fprintf(stderr,
                                 "Connection tried to connect before timeout is "
                                 "up\n");
