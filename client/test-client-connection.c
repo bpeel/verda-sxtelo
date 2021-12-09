@@ -793,7 +793,7 @@ check_other_shouted_cb(struct harness *harness,
 }
 
 static bool
-test_shout(void)
+test_receive_shout(void)
 {
         struct harness *harness = create_negotiated_harness();
 
@@ -837,6 +837,24 @@ out:
         return ret;
 }
 
+static bool
+test_send_shout(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_shout(harness->connection);
+
+        bool ret = (wake_up_connection(harness) &&
+                    expect_data(harness, (uint8_t *) "\x82\x01\x8a", 3));
+
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -848,7 +866,10 @@ main(int argc, char **argv)
         if (!test_slow_ws_response())
                 ret = EXIT_FAILURE;
 
-        if (!test_shout())
+        if (!test_receive_shout())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_shout())
                 ret = EXIT_FAILURE;
 
         return ret;
