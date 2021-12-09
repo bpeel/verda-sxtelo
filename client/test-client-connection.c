@@ -839,6 +839,24 @@ out:
 }
 
 static bool
+test_send_leave(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_leave(harness->connection);
+
+        bool ret = (wake_up_connection(harness) &&
+                    expect_data(harness, (uint8_t *) "\x82\x01\x84", 3));
+
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_send_shout(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -935,6 +953,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_leave())
                 ret = EXIT_FAILURE;
 
         if (!test_send_shout())
