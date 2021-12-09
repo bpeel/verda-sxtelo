@@ -1325,11 +1325,11 @@ start_connecting_running_state(struct vsx_connection *connection)
          * connecting
          */
         connection->reconnect_timeout = 0;
+        connection->reconnect_timestamp = vsx_monotonic_get();
 
         connection->running_state =
                 VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
 
-        set_reconnect_timestamp(connection);
         send_poll_changed(connection);
 }
 
