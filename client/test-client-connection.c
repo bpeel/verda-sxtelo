@@ -1271,6 +1271,99 @@ out:
         return ret;
 }
 
+static bool
+test_typing(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_connection_set_typing(harness->connection, true);
+
+        if (!vsx_connection_get_typing(harness->connection)) {
+                fprintf(stderr,
+                        "Typing not true after setting it to true\n");
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t typing_message[] =
+                "\x82\x01\x86";
+
+        if (!expect_data(harness, typing_message, sizeof typing_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Setting it to the same value shouldn’t do anything */
+        vsx_connection_set_typing(harness->connection, true);
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection wrote something after setting typing "
+                        "to same value\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_typing(harness->connection, false);
+
+        static const uint8_t untyping_message[] =
+                "\x82\x01\x87";
+
+        if (!expect_data(harness,
+                         untyping_message,
+                         sizeof untyping_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_typing(harness->connection, true);
+
+        if (!expect_data(harness, typing_message, sizeof typing_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_send_message(harness->connection, "hi");
+
+        vsx_connection_set_typing(harness->connection, false);
+
+        if (!expect_data(harness, (uint8_t *) "\x82\x04\x85hi\0", 6)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Sending a message should automatically set the typing state
+         * to false so the client shouldn’t send another message.
+         */
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection is trying to write something after "
+                        "sending a message and setting typing to false\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1304,6 +1397,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_message())
+                ret = EXIT_FAILURE;
+
+        if (!test_typing())
                 ret = EXIT_FAILURE;
 
         return ret;
