@@ -28,6 +28,7 @@
 
 #include "vsx-connection.h"
 #include "vsx-util.h"
+#include "vsx-proto.h"
 
 #define TEST_PORT 6132
 
@@ -855,6 +856,73 @@ test_send_shout(void)
         return ret;
 }
 
+static bool
+test_send_message(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_send_message(harness->connection,
+                                    "Eĥoŝanĝoĉiuĵaŭde "
+                                    "c’est le mot des espérantistes");
+        vsx_connection_send_message(harness->connection,
+                                    "Du mesaĝoj?");
+
+        static const uint8_t expected_response[] =
+                "\x82\x3a\x85"
+                "Eĥoŝanĝoĉiuĵaŭde "
+                "c’est le mot des espérantistes\0"
+                "\x82\x0e\x85"
+                "Du mesaĝoj?\0";
+
+        bool ret = true;
+        const size_t buf_size = VSX_PROTO_MAX_MESSAGE_LENGTH + 16;
+        char *buf = vsx_alloc(buf_size);
+
+        if (!wake_up_connection(harness) ||
+            !expect_data(harness,
+                         expected_response,
+                         sizeof expected_response - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send a message that is too long. The vsx_connection should
+         * clip it to a valid UTF-8 boundary.
+         */
+        memset(buf, 'a', VSX_PROTO_MAX_MESSAGE_LENGTH - 3);
+        strcpy(buf + VSX_PROTO_MAX_MESSAGE_LENGTH - 3, "ĉĥ");
+
+        vsx_connection_send_message(harness->connection, buf);
+
+        memset(buf, 0, buf_size);
+
+        const uint16_t payload_length =
+                1 + (VSX_PROTO_MAX_MESSAGE_LENGTH - 1) + 1;
+
+        buf[0] = 0x82;
+        buf[1] = 0x7e; /* 16-bit payload length */
+        buf[2] = payload_length >> 8;
+        buf[3] = payload_length & 0xff;
+        buf[4] = 0x85;
+        memset(buf + 5, 'a', VSX_PROTO_MAX_MESSAGE_LENGTH - 3);
+        strcpy(buf + 5 + VSX_PROTO_MAX_MESSAGE_LENGTH - 3, "ĉ");
+
+        if (!wake_up_connection(harness) ||
+            !expect_data(harness, (uint8_t *) buf, 4 + payload_length)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_free(buf);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -870,6 +938,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_shout())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_message())
                 ret = EXIT_FAILURE;
 
         return ret;
