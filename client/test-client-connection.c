@@ -221,6 +221,43 @@ free_harness(struct harness *harness)
         vsx_free(harness);
 }
 
+static bool
+accept_connection(struct harness *harness)
+{
+        struct pollfd fd = {
+                .fd = harness->server_sock,
+                .events = POLLIN,
+                .revents = 0,
+        };
+
+        if (poll(&fd, 1 /* nfds */, 0 /* timeout */) == -1) {
+                fprintf(stderr,
+                        "poll on server socket failed: %s\n",
+                        strerror(errno));
+                return false;
+        }
+
+        if ((fd.revents & (POLLIN | POLLHUP | POLLERR)) == 0) {
+                fprintf(stderr,
+                        "The test wants to accept a connection but the "
+                        "server socket is not ready for reading.\n");
+                return false;
+        }
+
+        harness->server_fd = accept(harness->server_sock,
+                                    NULL, /* addr */
+                                    NULL /* addrlen */);
+
+        if (harness->server_fd == -1) {
+                fprintf(stderr,
+                        "accept failed: %s\n",
+                        strerror(errno));
+                return false;
+        }
+
+        return true;
+}
+
 static struct harness *
 create_harness(void)
 {
@@ -296,16 +333,8 @@ create_harness(void)
         if (!wake_up_connection(harness))
                 goto error;
 
-        harness->server_fd = accept(harness->server_sock,
-                                    NULL, /* addr */
-                                    NULL /* addrlen */);
-
-        if (harness->server_fd == -1) {
-                fprintf(stderr,
-                        "accept failed: %s\n",
-                        strerror(errno));
+        if (!accept_connection(harness))
                 goto error;
-        }
 
         return harness;
 
@@ -779,14 +808,7 @@ test_reconnect(void)
                 goto out;
         }
 
-        harness->server_fd = accept(harness->server_sock,
-                                    NULL, /* addr */
-                                    NULL /* addrlen */);
-
-        if (harness->server_fd == -1) {
-                fprintf(stderr,
-                        "accept failed: %s\n",
-                        strerror(errno));
+        if (!accept_connection(harness)) {
                 ret = false;
                 goto out;
         }
