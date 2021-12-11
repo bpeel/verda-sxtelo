@@ -1561,6 +1561,41 @@ out:
         return ret;
 }
 
+static bool
+test_set_n_tiles(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_connection_set_n_tiles(harness->connection, 0x82);
+        vsx_connection_set_n_tiles(harness->connection, 0x42);
+
+        const uint8_t expected_data[] =
+                "\x82\x02\x8b\x42";
+
+        if (!expect_data(harness, expected_data, sizeof expected_data - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection sent more data after set_n_tiles "
+                        "command\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 struct check_tiles_closure {
         struct harness *harness;
         int next_tile_num;
@@ -2072,6 +2107,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_move_tile())
+                ret = EXIT_FAILURE;
+
+        if (!test_set_n_tiles())
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())

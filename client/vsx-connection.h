@@ -156,6 +156,10 @@ vsx_connection_move_tile(struct vsx_connection *connection,
                          int tile_num,
                          int x, int y);
 
+void
+vsx_connection_set_n_tiles(struct vsx_connection *connection,
+                           int n_tiles);
+
 enum vsx_connection_state
 vsx_connection_get_state(struct vsx_connection *connection);
 

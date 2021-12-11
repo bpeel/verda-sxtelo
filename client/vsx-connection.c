@@ -55,6 +55,7 @@ enum vsx_connection_dirty_flag {
         VSX_CONNECTION_DIRTY_FLAG_LEAVE = (1 << 3),
         VSX_CONNECTION_DIRTY_FLAG_SHOUT = (1 << 4),
         VSX_CONNECTION_DIRTY_FLAG_TURN = (1 << 5),
+        VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 6),
 };
 
 typedef int
@@ -134,6 +135,8 @@ struct vsx_connection {
         enum vsx_connection_dirty_flag dirty_flags;
         struct vsx_list tiles_to_move;
         struct vsx_list messages_to_send;
+        /* The n_tiles value that is queued to send to the server */
+        int n_tiles_to_send;
 
         int sock;
         /* The condition that the source was last created with so we can
@@ -262,6 +265,16 @@ vsx_connection_move_tile(struct vsx_connection *connection,
 found_tile:
         tile->x = x;
         tile->y = y;
+
+        update_poll(connection, false /* always_send */);
+}
+
+void
+vsx_connection_set_n_tiles(struct vsx_connection *connection,
+                           int n_tiles)
+{
+        connection->n_tiles_to_send = n_tiles;
+        connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
 
         update_poll(connection, false /* always_send */);
 }
@@ -951,6 +964,21 @@ write_keep_alive(struct vsx_connection *connection,
 }
 
 static int
+write_n_tiles(struct vsx_connection *connection,
+              uint8_t *buffer, size_t buffer_size)
+{
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_SET_N_TILES,
+
+                                       VSX_PROTO_TYPE_UINT8,
+                                       connection->n_tiles_to_send,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_leave(struct vsx_connection *connection,
             uint8_t *buffer, size_t buffer_size)
 {
@@ -1089,6 +1117,7 @@ write_one_item(struct vsx_connection *connection)
                 { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_request },
                 { VSX_CONNECTION_DIRTY_FLAG_HEADER, write_header },
                 { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
+                { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
                 { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
                 { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
                 { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
