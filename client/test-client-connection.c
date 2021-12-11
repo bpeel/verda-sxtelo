@@ -119,6 +119,11 @@ frame_error_tests[] = {
                 BIN_STR("\x82\x7e\x04\x01 This has a length of 1025 …"),
                 "The server sent a frame that is too long"
         },
+        {
+                BIN_STR("\x82\x7f\x00\x01\x00\x00 This has a length of "
+                        "65536 …"),
+                "The server sent a frame that is too long"
+        },
 };
 
 /* Hack to replace vsx_monotonic_get for the tests so we can fake the
