@@ -156,6 +156,11 @@ struct vsx_connection {
          */
         struct vsx_buffer tiles;
 
+        /* The total number of tiles that the game will have according
+         * to what was sent to us by the server.
+         */
+        int n_tiles;
+
         /* Monotonic time to wake up at in order to send a keepalive, or
          * INT64_MAX if no keepalive is scheduled.
          */
@@ -377,6 +382,42 @@ handle_player_id(struct vsx_connection *connection,
                 vsx_connection_set_state(connection,
                                          VSX_CONNECTION_STATE_IN_PROGRESS);
         }
+
+        return true;
+}
+
+static bool
+handle_n_tiles(struct vsx_connection *connection,
+               const uint8_t *payload,
+               size_t payload_length,
+               struct vsx_error **error)
+{
+        uint8_t n_tiles;
+
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_UINT8,
+                                    &n_tiles,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid n_tiles command");
+                return false;
+        }
+
+        connection->n_tiles = n_tiles;
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
+                .n_tiles_changed = {
+                        .n_tiles = n_tiles,
+                },
+        };
+
+        vsx_signal_emit(&connection->event_signal, &event);
 
         return true;
 }
@@ -656,6 +697,10 @@ process_message(struct vsx_connection *connection,
                 return handle_player_id(connection,
                                         payload, payload_length,
                                         error);
+        case VSX_PROTO_N_TILES:
+                return handle_n_tiles(connection,
+                                      payload, payload_length,
+                                      error);
         case VSX_PROTO_MESSAGE:
                 return handle_message(connection,
                                       payload, payload_length,
@@ -1636,4 +1681,10 @@ struct vsx_signal *
 vsx_connection_get_event_signal(struct vsx_connection *connection)
 {
         return &connection->event_signal;
+}
+
+int
+vsx_connection_get_n_tiles(struct vsx_connection *connection)
+{
+        return connection->n_tiles;
 }

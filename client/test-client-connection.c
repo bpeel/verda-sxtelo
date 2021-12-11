@@ -90,6 +90,10 @@ frame_error_tests[] = {
                 "The server sent an invalid player_id command"
         },
         {
+                BIN_STR("\x82\x04\x02six"),
+                "The server sent an invalid n_tiles command"
+        },
+        {
                 BIN_STR("\x82\x09\x01\x00ghijklm"),
                 "The server sent an invalid message command"
         },
@@ -1070,6 +1074,57 @@ test_keep_alive(void)
 
 out:
         replace_monotonic_time = false;
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+check_n_tiles_changed_cb(struct harness *harness,
+                         const struct vsx_connection_event *event,
+                         void *user_data)
+{
+        if (event->n_tiles_changed.n_tiles != 0x42) {
+                fprintf(stderr,
+                        "n_tiles in event has unexpected value (%i != %i)\n",
+                        event->n_tiles_changed.n_tiles,
+                        0x42);
+                return false;
+        }
+
+        if (event->n_tiles_changed.n_tiles !=
+            vsx_connection_get_n_tiles(harness->connection)) {
+                fprintf(stderr,
+                        "n_tiles in event does not match connection value "
+                        "(%i != %i)\n",
+                        event->n_tiles_changed.n_tiles,
+                        vsx_connection_get_n_tiles(harness->connection));
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_send_n_tiles(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
+                         check_n_tiles_changed_cb,
+                         (const uint8_t *) "\x82\x02\x02\x42", 4,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+out:
         free_harness(harness);
 
         return ret;
@@ -2086,6 +2141,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_keep_alive())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_n_tiles())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())

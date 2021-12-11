@@ -267,6 +267,8 @@ event_cb(struct vsx_listener *listener,
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
                 handle_player_shouted(connection, event);
                 break;
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+                break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(connection, event);
                 break;

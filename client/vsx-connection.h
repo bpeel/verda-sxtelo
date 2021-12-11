@@ -51,6 +51,7 @@ enum vsx_connection_event_type {
         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
         VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
@@ -87,6 +88,10 @@ struct vsx_connection_event {
                         bool new_tile;
                         const struct vsx_tile *tile;
                 } tile_changed;
+
+                struct {
+                        int n_tiles;
+                } n_tiles_changed;
 
                 struct {
                         bool running;
@@ -189,6 +194,9 @@ vsx_connection_get_self(struct vsx_connection *connection);
 const struct vsx_tile *
 vsx_connection_get_tile(struct vsx_connection *connection,
                         int tile_num);
+
+int
+vsx_connection_get_n_tiles(struct vsx_connection *connetion);
 
 typedef void
 (* vsx_connection_foreach_tile_cb)(const struct vsx_tile *tile,
