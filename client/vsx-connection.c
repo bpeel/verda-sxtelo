@@ -1298,8 +1298,8 @@ update_poll(struct vsx_connection *connection, bool always_send)
                 if (!connection->write_finished) {
                         if (has_pending_data(connection)) {
                                 events |= POLLOUT;
-                        } else if (connection->self &&
-                                   !vsx_player_is_connected(connection->self)) {
+                        } else if (connection->state ==
+                                   VSX_CONNECTION_STATE_DONE) {
                                 shutdown(connection->sock, SHUT_WR);
 
                                 connection->write_finished = true;
