@@ -31,6 +31,7 @@
 #include "vsx-proto.h"
 #include "vsx-monotonic.h"
 #include "vsx-file-error.h"
+#include "vsx-buffer.h"
 
 #define TEST_PORT 6132
 
@@ -1660,6 +1661,124 @@ out:
         return ret;
 }
 
+struct check_players_closure {
+        struct harness *harness;
+        int next_player_num;
+        bool succeeded;
+};
+
+static void
+check_players_cb(const struct vsx_player *player,
+                 void *user_data)
+{
+        struct check_players_closure *closure = user_data;
+        int player_num = closure->next_player_num++;
+
+        if (player_num != vsx_player_get_number(player)) {
+                fprintf(stderr,
+                        "Players reported out of order. Expected %i got %i\n",
+                        player_num,
+                        vsx_player_get_number(player));
+                closure->succeeded = false;
+                return;
+        }
+
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+        if (player_num == 1)
+                vsx_buffer_append_string(&buf, "George");
+        else
+                vsx_buffer_append_printf(&buf, "Player %i", player_num);
+
+        if (strcmp(vsx_player_get_name(player), (const char *) buf.data)) {
+                fprintf(stderr,
+                        "Wrong player name reported.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        (const char *) buf.data,
+                        vsx_player_get_name(player));
+                closure->succeeded = false;
+        }
+
+        vsx_buffer_destroy(&buf);
+
+        if (vsx_connection_get_player(closure->harness->connection,
+                                      player_num) != player) {
+                fprintf(stderr,
+                        "Player reported by get_player not same as iterating "
+                        "players\n");
+                closure->succeeded = false;
+                return;
+        }
+}
+
+static bool
+test_send_all_players(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+        /* Add all of the possible players */
+        for (int i = 0; i < 256; i++) {
+                /* Send them in a strange order */
+                int player_num = ((i & 0xfc) |
+                                  ((i & 2) >> 1) |
+                                  ((i & 1) << 1));
+
+                vsx_buffer_set_length(&buf, 0);
+                vsx_buffer_append_string(&buf, "\x82\xff\x04\xff");
+                vsx_buffer_append_printf(&buf, "Player %i", player_num);
+                buf.length++;
+                buf.data[1] = buf.length - 2;
+                buf.data[3] = player_num;
+
+                if (!write_data(harness, buf.data, buf.length)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        /* Update one of the players */
+        if (!add_player(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        struct check_players_closure closure = {
+                .harness = harness,
+                .next_player_num = 0,
+                .succeeded = true,
+        };
+
+        vsx_connection_foreach_player(harness->connection,
+                                      check_players_cb,
+                                      &closure);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.next_player_num != 256) {
+                fprintf(stderr,
+                        "vsx_connection_foreach_player didn’t report "
+                        "all the players\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_buffer_destroy(&buf);
+        free_harness(harness);
+
+        return ret;
+}
+
 static bool
 check_end_state_cb(struct harness *harness,
                    const struct vsx_connection_event *event,
@@ -1923,6 +2042,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_all_players())
                 ret = EXIT_FAILURE;
 
         if (!test_end(true /* do_shutdown */))
