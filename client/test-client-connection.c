@@ -1521,6 +1521,139 @@ out:
         return ret;
 }
 
+struct check_tiles_closure {
+        struct harness *harness;
+        int next_tile_num;
+        bool succeeded;
+};
+
+static void
+check_tiles_cb(const struct vsx_tile *tile,
+               void *user_data)
+{
+        struct check_tiles_closure *closure = user_data;
+        int tile_num = closure->next_tile_num++;
+
+        if (tile_num != vsx_tile_get_number(tile)) {
+                fprintf(stderr,
+                        "Tiles reported out of order. Expected %i got %i\n",
+                        tile_num,
+                        vsx_tile_get_number(tile));
+                closure->succeeded = false;
+                return;
+        }
+
+        int16_t x = tile_num * 257;
+        int y = (tile_num & 1) ? -tile_num : tile_num;
+
+        if (x != vsx_tile_get_x(tile) ||
+            y != vsx_tile_get_y(tile)) {
+                fprintf(stderr,
+                        "Wrong tile position reported.\n"
+                        " Expected: %i,%i\n"
+                        " Received: %i,%i\n",
+                        x, y,
+                        vsx_tile_get_x(tile),
+                        vsx_tile_get_y(tile));
+                closure->succeeded = false;
+                return;
+        }
+
+        char letter = tile_num % 26 + 'A';
+
+        if (letter != vsx_tile_get_letter(tile)) {
+                fprintf(stderr,
+                        "Reported tile letter does not match. (%c != %c)\n",
+                        letter,
+                        vsx_tile_get_letter(tile));
+                closure->succeeded = false;
+                return;
+        }
+
+        if (vsx_connection_get_tile(closure->harness->connection,
+                                    tile_num) != tile) {
+                fprintf(stderr,
+                        "Tile reported by get_tile not same as iterating "
+                        "tiles\n");
+                closure->succeeded = false;
+                return;
+        }
+}
+
+static bool
+test_send_all_tiles(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Add all of the possible tiles */
+        for (int i = 0; i < 256; i++) {
+                /* Send them in a strange order */
+                int tile_num = ((i & 0xfc) |
+                                ((i & 2) >> 1) |
+                                ((i & 1) << 1));
+
+                int x = tile_num * 257;
+                if ((x & 0x8000))
+                        x |= -1 & ~0xffff;
+
+                if (!send_tile(harness,
+                               tile_num,
+                               x,
+                               (tile_num & 1) ? -tile_num : tile_num,
+                               tile_num % 26 + 'A',
+                               tile_num / 2,
+                               true /* is_new */)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        /* Update one of the tiles */
+        if (!send_tile(harness,
+                       1,
+                       257,
+                       -1,
+                       'B',
+                       0,
+                       false /* is_new */)) {
+                ret = false;
+                goto out;
+        }
+
+        struct check_tiles_closure closure = {
+                .harness = harness,
+                .next_tile_num = 0,
+                .succeeded = true,
+        };
+
+        vsx_connection_foreach_tile(harness->connection,
+                                    check_tiles_cb,
+                                    &closure);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.next_tile_num != 256) {
+                fprintf(stderr,
+                        "vsx_connection_foreach_tile didn’t report "
+                        "all the tiles\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1560,6 +1693,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_move_tile())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_all_tiles())
                 ret = EXIT_FAILURE;
 
         return ret;
