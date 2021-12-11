@@ -30,6 +30,7 @@
 #include "vsx-util.h"
 #include "vsx-proto.h"
 #include "vsx-monotonic.h"
+#include "vsx-file-error.h"
 
 #define TEST_PORT 6132
 
@@ -1763,6 +1764,46 @@ out:
         return ret;
 }
 
+static bool
+test_read_error(void)
+{
+        struct harness *harness = create_harness();
+
+        bool ret = true;
+
+        /* Let the connection add the data for the WS request */
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Close the connection without reading the data. This will
+         * make the client receive an error rather than EOF.
+         */
+        vsx_close(harness->server_fd);
+        harness->server_fd = -1;
+
+        harness->expected_error_domain = &vsx_file_error;
+        harness->expected_error_code = VSX_FILE_ERROR_OTHER;
+        harness->expected_error_message =
+                "Error reading from socket: Connection reset by peer";
+
+        if (!wake_up_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (harness->expected_error_domain) {
+                fprintf(stderr, "Expected read error but none received\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1811,6 +1852,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_end(false /* do_shutdown */))
+                ret = EXIT_FAILURE;
+
+        if (!test_read_error())
                 ret = EXIT_FAILURE;
 
         return ret;
