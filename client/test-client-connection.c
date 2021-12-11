@@ -1381,6 +1381,146 @@ out:
         return ret;
 }
 
+struct send_tile_closure {
+        int num;
+        int x;
+        int y;
+        char letter;
+        bool is_new;
+};
+
+static bool
+check_tile_changed_cb(struct harness *harness,
+                      const struct vsx_connection_event *event,
+                      void *user_data)
+{
+        struct send_tile_closure *closure = user_data;
+
+        const struct vsx_tile *tile = event->tile_changed.tile;
+
+        if (vsx_tile_get_number(tile) != closure->num ||
+            vsx_tile_get_x(tile) != closure->x ||
+            vsx_tile_get_y(tile) != closure->y ||
+            vsx_tile_get_letter(tile) != closure->letter ||
+            event->tile_changed.new_tile != closure->is_new) {
+                fprintf(stderr,
+                        "Tile from event does not match sent tile:\n"
+                        " Expected: %i %i,%i %c %s\n"
+                        " Received: %i %i,%i %c %s\n",
+                        closure->num,
+                        closure->x,
+                        closure->y,
+                        closure->letter,
+                        closure->is_new ? "new" : "old",
+                        vsx_tile_get_number(tile),
+                        vsx_tile_get_x(tile),
+                        vsx_tile_get_y(tile),
+                        vsx_tile_get_letter(tile),
+                        event->tile_changed.new_tile ? "new" : "old");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+send_tile(struct harness *harness,
+          int num,
+          int x,
+          int y,
+          char letter,
+          uint8_t player,
+          bool is_new)
+{
+        uint8_t add_tile_message[] =
+                "\x82\x09\x03\x00\x01\x00\x02\x00g\x00\x00";
+
+        add_tile_message[3] = num;
+        add_tile_message[4] = x;
+        add_tile_message[5] = x >> 8;
+        add_tile_message[6] = y;
+        add_tile_message[7] = y >> 8;
+        add_tile_message[8] = letter;
+        add_tile_message[10] = player;
+
+        struct send_tile_closure closure = {
+                .num = num,
+                .x = x,
+                .y = y,
+                .letter = letter,
+                .is_new = is_new,
+        };
+
+        return check_event(harness,
+                           VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
+                           check_tile_changed_cb,
+                           add_tile_message,
+                           sizeof add_tile_message - 1,
+                           &closure);
+}
+
+static bool
+test_move_tile(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Add three tiles to the game */
+        for (int i = 0; i < 3; i++) {
+                if (!send_tile(harness,
+                               i,
+                               i * 2,
+                               i * 2 + 1,
+                               'a' + i,
+                               i /* player */,
+                               true /* is_new */)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        /* Move four tiles */
+        for (int i = 0; i < 4; i++) {
+                vsx_connection_move_tile(harness->connection,
+                                         i,
+                                         i * 2 + 5,
+                                         i * 2 + 1);
+        }
+
+        /* Move one of the tiles again */
+        vsx_connection_move_tile(harness->connection, 0, 3, 5);
+
+        /* We should only get 4 move commands because the second move
+         * of the same tile should be squashed into one.
+         */
+        const uint8_t expected_data[] =
+                "\x82\x06\x88\x00\x03\x00\x05\x00"
+                "\x82\x06\x88\x01\x07\x00\x03\x00"
+                "\x82\x06\x88\x02\x09\x00\x05\x00"
+                "\x82\x06\x88\x03\x0b\x00\x07\x00";
+
+        if (!expect_data(harness, expected_data, sizeof expected_data - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection sent more data after typing commands\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1417,6 +1557,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_typing())
+                ret = EXIT_FAILURE;
+
+        if (!test_move_tile())
                 ret = EXIT_FAILURE;
 
         return ret;
