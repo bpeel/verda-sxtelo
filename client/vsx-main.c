@@ -197,6 +197,16 @@ handle_player_shouted(struct vsx_connection *connection,
 }
 
 static void
+handle_n_tiles(struct vsx_connection *connection,
+               const struct vsx_connection_event *event)
+{
+
+        int n_tiles = event->n_tiles_changed.n_tiles;
+
+        format_print("** number of tiles is %i\n", n_tiles);
+}
+
+static void
 handle_tile_changed(struct vsx_connection *connection,
                     const struct vsx_connection_event *event)
 {
@@ -268,6 +278,7 @@ event_cb(struct vsx_listener *listener,
                 handle_player_shouted(connection, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+                handle_n_tiles(connection, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(connection, event);
