@@ -161,6 +161,11 @@ struct vsx_connection {
          */
         int n_tiles;
 
+        /* true if we have received a sync message since the last time
+         * we reconnected.
+         */
+        bool synced;
+
         /* Monotonic time to wake up at in order to send a keepalive, or
          * INT64_MAX if no keepalive is scheduled.
          */
@@ -659,6 +664,27 @@ handle_player_shouted(struct vsx_connection *connection,
 }
 
 static bool
+handle_sync(struct vsx_connection *connection,
+            const uint8_t *payload,
+            size_t payload_length, struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid sync command");
+                return false;
+        }
+
+        connection->synced = true;
+
+        return true;
+}
+
+static bool
 handle_end(struct vsx_connection *connection,
            const uint8_t *payload,
            size_t payload_length, struct vsx_error **error)
@@ -721,6 +747,10 @@ process_message(struct vsx_connection *connection,
                 return handle_player_shouted(connection,
                                              payload, payload_length,
                                              error);
+        case VSX_PROTO_SYNC:
+                return handle_sync(connection,
+                                  payload, payload_length,
+                                  error);
         case VSX_PROTO_END:
                 return handle_end(connection,
                                   payload, payload_length,
@@ -1294,6 +1324,7 @@ try_reconnect(struct vsx_connection *connection)
                                     VSX_CONNECTION_DIRTY_FLAG_HEADER);
         connection->ws_terminator_pos = 0;
         connection->write_finished = false;
+        connection->synced = false;
 
         connection->sock_events = events;
         send_poll_changed(connection);
@@ -1468,6 +1499,12 @@ vsx_connection_get_running(struct vsx_connection *connection)
 {
         return (connection->running_state !=
                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED);
+}
+
+bool
+vsx_connection_is_synced(struct vsx_connection *connection)
+{
+        return connection->synced;
 }
 
 struct vsx_connection *

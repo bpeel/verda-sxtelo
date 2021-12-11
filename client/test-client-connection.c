@@ -118,6 +118,10 @@ frame_error_tests[] = {
                 "The server sent an invalid end command"
         },
         {
+                BIN_STR("\x82\x04\x07!!!"),
+                "The server sent an invalid sync command"
+        },
+        {
                 BIN_STR("\x82\x00"),
                 "The server sent an empty message"
         },
@@ -887,10 +891,13 @@ error:
 }
 
 static bool
-read_reconnect_message(struct harness *harness)
+read_reconnect_message(struct harness *harness,
+                       int n_messages)
 {
-        static const uint8_t reconnect_message[] =
+        uint8_t reconnect_message[] =
                 "\x82\x0b\x81ghijklmn\x02\x00";
+
+        reconnect_message[sizeof reconnect_message - 3] = n_messages;
 
         return expect_data(harness,
                            reconnect_message,
@@ -922,7 +929,7 @@ test_immediate_reconnect(void)
                 goto out;
         }
 
-        if (!read_reconnect_message(harness)) {
+        if (!read_reconnect_message(harness, 2)) {
                 ret = false;
                 goto out;
         }
@@ -963,7 +970,7 @@ test_reconnect_delay(void)
                         goto out;
                 }
 
-                if (!read_reconnect_message(harness)) {
+                if (!read_reconnect_message(harness, 2)) {
                         ret = false;
                         goto out;
                 }
@@ -1924,6 +1931,59 @@ check_end_state_cb(struct harness *harness,
 }
 
 static bool
+test_sync(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        for (int i = 0; i < 2; i++) {
+                /* A new connection shouldn’t be synced */
+                if (vsx_connection_is_synced(harness->connection)) {
+                        fprintf(stderr,
+                                "Newly %s connection is already synced\n",
+                                i == 0 ? "created" : "reconnected");
+                        ret = false;
+                        goto out;
+                }
+
+                if (!write_string(harness, "\x82\x01\x07")) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!vsx_connection_is_synced(harness->connection)) {
+                        fprintf(stderr,
+                                "Connection is not synced after sending sync "
+                                "command\n");
+                        ret = false;
+                        goto out;
+                }
+
+                if (i > 0)
+                        break;
+
+                if (!do_unexpected_close(harness) ||
+                    !wake_up_connection(harness) ||
+                    !accept_connection(harness) ||
+                    !read_ws_request(harness) ||
+                    !write_string(harness, "\r\n\r\n") ||
+                    !read_reconnect_message(harness, 0)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_end(bool do_shutdown)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2174,6 +2234,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_players())
+                ret = EXIT_FAILURE;
+
+        if (!test_sync())
                 ret = EXIT_FAILURE;
 
         if (!test_end(true /* do_shutdown */))

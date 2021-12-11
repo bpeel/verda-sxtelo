@@ -144,6 +144,9 @@ bool
 vsx_connection_get_running(struct vsx_connection *connection);
 
 bool
+vsx_connection_is_synced(struct vsx_connection *connection);
+
+bool
 vsx_connection_get_typing(struct vsx_connection *connection);
 
 void
