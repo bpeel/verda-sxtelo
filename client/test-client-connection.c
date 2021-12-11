@@ -1804,6 +1804,66 @@ out:
         return ret;
 }
 
+static bool
+test_write_buffer_full(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+        const int message_size = 1000;
+
+        char *message = vsx_alloc(message_size + 1);
+        memset(message, 'a', message_size);
+        message[message_size] = '\0';
+
+        /* Queue enough messages that it can’t be sent in a single write */
+        vsx_connection_send_message(harness->connection, message);
+        vsx_connection_send_message(harness->connection, message);
+
+        int frame_length = message_size + 2;
+        int total_size = frame_length + 4;
+
+        char *frame = vsx_alloc(total_size);
+        frame[0] = 0x82;
+        frame[1] = 0x7e;
+        frame[2] = frame_length >> 8;
+        frame[3] = frame_length & 0xff;
+        frame[4] = 0x85;
+        strcpy(frame + 5, message);
+
+        if (!expect_data(harness, (uint8_t *) frame, total_size)) {
+                ret = false;
+                goto out;
+        }
+
+        /* The connection shouln’t have written all of its pending data */
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "The connection more data than should fit in its "
+                        "output buffer.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* The frame for the second message should be there after
+         * letting it write again.
+         */
+        if (!expect_data(harness, (uint8_t *) frame, total_size)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_free(message);
+        vsx_free(frame);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1855,6 +1915,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_read_error())
+                ret = EXIT_FAILURE;
+
+        if (!test_write_buffer_full())
                 ret = EXIT_FAILURE;
 
         return ret;
