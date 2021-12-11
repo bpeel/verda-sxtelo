@@ -67,7 +67,8 @@ enum check_event_result {
 
 typedef bool
 (* check_event_func)(struct harness *harness,
-                     const struct vsx_connection_event *event);
+                     const struct vsx_connection_event *event,
+                     void *user_data);
 
 struct check_event_listener {
         struct vsx_listener listener;
@@ -75,6 +76,7 @@ struct check_event_listener {
         enum vsx_connection_event_type expected_type;
         check_event_func cb;
         struct harness *harness;
+        void *user_data;
 };
 
 #define BIN_STR(x) ((const uint8_t *) (x)), (sizeof (x)) - 1
@@ -600,7 +602,9 @@ check_event_cb(struct vsx_listener *listener, void *data)
                         ce_listener->expected_type,
                         event->type);
                 ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-        } else if (ce_listener->cb(ce_listener->harness, event)) {
+        } else if (ce_listener->cb(ce_listener->harness,
+                                   event,
+                                   ce_listener->user_data)) {
                 ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
         } else {
                 ce_listener->result = CHECK_EVENT_RESULT_FAILED;
@@ -612,7 +616,8 @@ check_event(struct harness *harness,
             enum vsx_connection_event_type expected_type,
             check_event_func cb,
             const uint8_t *data,
-            size_t data_len)
+            size_t data_len,
+            void *user_data)
 {
         struct check_event_listener listener = {
                 .listener = { .notify = check_event_cb },
@@ -620,6 +625,7 @@ check_event(struct harness *harness,
                 .expected_type = expected_type,
                 .cb = cb,
                 .harness = harness,
+                .user_data = user_data,
         };
 
         vsx_signal_add(harness->event_signal, &listener.listener);
@@ -648,7 +654,8 @@ check_event(struct harness *harness,
 
 static bool
 check_state_in_progress_cb(struct harness *harness,
-                           const struct vsx_connection_event *event)
+                           const struct vsx_connection_event *event,
+                           void *user_data)
 {
         if (event->state_changed.state != VSX_CONNECTION_STATE_IN_PROGRESS) {
                 fprintf(stderr,
@@ -669,12 +676,14 @@ send_player_id(struct harness *harness)
                            VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
                            check_state_in_progress_cb,
                            header,
-                           sizeof header - 1);
+                           sizeof header - 1,
+                           NULL /* user_data */);
 }
 
 static bool
 check_player_changed_cb(struct harness *harness,
-                        const struct vsx_connection_event *event)
+                        const struct vsx_connection_event *event,
+                        void *user_data)
 {
         if (event->player_changed.player == NULL ||
             event->player_changed.player !=
@@ -702,12 +711,14 @@ send_player_data(struct harness *harness)
                             VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
                             check_player_changed_cb,
                             name_header,
-                            sizeof name_header - 1) &&
+                            sizeof name_header - 1,
+                            NULL /* user_data */) &&
                 check_event(harness,
                             VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
                             check_player_changed_cb,
                             data_header,
-                            sizeof data_header - 1));
+                            sizeof data_header - 1,
+                            NULL /* user_data */));
 }
 
 static struct harness *
@@ -1033,7 +1044,8 @@ out:
 
 static bool
 check_player_added_cb(struct harness *harness,
-                      const struct vsx_connection_event *event)
+                      const struct vsx_connection_event *event,
+                      void *user_data)
 {
         const struct vsx_player *other = event->player_changed.player;
         int number = vsx_player_get_number(other);
@@ -1067,12 +1079,14 @@ add_player(struct harness *harness)
                            VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
                            check_player_added_cb,
                            add_player_message,
-                           sizeof add_player_message - 1);
+                           sizeof add_player_message - 1,
+                           NULL /* user_data */);
 }
 
 static bool
 check_self_shouted_cb(struct harness *harness,
-                      const struct vsx_connection_event *event)
+                      const struct vsx_connection_event *event,
+                      void *user_data)
 {
         const struct vsx_player *self =
                 vsx_connection_get_self (harness->connection);
@@ -1090,7 +1104,8 @@ check_self_shouted_cb(struct harness *harness,
 
 static bool
 check_other_shouted_cb(struct harness *harness,
-                       const struct vsx_connection_event *event)
+                       const struct vsx_connection_event *event,
+                       void *user_data)
 {
         const struct vsx_player *shouter = event->player_shouted.player;
         int number = vsx_player_get_number(shouter);
@@ -1122,7 +1137,8 @@ test_receive_shout(void)
                          VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
                          check_self_shouted_cb,
                          self_shout_message,
-                         sizeof self_shout_message - 1)) {
+                         sizeof self_shout_message - 1,
+                         NULL /* user_data */)) {
                 ret = false;
                 goto out;
         }
@@ -1139,7 +1155,8 @@ test_receive_shout(void)
                          VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
                          check_other_shouted_cb,
                          other_shout_message,
-                         sizeof other_shout_message - 1)) {
+                         sizeof other_shout_message - 1,
+                         NULL /* user_data */)) {
                 ret = false;
                 goto out;
         }
