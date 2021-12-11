@@ -687,16 +687,31 @@ send_player_id(struct harness *harness)
                            NULL /* user_data */);
 }
 
+struct check_player_changed_closure {
+        enum vsx_connection_player_changed_flags flags;
+};
+
 static bool
 check_player_changed_cb(struct harness *harness,
                         const struct vsx_connection_event *event,
                         void *user_data)
 {
+        struct check_player_changed_closure *closure = user_data;
+
         if (event->player_changed.player == NULL ||
             event->player_changed.player !=
             vsx_connection_get_self(harness->connection)) {
                 fprintf(stderr,
                         "Changed player is not self\n");
+                return false;
+        }
+
+        if (event->player_changed.flags != closure->flags) {
+                fprintf(stderr,
+                        "Expected flags 0x%x in player changed event but "
+                        "received 0x%x\n",
+                        closure->flags,
+                        event->player_changed.flags);
                 return false;
         }
 
@@ -714,18 +729,29 @@ send_player_data(struct harness *harness)
                 /* player */
                 "\x82\x03\x05\x00\x01";
 
-        return (check_event(harness,
-                            VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                            check_player_changed_cb,
-                            name_header,
-                            sizeof name_header - 1,
-                            NULL /* user_data */) &&
-                check_event(harness,
-                            VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                            check_player_changed_cb,
-                            data_header,
-                            sizeof data_header - 1,
-                            NULL /* user_data */));
+        struct check_player_changed_closure closure = {
+                .flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME,
+        };
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                         check_player_changed_cb,
+                         name_header,
+                         sizeof name_header - 1,
+                         &closure))
+                return false;
+
+        closure.flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS;
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                         check_player_changed_cb,
+                         data_header,
+                         sizeof data_header - 1,
+                         &closure))
+                return false;
+
+        return true;
 }
 
 static struct harness *
@@ -1070,6 +1096,13 @@ check_player_added_cb(struct harness *harness,
                 fprintf(stderr,
                         "Other player is not called George: %s\n",
                         name);
+                return false;
+        }
+
+        if (event->player_changed.flags !=
+            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME) {
+                fprintf(stderr,
+                        "Player changed flags are not just the name\n");
                 return false;
         }
 

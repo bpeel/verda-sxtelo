@@ -56,6 +56,11 @@ enum vsx_connection_event_type {
         VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
 };
 
+enum vsx_connection_player_changed_flags {
+        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME = (1 << 0),
+        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS = (1 << 1),
+};
+
 struct vsx_connection_event {
         enum vsx_connection_event_type type;
 
@@ -71,6 +76,7 @@ struct vsx_connection_event {
 
                 struct {
                         const struct vsx_player *player;
+                        enum vsx_connection_player_changed_flags flags;
                 } player_changed;
 
                 struct {

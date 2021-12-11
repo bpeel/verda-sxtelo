@@ -483,11 +483,15 @@ handle_tile(struct vsx_connection *connection,
 
 static void
 emit_player_changed(struct vsx_connection *connection,
-                    struct vsx_player *player)
+                    struct vsx_player *player,
+                    enum vsx_connection_player_changed_flags flags)
 {
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                .player_changed = { .player = player },
+                .player_changed = {
+                        .player = player,
+                        .flags = flags,
+                },
         };
 
         vsx_signal_emit(&connection->event_signal, &event);
@@ -524,7 +528,9 @@ handle_player_name(struct vsx_connection *connection,
         vsx_free(player->name);
         player->name = vsx_strdup(name);
 
-        emit_player_changed(connection, player);
+        emit_player_changed(connection,
+                            player,
+                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME);
 
         return true;
 }
@@ -557,7 +563,9 @@ handle_player(struct vsx_connection *connection,
 
         player->flags = flags;
 
-        emit_player_changed(connection, player);
+        emit_player_changed(connection,
+                            player,
+                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS);
 
         return true;
 }
