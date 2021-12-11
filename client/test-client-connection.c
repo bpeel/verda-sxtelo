@@ -1654,6 +1654,110 @@ out:
         return ret;
 }
 
+static bool
+check_end_state_cb(struct harness *harness,
+                   const struct vsx_connection_event *event,
+                   void *user_data)
+{
+        if (event->state_changed.state != VSX_CONNECTION_STATE_DONE) {
+                fprintf(stderr,
+                        "State is not DONE after sending END\n");
+                return false;
+        }
+
+        if (event->state_changed.state !=
+            vsx_connection_get_state(harness->connection)) {
+                fprintf(stderr,
+                        "State in event does not match connection state\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_end(bool do_shutdown)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
+                         check_end_state_cb,
+                         (const uint8_t *) "\x82\x01\x08", 3,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        /* If do_shutdown is false the vsx_connection should initiate
+         * the graceful shutdown itself when it no longer has anything
+         * to write.
+         */
+        if (do_shutdown) {
+                /* Initiate a graceful shutdown */
+                shutdown(harness->server_fd, SHUT_WR);
+
+                if (!wake_up_connection(harness)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        if (!fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Socket not ready for reading after initiating "
+                        "graceful shutdown\n");
+                ret = false;
+                goto out;
+        }
+
+        uint8_t byte;
+
+        /* Reading should report EOF */
+        int got = read(harness->server_fd, &byte, 1);
+
+        if (got != 0) {
+                fprintf(stderr,
+                        "Expected EOF but read returned %i\n",
+                        got);
+                ret = false;
+                goto out;
+        }
+
+        if (do_shutdown) {
+                if (vsx_connection_get_running(harness->connection)) {
+                        fprintf(stderr, "Connection still running after END\n");
+                        ret = false;
+                        goto out;
+                }
+
+                if (harness->poll_fd != -1) {
+                        fprintf(stderr,
+                                "Connection is still polling after END\n");
+                        ret = false;
+                        goto out;
+                }
+        } else {
+                if (harness->poll_fd == -1 ||
+                    (harness->poll_events & POLLIN) == 0) {
+                        fprintf(stderr,
+                                "Connection is not waiting for shutdown\n");
+                        ret = false;
+                        goto out;
+                }
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1696,6 +1800,12 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_end(true /* do_shutdown */))
+                ret = EXIT_FAILURE;
+
+        if (!test_end(false /* do_shutdown */))
                 ret = EXIT_FAILURE;
 
         return ret;
