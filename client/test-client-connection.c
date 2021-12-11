@@ -1864,6 +1864,23 @@ out:
         return ret;
 }
 
+static bool
+test_leak_pendings(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        /* Queue some messages and tiles to move */
+        vsx_connection_send_message(harness->connection, "hi!");
+        vsx_connection_move_tile(harness->connection, 0, 1, 2);
+
+        /* Free the connection before it gets a chance to send them */
+        free_harness(harness);
+        return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1918,6 +1935,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_write_buffer_full())
+                ret = EXIT_FAILURE;
+
+        if (!test_leak_pendings())
                 ret = EXIT_FAILURE;
 
         return ret;
