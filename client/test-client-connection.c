@@ -83,6 +83,8 @@ struct check_event_listener {
 
 #define BIN_STR(x) ((const uint8_t *) (x)), (sizeof (x)) - 1
 
+static const uint8_t player_id_header[] = "\x82\x0a\x00ghijklmn\x00";
+
 static const struct frame_error_test
 frame_error_tests[] = {
         {
@@ -685,14 +687,20 @@ check_state_in_progress_cb(struct harness *harness,
 static bool
 send_player_id(struct harness *harness)
 {
-        static const uint8_t header[] = "\x82\x0a\x00ghijklmn\x00";
-
         return check_event(harness,
                            VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
                            check_state_in_progress_cb,
-                           header,
-                           sizeof header - 1,
+                           player_id_header,
+                           sizeof player_id_header - 1,
                            NULL /* user_data */);
+}
+
+static bool
+send_player_id_no_event(struct harness *harness)
+{
+        return write_data(harness,
+                          player_id_header,
+                          sizeof player_id_header - 1);
 }
 
 struct check_player_changed_closure {
@@ -941,6 +949,31 @@ out:
 }
 
 static bool
+test_reset_connect_timeout_for_stable_connection(struct harness *harness)
+{
+        if (!wake_up_connection(harness) ||
+            !accept_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n") ||
+            !read_reconnect_message(harness, 2) ||
+            !send_player_id_no_event(harness))
+                return false;
+
+        /* Advance time by 15 seconds so that the vsx_connection will
+         * decide that the connection was stable.
+         */
+        replacement_monotonic_time += 15 * 1000 * 1000;
+
+        /* Now it should go back to trying to reconnect immediately */
+        if (!do_unexpected_close(harness) ||
+            !wake_up_connection(harness) ||
+            !accept_connection(harness))
+                return false;
+
+        return true;
+}
+
+static bool
 test_reconnect_delay(void)
 {
         struct harness *harness = prepare_reconnect_test();
@@ -1013,6 +1046,11 @@ test_reconnect_delay(void)
                 replacement_monotonic_time += 1000001;
 
                 delay *= 2;
+        }
+
+        if (!test_reset_connect_timeout_for_stable_connection(harness)) {
+                ret = false;
+                goto out;
         }
 
 out:

@@ -84,6 +84,12 @@ update_poll(struct vsx_connection *connection,
  */
 #define VSX_CONNECTION_KEEP_ALIVE_TIME (150 * 1000 * 1000)
 
+/* If the connection stays alive for at least this much time after
+ * receiving the player_id command then we will assume it’s stable and
+ * reconnect immediately if an error occurs.
+ */
+#define VSX_CONNECTION_STABLE_TIME (15 * 1000 * 1000)
+
 enum vsx_connection_running_state {
         VSX_CONNECTION_RUNNING_STATE_DISCONNECTED,
         /* connect has been called and we are waiting for it to
@@ -129,6 +135,12 @@ struct vsx_connection {
          * reconnect is scheduled.
          */
         int64_t reconnect_timestamp;
+        /* The last time we got a player_id command in this
+         * connection, or INT64_MAX if we haven’t yet. This is used to
+         * reset the reconnect timeout if the connection was stable
+         * for a while.
+         */
+        int64_t player_id_received_timestamp;
 
         struct vsx_signal event_signal;
 
@@ -382,6 +394,7 @@ handle_player_id(struct vsx_connection *connection,
         connection->self->flags |= VSX_PLAYER_CONNECTED;
 
         connection->has_person_id = true;
+        connection->player_id_received_timestamp = vsx_monotonic_get();
 
         if (connection->state == VSX_CONNECTION_STATE_AWAITING_HEADER) {
                 vsx_connection_set_state(connection,
@@ -786,6 +799,16 @@ report_error(struct vsx_connection *connection,
              struct vsx_error *error)
 {
         close_socket(connection);
+
+        /* If the connection managed to stay up for a while after
+         * receiving the player_id command then we’ll assume it was
+         * working and we can reconnect immediately without getting
+         * into an infinite reconnect loop.
+         */
+        if (vsx_monotonic_get() - VSX_CONNECTION_STABLE_TIME >=
+            connection->player_id_received_timestamp)
+                connection->reconnect_timeout = 0;
+
         set_reconnect_timestamp(connection);
         send_poll_changed(connection);
         vsx_connection_signal_error(connection, error);
@@ -1281,6 +1304,7 @@ static void
 try_reconnect(struct vsx_connection *connection)
 {
         connection->reconnect_timestamp = INT64_MAX;
+        connection->player_id_received_timestamp = INT64_MAX;
 
         close_socket(connection);
 
