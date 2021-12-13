@@ -32,11 +32,14 @@
 #include <netdb.h>
 #include <poll.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
 #include "vsx-netaddress.h"
 #include "vsx-monotonic.h"
+#include "vsx-buffer.h"
+#include "vsx-worker.h"
 
 static void
 format_print(const char *format, ...);
@@ -47,11 +50,18 @@ static char *option_room = "default";
 static char *option_player_name = NULL;
 
 static struct vsx_connection *connection;
+static struct vsx_worker *worker;
 static bool had_eof = false;
-static int connection_poll_fd = -1;
-static short connection_poll_events = 0;
-static int64_t connection_wakeup_timestamp = INT64_MAX;
 static bool should_quit = false;
+
+static bool typing_state;
+static bool displayed_typing_state;
+
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct vsx_buffer log_buffer = VSX_BUFFER_STATIC_INIT;
+static struct vsx_buffer alternate_log_buffer = VSX_BUFFER_STATIC_INIT;
+static int log_wakeup_fds[2] = { -1, -1 };
+static bool log_wakeup_queued = false;
 
 static const char options[] = "-hs:p:r:n:";
 
@@ -115,6 +125,17 @@ process_arguments(int argc, char **argv)
 }
 
 static void
+wake_up_log_locked(void)
+{
+        if (log_wakeup_queued)
+                return;
+
+        static const uint8_t byte = 'W';
+        write(log_wakeup_fds[1], &byte, 1);
+        log_wakeup_queued = true;
+}
+
+static void
 handle_error(struct vsx_connection *connection,
              const struct vsx_connection_event *event)
 {
@@ -125,8 +146,12 @@ static void
 handle_running_state_changed(struct vsx_connection *connection,
                              const struct vsx_connection_event *event)
 {
-        if (!event->running_state_changed.running)
+        if (!event->running_state_changed.running) {
+                pthread_mutex_lock(&log_mutex);
+                wake_up_log_locked();
                 should_quit = true;
+                pthread_mutex_unlock(&log_mutex);
+        }
 }
 
 static void
@@ -181,9 +206,10 @@ handle_player_changed(struct vsx_connection *connection,
 
         vsx_connection_foreach_player(connection, check_typing_cb, &data);
 
-        clear_line();
-        rl_set_prompt(data.is_typing ? typing_prompt : not_typing_prompt);
-        rl_forced_update_display();
+        pthread_mutex_lock(&log_mutex);
+        typing_state = data.is_typing;
+        wake_up_log_locked();
+        pthread_mutex_unlock(&log_mutex);
 }
 
 static void
@@ -250,15 +276,6 @@ handle_state_changed(struct vsx_connection *connection,
 }
 
 static void
-handle_poll_changed(struct vsx_connection *connection,
-                    const struct vsx_connection_event *event)
-{
-        connection_poll_fd = event->poll_changed.fd;
-        connection_poll_events = event->poll_changed.events;
-        connection_wakeup_timestamp = event->poll_changed.wakeup_time;
-}
-
-static void
 event_cb(struct vsx_listener *listener,
          void *data)
 {
@@ -290,7 +307,6 @@ event_cb(struct vsx_listener *listener,
                 handle_state_changed(connection, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
-                handle_poll_changed(connection, event);
                 break;
         }
 }
@@ -312,10 +328,16 @@ readline_cb(char *line)
                 finish_stdin();
 
                 if (vsx_connection_get_state(connection) ==
-                    VSX_CONNECTION_STATE_IN_PROGRESS)
+                    VSX_CONNECTION_STATE_IN_PROGRESS) {
+                        vsx_worker_lock(worker);
                         vsx_connection_leave(connection);
-                else
+                        vsx_worker_unlock(worker);
+                } else {
+                        pthread_mutex_lock(&log_mutex);
+                        wake_up_log_locked();
                         should_quit = true;
+                        pthread_mutex_unlock(&log_mutex);
+                }
         }
 }
 
@@ -326,12 +348,13 @@ format_print(const char *format, ...)
 
         va_start(ap, format);
 
-        clear_line();
+        pthread_mutex_lock(&log_mutex);
 
-        vfprintf(stdout, format, ap);
+        vsx_buffer_append_vprintf(&log_buffer, format, ap);
 
-        if (!had_eof)
-                rl_forced_update_display();
+        wake_up_log_locked();
+
+        pthread_mutex_unlock(&log_mutex);
 
         va_end(ap);
 }
@@ -340,6 +363,8 @@ static int
 newline_cb(int count, int key)
 {
         if (*rl_line_buffer) {
+                vsx_worker_lock(worker);
+
                 if (!strcmp(rl_line_buffer, "s"))
                         vsx_connection_shout(connection);
                 else if (!strcmp(rl_line_buffer, "t"))
@@ -348,6 +373,8 @@ newline_cb(int count, int key)
                         vsx_connection_move_tile(connection, 0, 10, 20);
                 else
                         vsx_connection_send_message(connection, rl_line_buffer);
+
+                vsx_worker_unlock(worker);
 
                 rl_replace_line("", true);
         }
@@ -358,6 +385,8 @@ newline_cb(int count, int key)
 static void
 redisplay_hook(void)
 {
+        vsx_worker_lock(worker);
+
         /* There doesn't appear to be a good way to hook into
          * notifications of the buffer being modified so we'll just
          * hook into the redisplay function which should hopefully get
@@ -365,6 +394,8 @@ redisplay_hook(void)
          * empty then we'll assume the user is typing. If the user is
          * already marked as typing then this will do nothing */
         vsx_connection_set_typing(connection, *rl_line_buffer != '\0');
+
+        vsx_worker_unlock(worker);
 
         /* Chain up */
         rl_redisplay();
@@ -424,27 +455,71 @@ lookup_address(const char *hostname, int port, struct vsx_netaddress *address)
         return found;
 }
 
+static bool
+handle_log(void)
+{
+        uint8_t byte;
+
+        int got = read(log_wakeup_fds[0], &byte, 1);
+
+        if (got == 0) {
+                fprintf(stderr, "Unexpected EOF on log wakeup fd\n");
+                return false;
+        } else if (got == -1) {
+                if (errno == EINTR)
+                        return true;
+                fprintf(stderr,
+                        "Error reading log wakeup fd: %s\n",
+                        strerror(errno));
+                return false;
+        }
+
+        pthread_mutex_lock(&log_mutex);
+
+        log_wakeup_queued = false;
+
+        struct vsx_buffer tmp = log_buffer;
+        log_buffer = alternate_log_buffer;
+        alternate_log_buffer = tmp;
+
+        vsx_buffer_set_length(&log_buffer, 0);
+
+        bool new_typing_state = typing_state;
+
+        pthread_mutex_unlock(&log_mutex);
+
+        clear_line();
+
+        fwrite(alternate_log_buffer.data,
+               1,
+               alternate_log_buffer.length,
+               stdout);
+
+        if (!had_eof) {
+                if (new_typing_state != displayed_typing_state) {
+                        displayed_typing_state = new_typing_state;
+                        rl_set_prompt(new_typing_state ?
+                                      typing_prompt :
+                                      not_typing_prompt);
+                }
+
+                rl_forced_update_display();
+        }
+
+        return true;
+}
+
 static void
 run_main_loop(void)
 {
         while (!should_quit) {
-                int timeout;
-
-                if (connection_wakeup_timestamp < INT64_MAX) {
-                        int64_t now = vsx_monotonic_get();
-
-                        if (now >= connection_wakeup_timestamp) {
-                                timeout = 0;
-                        } else {
-                                timeout = ((connection_wakeup_timestamp - now) /
-                                           1000);
-                        }
-                } else {
-                        timeout = -1;
-                }
-
                 struct pollfd fds[2];
                 int nfds = 0;
+
+                fds[nfds].fd = log_wakeup_fds[0];
+                fds[nfds].events = POLLIN;
+                fds[nfds].revents = 0;
+                nfds++;
 
                 if (!had_eof) {
                         fds[nfds].fd = STDIN_FILENO;
@@ -453,27 +528,18 @@ run_main_loop(void)
                         nfds++;
                 }
 
-                if (connection_poll_fd != -1) {
-                        fds[nfds].fd = connection_poll_fd;
-                        fds[nfds].events = connection_poll_events;
-                        fds[nfds].revents = 0;
-                        nfds++;
-                }
-
-                if (poll(fds, nfds, timeout) == -1) {
+                if (poll(fds, nfds, -1 /* timeout */) == -1) {
                         fprintf(stderr, "poll failed: %s\n", strerror(errno));
                         break;
                 }
 
-                if (!had_eof && fds[0].revents) {
+                if (!had_eof && fds[nfds - 1].revents) {
                         rl_callback_read_char();
                         continue;
                 }
 
-                vsx_connection_wake_up(connection,
-                                       connection_poll_fd == -1 ?
-                                       0 :
-                                       fds[nfds - 1].revents);
+                if (fds[0].revents && !handle_log())
+                        break;
         }
 }
 
@@ -502,18 +568,51 @@ create_connection(void)
         return vsx_connection_new(&address, option_room, player_name);
 }
 
+static struct vsx_worker *
+create_worker(void)
+{
+        struct vsx_error *error = NULL;
+
+        struct vsx_worker *worker = vsx_worker_new(connection, &error);
+
+        if (worker == NULL) {
+                fprintf(stderr, "%s\n", error->message);
+                vsx_error_free(error);
+        }
+
+        return worker;
+}
+
 int
 main(int argc, char **argv)
 {
         if (!process_arguments(argc, argv))
                 return EXIT_FAILURE;
 
+        if (pipe(log_wakeup_fds) == -1) {
+                fprintf(stderr, "pipe failed: %s\n", strerror(errno));
+                return EXIT_FAILURE;
+        }
+
+        int ret = EXIT_SUCCESS;
+
         connection = create_connection();
 
-        if (connection == NULL)
-                return EXIT_FAILURE;
+        if (connection == NULL) {
+                ret = EXIT_FAILURE;
+                goto out_log_wakeup_fds;
+        }
+
+        worker = create_worker();
+
+        if (worker == NULL) {
+                ret = EXIT_FAILURE;
+                goto out_connection;
+        }
 
         start_stdin();
+
+        vsx_worker_lock(worker);
 
         struct vsx_signal *event_signal =
                 vsx_connection_get_event_signal(connection);
@@ -527,11 +626,22 @@ main(int argc, char **argv)
 
         print_state_message(connection);
 
+        vsx_worker_unlock(worker);
+
         run_main_loop();
 
         finish_stdin();
 
-        vsx_connection_free(connection);
+        vsx_worker_free(worker);
 
-        return 0;
+out_connection:
+        vsx_connection_free(connection);
+out_log_wakeup_fds:
+        vsx_close(log_wakeup_fds[0]);
+        vsx_close(log_wakeup_fds[1]);
+
+        vsx_buffer_destroy(&log_buffer);
+        vsx_buffer_destroy(&alternate_log_buffer);
+
+        return ret;
 }
