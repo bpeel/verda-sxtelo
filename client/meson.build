@@ -12,7 +12,7 @@ cc.check_header('term.h',
                 dependencies: readline_dep,
                 required: true)
  
-client_deps = [ readline_dep, termcap_dep ]
+client_deps = [ readline_dep, termcap_dep, thread_dep ]
 
 client_headers = [
         'vsx-connection.h',
@@ -36,6 +36,7 @@ client_src = [
         'vsx-tile.c',
         '../common/vsx-utf8.c',
         '../common/vsx-util.c',
+        'vsx-worker.c',
 ]
 
 executable('verda-sxtelo-client', client_src,

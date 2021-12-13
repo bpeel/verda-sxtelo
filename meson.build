@@ -27,6 +27,7 @@ cdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 vs_bindir = join_paths(get_option('prefix'), get_option('bindir'))
 
 openssl_dep = dependency('openssl')
+thread_dep = dependency('threads')
 
 if get_option('server')
   subdir('server')
