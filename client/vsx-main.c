@@ -45,18 +45,24 @@ struct vsx_main_data {
         struct vsx_connection *connection;
         struct vsx_worker *worker;
         bool had_eof;
-        bool should_quit;
 
-        bool typing_state;
         bool displayed_typing_state;
 
-        pthread_mutex_t log_mutex;
+        struct vsx_listener event_listener;
+
+        int wakeup_fds[2];
+
+        pthread_mutex_t mutex;
+
+        /* The following state is protected by the mutex */
+
+        bool wakeup_queued;
+
+        bool typing_state;
+        bool should_quit;
+
         struct vsx_buffer log_buffer;
         struct vsx_buffer alternate_log_buffer;
-        int log_wakeup_fds[2];
-        bool log_wakeup_queued;
-
-        struct vsx_listener event_listener;
 };
 
 VSX_PRINTF_FORMAT(2, 3)
@@ -137,14 +143,14 @@ process_arguments(int argc, char **argv)
 }
 
 static void
-wake_up_log_locked(struct vsx_main_data *main_data)
+wake_up_locked(struct vsx_main_data *main_data)
 {
-        if (main_data->log_wakeup_queued)
+        if (main_data->wakeup_queued)
                 return;
 
         static const uint8_t byte = 'W';
-        write(main_data->log_wakeup_fds[1], &byte, 1);
-        main_data->log_wakeup_queued = true;
+        write(main_data->wakeup_fds[1], &byte, 1);
+        main_data->wakeup_queued = true;
 }
 
 static void
@@ -159,10 +165,10 @@ handle_running_state_changed(struct vsx_main_data *main_data,
                              const struct vsx_connection_event *event)
 {
         if (!event->running_state_changed.running) {
-                pthread_mutex_lock(&main_data->log_mutex);
-                wake_up_log_locked(main_data);
+                pthread_mutex_lock(&main_data->mutex);
+                wake_up_locked(main_data);
                 main_data->should_quit = true;
-                pthread_mutex_unlock(&main_data->log_mutex);
+                pthread_mutex_unlock(&main_data->mutex);
         }
 }
 
@@ -221,10 +227,10 @@ handle_player_changed(struct vsx_main_data *main_data,
                                       check_typing_cb,
                                       &data);
 
-        pthread_mutex_lock(&main_data->log_mutex);
+        pthread_mutex_lock(&main_data->mutex);
         main_data->typing_state = data.is_typing;
-        wake_up_log_locked(main_data);
-        pthread_mutex_unlock(&main_data->log_mutex);
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static void
@@ -358,10 +364,10 @@ readline_cb(char *line)
                         vsx_connection_leave(main_data->connection);
                         vsx_worker_unlock(main_data->worker);
                 } else {
-                        pthread_mutex_lock(&main_data->log_mutex);
-                        wake_up_log_locked(main_data);
+                        pthread_mutex_lock(&main_data->mutex);
+                        wake_up_locked(main_data);
                         main_data->should_quit = true;
-                        pthread_mutex_unlock(&main_data->log_mutex);
+                        pthread_mutex_unlock(&main_data->mutex);
                 }
         }
 }
@@ -375,13 +381,13 @@ format_print(struct vsx_main_data *main_data,
 
         va_start(ap, format);
 
-        pthread_mutex_lock(&main_data->log_mutex);
+        pthread_mutex_lock(&main_data->mutex);
 
         vsx_buffer_append_vprintf(&main_data->log_buffer, format, ap);
 
-        wake_up_log_locked(main_data);
+        wake_up_locked(main_data);
 
-        pthread_mutex_unlock(&main_data->log_mutex);
+        pthread_mutex_unlock(&main_data->mutex);
 
         va_end(ap);
 }
@@ -493,28 +499,8 @@ lookup_address(const char *hostname, int port, struct vsx_netaddress *address)
 }
 
 static bool
-handle_log(struct vsx_main_data *main_data)
+handle_log_locked(struct vsx_main_data *main_data)
 {
-        uint8_t byte;
-
-        int got = read(main_data->log_wakeup_fds[0], &byte, 1);
-
-        if (got == 0) {
-                fprintf(stderr, "Unexpected EOF on log wakeup fd\n");
-                return false;
-        } else if (got == -1) {
-                if (errno == EINTR)
-                        return true;
-                fprintf(stderr,
-                        "Error reading log wakeup fd: %s\n",
-                        strerror(errno));
-                return false;
-        }
-
-        pthread_mutex_lock(&main_data->log_mutex);
-
-        main_data->log_wakeup_queued = false;
-
         struct vsx_buffer tmp = main_data->log_buffer;
         main_data->log_buffer = main_data->alternate_log_buffer;
         main_data->alternate_log_buffer = tmp;
@@ -523,14 +509,20 @@ handle_log(struct vsx_main_data *main_data)
 
         bool new_typing_state = main_data->typing_state;
 
-        pthread_mutex_unlock(&main_data->log_mutex);
+        pthread_mutex_unlock(&main_data->mutex);
 
-        clear_line();
+        bool need_update = false;
 
-        fwrite(main_data->alternate_log_buffer.data,
-               1,
-               main_data->alternate_log_buffer.length,
-               stdout);
+        if (main_data->alternate_log_buffer.length > 0) {
+                clear_line();
+
+                fwrite(main_data->alternate_log_buffer.data,
+                       1,
+                       main_data->alternate_log_buffer.length,
+                       stdout);
+
+                need_update = true;
+        }
 
         if (!main_data->had_eof) {
                 if (new_typing_state != main_data->displayed_typing_state) {
@@ -538,10 +530,15 @@ handle_log(struct vsx_main_data *main_data)
                         rl_set_prompt(new_typing_state ?
                                       typing_prompt :
                                       not_typing_prompt);
+
+                        need_update = true;
                 }
 
-                rl_forced_update_display();
+                if (need_update)
+                        rl_forced_update_display();
         }
+
+        pthread_mutex_lock(&main_data->mutex);
 
         return true;
 }
@@ -549,35 +546,57 @@ handle_log(struct vsx_main_data *main_data)
 static void
 run_main_loop(struct vsx_main_data *main_data)
 {
+        struct pollfd fds[2];
+
+        fds[0].fd = main_data->wakeup_fds[0];
+        fds[0].events = POLLIN;
+        fds[1].fd = STDIN_FILENO;
+        fds[1].events = POLLIN;
+
+        pthread_mutex_lock(&main_data->mutex);
+
         while (!main_data->should_quit) {
-                struct pollfd fds[2];
-                int nfds = 0;
+                for (int i = 0; i < VSX_N_ELEMENTS(main_data->wakeup_fds); i++)
+                        fds[i].revents = 0;
 
-                fds[nfds].fd = main_data->log_wakeup_fds[0];
-                fds[nfds].events = POLLIN;
-                fds[nfds].revents = 0;
-                nfds++;
+                int nfds = main_data->had_eof ? 1 : 2;
 
-                if (!main_data->had_eof) {
-                        fds[nfds].fd = STDIN_FILENO;
-                        fds[nfds].events = POLLIN;
-                        fds[nfds].revents = 0;
-                        nfds++;
-                }
+                pthread_mutex_unlock(&main_data->mutex);
 
                 if (poll(fds, nfds, -1 /* timeout */) == -1) {
                         fprintf(stderr, "poll failed: %s\n", strerror(errno));
-                        break;
+                        return;
                 }
 
-                if (!main_data->had_eof && fds[nfds - 1].revents) {
+                if (!main_data->had_eof && fds[nfds - 1].revents)
                         rl_callback_read_char();
-                        continue;
+
+                pthread_mutex_lock(&main_data->mutex);
+
+                if (fds[0].revents) {
+                        uint8_t byte;
+
+                        int got = read(main_data->wakeup_fds[0], &byte, 1);
+
+                        if (got == 0) {
+                                fprintf(stderr,
+                                        "Unexpected EOF on wakeup fd\n");
+                                break;
+                        } else if (got == -1 && errno != EINTR) {
+                                fprintf(stderr,
+                                        "Error reading log wakeup fd: %s\n",
+                                        strerror(errno));
+                                break;
+                        } else {
+                                main_data->wakeup_queued = false;
+                        }
                 }
 
-                if (fds[0].revents && !handle_log(main_data))
+                if (!handle_log_locked(main_data))
                         break;
         }
+
+        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static struct vsx_connection *
@@ -629,15 +648,15 @@ free_main_data(struct vsx_main_data *main_data)
         if (main_data->connection)
                 vsx_connection_free(main_data->connection);
 
-        for (int i = 0; i < VSX_N_ELEMENTS(main_data->log_wakeup_fds); i++) {
-                if (main_data->log_wakeup_fds[i] != -1)
-                        vsx_close(main_data->log_wakeup_fds[i]);
+        for (int i = 0; i < VSX_N_ELEMENTS(main_data->wakeup_fds); i++) {
+                if (main_data->wakeup_fds[i] != -1)
+                        vsx_close(main_data->wakeup_fds[i]);
         }
 
         vsx_buffer_destroy(&main_data->log_buffer);
         vsx_buffer_destroy(&main_data->alternate_log_buffer);
 
-        pthread_mutex_destroy(&main_data->log_mutex);
+        pthread_mutex_destroy(&main_data->mutex);
 
         vsx_free(main_data);
 }
@@ -647,14 +666,14 @@ create_main_data(void)
 {
         struct vsx_main_data *main_data = vsx_calloc(sizeof *main_data);
 
-        pthread_mutex_init(&main_data->log_mutex, NULL /* attr */);
+        pthread_mutex_init(&main_data->mutex, NULL /* attr */);
 
         vsx_buffer_init(&main_data->log_buffer);
         vsx_buffer_init(&main_data->alternate_log_buffer);
 
-        if (pipe(main_data->log_wakeup_fds) == -1) {
-                main_data->log_wakeup_fds[0] = -1;
-                main_data->log_wakeup_fds[1] = -1;
+        if (pipe(main_data->wakeup_fds) == -1) {
+                main_data->wakeup_fds[0] = -1;
+                main_data->wakeup_fds[1] = -1;
                 fprintf(stderr, "pipe failed: %s\n", strerror(errno));
                 goto error;
         }
