@@ -1,6 +1,7 @@
 inc_dirs = [ configinc, '../common' ]
 
 connection_src = [
+        '../common/vsx-bitmask.c',
         '../common/vsx-buffer.c',
         'vsx-connection.c',
         '../common/vsx-error.c',

@@ -39,6 +39,7 @@ server_common = [
 
 server_src = [
         'vsx-base64.c',
+        '../common/vsx-bitmask.c',
         'vsx-config.c',
         'vsx-connection.c',
         'vsx-key-value.c',
@@ -72,6 +73,7 @@ test('ws-parser', test_ws_parser)
 
 test_connection_src = [
         'vsx-base64.c',
+        '../common/vsx-bitmask.c',
         'vsx-connection.c',
         'vsx-normalize-name.c',
         'vsx-person.c',
