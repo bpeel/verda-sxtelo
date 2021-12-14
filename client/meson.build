@@ -1,17 +1,5 @@
 inc_dirs = [ configinc, '../common' ]
 
-readline_dep = declare_dependency(link_args: '-lreadline -ltermcap')
-
-readline_dep = cc.find_library('readline', required : true)
-cc.check_header('readline/readline.h',
-                dependencies: readline_dep,
-                required: true,
-                prefix: '#include <stdio.h>')
-termcap_dep = cc.find_library('termcap', required : true)
-cc.check_header('term.h',
-                dependencies: readline_dep,
-                required: true)
-
 connection_src = [
         '../common/vsx-buffer.c',
         'vsx-connection.c',
@@ -28,7 +16,7 @@ connection_src = [
         '../common/vsx-util.c',
 ]
 
-client_deps = [ readline_dep, termcap_dep, thread_dep ]
+client_deps = [ thread_dep ]
 
 client_headers = [
         'vsx-connection.h',

@@ -24,8 +24,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <readline/readline.h>
-#include <term.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -33,6 +31,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
@@ -44,9 +43,6 @@
 struct vsx_main_data {
         struct vsx_connection *connection;
         struct vsx_worker *worker;
-        bool had_eof;
-
-        bool displayed_typing_state;
 
         struct vsx_listener event_listener;
 
@@ -58,7 +54,6 @@ struct vsx_main_data {
 
         bool wakeup_queued;
 
-        bool typing_state;
         bool should_quit;
 
         struct vsx_buffer log_buffer;
@@ -78,11 +73,6 @@ static char *option_player_name = NULL;
 
 static const char options[] = "-hs:p:r:n:";
 
-/* The readline callback doesn’t have a data parameter so this is a
- * messy backdoor to pass the main_data to it.
- */
-static struct vsx_main_data *readline_cb_data;
-
 static void
 usage(void)
 {
@@ -95,9 +85,6 @@ usage(void)
                " -r <room>            The room to connect to\n"
                " -n <player>          The player name\n");
 }
-
-static const char typing_prompt[] = "vs*> ";
-static const char not_typing_prompt[] = "vs > ";
 
 static bool
 process_arguments(int argc, char **argv)
@@ -180,57 +167,6 @@ handle_message(struct vsx_main_data *main_data,
                      "%s: %s\n",
                      vsx_player_get_name(event->message.player),
                      event->message.message);
-}
-
-static void
-output_ti(char *name)
-{
-        const char *s;
-
-        s = tigetstr(name);
-        if (s && s != (char *) -1)
-                fputs(s, stdout);
-}
-
-static void
-clear_line(void)
-{
-        output_ti("cr");
-        output_ti("dl1");
-}
-
-struct check_typing_data {
-        const struct vsx_player *self;
-        bool is_typing;
-};
-
-static void
-check_typing_cb(const struct vsx_player *player,
-                void *user_data)
-{
-        struct check_typing_data *data = user_data;
-
-        if (player != data->self && vsx_player_is_typing(player))
-                data->is_typing = true;
-}
-
-static void
-handle_player_changed(struct vsx_main_data *main_data,
-                      const struct vsx_connection_event *event)
-{
-        struct check_typing_data data;
-
-        data.self = vsx_connection_get_self(main_data->connection);
-        data.is_typing = false;
-
-        vsx_connection_foreach_player(main_data->connection,
-                                      check_typing_cb,
-                                      &data);
-
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->typing_state = data.is_typing;
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static void
@@ -317,9 +253,6 @@ event_cb(struct vsx_listener *listener,
         case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
                 handle_message(main_data, event);
                 break;
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
-                handle_player_changed(main_data, event);
-                break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
                 handle_player_shouted(main_data, event);
                 break;
@@ -335,40 +268,9 @@ event_cb(struct vsx_listener *listener,
         case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
                 handle_state_changed(main_data, event);
                 break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
                 break;
-        }
-}
-
-static void
-finish_stdin(struct vsx_main_data *main_data)
-{
-        if (!main_data->had_eof) {
-                clear_line();
-                rl_callback_handler_remove();
-                main_data->had_eof = true;
-        }
-}
-
-static void
-readline_cb(char *line)
-{
-        struct vsx_main_data *main_data = readline_cb_data;
-
-        if (line == NULL) {
-                finish_stdin(main_data);
-
-                if (vsx_connection_get_state(main_data->connection) ==
-                    VSX_CONNECTION_STATE_IN_PROGRESS) {
-                        vsx_worker_lock(main_data->worker);
-                        vsx_connection_leave(main_data->connection);
-                        vsx_worker_unlock(main_data->worker);
-                } else {
-                        pthread_mutex_lock(&main_data->mutex);
-                        wake_up_locked(main_data);
-                        main_data->should_quit = true;
-                        pthread_mutex_unlock(&main_data->mutex);
-                }
         }
 }
 
@@ -390,66 +292,6 @@ format_print(struct vsx_main_data *main_data,
         pthread_mutex_unlock(&main_data->mutex);
 
         va_end(ap);
-}
-
-static int
-newline_cb(int count, int key)
-{
-        struct vsx_main_data *main_data = readline_cb_data;
-
-        if (*rl_line_buffer) {
-                vsx_worker_lock(main_data->worker);
-
-                if (!strcmp(rl_line_buffer, "s")) {
-                        vsx_connection_shout(main_data->connection);
-                } else if (!strcmp(rl_line_buffer, "t")) {
-                        vsx_connection_turn(main_data->connection);
-                } else if (!strcmp(rl_line_buffer, "m")) {
-                        vsx_connection_move_tile(main_data->connection,
-                                                 0,
-                                                 10, 20);
-                } else {
-                        vsx_connection_send_message(main_data->connection,
-                                                    rl_line_buffer);
-                }
-
-                vsx_worker_unlock(main_data->worker);
-
-                rl_replace_line("", true);
-        }
-
-        return 0;
-}
-
-static void
-redisplay_hook(void)
-{
-        struct vsx_main_data *main_data = readline_cb_data;
-
-        vsx_worker_lock(main_data->worker);
-
-        /* There doesn't appear to be a good way to hook into
-         * notifications of the buffer being modified so we'll just
-         * hook into the redisplay function which should hopefully get
-         * called every time it is modified. If the buffer is not
-         * empty then we'll assume the user is typing. If the user is
-         * already marked as typing then this will do nothing */
-        vsx_connection_set_typing(main_data->connection,
-                                  *rl_line_buffer != '\0');
-
-        vsx_worker_unlock(main_data->worker);
-
-        /* Chain up */
-        rl_redisplay();
-}
-
-static void
-start_stdin(struct vsx_main_data *main_data)
-{
-        readline_cb_data = main_data;
-        rl_callback_handler_install(not_typing_prompt, readline_cb);
-        rl_redisplay_function = redisplay_hook;
-        rl_bind_key('\r', newline_cb);
 }
 
 static bool
@@ -498,60 +340,35 @@ lookup_address(const char *hostname, int port, struct vsx_netaddress *address)
         return found;
 }
 
-static bool
+static void
 handle_log_locked(struct vsx_main_data *main_data)
 {
+        if (main_data->log_buffer.length <= 0)
+                return;
+
         struct vsx_buffer tmp = main_data->log_buffer;
         main_data->log_buffer = main_data->alternate_log_buffer;
         main_data->alternate_log_buffer = tmp;
 
         vsx_buffer_set_length(&main_data->log_buffer, 0);
 
-        bool new_typing_state = main_data->typing_state;
-
         pthread_mutex_unlock(&main_data->mutex);
 
-        bool need_update = false;
-
-        if (main_data->alternate_log_buffer.length > 0) {
-                clear_line();
-
-                fwrite(main_data->alternate_log_buffer.data,
-                       1,
-                       main_data->alternate_log_buffer.length,
-                       stdout);
-
-                need_update = true;
-        }
-
-        if (!main_data->had_eof) {
-                if (new_typing_state != main_data->displayed_typing_state) {
-                        main_data->displayed_typing_state = new_typing_state;
-                        rl_set_prompt(new_typing_state ?
-                                      typing_prompt :
-                                      not_typing_prompt);
-
-                        need_update = true;
-                }
-
-                if (need_update)
-                        rl_forced_update_display();
-        }
+        fwrite(main_data->alternate_log_buffer.data,
+               1,
+               main_data->alternate_log_buffer.length,
+               stdout);
 
         pthread_mutex_lock(&main_data->mutex);
-
-        return true;
 }
 
 static void
 run_main_loop(struct vsx_main_data *main_data)
 {
-        struct pollfd fds[2];
+        struct pollfd fds[1];
 
         fds[0].fd = main_data->wakeup_fds[0];
         fds[0].events = POLLIN;
-        fds[1].fd = STDIN_FILENO;
-        fds[1].events = POLLIN;
 
         pthread_mutex_lock(&main_data->mutex);
 
@@ -559,17 +376,12 @@ run_main_loop(struct vsx_main_data *main_data)
                 for (int i = 0; i < VSX_N_ELEMENTS(main_data->wakeup_fds); i++)
                         fds[i].revents = 0;
 
-                int nfds = main_data->had_eof ? 1 : 2;
-
                 pthread_mutex_unlock(&main_data->mutex);
 
-                if (poll(fds, nfds, -1 /* timeout */) == -1) {
+                if (poll(fds, 1 /* nfds */, -1 /* timeout */) == -1) {
                         fprintf(stderr, "poll failed: %s\n", strerror(errno));
                         return;
                 }
-
-                if (!main_data->had_eof && fds[nfds - 1].revents)
-                        rl_callback_read_char();
 
                 pthread_mutex_lock(&main_data->mutex);
 
@@ -592,8 +404,7 @@ run_main_loop(struct vsx_main_data *main_data)
                         }
                 }
 
-                if (!handle_log_locked(main_data))
-                        break;
+                handle_log_locked(main_data);
         }
 
         pthread_mutex_unlock(&main_data->mutex);
@@ -706,8 +517,6 @@ main(int argc, char **argv)
         if (main_data == NULL)
                 return EXIT_FAILURE;
 
-        start_stdin(main_data);
-
         vsx_worker_lock(main_data->worker);
 
         struct vsx_signal *event_signal =
@@ -724,8 +533,6 @@ main(int argc, char **argv)
         vsx_worker_unlock(main_data->worker);
 
         run_main_loop(main_data);
-
-        finish_stdin(main_data);
 
         free_main_data(main_data);
 
