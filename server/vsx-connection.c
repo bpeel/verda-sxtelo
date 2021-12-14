@@ -27,7 +27,7 @@
 #include "vsx-ws-parser.h"
 #include "vsx-proto.h"
 #include "vsx-log.h"
-#include "vsx-flags.h"
+#include "vsx-bitmask.h"
 #include "vsx-normalize-name.h"
 #include "vsx-base64.h"
 #include "vsx-util.h"
@@ -85,12 +85,12 @@ struct _VsxConnection
   VsxConnectionDirtyFlag dirty_flags;
 
   /* Bit mask of players whose state needs updating */
-  unsigned long dirty_players
-  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_CONVERSATION_MAX_PLAYERS)];
+  vsx_bitmask_element_t dirty_players
+  [VSX_BITMASK_N_ELEMENTS_FOR_SIZE (VSX_CONVERSATION_MAX_PLAYERS)];
 
   /* Bit mask of tiles that need updating */
-  unsigned long dirty_tiles
-  [VSX_FLAGS_N_LONGS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
+  vsx_bitmask_element_t dirty_tiles
+  [VSX_BITMASK_N_ELEMENTS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
 
   int pending_shout;
 
@@ -147,11 +147,11 @@ conversation_changed_cb (struct vsx_listener *listener,
       break;
 
     case VSX_CONVERSATION_PLAYER_CHANGED:
-      VSX_FLAGS_SET (conn->dirty_players, data->num, true);
+      vsx_bitmask_set (conn->dirty_players, data->num, true);
       break;
 
     case VSX_CONVERSATION_TILE_CHANGED:
-      VSX_FLAGS_SET (conn->dirty_tiles, data->num, true);
+      vsx_bitmask_set (conn->dirty_tiles, data->num, true);
       break;
 
     case VSX_CONVERSATION_STATE_CHANGED:
@@ -174,11 +174,11 @@ start_following_person (VsxConnection *conn)
                         | VSX_CONNECTION_DIRTY_FLAG_N_TILES
                         | VSX_CONNECTION_DIRTY_FLAG_SYNC);
 
-  vsx_flags_set_range (conn->dirty_tiles,
-                       conn->person->conversation->n_tiles_in_play);
+  vsx_bitmask_set_range (conn->dirty_tiles,
+                         conn->person->conversation->n_tiles_in_play);
 
-  vsx_flags_set_range (conn->dirty_players,
-                       conn->person->conversation->n_players);
+  vsx_bitmask_set_range (conn->dirty_players,
+                         conn->person->conversation->n_players);
 
   conn->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&conn->person->conversation->changed_signal,
