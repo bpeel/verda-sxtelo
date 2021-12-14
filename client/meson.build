@@ -16,7 +16,9 @@ connection_src = [
         '../common/vsx-util.c',
 ]
 
-client_deps = [ thread_dep ]
+sdl_dep = dependency('sdl2')
+
+client_deps = [ thread_dep, sdl_dep ]
 
 client_headers = [
         'vsx-connection.h',
@@ -25,6 +27,7 @@ client_headers = [
 ]
 
 client_src = [
+        'vsx-gl.c',
         'vsx-main.c',
         'vsx-monotonic.c',
         'vsx-worker.c',

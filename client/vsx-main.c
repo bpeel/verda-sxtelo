@@ -28,11 +28,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <poll.h>
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
+#include <SDL.h>
 
+#include "vsx-gl.h"
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
 #include "vsx-netaddress.h"
@@ -40,19 +41,38 @@
 #include "vsx-buffer.h"
 #include "vsx-worker.h"
 
+#define MIN_GL_MAJOR_VERSION 2
+#define MIN_GL_MINOR_VERSION 0
+#define REQUEST_GL_MAJOR_VERSION 2
+#define REQUEST_GL_MINOR_VERSION 0
+#define VSX_GL_PROFILE SDL_GL_CONTEXT_PROFILE_ES
+
+/* Pick a default resolution that matches the aspect ratio of a Google
+ * Pixel 3a in landscape orientation
+ */
+#define DEFAULT_WIDTH (2220 * 2 / 5)
+#define DEFAULT_HEIGHT (1080 * 2 / 5)
+
 struct vsx_main_data {
+        SDL_Window *window;
+        SDL_GLContext gl_context;
+
+        bool sdl_inited;
+
         struct vsx_connection *connection;
         struct vsx_worker *worker;
 
         struct vsx_listener event_listener;
 
-        int wakeup_fds[2];
+        SDL_Event wakeup_event;
 
         pthread_mutex_t mutex;
 
         /* The following state is protected by the mutex */
 
         bool wakeup_queued;
+
+        bool redraw_queued;
 
         bool should_quit;
 
@@ -130,13 +150,42 @@ process_arguments(int argc, char **argv)
 }
 
 static void
+handle_event_locked(struct vsx_main_data *main_data,
+                    const SDL_Event *event)
+{
+        switch (event->type) {
+        case SDL_WINDOWEVENT:
+                switch (event->window.event) {
+                case SDL_WINDOWEVENT_CLOSE:
+                        main_data->should_quit = true;
+                        break;
+                case SDL_WINDOWEVENT_EXPOSED:
+                        main_data->redraw_queued = true;
+                        break;
+                }
+                goto handled;
+
+        case SDL_QUIT:
+                main_data->should_quit = true;
+                goto handled;
+        }
+
+        if (event->type == main_data->wakeup_event.type) {
+                main_data->wakeup_queued = false;
+                goto handled;
+        }
+
+handled:
+        (void) 0;
+}
+
+static void
 wake_up_locked(struct vsx_main_data *main_data)
 {
         if (main_data->wakeup_queued)
                 return;
 
-        static const uint8_t byte = 'W';
-        write(main_data->wakeup_fds[1], &byte, 1);
+        SDL_PushEvent(&main_data->wakeup_event);
         main_data->wakeup_queued = true;
 }
 
@@ -363,45 +412,41 @@ handle_log_locked(struct vsx_main_data *main_data)
 }
 
 static void
+paint(struct vsx_main_data *main_data)
+{
+        vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
+
+        SDL_GL_SwapWindow(main_data->window);
+}
+
+static void
 run_main_loop(struct vsx_main_data *main_data)
 {
-        struct pollfd fds[1];
-
-        fds[0].fd = main_data->wakeup_fds[0];
-        fds[0].events = POLLIN;
-
         pthread_mutex_lock(&main_data->mutex);
 
         while (!main_data->should_quit) {
-                for (int i = 0; i < VSX_N_ELEMENTS(main_data->wakeup_fds); i++)
-                        fds[i].revents = 0;
+                bool redraw_queued = main_data->redraw_queued;
 
                 pthread_mutex_unlock(&main_data->mutex);
 
-                if (poll(fds, 1 /* nfds */, -1 /* timeout */) == -1) {
-                        fprintf(stderr, "poll failed: %s\n", strerror(errno));
-                        return;
-                }
+                SDL_Event event;
+                bool had_event;
+
+                if (redraw_queued)
+                        had_event = SDL_PollEvent(&event);
+                else
+                        had_event = SDL_WaitEvent(&event);
 
                 pthread_mutex_lock(&main_data->mutex);
 
-                if (fds[0].revents) {
-                        uint8_t byte;
+                if (had_event) {
+                        handle_event_locked(main_data, &event);
+                } else if (main_data->redraw_queued) {
+                        main_data->redraw_queued = false;
 
-                        int got = read(main_data->wakeup_fds[0], &byte, 1);
-
-                        if (got == 0) {
-                                fprintf(stderr,
-                                        "Unexpected EOF on wakeup fd\n");
-                                break;
-                        } else if (got == -1 && errno != EINTR) {
-                                fprintf(stderr,
-                                        "Error reading log wakeup fd: %s\n",
-                                        strerror(errno));
-                                break;
-                        } else {
-                                main_data->wakeup_queued = false;
-                        }
+                        pthread_mutex_unlock(&main_data->mutex);
+                        paint(main_data);
+                        pthread_mutex_lock(&main_data->mutex);
                 }
 
                 handle_log_locked(main_data);
@@ -451,18 +496,30 @@ create_worker(struct vsx_connection *connection)
 }
 
 static void
+finish_sdl(struct vsx_main_data *main_data)
+{
+        if (main_data->gl_context) {
+                SDL_GL_MakeCurrent(NULL, NULL);
+                SDL_GL_DeleteContext(main_data->gl_context);
+        }
+
+        if (main_data->window)
+                SDL_DestroyWindow(main_data->window);
+
+        if (main_data->sdl_inited)
+                SDL_Quit();
+}
+
+static void
 free_main_data(struct vsx_main_data *main_data)
 {
+        finish_sdl(main_data);
+
         if (main_data->worker)
                 vsx_worker_free(main_data->worker);
 
         if (main_data->connection)
                 vsx_connection_free(main_data->connection);
-
-        for (int i = 0; i < VSX_N_ELEMENTS(main_data->wakeup_fds); i++) {
-                if (main_data->wakeup_fds[i] != -1)
-                        vsx_close(main_data->wakeup_fds[i]);
-        }
 
         vsx_buffer_destroy(&main_data->log_buffer);
         vsx_buffer_destroy(&main_data->alternate_log_buffer);
@@ -482,13 +539,6 @@ create_main_data(void)
         vsx_buffer_init(&main_data->log_buffer);
         vsx_buffer_init(&main_data->alternate_log_buffer);
 
-        if (pipe(main_data->wakeup_fds) == -1) {
-                main_data->wakeup_fds[0] = -1;
-                main_data->wakeup_fds[1] = -1;
-                fprintf(stderr, "pipe failed: %s\n", strerror(errno));
-                goto error;
-        }
-
         main_data->connection = create_connection();
 
         if (main_data->connection == NULL)
@@ -506,6 +556,112 @@ error:
         return NULL;
 }
 
+static bool
+check_gl_version(void)
+{
+        if (vsx_gl.major_version < 0 ||
+            vsx_gl.minor_version < 0) {
+                fprintf(stderr,
+                        "Invalid GL version string encountered: %s",
+                        (const char *)
+                        vsx_gl.glGetString(GL_VERSION));
+
+                return false;
+        }
+
+        if (vsx_gl.major_version < MIN_GL_MAJOR_VERSION ||
+            (vsx_gl.major_version == MIN_GL_MAJOR_VERSION &&
+             vsx_gl.minor_version < MIN_GL_MINOR_VERSION)) {
+                fprintf(stderr,
+                        "GL version %i.%i is required but the driver "
+                        "is reporting:\n"
+                        "Version: %s\n"
+                        "Vendor: %s\n"
+                        "Renderer: %s",
+                        MIN_GL_MAJOR_VERSION,
+                        MIN_GL_MINOR_VERSION,
+                        (const char *)
+                        vsx_gl.glGetString(GL_VERSION),
+                        (const char *)
+                        vsx_gl.glGetString(GL_VENDOR),
+                        (const char *)
+                        vsx_gl.glGetString(GL_RENDERER));
+
+                return false;
+        }
+
+        return true;
+}
+
+static void *
+gl_get_proc_address(const char *func_name,
+                    void *unused)
+{
+        return SDL_GL_GetProcAddress(func_name);
+}
+
+static bool
+init_sdl(struct vsx_main_data *main_data)
+{
+        int res = SDL_Init(SDL_INIT_VIDEO);
+
+        if (res < 0) {
+                fprintf(stderr, "Unable to init SDL: %s\n", SDL_GetError());
+                return false;
+        }
+
+        main_data->sdl_inited = true;
+
+        main_data->wakeup_event.type = SDL_RegisterEvents(1);
+
+        SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,
+                            REQUEST_GL_MAJOR_VERSION);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,
+                            REQUEST_GL_MINOR_VERSION);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                            VSX_GL_PROFILE);
+
+        Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+
+        main_data->window = SDL_CreateWindow("Verda Ŝtelo",
+                                             SDL_WINDOWPOS_UNDEFINED,
+                                             SDL_WINDOWPOS_UNDEFINED,
+                                             DEFAULT_WIDTH,
+                                             DEFAULT_HEIGHT,
+                                             flags);
+
+        if (main_data->window == NULL) {
+                fprintf(stderr,
+                        "Failed to create SDL window: %s",
+                        SDL_GetError());
+                return false;
+        }
+
+        main_data->gl_context = SDL_GL_CreateContext(main_data->window);
+
+        if (main_data->gl_context == NULL) {
+                fprintf(stderr,
+                        "Failed to create GL context: %s",
+                        SDL_GetError());
+                return false;
+        }
+
+        SDL_GL_MakeCurrent(main_data->window, main_data->gl_context);
+
+        vsx_gl_init(gl_get_proc_address, NULL /* user_data */);
+
+        if (!check_gl_version())
+                return false;
+
+        return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -516,6 +672,13 @@ main(int argc, char **argv)
 
         if (main_data == NULL)
                 return EXIT_FAILURE;
+
+        int ret = EXIT_SUCCESS;
+
+        if (!init_sdl(main_data)) {
+                ret = EXIT_FAILURE;
+                goto out;
+        }
 
         vsx_worker_lock(main_data->worker);
 
@@ -534,7 +697,8 @@ main(int argc, char **argv)
 
         run_main_loop(main_data);
 
+out:
         free_main_data(main_data);
 
-        return EXIT_SUCCESS;
+        return ret;
 }
