@@ -36,6 +36,7 @@ client_src = [
         'vsx-main.c',
         'vsx-map-buffer.c',
         'vsx-monotonic.c',
+        'vsx-quad-buffer.c',
         'vsx-shader-data.c',
         'vsx-worker.c',
 ] + connection_src
