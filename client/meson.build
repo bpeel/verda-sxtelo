@@ -33,6 +33,7 @@ client_src = [
         'vsx-gl.c',
         'vsx-main.c',
         'vsx-monotonic.c',
+        'vsx-shader-data.c',
         'vsx-worker.c',
 ] + connection_src
 
