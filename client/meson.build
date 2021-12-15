@@ -39,6 +39,7 @@ client_src = [
         'vsx-monotonic.c',
         'vsx-quad-buffer.c',
         'vsx-shader-data.c',
+        'vsx-thread-linux.c',
         'vsx-tile-painter.c',
         'vsx-worker.c',
 ] + connection_src
@@ -60,6 +61,7 @@ test('client-connection', test_client_connection)
 test_worker_src = [
         'test-worker.c',
         'vsx-monotonic.c',
+        'vsx-thread-linux.c',
         'vsx-worker.c',
 ] + connection_src
 

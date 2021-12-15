@@ -30,6 +30,7 @@
 #include "vsx-util.h"
 #include "vsx-file-error.h"
 #include "vsx-monotonic.h"
+#include "vsx-thread.h"
 
 struct vsx_worker {
         struct vsx_connection *connection;
@@ -192,10 +193,10 @@ vsx_worker_new(struct vsx_connection *connection,
                 goto error;
         }
 
-        int thread_ret = pthread_create(&worker->thread,
-                                        NULL, /* attr */
-                                        thread_func,
-                                        worker);
+        int thread_ret = vsx_thread_create(&worker->thread,
+                                           NULL, /* attr */
+                                           thread_func,
+                                           worker);
 
         if (thread_ret != 0) {
                 vsx_file_error_set(error,
