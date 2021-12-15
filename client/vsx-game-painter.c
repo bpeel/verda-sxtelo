@@ -34,18 +34,45 @@ struct vsx_game_painter {
         struct vsx_tile_painter *tile_painter;
 };
 
+static bool
+init_toolbox(struct vsx_game_painter *painter,
+             struct vsx_asset_manager *asset_manager,
+             struct vsx_error **error)
+{
+        struct vsx_painter_toolbox *toolbox = &painter->toolbox;
+
+        if (!vsx_shader_data_init(&toolbox->shader_data,
+                                  asset_manager,
+                                  error))
+                return false;
+
+        painter->shader_data_inited = true;
+
+        toolbox->image_loader = vsx_image_loader_new(asset_manager);
+
+        return true;
+}
+
+static void
+destroy_toolbox(struct vsx_game_painter *painter)
+{
+        struct vsx_painter_toolbox *toolbox = &painter->toolbox;
+
+        if (toolbox->image_loader)
+                vsx_image_loader_free(toolbox->image_loader);
+
+        if (painter->shader_data_inited)
+                vsx_shader_data_destroy(&toolbox->shader_data);
+}
+
 struct vsx_game_painter *
 vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error)
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
-        if (!vsx_shader_data_init(&painter->toolbox.shader_data,
-                                  asset_manager,
-                                  error))
+        if (!init_toolbox(painter, asset_manager, error))
                 goto error;
-
-        painter->shader_data_inited = true;
 
         painter->tile_painter = vsx_tile_painter_new(&painter->toolbox);
 
@@ -78,8 +105,7 @@ vsx_game_painter_free(struct vsx_game_painter *painter)
         if (painter->tile_painter)
                 vsx_tile_painter_free(painter->tile_painter);
 
-        if (painter->shader_data_inited)
-                vsx_shader_data_destroy(&painter->toolbox.shader_data);
+        destroy_toolbox(painter);
 
         vsx_free(painter);
 }

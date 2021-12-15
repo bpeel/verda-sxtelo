@@ -20,9 +20,11 @@
 #define VSX_PAINTER_TOOLBOX_H
 
 #include "vsx-shader-data.h"
+#include "vsx-image-loader.h"
 
 struct vsx_painter_toolbox {
         struct vsx_shader_data shader_data;
+        struct vsx_image_loader *image_loader;
 };
 
 #endif /* VSX_PAINTER_TOOLBOX_H */
