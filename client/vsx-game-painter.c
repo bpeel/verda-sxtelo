@@ -20,6 +20,7 @@
 
 #include "vsx-game-painter.h"
 #include "vsx-shader-data.h"
+#include "vsx-tile-painter.h"
 #include "vsx-gl.h"
 
 #include <stdbool.h>
@@ -28,6 +29,8 @@
 struct vsx_game_painter {
         struct vsx_shader_data shader_data;
         bool shader_data_inited;
+
+        struct vsx_tile_painter *tile_painter;
 };
 
 struct vsx_game_painter *
@@ -42,6 +45,8 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
                 goto error;
 
         painter->shader_data_inited = true;
+
+        painter->tile_painter = vsx_tile_painter_new(&painter->shader_data);
 
         return painter;
 
@@ -59,11 +64,19 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
         vsx_gl.glViewport(0, 0, width, height);
 
         vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
+
+        vsx_tile_painter_paint(painter->tile_painter,
+                               game_state,
+                               width,
+                               height);
 }
 
 void
 vsx_game_painter_free(struct vsx_game_painter *painter)
 {
+        if (painter->tile_painter)
+                vsx_tile_painter_free(painter->tile_painter);
+
         if (painter->shader_data_inited)
                 vsx_shader_data_destroy(&painter->shader_data);
 

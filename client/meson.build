@@ -38,6 +38,7 @@ client_src = [
         'vsx-monotonic.c',
         'vsx-quad-buffer.c',
         'vsx-shader-data.c',
+        'vsx-tile-painter.c',
         'vsx-worker.c',
 ] + connection_src
 
