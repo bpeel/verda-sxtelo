@@ -42,6 +42,7 @@
 #include "vsx-worker.h"
 #include "vsx-game-state.h"
 #include "vsx-asset-linux.h"
+#include "vsx-game-painter.h"
 
 #define MIN_GL_MAJOR_VERSION 2
 #define MIN_GL_MINOR_VERSION 0
@@ -67,6 +68,8 @@ struct vsx_main_data {
         struct vsx_worker *worker;
         struct vsx_game_state *game_state;
         struct vsx_asset_manager *asset_manager;
+
+        struct vsx_game_painter *game_painter;
 
         struct vsx_listener event_listener;
 
@@ -447,7 +450,10 @@ paint(struct vsx_main_data *main_data)
         vsx_game_state_update(main_data->game_state);
         vsx_worker_unlock(main_data->worker);
 
-        vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
+        vsx_game_painter_paint(main_data->game_painter,
+                               main_data->game_state,
+                               main_data->fb_width,
+                               main_data->fb_height);
 
         SDL_GL_SwapWindow(main_data->window);
 }
@@ -546,6 +552,9 @@ finish_sdl(struct vsx_main_data *main_data)
 static void
 free_main_data(struct vsx_main_data *main_data)
 {
+        if (main_data->game_painter)
+                vsx_game_painter_free(main_data->game_painter);
+
         finish_sdl(main_data);
 
         if (main_data->worker)
@@ -703,6 +712,24 @@ init_sdl(struct vsx_main_data *main_data)
         return true;
 }
 
+static bool
+init_painter(struct vsx_main_data *main_data)
+{
+        struct vsx_error *error = NULL;
+
+        main_data->game_painter =
+                vsx_game_painter_new(main_data->asset_manager,
+                                     &error);
+
+        if (main_data->game_painter == NULL) {
+                fprintf(stderr, "%s\n", error->message);
+                vsx_error_free(error);
+                return false;
+        }
+
+        return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -717,6 +744,11 @@ main(int argc, char **argv)
         int ret = EXIT_SUCCESS;
 
         if (!init_sdl(main_data)) {
+                ret = EXIT_FAILURE;
+                goto out;
+        }
+
+        if (!init_painter(main_data)) {
                 ret = EXIT_FAILURE;
                 goto out;
         }
