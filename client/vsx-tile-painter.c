@@ -44,11 +44,12 @@ struct vertex {
 #define TILE_SIZE 20
 
 struct vsx_tile_painter *
-vsx_tile_painter_new(struct vsx_shader_data *shader_data)
+vsx_tile_painter_new(struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
 
-        painter->program = shader_data->programs[VSX_SHADER_DATA_PROGRAM_SOLID];
+        painter->program =
+                toolbox->shader_data.programs[VSX_SHADER_DATA_PROGRAM_SOLID];
 
         return painter;
 }

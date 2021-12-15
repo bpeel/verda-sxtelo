@@ -19,15 +19,16 @@
 #include "config.h"
 
 #include "vsx-game-painter.h"
-#include "vsx-shader-data.h"
-#include "vsx-tile-painter.h"
-#include "vsx-gl.h"
 
 #include <stdbool.h>
 #include <math.h>
 
+#include "vsx-painter-toolbox.h"
+#include "vsx-tile-painter.h"
+#include "vsx-gl.h"
+
 struct vsx_game_painter {
-        struct vsx_shader_data shader_data;
+        struct vsx_painter_toolbox toolbox;
         bool shader_data_inited;
 
         struct vsx_tile_painter *tile_painter;
@@ -39,14 +40,14 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
-        if (!vsx_shader_data_init(&painter->shader_data,
+        if (!vsx_shader_data_init(&painter->toolbox.shader_data,
                                   asset_manager,
                                   error))
                 goto error;
 
         painter->shader_data_inited = true;
 
-        painter->tile_painter = vsx_tile_painter_new(&painter->shader_data);
+        painter->tile_painter = vsx_tile_painter_new(&painter->toolbox);
 
         return painter;
 
@@ -78,7 +79,7 @@ vsx_game_painter_free(struct vsx_game_painter *painter)
                 vsx_tile_painter_free(painter->tile_painter);
 
         if (painter->shader_data_inited)
-                vsx_shader_data_destroy(&painter->shader_data);
+                vsx_shader_data_destroy(&painter->toolbox.shader_data);
 
         vsx_free(painter);
 }

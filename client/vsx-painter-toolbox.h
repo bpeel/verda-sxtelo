@@ -16,24 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_TILE_PAINTER_H
-#define VSX_TILE_PAINTER_H
+#ifndef VSX_PAINTER_TOOLBOX_H
+#define VSX_PAINTER_TOOLBOX_H
 
-#include "vsx-game-state.h"
-#include "vsx-painter-toolbox.h"
+#include "vsx-shader-data.h"
 
-struct vsx_tile_painter;
+struct vsx_painter_toolbox {
+        struct vsx_shader_data shader_data;
+};
 
-struct vsx_tile_painter *
-vsx_tile_painter_new(struct vsx_painter_toolbox *toolbox);
-
-void
-vsx_tile_painter_paint(struct vsx_tile_painter *painter,
-                       struct vsx_game_state *game_state,
-                       int fb_width,
-                       int fb_height);
-
-void
-vsx_tile_painter_free(struct vsx_tile_painter *painter);
-
-#endif /* VSX_TILE_PAINTER_H */
+#endif /* VSX_PAINTER_TOOLBOX_H */
