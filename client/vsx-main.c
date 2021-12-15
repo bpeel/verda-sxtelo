@@ -41,6 +41,7 @@
 #include "vsx-buffer.h"
 #include "vsx-worker.h"
 #include "vsx-game-state.h"
+#include "vsx-asset-linux.h"
 
 #define MIN_GL_MAJOR_VERSION 2
 #define MIN_GL_MINOR_VERSION 0
@@ -63,6 +64,7 @@ struct vsx_main_data {
         struct vsx_connection *connection;
         struct vsx_worker *worker;
         struct vsx_game_state *game_state;
+        struct vsx_asset_manager *asset_manager;
 
         struct vsx_listener event_listener;
 
@@ -530,6 +532,9 @@ free_main_data(struct vsx_main_data *main_data)
         if (main_data->connection)
                 vsx_connection_free(main_data->connection);
 
+        if (main_data->asset_manager)
+                vsx_asset_manager_free(main_data->asset_manager);
+
         vsx_buffer_destroy(&main_data->log_buffer);
         vsx_buffer_destroy(&main_data->alternate_log_buffer);
 
@@ -547,6 +552,8 @@ create_main_data(void)
 
         vsx_buffer_init(&main_data->log_buffer);
         vsx_buffer_init(&main_data->alternate_log_buffer);
+
+        main_data->asset_manager = vsx_asset_manager_new();
 
         main_data->connection = create_connection();
 
