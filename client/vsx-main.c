@@ -43,6 +43,7 @@
 #include "vsx-game-state.h"
 #include "vsx-asset-linux.h"
 #include "vsx-game-painter.h"
+#include "vsx-main-thread.h"
 
 #define MIN_GL_MAJOR_VERSION 2
 #define MIN_GL_MINOR_VERSION 0
@@ -204,6 +205,11 @@ handle_event_locked(struct vsx_main_data *main_data,
 
         if (event->type == main_data->wakeup_event.type) {
                 main_data->wakeup_queued = false;
+
+                pthread_mutex_unlock(&main_data->mutex);
+                vsx_main_thread_flush_idle_events();
+                pthread_mutex_lock(&main_data->mutex);
+
                 goto handled;
         }
 
@@ -219,6 +225,16 @@ wake_up_locked(struct vsx_main_data *main_data)
 
         SDL_PushEvent(&main_data->wakeup_event);
         main_data->wakeup_queued = true;
+}
+
+static void
+wakeup_cb(void *user_data)
+{
+        struct vsx_main_data *main_data = user_data;
+
+        pthread_mutex_lock(&main_data->mutex);
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static void
@@ -668,6 +684,7 @@ init_sdl(struct vsx_main_data *main_data)
         main_data->sdl_inited = true;
 
         main_data->wakeup_event.type = SDL_RegisterEvents(1);
+        vsx_main_thread_set_wakeup_func(wakeup_cb, main_data);
 
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -779,6 +796,8 @@ main(int argc, char **argv)
 
 out:
         free_main_data(main_data);
+
+        vsx_main_thread_clean_up();
 
         return ret;
 }

@@ -34,6 +34,7 @@ client_src = [
         'vsx-game-state.c',
         'vsx-gl.c',
         'vsx-main.c',
+        'vsx-main-thread.c',
         'vsx-map-buffer.c',
         'vsx-monotonic.c',
         'vsx-quad-buffer.c',
