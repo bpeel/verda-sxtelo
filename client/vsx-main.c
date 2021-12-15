@@ -59,6 +59,8 @@ struct vsx_main_data {
         SDL_Window *window;
         SDL_GLContext gl_context;
 
+        int fb_width, fb_height;
+
         bool sdl_inited;
 
         struct vsx_connection *connection;
@@ -154,14 +156,37 @@ process_arguments(int argc, char **argv)
 }
 
 static void
+update_fb_size(struct vsx_main_data *main_data,
+               int fb_width,
+               int fb_height)
+{
+        main_data->fb_width = fb_width;
+        main_data->fb_height = fb_height;
+}
+
+static void
 handle_event_locked(struct vsx_main_data *main_data,
                     const SDL_Event *event)
 {
+        int fb_width, fb_height;
+
         switch (event->type) {
         case SDL_WINDOWEVENT:
                 switch (event->window.event) {
                 case SDL_WINDOWEVENT_CLOSE:
                         main_data->should_quit = true;
+                        break;
+                case SDL_WINDOWEVENT_SHOWN:
+                        SDL_GetWindowSize(main_data->window,
+                                          &fb_width,
+                                          &fb_height);
+                        update_fb_size(main_data, fb_width, fb_height);
+                        break;
+                case SDL_WINDOWEVENT_SIZE_CHANGED:
+                        update_fb_size(main_data,
+                                       event->window.data1,
+                                       event->window.data2);
+                        main_data->redraw_queued = true;
                         break;
                 case SDL_WINDOWEVENT_EXPOSED:
                         main_data->redraw_queued = true;
