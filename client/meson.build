@@ -33,6 +33,7 @@ client_src = [
         'vsx-game-state.c',
         'vsx-gl.c',
         'vsx-main.c',
+        'vsx-map-buffer.c',
         'vsx-monotonic.c',
         'vsx-shader-data.c',
         'vsx-worker.c',
