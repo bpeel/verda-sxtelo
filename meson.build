@@ -23,6 +23,8 @@ endif
 
 cdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
+cdata.set('VSX_SOURCE_ROOT', '"' + meson.source_root() + '"')
+
 # Paths
 vs_bindir = join_paths(get_option('prefix'), get_option('bindir'))
 

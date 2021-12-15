@@ -33,6 +33,8 @@ client_src = [
         'vsx-game-painter.c',
         'vsx-game-state.c',
         'vsx-gl.c',
+        'vsx-image.c',
+        'vsx-image-loader.c',
         'vsx-main.c',
         'vsx-main-thread.c',
         'vsx-map-buffer.c',
@@ -70,3 +72,18 @@ test_worker = executable('test-worker',
                          dependencies: [thread_dep],
                          include_directories: inc_dirs)
 test('worker', test_worker)
+
+test_image_loader_src = [
+        'vsx-image-loader.c',
+        'vsx-asset-linux.c',
+        'vsx-main-thread.c',
+        'vsx-thread-linux.c',
+        '../common/vsx-util.c',
+        'vsx-image.c',
+        '../common/vsx-error.c',
+        'test-image-loader.c',
+]
+test_image_loader = executable('test-image-loader', test_image_loader_src,
+                               dependencies: [sdl_dep, thread_dep],
+                               include_directories: inc_dirs)
+test('image_loader', test_image_loader)
