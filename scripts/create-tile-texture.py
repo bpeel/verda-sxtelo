@@ -80,17 +80,10 @@ def get_texture_size():
     return w, h
 
 
-def generate_texture():
-    x_tiles, y_tiles = get_texture_size()
-
-    surface = cairo.ImageSurface(cairo.FORMAT_RGB24,
-                                 x_tiles * TILE_SIZE,
-                                 y_tiles * TILE_SIZE)
-    cr = cairo.Context(surface)
-
+def generate_tiles(cr, tiles_per_row):
     for tile_num, letter in enumerate(LETTERS):
-        x = tile_num % x_tiles
-        y = tile_num // x_tiles
+        x = tile_num % tiles_per_row
+        y = tile_num // tiles_per_row
 
         cr.save()
 
@@ -100,7 +93,51 @@ def generate_texture():
 
         cr.restore()
 
+
+def generate_texture():
+    x_tiles, y_tiles = get_texture_size()
+
+    full_width = x_tiles * TILE_SIZE
+    full_height = y_tiles * TILE_SIZE
+
+    surface = cairo.ImageSurface(cairo.FORMAT_RGB24,
+                                 full_width,
+                                 full_height * 3 // 2)
+    cr = cairo.Context(surface)
+
+    scale_x = 1
+    scale_y = 1
+    x_pos = 0
+    y_pos = 0
+    level = 0
+
+    while True:
+        level_width = full_width // scale_x
+        level_height = full_height // scale_y
+
+        cr.save()
+        cr.translate(x_pos, y_pos)
+        cr.scale(1.0 / scale_x, 1.0 / scale_y)
+
+        generate_tiles(cr, x_tiles)
+
+        cr.restore()
+
+        if level_width <= 1 and level_height <= 1:
+            break;
+
+        if (level & 1) == 0:
+            y_pos += level_height
+        else:
+            x_pos += level_width
+
+        level += 1
+
+        if level_width > 1:
+            scale_x *= 2
+        if level_height > 1:
+            scale_y *= 2
+
     return surface
 
-
-generate_texture().write_to_png("tiles.png")
+generate_texture().write_to_png("tiles.mpng")
