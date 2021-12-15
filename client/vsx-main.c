@@ -288,6 +288,11 @@ handle_tile_changed(struct vsx_main_data *main_data,
                      vsx_tile_get_number(tile),
                      vsx_tile_get_x(tile), vsx_tile_get_y(tile),
                      letter);
+
+        pthread_mutex_lock(&main_data->mutex);
+        main_data->redraw_queued = true;
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static void
