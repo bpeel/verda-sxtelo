@@ -40,6 +40,7 @@
 #include "vsx-monotonic.h"
 #include "vsx-buffer.h"
 #include "vsx-worker.h"
+#include "vsx-game-state.h"
 
 #define MIN_GL_MAJOR_VERSION 2
 #define MIN_GL_MINOR_VERSION 0
@@ -61,6 +62,7 @@ struct vsx_main_data {
 
         struct vsx_connection *connection;
         struct vsx_worker *worker;
+        struct vsx_game_state *game_state;
 
         struct vsx_listener event_listener;
 
@@ -414,6 +416,10 @@ handle_log_locked(struct vsx_main_data *main_data)
 static void
 paint(struct vsx_main_data *main_data)
 {
+        vsx_worker_lock(main_data->worker);
+        vsx_game_state_update(main_data->game_state);
+        vsx_worker_unlock(main_data->worker);
+
         vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
 
         SDL_GL_SwapWindow(main_data->window);
@@ -517,6 +523,9 @@ free_main_data(struct vsx_main_data *main_data)
 
         if (main_data->worker)
                 vsx_worker_free(main_data->worker);
+
+        if (main_data->game_state)
+                vsx_game_state_free(main_data->game_state);
 
         if (main_data->connection)
                 vsx_connection_free(main_data->connection);
@@ -681,6 +690,8 @@ main(int argc, char **argv)
         }
 
         vsx_worker_lock(main_data->worker);
+
+        main_data->game_state = vsx_game_state_new(main_data->connection);
 
         struct vsx_signal *event_signal =
                 vsx_connection_get_event_signal(main_data->connection);

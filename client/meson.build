@@ -28,6 +28,7 @@ client_headers = [
 ]
 
 client_src = [
+        'vsx-game-state.c',
         'vsx-gl.c',
         'vsx-main.c',
         'vsx-monotonic.c',
