@@ -43,13 +43,13 @@ static const struct vsx_shader_data_shader
 vsx_shader_data_shaders[] = {
         {
                 GL_FRAGMENT_SHADER,
-                (const char *[]) { "vsx-solid-fragment.glsl", NULL },
-                { VSX_SHADER_DATA_PROGRAM_SOLID, PROGRAMS_END }
+                (const char *[]) { "vsx-texture-fragment.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_TEXTURE, PROGRAMS_END }
         },
         {
                 GL_VERTEX_SHADER,
-                (const char *[]) { "vsx-solid-vertex.glsl", NULL },
-                { VSX_SHADER_DATA_PROGRAM_SOLID, PROGRAMS_END }
+                (const char *[]) { "vsx-texture-vertex.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_TEXTURE, PROGRAMS_END }
         },
 };
 
