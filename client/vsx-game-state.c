@@ -23,11 +23,14 @@
 #include <pthread.h>
 #include <strings.h>
 #include <string.h>
+#include <stdalign.h>
 
 #include "vsx-util.h"
 #include "vsx-signal.h"
 #include "vsx-buffer.h"
 #include "vsx-bitmask.h"
+#include "vsx-list.h"
+#include "vsx-slab.h"
 
 struct vsx_game_state_player {
         char *name;
@@ -36,6 +39,7 @@ struct vsx_game_state_player {
 };
 
 struct vsx_game_state_tile {
+        struct vsx_list link;
         int16_t x, y;
         uint32_t letter;
 };
@@ -47,7 +51,12 @@ struct vsx_game_state {
 
         struct vsx_game_state_player players[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
 
-        struct vsx_buffer tiles;
+        /* Array of tile pointers indexed by tile number */
+        struct vsx_buffer tiles_by_index;
+        /* List of tiles in reverse order of last updated */
+        struct vsx_list tile_list;
+        /* Slab allocator for the tiles */
+        struct vsx_slab_allocator tile_allocator;
 
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -112,15 +121,37 @@ static void
 ensure_n_tiles(struct vsx_game_state *game_state,
                int n_tiles)
 {
-        size_t new_length = sizeof (struct vsx_game_state_tile) * n_tiles;
-        size_t old_length = game_state->tiles.length;
+        size_t new_length = sizeof (struct vsx_game_state_tile *) * n_tiles;
+        size_t old_length = game_state->tiles_by_index.length;
 
         if (new_length > old_length) {
-                vsx_buffer_set_length(&game_state->tiles, new_length);
-                memset(game_state->tiles.data + old_length,
+                vsx_buffer_set_length(&game_state->tiles_by_index, new_length);
+                memset(game_state->tiles_by_index.data + old_length,
                        0,
                        new_length - old_length);
         }
+}
+
+static struct vsx_game_state_tile *
+get_tile_by_index(struct vsx_game_state *game_state,
+                  int tile_num)
+{
+        ensure_n_tiles(game_state, tile_num + 1);
+
+        struct vsx_game_state_tile **tile_pointers =
+                (struct vsx_game_state_tile **) game_state->tiles_by_index.data;
+
+        struct vsx_game_state_tile *tile = tile_pointers[tile_num];
+
+        if (tile == NULL) {
+                tile = vsx_slab_allocate(&game_state->tile_allocator,
+                                         sizeof *tile,
+                                         alignof *tile);
+                tile_pointers[tile_num] = tile;
+                vsx_list_insert(game_state->tile_list.prev, &tile->link);
+        }
+
+        return tile;
 }
 
 static void
@@ -142,16 +173,20 @@ update_tiles_locked(struct vsx_game_state *game_state)
                                 vsx_connection_get_tile(game_state->connection,
                                                         tile_num);
 
-                        ensure_n_tiles(game_state, tile_num + 1);
-
                         struct vsx_game_state_tile *state_tile =
-                                (struct vsx_game_state_tile *)
-                                game_state->tiles.data +
-                                tile_num;
+                                get_tile_by_index(game_state, tile_num);
 
                         state_tile->x = vsx_tile_get_x(tile);
                         state_tile->y = vsx_tile_get_y(tile);
                         state_tile->letter = vsx_tile_get_letter(tile);
+
+                        /* Move the tile to the end of the list so
+                         * that the list will always been in reverse
+                         * order of most recently updated.
+                         */
+                        vsx_list_remove(&state_tile->link);
+                        vsx_list_insert(game_state->tile_list.prev,
+                                        &state_tile->link);
 
                         elements[i] &= ~(1UL << (bit - 1));
                 }
@@ -161,7 +196,8 @@ update_tiles_locked(struct vsx_game_state *game_state)
 size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
 {
-        return game_state->tiles.length / sizeof (struct vsx_game_state_tile);
+        return (game_state->tiles_by_index.length /
+                sizeof (struct vsx_game_state_tile *));
 }
 
 void
@@ -169,14 +205,9 @@ vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
                             vsx_game_state_foreach_tile_cb cb,
                             void *user_data)
 {
-        size_t n_tiles = vsx_game_state_get_n_tiles(game_state);
+        struct vsx_game_state_tile *tile;
 
-        for (unsigned i = 0; i < n_tiles; i++) {
-                const struct vsx_game_state_tile *tile =
-                        (const struct vsx_game_state_tile *)
-                        game_state->tiles.data +
-                        i;
-
+        vsx_list_for_each(tile, &game_state->tile_list, link) {
                 cb(tile->x, tile->y, tile->letter, user_data);
         }
 }
@@ -262,6 +293,9 @@ vsx_game_state_new(struct vsx_connection *connection)
         pthread_mutex_init(&game_state->mutex, NULL /* attr */);
 
         vsx_buffer_init(&game_state->dirty_tiles);
+        vsx_buffer_init(&game_state->tiles_by_index);
+        vsx_slab_init(&game_state->tile_allocator);
+        vsx_list_init(&game_state->tile_list);
 
         game_state->connection = connection;
 
@@ -281,7 +315,8 @@ vsx_game_state_free(struct vsx_game_state *game_state)
                 vsx_free(game_state->players[i].name);
 
         vsx_buffer_destroy(&game_state->dirty_tiles);
-        vsx_buffer_destroy(&game_state->tiles);
+        vsx_buffer_destroy(&game_state->tiles_by_index);
+        vsx_slab_destroy(&game_state->tile_allocator);
 
         pthread_mutex_destroy(&game_state->mutex);
 
