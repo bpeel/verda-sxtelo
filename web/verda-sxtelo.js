@@ -543,7 +543,7 @@ ChatSession.prototype.trySendTiles = function ()
             this.trySendTiles ();
           }
 
-          this.dirtyTilesTimout = setTimeout (callback.bind (this), 125);
+          this.dirtyTilesTimeout = setTimeout (callback.bind (this), 125);
         }
     }
   else
@@ -904,7 +904,7 @@ ChatSession.prototype.resetKeepAliveTimeout = function ()
 
   function callback ()
   {
-    this.keepAliveTimout = null;
+    this.keepAliveTimeout = null;
     if (this.sock)
       this.sendMessage (0x83, "");
   }
