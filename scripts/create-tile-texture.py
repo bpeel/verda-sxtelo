@@ -19,13 +19,111 @@
 
 import cairo
 import math
-
+import re
+import os.path
+import mako.template
 
 LETTERS = list(sorted("ABCDEFGHIJKLMNOPQRSTUVWXYZĤŜĜĈĴŬ"))
 N_LETTERS = len(LETTERS)
 
 TILE_SIZE = 128
 BORDER_SIZE = TILE_SIZE // 16
+
+HEADER_TEMPLATE = mako.template.Template("""\
+#ifndef VSX_TILE_TEXTURE_H
+#define VSX_TILE_TEXTURE_H
+
+#include <stdint.h>
+
+#define VSX_TILE_TEXTURE_N_LETTERS ${n_letters}
+
+struct vsx_tile_texture_letter {
+        uint32_t letter;
+        uint16_t s1, t1;
+        uint16_t s2, t2;
+};
+
+extern const struct vsx_tile_texture_letter
+vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS];
+
+#endif /* VSX_TILE_TEXTURE_H */""")
+
+SOURCE_TEMPLATE = mako.template.Template("""\
+#include "vsx-tile-texture.h"
+
+const struct vsx_tile_texture_letter
+vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS] = {
+% for letter_num, letter in enumerate(letters):
+<%
+  x1 = letter_num % x_tiles
+  y1 = letter_num // x_tiles
+  x2 = x1 + 1
+  y2 = y1 + 1
+%>\
+        {
+                .letter = ${ord(letter)}, /* ${letter} */
+                .s1 = ${x1 * 65535 // x_tiles}, .t1 = ${y1 * 65535 // y_tiles},
+                .s2 = ${x2 * 65535 // x_tiles}, .t2 = ${y2 * 65535 // y_tiles},
+        },
+% endfor
+};""")
+
+
+def output_copyright(outfile):
+    had_line = False
+    reg = re.compile(r'^#(?!!)')
+
+    with open(__file__, "rt", encoding="utf-8") as f:
+        print("/*", file=outfile)
+        for line in f:
+            if reg.match(line):
+                had_line = True
+                print(reg.sub(" *", line), end='', file=outfile)
+            elif had_line:
+                break
+
+        print(" */\n", file=outfile)
+
+
+def get_texture_size():
+    w = 1
+    h = 1
+
+    while w * h < N_LETTERS:
+        if w <= h:
+            w *= 2
+        else:
+            h *= 2
+
+    return w, h
+
+
+def generate_header_file():
+    header_file_name = os.path.join(os.path.dirname(__file__),
+                                    "..",
+                                    "client",
+                                    "vsx-tile-texture.h")
+    with open(header_file_name, "wt", encoding="utf-8") as f:
+        output_copyright(f)
+
+        print(HEADER_TEMPLATE.render(n_letters=N_LETTERS),
+              file=f)
+
+
+def generate_source_file():
+    source_file_name = os.path.join(os.path.dirname(__file__),
+                                    "..",
+                                    "client",
+                                    "vsx-tile-texture.c")
+    x_tiles, y_tiles = get_texture_size()
+
+    with open(source_file_name, "wt", encoding="utf-8") as f:
+        output_copyright(f)
+
+        print(SOURCE_TEMPLATE.render(letters=LETTERS,
+                                     x_tiles=x_tiles,
+                                     y_tiles=y_tiles),
+              file=f)
 
 
 def generate_tile(cr, letter):
@@ -65,19 +163,6 @@ def generate_tile(cr, letter):
     cr.move_to(int(TILE_SIZE / 2.0 - extents.x_bearing - extents.width / 2.0),
                BORDER_SIZE + (TILE_SIZE - BORDER_SIZE * 2.0) * 0.82)
     cr.show_text(letter)
-
-
-def get_texture_size():
-    w = 1
-    h = 1
-
-    while w * h < N_LETTERS:
-        if w <= h:
-            w *= 2
-        else:
-            h *= 2
-
-    return w, h
 
 
 def generate_tiles(cr, tiles_per_row):
@@ -141,3 +226,6 @@ def generate_texture():
     return surface
 
 generate_texture().write_to_png("tiles.mpng")
+
+generate_header_file()
+generate_source_file()

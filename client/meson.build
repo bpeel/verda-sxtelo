@@ -44,6 +44,7 @@ client_src = [
         'vsx-shader-data.c',
         'vsx-thread-linux.c',
         'vsx-tile-painter.c',
+        'vsx-tile-texture.c',
         'vsx-worker.c',
 ] + connection_src
 
