@@ -38,6 +38,7 @@ painters[] = {
 
 struct painter_data {
         void *data;
+        struct vsx_listener listener;
         struct vsx_game_painter *game_painter;
 };
 
@@ -55,6 +56,30 @@ struct vsx_game_painter {
 };
 
 static void
+redraw_needed_cb(struct vsx_listener *listener,
+                 void *signal_data)
+{
+        struct painter_data *painter_data =
+                vsx_container_of(listener, struct painter_data, listener);
+        struct vsx_game_painter *painter = painter_data->game_painter;
+
+        vsx_signal_emit(&painter->redraw_needed_signal, painter);
+}
+
+static void
+init_redraw_needed_listener(struct vsx_game_painter *painter,
+                            struct painter_data *painter_data,
+                            const struct vsx_painter *callbacks)
+{
+        struct vsx_signal *signal =
+                callbacks->get_redraw_needed_signal_cb(painter_data->data);
+
+        painter_data->listener.notify = redraw_needed_cb;
+
+        vsx_signal_add(signal, &painter_data->listener);
+}
+
+static void
 init_painters(struct vsx_game_painter *painter)
 {
         for (unsigned i = 0; i < N_PAINTERS; i++) {
@@ -64,6 +89,12 @@ init_painters(struct vsx_game_painter *painter)
                 painter_data->data = callbacks->create_cb(&painter->toolbox);
 
                 painter_data->game_painter = painter;
+
+                if (callbacks->get_redraw_needed_signal_cb) {
+                        init_redraw_needed_listener(painter,
+                                                    painter_data,
+                                                    callbacks);
+                }
         }
 }
 

@@ -25,6 +25,7 @@
 #include "vsx-image-loader.h"
 #include "vsx-game-state.h"
 #include "vsx-paint-state.h"
+#include "vsx-signal.h"
 
 struct vsx_painter_toolbox {
         struct vsx_shader_data shader_data;
@@ -39,6 +40,9 @@ struct vsx_painter {
         (* paint_cb)(void *painter,
                      struct vsx_game_state *game_state,
                      const struct vsx_paint_state *paint_state);
+
+        struct vsx_signal *
+        (* get_redraw_needed_signal_cb)(void *painter);
 
         void
         (* free_cb)(void *painter);
