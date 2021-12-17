@@ -29,9 +29,12 @@
 #include "vsx-tile-texture.h"
 #include "vsx-mipmap.h"
 #include "vsx-gl.h"
+#include "vsx-board.h"
 
 struct vsx_tile_painter {
         GLuint program;
+        GLint matrix_uniform;
+        GLint translation_uniform;
 
         struct vsx_array_object *vao;
         GLuint vbo;
@@ -96,6 +99,13 @@ init_program(struct vsx_tile_painter *painter,
                 vsx_gl.glGetUniformLocation(painter->program, "tex");
         vsx_gl.glUseProgram(painter->program);
         vsx_gl.glUniform1i(tex_uniform, 0);
+
+        painter->matrix_uniform =
+                vsx_gl.glGetUniformLocation(painter->program,
+                                            "transform_matrix");
+        painter->translation_uniform =
+                vsx_gl.glGetUniformLocation(painter->program,
+                                            "translation");
 }
 
 struct vsx_tile_painter *
@@ -196,7 +206,6 @@ find_letter(uint32_t letter)
 }
 
 struct tile_closure {
-        float x_scale, y_scale;
         struct vertex *vertices;
         int tile_num;
 };
@@ -216,28 +225,23 @@ tile_cb(int x, int y,
 
         struct vertex *v = closure->vertices + closure->tile_num * 4;
 
-        float left = x * closure->x_scale - 1.0f;
-        float right = left + TILE_SIZE * closure->x_scale;
-        float top = 1.0f - y * closure->y_scale;
-        float bottom = top - TILE_SIZE * closure->y_scale;
-
-        v->x = left;
-        v->y = top;
+        v->x = x;
+        v->y = y;
         v->s = letter_data->s1;
         v->t = letter_data->t1;
         v++;
-        v->x = left;
-        v->y = bottom;
+        v->x = x;
+        v->y = y + TILE_SIZE;
         v->s = letter_data->s1;
         v->t = letter_data->t2;
         v++;
-        v->x = right;
-        v->y = top;
+        v->x = x + TILE_SIZE;
+        v->y = y;
         v->s = letter_data->s2;
         v->t = letter_data->t1;
         v++;
-        v->x = right;
-        v->y = bottom;
+        v->x = x + TILE_SIZE;
+        v->y = y + TILE_SIZE;
         v->s = letter_data->s2;
         v->t = letter_data->t2;
         v++;
@@ -261,8 +265,6 @@ vsx_tile_painter_paint(struct vsx_tile_painter *painter,
         ensure_buffer_size(painter, n_tiles);
 
         struct tile_closure closure = {
-                .x_scale = 2.0f / paint_state->width,
-                .y_scale = 2.0f / paint_state->height,
                 .tile_num = 0,
         };
 
@@ -289,6 +291,14 @@ vsx_tile_painter_paint(struct vsx_tile_painter *painter,
 
         vsx_gl.glUseProgram(painter->program);
         vsx_array_object_bind(painter->vao);
+
+        vsx_gl.glUniformMatrix2fv(painter->matrix_uniform,
+                                  1, /* count */
+                                  GL_FALSE, /* transpose */
+                                  paint_state->board_matrix);
+        vsx_gl.glUniform2f(painter->translation_uniform,
+                           paint_state->board_translation[0],
+                           paint_state->board_translation[1]);
 
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
 

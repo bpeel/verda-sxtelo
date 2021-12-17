@@ -22,6 +22,11 @@
 struct vsx_paint_state {
         /* Size of the framebuffer */
         int width, height;
+
+        /* Transformation matrix for the board */
+        float board_matrix[4];
+        /* Board translation */
+        float board_translation[2];
 };
 
 #endif /* VSX_PAINT_STATE_H */

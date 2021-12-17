@@ -138,6 +138,9 @@ VSX_GL_FUNC(void,
             glUniformMatrix3fv, (GLint location, GLsizei count,
                                  GLboolean transpose, const GLfloat *value))
 VSX_GL_FUNC(void,
+            glUniformMatrix2fv, (GLint location, GLsizei count,
+                                 GLboolean transpose, const GLfloat *value))
+VSX_GL_FUNC(void,
             glUseProgram, (GLuint program))
 VSX_GL_FUNC(void,
             glVertexAttribPointer, (GLuint index, GLint size,

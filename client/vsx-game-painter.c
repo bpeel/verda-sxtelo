@@ -22,10 +22,12 @@
 
 #include <stdbool.h>
 #include <math.h>
+#include <string.h>
 
 #include "vsx-painter-toolbox.h"
 #include "vsx-tile-painter.h"
 #include "vsx-gl.h"
+#include "vsx-board.h"
 
 struct vsx_game_painter {
         struct vsx_painter_toolbox toolbox;
@@ -84,12 +86,86 @@ error:
 }
 
 static void
+fit_board_normal(struct vsx_paint_state *paint_state,
+                 float scale)
+{
+        paint_state->board_matrix[0] =
+                scale * 2.0f / paint_state->width;
+        paint_state->board_matrix[1] = 0.0f;
+        paint_state->board_matrix[2] = 0.0f;
+        paint_state->board_matrix[3] =
+                -scale * 2.0f / paint_state->height;
+        paint_state->board_translation[0] =
+                -VSX_BOARD_WIDTH / 2.0f * paint_state->board_matrix[0];
+        paint_state->board_translation[1] =
+                -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[3];
+}
+
+static void
+fit_board_rotated(struct vsx_paint_state *paint_state,
+                 float scale)
+{
+        paint_state->board_matrix[0] = 0.0f;
+        paint_state->board_matrix[1] =
+                -scale * 2.0f / paint_state->height;
+        paint_state->board_matrix[2] =
+                scale * 2.0f / paint_state->width;
+        paint_state->board_matrix[3] = 0.0f;
+        paint_state->board_translation[0] =
+                -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[2];
+        paint_state->board_translation[1] =
+                -VSX_BOARD_WIDTH / 2.0f * paint_state->board_matrix[1];
+}
+
+static void
 calculate_paint_state(struct vsx_paint_state *paint_state,
                       int fb_width,
                       int fb_height)
 {
         paint_state->width = fb_width;
         paint_state->height = fb_height;
+
+        if (fb_width == 0 || fb_height == 0) {
+                memset(paint_state->board_matrix,
+                       0,
+                       sizeof paint_state->board_matrix);
+                memset(paint_state->board_translation,
+                       0,
+                       sizeof paint_state->board_translation);
+                return;
+        }
+
+        int large_axis, small_axis;
+        bool rotate;
+
+        if (fb_width > fb_height) {
+                large_axis = fb_width;
+                small_axis = fb_height;
+                rotate = false;
+        } else {
+                large_axis = fb_height;
+                small_axis = fb_width;
+                rotate = true;
+        }
+
+        /* We want to know if the (possibly rotated) framebuffer
+         * width/height ratio is greater than the board width/height
+         * ratio. Otherwise we will fit the board so that the width
+         * fills the screen instead of the height.
+         *
+         * (a/b > c/d) == (a*d/b*d > c*b/b*d) == (a*d > c*b)
+         */
+        bool fit_small = (large_axis * VSX_BOARD_HEIGHT >
+                          VSX_BOARD_WIDTH * small_axis);
+
+        float scale = (fit_small ?
+                       small_axis / (float) VSX_BOARD_HEIGHT :
+                       large_axis / (float) VSX_BOARD_WIDTH);
+
+        if (rotate)
+                fit_board_rotated(paint_state, scale);
+        else
+                fit_board_normal(paint_state, scale);
 }
 
 void
