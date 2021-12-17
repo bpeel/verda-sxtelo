@@ -16,24 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_TILE_PAINTER_H
-#define VSX_TILE_PAINTER_H
+#ifndef VSX_PAINT_STATE_H
+#define VSX_PAINT_STATE_H
 
-#include "vsx-game-state.h"
-#include "vsx-painter-toolbox.h"
-#include "vsx-paint-state.h"
+struct vsx_paint_state {
+        /* Size of the framebuffer */
+        int width, height;
+};
 
-struct vsx_tile_painter;
-
-struct vsx_tile_painter *
-vsx_tile_painter_new(struct vsx_painter_toolbox *toolbox);
-
-void
-vsx_tile_painter_paint(struct vsx_tile_painter *painter,
-                       struct vsx_game_state *game_state,
-                       const struct vsx_paint_state *paint_state);
-
-void
-vsx_tile_painter_free(struct vsx_tile_painter *painter);
-
-#endif /* VSX_TILE_PAINTER_H */
+#endif /* VSX_PAINT_STATE_H */

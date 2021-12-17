@@ -248,8 +248,7 @@ tile_cb(int x, int y,
 void
 vsx_tile_painter_paint(struct vsx_tile_painter *painter,
                        struct vsx_game_state *game_state,
-                       int fb_width,
-                       int fb_height)
+                       const struct vsx_paint_state *paint_state)
 {
         if (painter->tex == 0)
                 return;
@@ -262,8 +261,8 @@ vsx_tile_painter_paint(struct vsx_tile_painter *painter,
         ensure_buffer_size(painter, n_tiles);
 
         struct tile_closure closure = {
-                .x_scale = 2.0f / fb_width,
-                .y_scale = 2.0f / fb_height,
+                .x_scale = 2.0f / paint_state->width,
+                .y_scale = 2.0f / paint_state->height,
                 .tile_num = 0,
         };
 

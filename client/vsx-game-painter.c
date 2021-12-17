@@ -83,6 +83,15 @@ error:
         return NULL;
 }
 
+static void
+calculate_paint_state(struct vsx_paint_state *paint_state,
+                      int fb_width,
+                      int fb_height)
+{
+        paint_state->width = fb_width;
+        paint_state->height = fb_height;
+}
+
 void
 vsx_game_painter_paint(struct vsx_game_painter *painter,
                        struct vsx_game_state *game_state,
@@ -93,10 +102,13 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
 
         vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
 
+        struct vsx_paint_state paint_state;
+
+        calculate_paint_state(&paint_state, width, height);
+
         vsx_tile_painter_paint(painter->tile_painter,
                                game_state,
-                               width,
-                               height);
+                               &paint_state);
 }
 
 void
