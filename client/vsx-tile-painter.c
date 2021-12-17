@@ -108,8 +108,8 @@ init_program(struct vsx_tile_painter *painter,
                                             "translation");
 }
 
-struct vsx_tile_painter *
-vsx_tile_painter_new(struct vsx_painter_toolbox *toolbox)
+static void *
+create_cb(struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
 
@@ -249,11 +249,13 @@ tile_cb(int x, int y,
         closure->tile_num++;
 }
 
-void
-vsx_tile_painter_paint(struct vsx_tile_painter *painter,
-                       struct vsx_game_state *game_state,
-                       const struct vsx_paint_state *paint_state)
+static void
+paint_cb(void *painter_data,
+         struct vsx_game_state *game_state,
+         const struct vsx_paint_state *paint_state)
 {
+        struct vsx_tile_painter *painter = painter_data;
+
         if (painter->tex == 0)
                 return;
 
@@ -309,9 +311,11 @@ vsx_tile_painter_paint(struct vsx_tile_painter *painter,
                                    NULL /* indices */);
 }
 
-void
-vsx_tile_painter_free(struct vsx_tile_painter *painter)
+static void
+free_cb(void *painter_data)
 {
+        struct vsx_tile_painter *painter = painter_data;
+
         free_buffer(painter);
 
         if (painter->image_token)
@@ -321,3 +325,10 @@ vsx_tile_painter_free(struct vsx_tile_painter *painter)
 
         vsx_free(painter);
 }
+
+const struct vsx_painter
+vsx_tile_painter = {
+        .create_cb = create_cb,
+        .paint_cb = paint_cb,
+        .free_cb = free_cb,
+};

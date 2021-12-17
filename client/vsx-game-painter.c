@@ -24,10 +24,22 @@
 #include <math.h>
 #include <string.h>
 
-#include "vsx-painter-toolbox.h"
+#include "vsx-painter.h"
 #include "vsx-tile-painter.h"
 #include "vsx-gl.h"
 #include "vsx-board.h"
+
+static const struct vsx_painter * const
+painters[] = {
+        &vsx_tile_painter,
+};
+
+#define N_PAINTERS VSX_N_ELEMENTS(painters)
+
+struct painter_data {
+        void *data;
+        struct vsx_game_painter *game_painter;
+};
 
 struct vsx_game_painter {
         struct vsx_painter_toolbox toolbox;
@@ -37,8 +49,21 @@ struct vsx_game_painter {
 
         bool viewport_dirty;
 
-        struct vsx_tile_painter *tile_painter;
+        struct painter_data painters[N_PAINTERS];
 };
+
+static void
+init_painters(struct vsx_game_painter *painter)
+{
+        for (unsigned i = 0; i < N_PAINTERS; i++) {
+                struct painter_data *painter_data = painter->painters + i;
+                const struct vsx_painter *callbacks = painters[i];
+
+                painter_data->data = callbacks->create_cb(&painter->toolbox);
+
+                painter_data->game_painter = painter;
+        }
+}
 
 static bool
 init_toolbox(struct vsx_game_painter *painter,
@@ -84,7 +109,7 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
         if (!init_toolbox(painter, asset_manager, error))
                 goto error;
 
-        painter->tile_painter = vsx_tile_painter_new(&painter->toolbox);
+        init_painters(painter);
 
         return painter;
 
@@ -186,16 +211,33 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
 
         vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
 
-        vsx_tile_painter_paint(painter->tile_painter,
-                               game_state,
-                               &painter->paint_state);
+        for (unsigned i = 0; i < N_PAINTERS; i++) {
+                if (painters[i]->paint_cb == NULL)
+                        continue;
+
+                painters[i]->paint_cb(painter->painters[i].data,
+                                      game_state,
+                                      &painter->paint_state);
+        }
+}
+
+static void
+free_painters(struct vsx_game_painter *painter)
+{
+        for (unsigned i = 0; i < N_PAINTERS; i++) {
+                void *data = painter->painters[i].data;
+
+                if (data == NULL)
+                        continue;
+
+                painters[i]->free_cb(data);
+        }
 }
 
 void
 vsx_game_painter_free(struct vsx_game_painter *painter)
 {
-        if (painter->tile_painter)
-                vsx_tile_painter_free(painter->tile_painter);
+        free_painters(painter);
 
         destroy_toolbox(painter);
 

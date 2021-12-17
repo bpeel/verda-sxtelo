@@ -16,15 +16,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_PAINTER_TOOLBOX_H
-#define VSX_PAINTER_TOOLBOX_H
+#ifndef VSX_PAINTER_H
+#define VSX_PAINTER_H
+
+#include <stdbool.h>
 
 #include "vsx-shader-data.h"
 #include "vsx-image-loader.h"
+#include "vsx-game-state.h"
+#include "vsx-paint-state.h"
 
 struct vsx_painter_toolbox {
         struct vsx_shader_data shader_data;
         struct vsx_image_loader *image_loader;
 };
 
-#endif /* VSX_PAINTER_TOOLBOX_H */
+struct vsx_painter {
+        void *
+        (* create_cb)(struct vsx_painter_toolbox *toolbox);
+
+        void
+        (* paint_cb)(void *painter,
+                     struct vsx_game_state *game_state,
+                     const struct vsx_paint_state *paint_state);
+
+        void
+        (* free_cb)(void *painter);
+};
+
+#endif /* VSX_PAINTER_H */
