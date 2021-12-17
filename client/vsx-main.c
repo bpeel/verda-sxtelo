@@ -69,6 +69,7 @@ struct vsx_main_data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_painter *game_painter;
+        struct vsx_listener redraw_needed_listener;
 
         struct vsx_listener event_listener;
 
@@ -731,20 +732,44 @@ init_sdl(struct vsx_main_data *main_data)
         return true;
 }
 
+static void
+redraw_needed_cb(struct vsx_listener *listener,
+                 void *signal_data)
+{
+        struct vsx_main_data *main_data =
+                vsx_container_of(listener,
+                                 struct vsx_main_data,
+                                 redraw_needed_listener);
+
+        pthread_mutex_lock(&main_data->mutex);
+        main_data->redraw_queued = true;
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
+}
+
 static bool
 init_painter(struct vsx_main_data *main_data)
 {
         struct vsx_error *error = NULL;
 
-        main_data->game_painter =
+        struct vsx_game_painter *game_painter =
                 vsx_game_painter_new(main_data->asset_manager,
                                      &error);
 
-        if (main_data->game_painter == NULL) {
+        if (game_painter == NULL) {
                 fprintf(stderr, "%s\n", error->message);
                 vsx_error_free(error);
                 return false;
         }
+
+        main_data->game_painter = game_painter;
+
+        main_data->redraw_needed_listener.notify = redraw_needed_cb;
+
+        struct vsx_signal *redraw_needed_signal =
+                vsx_game_painter_get_redraw_needed_signal(game_painter);
+        vsx_signal_add(redraw_needed_signal,
+                       &main_data->redraw_needed_listener);
 
         return true;
 }

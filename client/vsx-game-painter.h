@@ -44,6 +44,9 @@ void
 vsx_game_painter_paint(struct vsx_game_painter *painter,
                        struct vsx_game_state *game_state);
 
+struct vsx_signal *
+vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter);
+
 void
 vsx_game_painter_free(struct vsx_game_painter *painter);
 

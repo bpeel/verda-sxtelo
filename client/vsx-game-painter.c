@@ -50,6 +50,8 @@ struct vsx_game_painter {
         bool viewport_dirty;
 
         struct painter_data painters[N_PAINTERS];
+
+        struct vsx_signal redraw_needed_signal;
 };
 
 static void
@@ -105,6 +107,8 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
         painter->paint_state.width = 1;
         painter->paint_state.height = 1;
         painter->viewport_dirty = true;
+
+        vsx_signal_init(&painter->redraw_needed_signal);
 
         if (!init_toolbox(painter, asset_manager, error))
                 goto error;
@@ -219,6 +223,12 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
                                       game_state,
                                       &painter->paint_state);
         }
+}
+
+struct vsx_signal *
+vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter)
+{
+        return &painter->redraw_needed_signal;
 }
 
 static void
