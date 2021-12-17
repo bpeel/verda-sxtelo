@@ -33,6 +33,10 @@ struct vsx_game_painter {
         struct vsx_painter_toolbox toolbox;
         bool shader_data_inited;
 
+        struct vsx_paint_state paint_state;
+
+        bool viewport_dirty;
+
         struct vsx_tile_painter *tile_painter;
 };
 
@@ -72,6 +76,10 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error)
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
+
+        painter->paint_state.width = 1;
+        painter->paint_state.height = 1;
+        painter->viewport_dirty = true;
 
         if (!init_toolbox(painter, asset_manager, error))
                 goto error;
@@ -118,33 +126,18 @@ fit_board_rotated(struct vsx_paint_state *paint_state,
 }
 
 static void
-calculate_paint_state(struct vsx_paint_state *paint_state,
-                      int fb_width,
-                      int fb_height)
+calculate_transform(struct vsx_paint_state *paint_state)
 {
-        paint_state->width = fb_width;
-        paint_state->height = fb_height;
-
-        if (fb_width == 0 || fb_height == 0) {
-                memset(paint_state->board_matrix,
-                       0,
-                       sizeof paint_state->board_matrix);
-                memset(paint_state->board_translation,
-                       0,
-                       sizeof paint_state->board_translation);
-                return;
-        }
-
         int large_axis, small_axis;
         bool rotate;
 
-        if (fb_width > fb_height) {
-                large_axis = fb_width;
-                small_axis = fb_height;
+        if (paint_state->width > paint_state->height) {
+                large_axis = paint_state->width;
+                small_axis = paint_state->height;
                 rotate = false;
         } else {
-                large_axis = fb_height;
-                small_axis = fb_width;
+                large_axis = paint_state->height;
+                small_axis = paint_state->width;
                 rotate = true;
         }
 
@@ -169,22 +162,33 @@ calculate_paint_state(struct vsx_paint_state *paint_state,
 }
 
 void
-vsx_game_painter_paint(struct vsx_game_painter *painter,
-                       struct vsx_game_state *game_state,
-                       int width,
-                       int height)
+vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
+                             int width,
+                             int height)
 {
-        vsx_gl.glViewport(0, 0, width, height);
+        painter->paint_state.width = MAX(1, width);
+        painter->paint_state.height = MAX(1, height);
+        painter->viewport_dirty = true;
+}
+
+void
+vsx_game_painter_paint(struct vsx_game_painter *painter,
+                       struct vsx_game_state *game_state)
+{
+        if (painter->viewport_dirty) {
+                vsx_gl.glViewport(0, 0,
+                                  painter->paint_state.width,
+                                  painter->paint_state.height);
+                calculate_transform(&painter->paint_state);
+
+                painter->viewport_dirty = false;
+        }
 
         vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
 
-        struct vsx_paint_state paint_state;
-
-        calculate_paint_state(&paint_state, width, height);
-
         vsx_tile_painter_paint(painter->tile_painter,
                                game_state,
-                               &paint_state);
+                               &painter->paint_state);
 }
 
 void

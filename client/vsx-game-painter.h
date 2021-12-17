@@ -36,10 +36,13 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error);
 
 void
+vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
+                             int width,
+                             int height);
+
+void
 vsx_game_painter_paint(struct vsx_game_painter *painter,
-                       struct vsx_game_state *game_state,
-                       int width,
-                       int height);
+                       struct vsx_game_state *game_state);
 
 void
 vsx_game_painter_free(struct vsx_game_painter *painter);

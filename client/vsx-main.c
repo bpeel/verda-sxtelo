@@ -61,8 +61,6 @@ struct vsx_main_data {
         SDL_Window *window;
         SDL_GLContext gl_context;
 
-        int fb_width, fb_height;
-
         bool sdl_inited;
 
         struct vsx_connection *connection;
@@ -164,8 +162,9 @@ update_fb_size(struct vsx_main_data *main_data,
                int fb_width,
                int fb_height)
 {
-        main_data->fb_width = fb_width;
-        main_data->fb_height = fb_height;
+        vsx_game_painter_set_fb_size(main_data->game_painter,
+                                     fb_width,
+                                     fb_height);
 }
 
 static void
@@ -472,9 +471,7 @@ paint(struct vsx_main_data *main_data)
         vsx_worker_unlock(main_data->worker);
 
         vsx_game_painter_paint(main_data->game_painter,
-                               main_data->game_state,
-                               main_data->fb_width,
-                               main_data->fb_height);
+                               main_data->game_state);
 
         SDL_GL_SwapWindow(main_data->window);
 }
