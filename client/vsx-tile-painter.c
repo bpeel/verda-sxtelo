@@ -43,6 +43,8 @@ struct vsx_tile_painter {
         GLuint tex;
         struct vsx_image_loader_token *image_token;
 
+        struct vsx_signal redraw_needed_signal;
+
         int buffer_n_tiles;
 };
 
@@ -86,6 +88,8 @@ texture_load_cb(const struct vsx_image *image,
                                GL_LINEAR);
 
         vsx_mipmap_load_image(image, painter->tex);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static void
@@ -112,6 +116,8 @@ static void *
 create_cb(struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
+
+        vsx_signal_init(&painter->redraw_needed_signal);
 
         init_program(painter, &toolbox->shader_data);
 
@@ -311,6 +317,14 @@ paint_cb(void *painter_data,
                                    NULL /* indices */);
 }
 
+static struct vsx_signal *
+get_redraw_needed_signal_cb(void *painter_data)
+{
+        struct vsx_tile_painter *painter = painter_data;
+
+        return &painter->redraw_needed_signal;
+}
+
 static void
 free_cb(void *painter_data)
 {
@@ -330,5 +344,6 @@ const struct vsx_painter
 vsx_tile_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
+        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };
