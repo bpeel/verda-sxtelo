@@ -280,6 +280,13 @@ vsx_tile_painter_paint(struct vsx_tile_painter *painter,
 
         vsx_map_buffer_unmap();
 
+        /* This shouldn’t happen unless for some reason all of the
+         * tiles that the server sent had letters that we don’t
+         * recognise.
+         */
+        if (closure.tile_num <= 0)
+                return;
+
         vsx_gl.glUseProgram(painter->program);
         vsx_array_object_bind(painter->vao);
 
