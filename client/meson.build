@@ -30,6 +30,7 @@ client_headers = [
 client_src = [
         'vsx-array-object.c',
         'vsx-asset-linux.c',
+        'vsx-board-painter.c',
         'vsx-game-painter.c',
         'vsx-game-state.c',
         'vsx-gl.c',
