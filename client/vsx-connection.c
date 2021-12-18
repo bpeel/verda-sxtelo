@@ -97,7 +97,8 @@ enum vsx_connection_running_state {
          */
         VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
         VSX_CONNECTION_RUNNING_STATE_RUNNING,
-        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT
+        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT,
+        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS,
 };
 
 struct vsx_connection_tile_to_move {
@@ -114,7 +115,9 @@ struct vsx_connection_message_to_send {
 };
 
 struct vsx_connection {
+        bool has_address;
         struct vsx_netaddress address;
+
         char *room;
         char *player_name;
         struct vsx_player *self;
@@ -1462,12 +1465,19 @@ start_connecting_running_state(struct vsx_connection *connection)
          * connecting
          */
         connection->reconnect_timeout = 0;
-        connection->reconnect_timestamp = vsx_monotonic_get();
 
-        connection->running_state =
-                VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+        if (connection->has_address) {
+                connection->reconnect_timestamp = vsx_monotonic_get();
 
-        send_poll_changed(connection);
+                connection->running_state =
+                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+
+                send_poll_changed(connection);
+        } else {
+                connection->reconnect_timestamp = INT64_MAX;
+                connection->running_state =
+                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS;
+        }
 }
 
 static void
@@ -1499,6 +1509,11 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         send_poll_changed(connection);
+                        break;
+
+                case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS:
+                        connection->running_state =
+                                VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         break;
                 }
         }
@@ -1532,19 +1547,10 @@ vsx_connection_is_synced(struct vsx_connection *connection)
 }
 
 struct vsx_connection *
-vsx_connection_new(const struct vsx_netaddress *address,
-                   const char *room,
+vsx_connection_new(const char *room,
                    const char *player_name)
 {
         struct vsx_connection *connection = vsx_calloc(sizeof *connection);
-
-        if (address == NULL) {
-                vsx_netaddress_from_string(&connection->address,
-                                           "127.0.0.1",
-                                           5144);
-        } else {
-                connection->address = *address;
-        }
 
         vsx_signal_init(&connection->event_signal);
 
@@ -1748,4 +1754,16 @@ int
 vsx_connection_get_n_tiles(struct vsx_connection *connection)
 {
         return connection->n_tiles;
+}
+
+void
+vsx_connection_set_address(struct vsx_connection *connection,
+                           const struct vsx_netaddress *address)
+{
+        connection->has_address = true;
+        connection->address = *address;
+
+        if (connection->running_state ==
+            VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS)
+                start_connecting_running_state(connection);
 }

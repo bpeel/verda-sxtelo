@@ -535,7 +535,12 @@ create_connection(void)
                         player_name = "?";
         }
 
-        return vsx_connection_new(&address, option_room, player_name);
+        struct vsx_connection *connection =
+                vsx_connection_new(option_room, player_name);
+
+        vsx_connection_set_address(connection, &address);
+
+        return connection;
 }
 
 static struct vsx_worker *

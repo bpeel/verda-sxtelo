@@ -128,8 +128,7 @@ extern struct vsx_error_domain
 vsx_connection_error;
 
 struct vsx_connection *
-vsx_connection_new(const struct vsx_netaddress *address,
-                   const char *room,
+vsx_connection_new(const char *room,
                    const char *player_name);
 
 void
@@ -212,6 +211,10 @@ vsx_connection_foreach_tile(struct vsx_connection *connection,
 
 struct vsx_signal *
 vsx_connection_get_event_signal(struct vsx_connection *connection);
+
+void
+vsx_connection_set_address(struct vsx_connection *connection,
+                           const struct vsx_netaddress *address);
 
 void
 vsx_connection_free(struct vsx_connection *connection);
