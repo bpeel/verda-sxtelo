@@ -49,11 +49,7 @@
      transform="translate(-77.251118,-56.457054)">
     <path
        id="rect1484"
-       style="fill:#ffffff;stroke:none;stroke-width:3.93449;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
-       d="M 0,0 V 32 64 H 32 64 V 32 C 64,14.272001 49.727999,0 32,0 Z"
-       transform="matrix(0.26458333,0,0,0.26458333,77.251118,56.457054)"
-       inkscape:export-filename="/home/neil/c/verda-sxtelo/app/src/main/assets/board.png"
-       inkscape:export-xdpi="96"
-       inkscape:export-ydpi="96" />
+       style="fill:#ffffff;stroke:none;stroke-width:2.082;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
+       d="m 77.251118,56.457054 v 16.933333 h 16.933333 c 0,-9.381066 -7.552267,-16.933333 -16.933333,-16.933333 z" />
   </g>
 </svg>
