@@ -26,11 +26,16 @@
 #include <errno.h>
 #include <poll.h>
 #include <stdint.h>
+#include <netdb.h>
 
 #include "vsx-util.h"
 #include "vsx-file-error.h"
 #include "vsx-monotonic.h"
 #include "vsx-thread.h"
+#include "vsx-netaddress.h"
+
+/* Delay in microseconds before retrying the address resolve */
+#define RESOLVE_DELAY (10 * 1000 * 1000)
 
 struct vsx_worker {
         struct vsx_connection *connection;
@@ -38,6 +43,14 @@ struct vsx_worker {
         bool thread_created;
         pthread_t thread;
         pthread_mutex_t mutex;
+
+        /* This will be NULL if there is no address queued to be
+         * resolved. It is set back to NULL if the resolve succeeds.
+         */
+        char *address_to_resolve;
+        int port;
+        /* Timestamp of the last time we tried to resolve the address */
+        int64_t last_resolve_time;
 
         int wakeup_fds[2];
         bool wakeup_queued;
@@ -85,6 +98,93 @@ event_cb(struct vsx_listener *listener,
         }
 }
 
+static bool
+lookup_address(const char *hostname, int port, struct vsx_netaddress *address)
+{
+        struct addrinfo *addrinfo;
+
+        int ret = getaddrinfo(hostname,
+                              NULL, /* service */
+                              NULL, /* hints */
+                              &addrinfo);
+
+        if (ret)
+                return false;
+
+        bool found = false;
+
+        for (const struct addrinfo * a = addrinfo; a; a = a->ai_next) {
+                switch (a->ai_family) {
+                case AF_INET:
+                        if (a->ai_addrlen != sizeof(struct sockaddr_in))
+                                continue;
+                        break;
+                case AF_INET6:
+                        if (a->ai_addrlen != sizeof(struct sockaddr_in6))
+                                continue;
+                        break;
+                default:
+                        continue;
+                }
+
+                struct vsx_netaddress_native native_address;
+
+                memcpy(&native_address.sockaddr, a->ai_addr, a->ai_addrlen);
+                native_address.length = a->ai_addrlen;
+
+                vsx_netaddress_from_native(address, &native_address);
+                address->port = port;
+
+                found = true;
+                break;
+        }
+
+        freeaddrinfo(addrinfo);
+
+        return found;
+}
+
+static void
+resolve_address_locked(struct vsx_worker *worker)
+{
+        worker->last_resolve_time = vsx_monotonic_get();
+
+        char *address_to_resolve = worker->address_to_resolve;
+        int port = worker->port;
+
+        /* Steal the address so we can unlock the worker and later
+         * detect if another address was set.
+         */
+        worker->address_to_resolve = NULL;
+
+        vsx_worker_unlock(worker);
+
+        struct vsx_netaddress address;
+
+        bool succeeded =
+                vsx_netaddress_from_string(&address,
+                                           address_to_resolve,
+                                           port) ||
+                lookup_address(address_to_resolve, port, &address);
+
+        vsx_worker_lock(worker);
+
+        /* If a different address was set in the meantime then abandon
+         * this one
+         */
+        if (worker->address_to_resolve) {
+                vsx_free(address_to_resolve);
+        } else if (succeeded) {
+                vsx_free(address_to_resolve);
+
+                vsx_connection_set_address(worker->connection, &address);
+        } else {
+                /* Put the address back so we can try again after a delay */
+                worker->address_to_resolve = address_to_resolve;
+                worker->port = port;
+        }
+}
+
 static void *
 thread_func(void *user_data)
 {
@@ -103,17 +203,26 @@ thread_func(void *user_data)
                 for (int i = 0; i < VSX_N_ELEMENTS(worker->poll_fds); i++)
                         worker->poll_fds[i].revents = 0;
 
+                int64_t wakeup_timestamp = worker->wakeup_timestamp;
+
+                if (worker->address_to_resolve) {
+                        int64_t resolve_wakeup_timestamp =
+                                worker->last_resolve_time + RESOLVE_DELAY;
+                        if (resolve_wakeup_timestamp < wakeup_timestamp)
+                                wakeup_timestamp = resolve_wakeup_timestamp;
+                }
+
                 int timeout;
 
-                if (worker->wakeup_timestamp >= INT64_MAX) {
+                if (wakeup_timestamp >= INT64_MAX) {
                         timeout = -1;
                 } else {
                         int64_t now = vsx_monotonic_get();
 
-                        if (worker->wakeup_timestamp <= now) {
+                        if (wakeup_timestamp <= now) {
                                 timeout = 0;
                         } else {
-                                timeout = ((worker->wakeup_timestamp - now) /
+                                timeout = ((wakeup_timestamp - now) /
                                            1000) + 1;
                         }
                 }
@@ -134,6 +243,12 @@ thread_func(void *user_data)
 
                 if (worker->quit)
                         break;
+
+                if (worker->address_to_resolve &&
+                    worker->last_resolve_time +
+                    RESOLVE_DELAY <=
+                    vsx_monotonic_get())
+                        resolve_address_locked(worker);
 
                 if (worker->poll_fds[0].revents) {
                         uint8_t byte;
@@ -230,6 +345,22 @@ vsx_worker_unlock(struct vsx_worker *worker)
 }
 
 void
+vsx_worker_queue_address_resolve(struct vsx_worker *worker,
+                                 const char *address,
+                                 int port)
+{
+        vsx_worker_lock(worker);
+
+        vsx_free(worker->address_to_resolve);
+        worker->address_to_resolve = vsx_strdup(address);
+        worker->port = port;
+
+        wake_up_thread_locked(worker);
+
+        vsx_worker_unlock(worker);
+}
+
+void
 vsx_worker_free(struct vsx_worker *worker)
 {
         if (worker->thread_created) {
@@ -247,6 +378,8 @@ vsx_worker_free(struct vsx_worker *worker)
         }
 
         pthread_mutex_destroy(&worker->mutex);
+
+        vsx_free(worker->address_to_resolve);
 
         vsx_free(worker);
 }

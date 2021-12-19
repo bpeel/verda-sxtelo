@@ -29,6 +29,11 @@ vsx_worker_new(struct vsx_connection *connection,
                struct vsx_error **error);
 
 void
+vsx_worker_queue_address_resolve(struct vsx_worker *worker,
+                                 const char *address,
+                                 int port);
+
+void
 vsx_worker_lock(struct vsx_worker *worker);
 
 void

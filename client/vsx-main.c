@@ -27,7 +27,6 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
@@ -36,7 +35,6 @@
 #include "vsx-gl.h"
 #include "vsx-connection.h"
 #include "vsx-utf8.h"
-#include "vsx-netaddress.h"
 #include "vsx-monotonic.h"
 #include "vsx-buffer.h"
 #include "vsx-worker.h"
@@ -396,52 +394,6 @@ format_print(struct vsx_main_data *main_data,
         va_end(ap);
 }
 
-static bool
-lookup_address(const char *hostname, int port, struct vsx_netaddress *address)
-{
-        struct addrinfo *addrinfo;
-
-        int ret = getaddrinfo(hostname,
-                              NULL, /* service */
-                              NULL, /* hints */
-                              &addrinfo);
-
-        if (ret)
-                return false;
-
-        bool found = false;
-
-        for (const struct addrinfo * a = addrinfo; a; a = a->ai_next) {
-                switch (a->ai_family) {
-                case AF_INET:
-                        if (a->ai_addrlen != sizeof(struct sockaddr_in))
-                                continue;
-                        break;
-                case AF_INET6:
-                        if (a->ai_addrlen != sizeof(struct sockaddr_in6))
-                                continue;
-                        break;
-                default:
-                        continue;
-                }
-
-                struct vsx_netaddress_native native_address;
-
-                memcpy(&native_address.sockaddr, a->ai_addr, a->ai_addrlen);
-                native_address.length = a->ai_addrlen;
-
-                vsx_netaddress_from_native(address, &native_address);
-                address->port = port;
-
-                found = true;
-                break;
-        }
-
-        freeaddrinfo(addrinfo);
-
-        return found;
-}
-
 static void
 handle_log_locked(struct vsx_main_data *main_data)
 {
@@ -516,17 +468,6 @@ run_main_loop(struct vsx_main_data *main_data)
 static struct vsx_connection *
 create_connection(void)
 {
-        struct vsx_netaddress address;
-
-        address.port = option_server_port;
-
-        if (!vsx_netaddress_from_string(&address,
-                                        option_server, option_server_port) &&
-            !lookup_address(option_server, option_server_port, &address)) {
-                fprintf(stderr, "Failed to resolve %s\n", option_server);
-                return NULL;
-        }
-
         const char *player_name = option_player_name;
 
         if (player_name == NULL) {
@@ -535,12 +476,7 @@ create_connection(void)
                         player_name = "?";
         }
 
-        struct vsx_connection *connection =
-                vsx_connection_new(option_room, player_name);
-
-        vsx_connection_set_address(connection, &address);
-
-        return connection;
+        return vsx_connection_new(option_room, player_name);
 }
 
 static struct vsx_worker *
@@ -554,6 +490,10 @@ create_worker(struct vsx_connection *connection)
                 fprintf(stderr, "%s\n", error->message);
                 vsx_error_free(error);
         }
+
+        vsx_worker_queue_address_resolve(worker,
+                                         option_server,
+                                         option_server_port);
 
         return worker;
 }
