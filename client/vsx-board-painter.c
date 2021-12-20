@@ -590,7 +590,9 @@ paint_box_cb(const char *name,
                 closure->painter->box_draw_commands + player_num;
         const struct box_style_draw_command *style;
 
-        if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
+        if ((flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING))
+                style = box->styles + 2;
+        else if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
                 style = box->styles + 1;
         else
                 style = box->styles + 0;
