@@ -33,6 +33,8 @@ struct vsx_player {
         char *name;
 
         enum vsx_player_flags flags;
+
+        bool shouting;
 };
 
 #endif /* VSX_PLAYER_PRIVATE_H */

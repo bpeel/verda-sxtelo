@@ -38,6 +38,12 @@ vsx_player_has_next_turn(const struct vsx_player *player)
         return !!(player->flags & VSX_PLAYER_NEXT_TURN);
 }
 
+bool
+vsx_player_is_shouting(const struct vsx_player *player)
+{
+        return player->shouting;
+}
+
 int
 vsx_player_get_number(const struct vsx_player *player)
 {

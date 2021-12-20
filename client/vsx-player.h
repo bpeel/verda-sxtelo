@@ -36,6 +36,9 @@ bool
 vsx_player_is_typing(const struct vsx_player *player);
 
 bool
+vsx_player_is_shouting(const struct vsx_player *player);
+
+bool
 vsx_player_has_next_turn(const struct vsx_player *player);
 
 #endif /* VSX_PLAYER_H */
