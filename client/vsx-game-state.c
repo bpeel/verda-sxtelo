@@ -115,6 +115,8 @@ update_player_flags_locked(struct vsx_game_state *game_state)
                         flags |= VSX_GAME_STATE_PLAYER_FLAG_TYPING;
                 if (vsx_player_has_next_turn(player))
                         flags |= VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN;
+                if (vsx_player_is_shouting(player))
+                        flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
 
                 game_state->players[player_num].flags = flags;
 
@@ -259,7 +261,8 @@ handle_player_changed(struct vsx_game_state *game_state,
         }
 
         if ((event->player_changed.flags &
-             VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS)) {
+             (VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS |
+              VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING))) {
                 game_state->dirty_player_flags |= 1 << player_num;
         }
 

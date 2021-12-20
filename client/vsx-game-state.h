@@ -37,6 +37,7 @@ enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_CONNECTED = (1 << 0),
         VSX_GAME_STATE_PLAYER_FLAG_TYPING = (1 << 1),
         VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN = (1 << 2),
+        VSX_GAME_STATE_PLAYER_FLAG_SHOUTING = (1 << 3),
 };
 
 struct vsx_game_state *
