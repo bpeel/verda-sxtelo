@@ -67,8 +67,7 @@ struct vsx_error_domain
 vsx_connection_error;
 
 static void
-update_poll(struct vsx_connection *connection,
-            bool always_send);
+update_poll(struct vsx_connection *connection);
 
 /* Initial timeout (in microseconds) before attempting to reconnect
  * after an error. The timeout will be doubled every time there is a
@@ -154,11 +153,11 @@ struct vsx_connection {
         int n_tiles_to_send;
 
         int sock;
-        /* The poll events that were last reported in the poll changed
-         * event so we can know if we need to send a new event to
-         * update it.
+
+        /* The last poll_changed event that we sent so we can detect
+         * changes.
          */
-        short sock_events;
+        struct vsx_connection_event poll_changed_event;
 
         /* Array of pointers to players, indexed by player num. This can
          * have NULL gaps.
@@ -203,29 +202,6 @@ struct vsx_connection {
 };
 
 static void
-send_poll_changed(struct vsx_connection *connection)
-{
-        int64_t wakeup_time = INT64_MAX;
-
-        if (connection->reconnect_timestamp < wakeup_time)
-                wakeup_time = connection->reconnect_timestamp;
-
-        if (connection->keep_alive_timestamp < wakeup_time)
-                wakeup_time = connection->keep_alive_timestamp;
-
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
-                .poll_changed = {
-                        .wakeup_time = wakeup_time,
-                        .fd = connection->sock,
-                        .events = connection->sock_events,
-                },
-        };
-
-        vsx_signal_emit(&connection->event_signal, &event);
-}
-
-static void
 vsx_connection_signal_error(struct vsx_connection *connection,
                             struct vsx_error *error)
 {
@@ -252,7 +228,7 @@ vsx_connection_set_typing(struct vsx_connection *connection,
 {
         if (connection->typing != typing) {
                 connection->typing = typing;
-                update_poll(connection, false /* always_send */);
+                update_poll(connection);
         }
 }
 
@@ -261,7 +237,7 @@ vsx_connection_shout(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_SHOUT;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -269,7 +245,7 @@ vsx_connection_turn(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_TURN;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -292,7 +268,7 @@ found_tile:
         tile->x = x;
         tile->y = y;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -302,7 +278,7 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
         connection->n_tiles_to_send = n_tiles;
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 static void
@@ -814,7 +790,7 @@ report_error(struct vsx_connection *connection,
                 connection->reconnect_timeout = 0;
 
         set_reconnect_timestamp(connection);
-        send_poll_changed(connection);
+        update_poll(connection);
         vsx_connection_signal_error(connection, error);
 }
 
@@ -997,7 +973,7 @@ handle_read(struct vsx_connection *connection)
                         p);
                 connection->input_length -= p - connection->input_buffer;
 
-                update_poll(connection, false /* always_send */ );
+                update_poll(connection);
         }
 }
 
@@ -1300,7 +1276,7 @@ handle_write(struct vsx_connection *connection)
                 connection->keep_alive_timestamp =
                         vsx_monotonic_get() + VSX_CONNECTION_KEEP_ALIVE_TIME;
 
-                update_poll(connection, true /* always_send */ );
+                update_poll(connection);
         }
 }
 
@@ -1334,16 +1310,12 @@ try_reconnect(struct vsx_connection *connection)
                                   &address.sockaddr,
                                   address.length);
 
-        short events;
-
         if (connect_ret == 0) {
                 connection->running_state =
                         VSX_CONNECTION_RUNNING_STATE_RUNNING;
-                events = POLLIN | POLLOUT;
         } else if (errno == EINPROGRESS) {
                 connection->running_state =
                         VSX_CONNECTION_RUNNING_STATE_RECONNECTING;
-                events = POLLOUT;
         } else {
                 goto file_error;
         }
@@ -1354,8 +1326,7 @@ try_reconnect(struct vsx_connection *connection)
         connection->write_finished = false;
         connection->synced = false;
 
-        connection->sock_events = events;
-        send_poll_changed(connection);
+        update_poll(connection);
 
         return;
 
@@ -1399,7 +1370,7 @@ vsx_connection_wake_up(struct vsx_connection *connection,
         else if ((poll_events & POLLOUT))
                 handle_write(connection);
         else
-                update_poll(connection, false /* always_send */ );
+                update_poll(connection);
 }
 
 static bool
@@ -1423,8 +1394,8 @@ has_pending_data(struct vsx_connection *connection)
         return false;
 }
 
-static void
-update_poll(struct vsx_connection *connection, bool always_send)
+static short
+calculate_poll_events(struct vsx_connection *connection)
 {
         short events = 0;
 
@@ -1449,13 +1420,46 @@ update_poll(struct vsx_connection *connection, bool always_send)
                 break;
 
         default:
-                return;
+                break;
         }
 
-        if (always_send || connection->sock_events != events) {
-                connection->sock_events = events;
+        return events;
+}
 
-                send_poll_changed(connection);
+static int64_t
+calculate_wakeup_timestamp(struct vsx_connection *connection)
+{
+        int64_t wakeup_timestamp = INT64_MAX;
+
+        if (connection->reconnect_timestamp < wakeup_timestamp)
+                wakeup_timestamp = connection->reconnect_timestamp;
+
+        if (connection->keep_alive_timestamp < wakeup_timestamp)
+                wakeup_timestamp = connection->keep_alive_timestamp;
+
+        return wakeup_timestamp;
+}
+
+static void
+update_poll(struct vsx_connection *connection)
+{
+        short events = calculate_poll_events(connection);
+        int64_t wakeup_timestamp = calculate_wakeup_timestamp(connection);
+
+        if (connection->poll_changed_event.poll_changed.fd !=
+            connection->sock ||
+            connection->poll_changed_event.poll_changed.events != events ||
+            connection->poll_changed_event.poll_changed.wakeup_time !=
+            wakeup_timestamp) {
+                connection->poll_changed_event.poll_changed.fd =
+                        connection->sock;
+                connection->poll_changed_event.poll_changed.events =
+                        events;
+                connection->poll_changed_event.poll_changed.wakeup_time =
+                        wakeup_timestamp;
+
+                vsx_signal_emit(&connection->event_signal,
+                                &connection->poll_changed_event);
         }
 }
 
@@ -1473,7 +1477,7 @@ start_connecting_running_state(struct vsx_connection *connection)
                 connection->running_state =
                         VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
 
-                send_poll_changed(connection);
+                update_poll(connection);
         } else {
                 connection->reconnect_timestamp = INT64_MAX;
                 connection->running_state =
@@ -1501,7 +1505,7 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         close_socket(connection);
-                        send_poll_changed(connection);
+                        update_poll(connection);
                         break;
 
                 case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT:
@@ -1509,7 +1513,7 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         connection->reconnect_timestamp = INT64_MAX;
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
-                        send_poll_changed(connection);
+                        update_poll(connection);
                         break;
 
                 case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS:
@@ -1557,6 +1561,9 @@ vsx_connection_new(const char *room,
 
         connection->keep_alive_timestamp = INT64_MAX;
         connection->reconnect_timestamp = INT64_MAX;
+
+        connection->poll_changed_event.type =
+                VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
 
         connection->sock = -1;
 
@@ -1678,7 +1685,7 @@ vsx_connection_send_message(struct vsx_connection *connection,
         vsx_list_insert(connection->messages_to_send.prev,
                         &message_to_send->link);
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -1686,7 +1693,7 @@ vsx_connection_leave(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LEAVE;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 const struct vsx_player *
