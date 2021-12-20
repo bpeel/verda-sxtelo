@@ -154,8 +154,9 @@ struct vsx_connection {
         int n_tiles_to_send;
 
         int sock;
-        /* The condition that the source was last created with so we can
-         * know if we need to recreate it.
+        /* The poll events that were last reported in the poll changed
+         * event so we can know if we need to send a new event to
+         * update it.
          */
         short sock_events;
 
