@@ -34,8 +34,7 @@
 
 struct vsx_game_state_player {
         char *name;
-        bool is_typing;
-        bool is_connected;
+        enum vsx_game_state_player_flag flags;
 };
 
 struct vsx_game_state_tile {
@@ -108,10 +107,16 @@ update_player_flags_locked(struct vsx_game_state *game_state)
                         vsx_connection_get_player(game_state->connection,
                                                   player_num);
 
-                game_state->players[player_num].is_typing =
-                        vsx_player_is_typing(player);
-                game_state->players[player_num].is_connected =
-                        vsx_player_is_connected(player);
+                enum vsx_game_state_player_flag flags = 0;
+
+                if (vsx_player_is_connected(player))
+                        flags |= VSX_GAME_STATE_PLAYER_FLAG_CONNECTED;
+                if (vsx_player_is_typing(player))
+                        flags |= VSX_GAME_STATE_PLAYER_FLAG_TYPING;
+                if (vsx_player_has_next_turn(player))
+                        flags |= VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN;
+
+                game_state->players[player_num].flags = flags;
 
                 game_state->dirty_player_flags &= ~(1 << player_num);
         }
