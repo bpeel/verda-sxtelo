@@ -236,6 +236,15 @@ wakeup_cb(void *user_data)
 }
 
 static void
+queue_redraw_unlocked(struct vsx_main_data *main_data)
+{
+        pthread_mutex_lock(&main_data->mutex);
+        main_data->redraw_queued = true;
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
+}
+
+static void
 handle_error(struct vsx_main_data *main_data,
              const struct vsx_connection_event *event)
 {
@@ -303,10 +312,7 @@ handle_tile_changed(struct vsx_main_data *main_data,
                      vsx_tile_get_x(tile), vsx_tile_get_y(tile),
                      letter);
 
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->redraw_queued = true;
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
+        queue_redraw_unlocked(main_data);
 }
 
 static void
@@ -334,6 +340,13 @@ handle_state_changed(struct vsx_main_data *main_data,
                      const struct vsx_connection_event *event)
 {
         print_state_message(main_data);
+}
+
+static void
+handle_player_changed(struct vsx_main_data *main_data,
+                      const struct vsx_connection_event *event)
+{
+        queue_redraw_unlocked(main_data);
 }
 
 static void
@@ -369,6 +382,8 @@ event_cb(struct vsx_listener *listener,
                 handle_state_changed(main_data, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
+                handle_player_changed(main_data, event);
+                break;
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
                 break;
         }
@@ -686,10 +701,7 @@ redraw_needed_cb(struct vsx_listener *listener,
                                  struct vsx_main_data,
                                  redraw_needed_listener);
 
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->redraw_queued = true;
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
+        queue_redraw_unlocked(main_data);
 }
 
 static bool
