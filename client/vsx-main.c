@@ -725,6 +725,8 @@ main(int argc, char **argv)
         if (!process_arguments(argc, argv))
                 return EXIT_FAILURE;
 
+        SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1");
+
         struct vsx_main_data *main_data = create_main_data();
 
         if (main_data == NULL)
