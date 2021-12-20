@@ -32,9 +32,15 @@
 #include "vsx-quad-buffer.h"
 #include "vsx-board.h"
 
-struct box_draw_command {
+#define N_BOX_STYLES 3
+
+struct box_style_draw_command {
         int offset;
         int min_vertex, max_vertex;
+};
+
+struct box_draw_command {
+        struct box_style_draw_command styles[N_BOX_STYLES];
 };
 
 struct vsx_board_painter {
@@ -57,7 +63,7 @@ struct vsx_board_painter {
 
 struct vertex {
         int16_t x, y;
-        uint8_t s, t;
+        uint16_t s, t;
 };
 
 #define PLAYER_SPACE_SIDE_HEIGHT 170
@@ -71,6 +77,9 @@ struct vertex {
 struct board_quad {
         int16_t x1, y1;
         int16_t x2, y2;
+        /* The texture coordinates are always either 0 or 1 to
+         * represent a side of the corner image.
+         */
         uint8_t s1, t1;
         uint8_t s2, t2;
 };
@@ -83,8 +92,8 @@ board_quads[] = {
                 .y1 = PLAYER_SPACE_SIDE_HEIGHT,
                 .x2 = PLAYER_SPACE_SIDE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
-                .s1 = 255,
-                .s2 = 255,
+                .s1 = 1,
+                .s2 = 1,
         },
 
         /* Left gap */
@@ -93,8 +102,8 @@ board_quads[] = {
                 .y1 = 0,
                 .x2 = PLAYER_SPACE_MIDDLE_X,
                 .y2 = VSX_BOARD_HEIGHT,
-                .s1 = 255,
-                .s2 = 255,
+                .s1 = 1,
+                .s2 = 1,
         },
 
         /* Middle gap */
@@ -103,7 +112,7 @@ board_quads[] = {
                 .y1 = PLAYER_SPACE_MIDDLE_HEIGHT,
                 .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT,
-                .s1 = 255, .s2 = 255,
+                .s1 = 1, .s2 = 1,
         },
 
         /* Right gap */
@@ -112,7 +121,7 @@ board_quads[] = {
                 .y1 = 0,
                 .x2 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT,
-                .s1 = 255, .s2 = 255,
+                .s1 = 1, .s2 = 1,
         },
 
         /* Gap between players on the right */
@@ -121,8 +130,8 @@ board_quads[] = {
                 .y1 = PLAYER_SPACE_SIDE_HEIGHT,
                 .x2 = VSX_BOARD_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
-                .s1 = 255,
-                .s2 = 255,
+                .s1 = 1,
+                .s2 = 1,
         },
 };
 
@@ -148,7 +157,7 @@ player_0_quads[] = {
                 .y1 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
                 .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
                 .y2 = PLAYER_SPACE_MIDDLE_HEIGHT,
-                .s1 = 255, .t1 = 255,
+                .s1 = 1, .t1 = 1,
                 .s2 = 0, .t2 = 0,
         },
         {
@@ -158,8 +167,8 @@ player_0_quads[] = {
                 .y1 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
                 .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
                 .y2 = PLAYER_SPACE_MIDDLE_HEIGHT,
-                .s1 = 0, .t1 = 255,
-                .s2 = 255, .t2 = 0,
+                .s1 = 0, .t1 = 1,
+                .s2 = 1, .t2 = 0,
         },
 };
 
@@ -173,8 +182,8 @@ player_1_quads[] = {
                 .y2 = (VSX_BOARD_HEIGHT -
                        PLAYER_SPACE_MIDDLE_HEIGHT +
                        PLAYER_SPACE_CORNER_SIZE),
-                .s1 = 255, .t1 = 0,
-                .s2 = 0, .t2 = 255,
+                .s1 = 1, .t1 = 0,
+                .s2 = 0, .t2 = 1,
         },
         {
                 .x1 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
@@ -196,7 +205,7 @@ player_1_quads[] = {
                        PLAYER_SPACE_MIDDLE_HEIGHT +
                        PLAYER_SPACE_CORNER_SIZE),
                 .s1 = 0, .t1 = 0,
-                .s2 = 255, .t2 = 255,
+                .s2 = 1, .t2 = 1,
         },
         {
                 .x1 = PLAYER_SPACE_MIDDLE_X,
@@ -227,8 +236,8 @@ player_2_quads[] = {
                 .y1 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
                 .x2 = PLAYER_SPACE_SIDE_WIDTH,
                 .y2 = PLAYER_SPACE_SIDE_HEIGHT,
-                .s1 = 0, .t1 = 255,
-                .s2 = 255, .t2 = 0,
+                .s1 = 0, .t1 = 1,
+                .s2 = 1, .t2 = 0,
         },
 };
 
@@ -247,7 +256,7 @@ player_3_quads[] = {
                        PLAYER_SPACE_SIDE_WIDTH +
                        PLAYER_SPACE_CORNER_SIZE),
                 .y2 = PLAYER_SPACE_SIDE_HEIGHT,
-                .s1 = 255, .t1 = 255,
+                .s1 = 1, .t1 = 1,
                 .s2 = 0, .t2 = 0,
         },
         {
@@ -279,7 +288,7 @@ player_4_quads[] = {
                        PLAYER_SPACE_SIDE_HEIGHT +
                        PLAYER_SPACE_CORNER_SIZE),
                 .s1 = 0, .t1 = 0,
-                .s2 = 255, .t2 = 255,
+                .s2 = 1, .t2 = 1,
         },
         {
                 .x1 = 0,
@@ -302,8 +311,8 @@ player_5_quads[] = {
                 .y2 = (VSX_BOARD_HEIGHT -
                        PLAYER_SPACE_SIDE_HEIGHT +
                        PLAYER_SPACE_CORNER_SIZE),
-                .s1 = 255, .t1 = 0,
-                .s2 = 0, .t2 = 255,
+                .s1 = 1, .t1 = 0,
+                .s2 = 0, .t2 = 1,
         },
         {
                 .x1 = (VSX_BOARD_WIDTH -
@@ -404,33 +413,39 @@ texture_load_cb(const struct vsx_image *image,
 
 static void
 generate_vertices(struct vertex *vertices,
+                  int corner_image,
                   const struct board_quad *quads,
                   size_t n_quads)
 {
         struct vertex *v = vertices;
+
+        uint16_t left = 96 * corner_image * 65535 / 256;
+        uint16_t right = (96 * corner_image + 64) * 65535 / 256;
+        uint16_t top = 0;
+        uint16_t bottom = 65535;
 
         for (int i = 0; i < n_quads; i++) {
                 const struct board_quad *quad = quads + i;
 
                 v->x = quad->x1;
                 v->y = quad->y1;
-                v->s = quad->s1;
-                v->t = quad->t1;
+                v->s = quad->s1 ? right : left;
+                v->t = quad->t1 ? bottom : top;
                 v++;
                 v->x = quad->x1;
                 v->y = quad->y2;
-                v->s = quad->s1;
-                v->t = quad->t2;
+                v->s = quad->s1 ? right : left;
+                v->t = quad->t2 ? bottom : top;
                 v++;
                 v->x = quad->x2;
                 v->y = quad->y1;
-                v->s = quad->s2;
-                v->t = quad->t1;
+                v->s = quad->s2 ? right : left;
+                v->t = quad->t1 ? bottom : top;
                 v++;
                 v->x = quad->x2;
                 v->y = quad->y2;
-                v->s = quad->s2;
-                v->t = quad->t2;
+                v->s = quad->s2 ? right : left;
+                v->t = quad->t2 ? bottom : top;
                 v++;
         }
 
@@ -443,7 +458,7 @@ create_buffer(struct vsx_board_painter *painter)
         size_t total_n_quads = N_BOARD_QUADS;
 
         for (int i = 0; i < VSX_N_ELEMENTS(player_boxes); i++)
-                total_n_quads += player_boxes[i].n_quads;
+                total_n_quads += player_boxes[i].n_quads * N_BOX_STYLES;
 
         size_t total_n_vertices = total_n_quads * 4;
 
@@ -468,7 +483,7 @@ create_buffer(struct vsx_board_painter *painter)
         vsx_array_object_set_attribute(painter->vao,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_UNSIGNED_BYTE,
+                                       GL_UNSIGNED_SHORT,
                                        true, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
@@ -483,20 +498,30 @@ create_buffer(struct vsx_board_painter *painter)
 
         struct vertex *v = vertices;
 
-        generate_vertices(v, board_quads, N_BOARD_QUADS);
+        generate_vertices(v,
+                          0, /* corner_image */
+                          board_quads,
+                          N_BOARD_QUADS);
         v += N_BOARD_VERTICES;
 
-        for (int i = 0; i < VSX_N_ELEMENTS(player_boxes); i++) {
-                struct box_draw_command *command =
-                        painter->box_draw_commands + i;
-                const struct player_box *box = player_boxes + i;
+        for (int player = 0; player < VSX_N_ELEMENTS(player_boxes); player++) {
+                const struct player_box *box = player_boxes + player;
 
-                command->offset = (v - vertices) * 6 / 4 * sizeof (uint16_t);
-                command->min_vertex = v - vertices;
-                command->max_vertex = v - vertices + box->n_quads * 4 - 1;
+                for (int style = 0; style < N_BOX_STYLES; style++) {
+                        struct box_style_draw_command *command =
+                                painter->box_draw_commands[player].styles +
+                                style;
 
-                generate_vertices(v, box->quads, box->n_quads);
-                v += box->n_quads * 4;
+                        command->offset = ((v - vertices) * 6 / 4 *
+                                           sizeof (uint16_t));
+                        command->min_vertex = v - vertices;
+                        command->max_vertex = (v - vertices +
+                                               box->n_quads * 4 -
+                                               1);
+
+                        generate_vertices(v, style, box->quads, box->n_quads);
+                        v += box->n_quads * 4;
+                }
         }
 
         assert(v - vertices == total_n_vertices);
@@ -546,6 +571,41 @@ create_cb(struct vsx_painter_toolbox *toolbox)
         return painter;
 }
 
+struct paint_box_closure {
+        struct vsx_board_painter *painter;
+        int player_num;
+};
+
+static void
+paint_box_cb(const char *name,
+             enum vsx_game_state_player_flag flags,
+             void *user_data)
+{
+        struct paint_box_closure *closure = user_data;
+
+        assert(closure->player_num <= VSX_GAME_STATE_N_VISIBLE_PLAYERS);
+
+        int player_num = closure->player_num;
+        const struct box_draw_command *box =
+                closure->painter->box_draw_commands + player_num;
+        const struct box_style_draw_command *style;
+
+        if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
+                style = box->styles + 1;
+        else
+                style = box->styles + 0;
+
+        vsx_gl_draw_range_elements(GL_TRIANGLES,
+                                   style->min_vertex,
+                                   style->max_vertex,
+                                   player_boxes[player_num].n_quads * 6,
+                                   GL_UNSIGNED_SHORT,
+                                   (GLvoid *) (intptr_t)
+                                   style->offset);
+
+        closure->player_num++;
+}
+
 static void
 paint_cb(void *painter_data,
          struct vsx_game_state *game_state,
@@ -577,18 +637,14 @@ paint_cb(void *painter_data,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
-                const struct box_draw_command *box =
-                        painter->box_draw_commands + i;
+        struct paint_box_closure closure = {
+                .player_num = 0,
+                .painter = painter,
+        };
 
-                vsx_gl_draw_range_elements(GL_TRIANGLES,
-                                           box->min_vertex,
-                                           box->max_vertex,
-                                           player_boxes[i].n_quads * 6,
-                                           GL_UNSIGNED_SHORT,
-                                           (GLvoid *) (intptr_t)
-                                           box->offset);
-        }
+        vsx_game_state_foreach_player(game_state, paint_box_cb, &closure);
+
+        assert(closure.player_num == VSX_GAME_STATE_N_VISIBLE_PLAYERS);
 }
 
 static struct vsx_signal *

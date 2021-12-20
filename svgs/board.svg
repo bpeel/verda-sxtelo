@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="63.999996"
+   width="256"
    height="63.999996"
-   viewBox="0 0 16.933332 16.933332"
+   viewBox="0 0 67.733332 16.933332"
    version="1.1"
    id="svg5"
    inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
@@ -31,9 +31,9 @@
      fit-margin-right="0"
      fit-margin-bottom="0"
      units="px"
-     inkscape:zoom="2.7456882"
-     inkscape:cx="123.64842"
-     inkscape:cy="113.26851"
+     inkscape:zoom="1.9414947"
+     inkscape:cx="134.69004"
+     inkscape:cy="55.112176"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
@@ -51,5 +51,15 @@
        id="rect1484"
        style="fill:#ffffff;stroke:none;stroke-width:2.082;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
        d="m 77.251118,56.457054 v 16.933333 h 16.933333 c 0,-9.381066 -7.552267,-16.933333 -16.933333,-16.933333 z" />
+    <path
+       id="path904"
+       style="fill:#beffbe;stroke:none;stroke-width:7.86898;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill;fill-opacity:1"
+       d="M 80 0 L 80 64 L 96 64 L 160 64 C 160 28.544003 131.45597 0 96 0 L 80 0 z "
+       transform="matrix(0.26458333,0,0,0.26458333,77.251118,56.457054)" />
+    <path
+       id="path906"
+       style="fill:#f06464;stroke:none;stroke-width:7.86898;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill;fill-opacity:1"
+       d="M 176 0 L 176 64 L 192 64 L 256 64 C 256 28.544003 227.45597 0 192 0 L 176 0 z "
+       transform="matrix(0.26458333,0,0,0.26458333,77.251118,56.457054)" />
   </g>
 </svg>
