@@ -76,6 +76,7 @@ struct check_event_listener {
         struct vsx_listener listener;
         enum check_event_result result;
         enum vsx_connection_event_type expected_type;
+        int ignore_event_type;
         check_event_func cb;
         struct harness *harness;
         void *user_data;
@@ -609,6 +610,9 @@ check_event_cb(struct vsx_listener *listener, void *data)
                                  listener);
         const struct vsx_connection_event *event = data;
 
+        if (event->type == ce_listener->ignore_event_type)
+                return;
+
         if (ce_listener->result != CHECK_EVENT_RESULT_NO_MESSAGE) {
                 fprintf(stderr,
                         "Multiple events received when only one "
@@ -630,17 +634,19 @@ check_event_cb(struct vsx_listener *listener, void *data)
 }
 
 static bool
-check_event(struct harness *harness,
-            enum vsx_connection_event_type expected_type,
-            check_event_func cb,
-            const uint8_t *data,
-            size_t data_len,
-            void *user_data)
+check_event_with_ignore(struct harness *harness,
+                        enum vsx_connection_event_type expected_type,
+                        int ignore_event_type,
+                        check_event_func cb,
+                        const uint8_t *data,
+                        size_t data_len,
+                        void *user_data)
 {
         struct check_event_listener listener = {
                 .listener = { .notify = check_event_cb },
                 .result = CHECK_EVENT_RESULT_NO_MESSAGE,
                 .expected_type = expected_type,
+                .ignore_event_type = ignore_event_type,
                 .cb = cb,
                 .harness = harness,
                 .user_data = user_data,
@@ -668,6 +674,23 @@ check_event(struct harness *harness,
         assert(!"Unexpected check_event result");
 
         return false;
+}
+
+static bool
+check_event(struct harness *harness,
+            enum vsx_connection_event_type expected_type,
+            check_event_func cb,
+            const uint8_t *data,
+            size_t data_len,
+            void *user_data)
+{
+        return check_event_with_ignore(harness,
+                                       expected_type,
+                                       -1, /* ignore_event_type */
+                                       cb,
+                                       data,
+                                       data_len,
+                                       user_data);
 }
 
 static bool
@@ -1225,18 +1248,30 @@ add_player(struct harness *harness)
 }
 
 static bool
-check_self_shouted_cb(struct harness *harness,
-                      const struct vsx_connection_event *event,
-                      void *user_data)
+check_shouter_num(const struct vsx_player *expected_shouter,
+                  const struct vsx_connection_event *event)
 {
-        const struct vsx_player *self =
-                vsx_connection_get_self (harness->connection);
-        const struct vsx_player *shouter = event->player_shouted.player;
+        const struct vsx_player *shouter = event->player_changed.player;
 
-        if (self != shouter) {
+        if (expected_shouter != shouter) {
                 fprintf(stderr,
-                        "Expected self to shout but got %i\n",
+                        "Expected shouter to be %i but got %i\n",
+                        vsx_player_get_number(expected_shouter),
                         vsx_player_get_number(shouter));
+                return false;
+        }
+
+        if (event->player_changed.flags !=
+            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING) {
+                fprintf(stderr,
+                        "Player changed event after shout is not changing "
+                        "shout\n");
+                return false;
+        }
+
+        if (!vsx_player_is_shouting(shouter)) {
+                fprintf(stderr,
+                        "Received shout event but player is not shouting\n");
                 return false;
         }
 
@@ -1244,21 +1279,103 @@ check_self_shouted_cb(struct harness *harness,
 }
 
 static bool
+check_self_shouted_cb(struct harness *harness,
+                      const struct vsx_connection_event *event,
+                      void *user_data)
+{
+        const struct vsx_player *self =
+                vsx_connection_get_self (harness->connection);
+
+        return check_shouter_num(self, event);
+}
+
+static bool
 check_other_shouted_cb(struct harness *harness,
                        const struct vsx_connection_event *event,
                        void *user_data)
 {
-        const struct vsx_player *shouter = event->player_shouted.player;
-        int number = vsx_player_get_number(shouter);
+        const struct vsx_player *other =
+                vsx_connection_get_player(harness->connection, 1);
 
-        if (number != 1) {
+        return check_shouter_num(other, event);
+}
+
+static bool
+check_reset_shouting_player_cb(struct harness *harness,
+                               const struct vsx_connection_event *event,
+                               void *user_data)
+{
+        const struct vsx_player *shouter = event->player_changed.player;
+        const struct vsx_player *expected_shouter = user_data;
+
+        if (expected_shouter != shouter) {
                 fprintf(stderr,
-                        "Expected other to shout but got %i\n",
-                        number);
+                        "Expected shouter reset to be %i but got %i\n",
+                        vsx_player_get_number(expected_shouter),
+                        vsx_player_get_number(shouter));
+                return false;
+        }
+
+        if (event->player_changed.flags !=
+            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING) {
+                fprintf(stderr,
+                        "Player changed event after reset shout is not "
+                        "changing shout\n");
+                return false;
+        }
+
+        if (vsx_player_is_shouting(shouter)) {
+                fprintf(stderr,
+                        "Received shout reset event but player is still "
+                        "shouting\n");
                 return false;
         }
 
         return true;
+}
+
+static bool
+check_reset_shouting_player(struct harness *harness,
+                            const struct vsx_player *player)
+{
+        if (llabs(harness->wakeup_time -
+                  (replacement_monotonic_time + 10 * 1000000)) >
+            1000000) {
+                fprintf(stderr,
+                        "Expected the connection to request a wakeup "
+                        "10 seconds after shouting, but it requested "
+                        "%f seconds\n",
+                        (harness->wakeup_time - replacement_monotonic_time) /
+                        1000000.0);
+                return false;
+        }
+
+        /* Advance time to nearly enough */
+        replacement_monotonic_time += 10 * 1000000 - 500000;
+
+        harness->events_triggered = 0;
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        /* Check that no event was fired */
+        if (harness->events_triggered != 0) {
+                fprintf(stderr,
+                        "The vsx_connection triggered an event before the "
+                        "shout reset delay.\n");
+                return false;
+        }
+
+        /* Now advance actually enough time */
+        replacement_monotonic_time += 500001;
+
+        return check_event_with_ignore(harness,
+                                       VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                       VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+                                       check_reset_shouting_player_cb,
+                                       (const uint8_t *) "", /* data */
+                                       0, /* data_len */
+                                       (void *) player);
 }
 
 static bool
@@ -1274,12 +1391,24 @@ test_receive_shout(void)
         static const uint8_t self_shout_message[] =
                 "\x82\x02\x06\x00";
 
-        if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
-                         check_self_shouted_cb,
-                         self_shout_message,
-                         sizeof self_shout_message - 1,
-                         NULL /* user_data */)) {
+        replacement_monotonic_time = vsx_monotonic_get();
+        replace_monotonic_time = true;
+
+        if (!check_event_with_ignore(harness,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                     VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+                                     check_self_shouted_cb,
+                                     self_shout_message,
+                                     sizeof self_shout_message - 1,
+                                     NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        const struct vsx_player *self =
+                vsx_connection_get_self(harness->connection);
+
+        if (!check_reset_shouting_player(harness, self)) {
                 ret = false;
                 goto out;
         }
@@ -1292,17 +1421,27 @@ test_receive_shout(void)
         static const uint8_t other_shout_message[] =
                 "\x82\x02\x06\x01";
 
-        if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
-                         check_other_shouted_cb,
-                         other_shout_message,
-                         sizeof other_shout_message - 1,
-                         NULL /* user_data */)) {
+        if (!check_event_with_ignore(harness,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                     VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+                                     check_other_shouted_cb,
+                                     other_shout_message,
+                                     sizeof other_shout_message - 1,
+                                     NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        const struct vsx_player *other =
+                vsx_connection_get_player(harness->connection, 1);
+
+        if (!check_reset_shouting_player(harness, other)) {
                 ret = false;
                 goto out;
         }
 
 out:
+        replace_monotonic_time = false;
         free_harness(harness);
 
         return ret;

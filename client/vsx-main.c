@@ -274,16 +274,6 @@ handle_message(struct vsx_main_data *main_data,
 }
 
 static void
-handle_player_shouted(struct vsx_main_data *main_data,
-                      const struct vsx_connection_event *event)
-{
-
-        const struct vsx_player *player = event->player_shouted.player;
-
-        format_print(main_data, "** %s SHOUTS\n", vsx_player_get_name(player));
-}
-
-static void
 handle_n_tiles(struct vsx_main_data *main_data,
                const struct vsx_connection_event *event)
 {
@@ -365,9 +355,6 @@ event_cb(struct vsx_listener *listener,
                 break;
         case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
                 handle_message(main_data, event);
-                break;
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
-                handle_player_shouted(main_data, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
                 handle_n_tiles(main_data, event);
