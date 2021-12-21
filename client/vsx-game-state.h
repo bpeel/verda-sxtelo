@@ -72,6 +72,12 @@ void
 vsx_game_state_update(struct vsx_game_state *game_state);
 
 void
+vsx_game_state_shout(struct vsx_game_state *game_state);
+
+void
+vsx_game_state_turn(struct vsx_game_state *game_state);
+
+void
 vsx_game_state_free(struct vsx_game_state *game_state);
 
 #endif /* VSX_GAME_STATE_H */

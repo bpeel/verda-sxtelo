@@ -308,6 +308,22 @@ event_cb(struct vsx_listener *listener,
         }
 }
 
+void
+vsx_game_state_shout(struct vsx_game_state *game_state)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_shout(game_state->connection);
+        vsx_worker_unlock(game_state->worker);
+}
+
+void
+vsx_game_state_turn(struct vsx_game_state *game_state)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_turn(game_state->connection);
+        vsx_worker_unlock(game_state->worker);
+}
+
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection)
