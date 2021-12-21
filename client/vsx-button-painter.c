@@ -194,6 +194,69 @@ calculate_area_size(struct vsx_button_painter *painter,
         }
 }
 
+static bool
+handle_click(struct vsx_button_painter *painter,
+             const struct vsx_input_event *event)
+{
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        vsx_paint_state_ensure_layout(paint_state);
+
+        int x, y;
+
+        if (paint_state->board_rotated) {
+                /* This takes into account the inverted y-origin of
+                 * the board scissor
+                 */
+                x = (event->click.y -
+                     (paint_state->height -
+                      paint_state->board_scissor_y));
+                y = paint_state->width - 1 - event->click.x;
+        } else {
+                x = (event->click.x -
+                     paint_state->board_scissor_x -
+                     paint_state->board_scissor_width);
+                y = event->click.y;
+        }
+
+        if (x < 0 || y < 0)
+                return false;
+
+        int area_width, area_height;
+
+        calculate_area_size(painter, &area_width, &area_height);
+
+        if (x >= area_width || y >= area_height)
+                return false;
+
+        if (y >= area_height / 2)
+                vsx_game_state_shout(painter->game_state);
+        else
+                vsx_game_state_turn(painter->game_state);
+
+        return false;
+}
+
+static bool
+input_event_cb(void *painter_data,
+               const struct vsx_input_event *event)
+{
+        struct vsx_button_painter *painter = painter_data;
+
+        switch (event->type) {
+        case VSX_INPUT_EVENT_TYPE_DRAG_START:
+        case VSX_INPUT_EVENT_TYPE_DRAG:
+        case VSX_INPUT_EVENT_TYPE_ZOOM_START:
+        case VSX_INPUT_EVENT_TYPE_ZOOM:
+                return false;
+
+        case VSX_INPUT_EVENT_TYPE_CLICK:
+                return handle_click(painter, event);
+        }
+
+        return false;
+}
+
 static void
 calculate_transform(struct vsx_button_painter *painter)
 {
@@ -385,6 +448,7 @@ const struct vsx_painter
 vsx_button_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
+        .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };
