@@ -18,8 +18,9 @@ connection_src = [
 ]
 
 sdl_dep = dependency('sdl2')
+m_dep = cc.find_library('m', required : false)
 
-client_deps = [ thread_dep, sdl_dep ]
+client_deps = [ thread_dep, sdl_dep, m_dep ]
 
 client_headers = [
         'vsx-connection.h',

@@ -23,6 +23,17 @@ struct vsx_paint_state {
         /* Size of the framebuffer */
         int width, height;
 
+        /* Position of the board in pixels within the framebuffer.
+         * This doesn’t take into account the rotation so they are
+         * directly the values that could be used for a scissor.
+         * y=0 is the bottom of the framebuffer.
+         */
+        int board_scissor_x, board_scissor_y;
+        int board_scissor_width, board_scissor_height;
+
+        /* true if the board is rotated 90° clockwise */
+        bool board_rotated;
+
         /* Transformation matrix for the board */
         float board_matrix[4];
         /* Board translation */

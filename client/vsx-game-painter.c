@@ -191,16 +191,15 @@ static void
 calculate_transform(struct vsx_paint_state *paint_state)
 {
         int large_axis, small_axis;
-        bool rotate;
 
         if (paint_state->width > paint_state->height) {
                 large_axis = paint_state->width;
                 small_axis = paint_state->height;
-                rotate = false;
+                paint_state->board_rotated = false;
         } else {
                 large_axis = paint_state->height;
                 small_axis = paint_state->width;
-                rotate = true;
+                paint_state->board_rotated = true;
         }
 
         /* We want to know if the (possibly rotated) framebuffer
@@ -217,10 +216,28 @@ calculate_transform(struct vsx_paint_state *paint_state)
                        small_axis / (float) VSX_BOARD_HEIGHT :
                        large_axis / (float) VSX_BOARD_WIDTH);
 
-        if (rotate)
+        if (paint_state->board_rotated)
                 fit_board_rotated(paint_state, scale);
         else
                 fit_board_normal(paint_state, scale);
+
+
+        float x1 = ((paint_state->board_translation[0] + 1.0f) *
+                    paint_state->width / 2.0f);
+        float y1 = ((paint_state->board_translation[1] + 1.0f) *
+                    paint_state->height / 2.0f);
+        float x2 = ((VSX_BOARD_WIDTH * paint_state->board_matrix[0] +
+                     VSX_BOARD_HEIGHT * paint_state->board_matrix[2] +
+                     paint_state->board_translation[0] + 1.0f) *
+                    paint_state->width / 2.0f);
+        float y2 = ((VSX_BOARD_WIDTH * paint_state->board_matrix[1] +
+                     VSX_BOARD_HEIGHT * paint_state->board_matrix[3] +
+                     paint_state->board_translation[1] + 1.0f) *
+                    paint_state->height / 2.0f);
+        paint_state->board_scissor_x = roundf(x1);
+        paint_state->board_scissor_y = roundf(y2);
+        paint_state->board_scissor_width = roundf(x2 - x1);
+        paint_state->board_scissor_height = roundf(y1 - y2);
 }
 
 void
