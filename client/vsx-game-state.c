@@ -57,6 +57,7 @@ struct vsx_game_state {
         /* Slab allocator for the tiles */
         struct vsx_slab_allocator tile_allocator;
 
+        struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
 
@@ -234,6 +235,7 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
 void
 vsx_game_state_update(struct vsx_game_state *game_state)
 {
+        vsx_worker_lock(game_state->worker);
         pthread_mutex_lock(&game_state->mutex);
 
         update_player_names_locked(game_state);
@@ -241,6 +243,7 @@ vsx_game_state_update(struct vsx_game_state *game_state)
         update_tiles_locked(game_state);
 
         pthread_mutex_unlock(&game_state->mutex);
+        vsx_worker_unlock(game_state->worker);
 }
 
 static void
@@ -306,7 +309,8 @@ event_cb(struct vsx_listener *listener,
 }
 
 struct vsx_game_state *
-vsx_game_state_new(struct vsx_connection *connection)
+vsx_game_state_new(struct vsx_worker *worker,
+                   struct vsx_connection *connection)
 {
         struct vsx_game_state *game_state = vsx_calloc(sizeof *game_state);
 
@@ -317,11 +321,16 @@ vsx_game_state_new(struct vsx_connection *connection)
         vsx_slab_init(&game_state->tile_allocator);
         vsx_list_init(&game_state->tile_list);
 
+        game_state->worker = worker;
         game_state->connection = connection;
+
+        vsx_worker_lock(game_state->worker);
 
         game_state->event_listener.notify = event_cb;
         vsx_signal_add(vsx_connection_get_event_signal(connection),
                        &game_state->event_listener);
+
+        vsx_worker_unlock(game_state->worker);
 
         return game_state;
 }

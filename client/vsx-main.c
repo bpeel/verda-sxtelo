@@ -421,9 +421,7 @@ handle_log_locked(struct vsx_main_data *main_data)
 static void
 paint(struct vsx_main_data *main_data)
 {
-        vsx_worker_lock(main_data->worker);
         vsx_game_state_update(main_data->game_state);
-        vsx_worker_unlock(main_data->worker);
 
         vsx_game_painter_paint(main_data->game_painter,
                                main_data->game_state);
@@ -743,9 +741,10 @@ main(int argc, char **argv)
                 goto out;
         }
 
-        vsx_worker_lock(main_data->worker);
+        main_data->game_state = vsx_game_state_new(main_data->worker,
+                                                   main_data->connection);
 
-        main_data->game_state = vsx_game_state_new(main_data->connection);
+        vsx_worker_lock(main_data->worker);
 
         struct vsx_signal *event_signal =
                 vsx_connection_get_event_signal(main_data->connection);

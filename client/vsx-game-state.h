@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include "vsx-connection.h"
+#include "vsx-worker.h"
 
 /* This maintains a copy of the game state reported by the
  * vsx_connection so that it can be painted. The state is only
@@ -41,7 +42,8 @@ enum vsx_game_state_player_flag {
 };
 
 struct vsx_game_state *
-vsx_game_state_new(struct vsx_connection *connection);
+vsx_game_state_new(struct vsx_worker *worker,
+                   struct vsx_connection *connection);
 
 size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
