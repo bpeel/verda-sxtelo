@@ -50,8 +50,6 @@ struct vsx_game_painter {
         struct vsx_painter_toolbox toolbox;
         bool shader_data_inited;
 
-        struct vsx_paint_state paint_state;
-
         bool viewport_dirty;
 
         struct painter_data painters[N_PAINTERS];
@@ -139,7 +137,7 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
-        vsx_paint_state_set_fb_size(&painter->paint_state, 1, 1);
+        vsx_paint_state_set_fb_size(&painter->toolbox.paint_state, 1, 1);
         painter->viewport_dirty = true;
 
         vsx_signal_init(&painter->redraw_needed_signal);
@@ -161,7 +159,8 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
                              int width,
                              int height)
 {
-        vsx_paint_state_set_fb_size(&painter->paint_state, width, height);
+        vsx_paint_state_set_fb_size(&painter->toolbox.paint_state,
+                                    width, height);
         painter->viewport_dirty = true;
 }
 
@@ -171,8 +170,8 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
 {
         if (painter->viewport_dirty) {
                 vsx_gl.glViewport(0, 0,
-                                  painter->paint_state.width,
-                                  painter->paint_state.height);
+                                  painter->toolbox.paint_state.width,
+                                  painter->toolbox.paint_state.height);
 
                 painter->viewport_dirty = false;
         }
@@ -184,8 +183,7 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
                         continue;
 
                 painters[i]->paint_cb(painter->painters[i].data,
-                                      game_state,
-                                      &painter->paint_state);
+                                      game_state);
         }
 }
 

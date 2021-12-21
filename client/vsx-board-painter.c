@@ -44,6 +44,8 @@ struct box_draw_command {
 };
 
 struct vsx_board_painter {
+        struct vsx_painter_toolbox *toolbox;
+
         GLuint program;
         GLint matrix_uniform;
         GLint translation_uniform;
@@ -559,6 +561,8 @@ create_cb(struct vsx_painter_toolbox *toolbox)
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
+        painter->toolbox = toolbox;
+
         init_program(painter, &toolbox->shader_data);
 
         create_buffer(painter);
@@ -610,13 +614,14 @@ paint_box_cb(const char *name,
 
 static void
 paint_cb(void *painter_data,
-         struct vsx_game_state *game_state,
-         struct vsx_paint_state *paint_state)
+         struct vsx_game_state *game_state)
 {
         struct vsx_board_painter *painter = painter_data;
 
         if (painter->tex == 0)
                 return;
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         vsx_paint_state_ensure_layout(paint_state);
 

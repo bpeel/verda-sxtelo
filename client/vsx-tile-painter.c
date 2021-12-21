@@ -32,6 +32,8 @@
 #include "vsx-board.h"
 
 struct vsx_tile_painter {
+        struct vsx_painter_toolbox *toolbox;
+
         GLuint program;
         GLint matrix_uniform;
         GLint translation_uniform;
@@ -116,6 +118,8 @@ static void *
 create_cb(struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
+
+        painter->toolbox = toolbox;
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
@@ -257,13 +261,14 @@ tile_cb(int x, int y,
 
 static void
 paint_cb(void *painter_data,
-         struct vsx_game_state *game_state,
-         struct vsx_paint_state *paint_state)
+         struct vsx_game_state *game_state)
 {
         struct vsx_tile_painter *painter = painter_data;
 
         if (painter->tex == 0)
                 return;
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         vsx_paint_state_ensure_layout(paint_state);
 
