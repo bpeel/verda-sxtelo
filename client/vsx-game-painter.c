@@ -136,11 +136,13 @@ destroy_toolbox(struct vsx_game_painter *painter)
 struct vsx_game_painter *
 vsx_game_painter_new(struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
+                     int dpi,
                      struct vsx_error **error)
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
         vsx_paint_state_set_fb_size(&painter->toolbox.paint_state, 1, 1);
+        painter->toolbox.paint_state.dpi = dpi;
         painter->viewport_dirty = true;
 
         vsx_signal_init(&painter->redraw_needed_signal);

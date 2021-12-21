@@ -55,6 +55,13 @@
 #define DEFAULT_WIDTH (2220 * 2 / 5)
 #define DEFAULT_HEIGHT (1080 * 2 / 5)
 
+/* Although it is possible to ask SDL for a DPI, it doesn’t seem to
+ * actually correspond to the DPI of the screen, so we might as well
+ * just pick a value that would look similar to how it looks on the
+ * phone. 480 is the approximate DPI used on a Google Pixel 3a.
+ */
+#define DPI (480 * 2 / 5)
+
 struct vsx_main_data {
         SDL_Window *window;
         SDL_GLContext gl_context;
@@ -696,6 +703,7 @@ init_painter(struct vsx_main_data *main_data)
         struct vsx_game_painter *game_painter =
                 vsx_game_painter_new(main_data->game_state,
                                      main_data->asset_manager,
+                                     DPI,
                                      &error);
 
         if (game_painter == NULL) {

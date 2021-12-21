@@ -25,6 +25,9 @@ struct vsx_paint_state {
         /* Size of the framebuffer */
         int width, height;
 
+        /* DPI of the screen */
+        int dpi;
+
         bool layout_dirty;
 
         /* The rest of the data is lazily generated on demand */

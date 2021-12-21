@@ -34,6 +34,7 @@ struct vsx_game_painter;
 struct vsx_game_painter *
 vsx_game_painter_new(struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
+                     int dpi,
                      struct vsx_error **error);
 
 void
