@@ -165,8 +165,7 @@ fit_board_normal(struct vsx_paint_state *paint_state,
         paint_state->board_matrix[2] = 0.0f;
         paint_state->board_matrix[3] =
                 -scale * 2.0f / paint_state->height;
-        paint_state->board_translation[0] =
-                -VSX_BOARD_WIDTH / 2.0f * paint_state->board_matrix[0];
+        paint_state->board_translation[0] = -1.0f;
         paint_state->board_translation[1] =
                 -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[3];
 }
@@ -183,8 +182,7 @@ fit_board_rotated(struct vsx_paint_state *paint_state,
         paint_state->board_matrix[3] = 0.0f;
         paint_state->board_translation[0] =
                 -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[2];
-        paint_state->board_translation[1] =
-                -VSX_BOARD_WIDTH / 2.0f * paint_state->board_matrix[1];
+        paint_state->board_translation[1] = 1.0f;
 }
 
 static void
