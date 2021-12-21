@@ -24,6 +24,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-mipmap.h"
@@ -48,10 +49,12 @@ struct vsx_button_painter {
 
 struct vertex {
         int16_t x, y;
-        uint8_t s, t;
+        int32_t s, t;
 };
 
-#define N_QUADS 4
+#define N_BUTTONS 2
+#define N_GAPS (N_BUTTONS + 1)
+#define N_QUADS (N_BUTTONS + N_GAPS)
 #define N_VERTICES (N_QUADS * 4)
 
 static void
@@ -115,7 +118,7 @@ create_buffer(struct vsx_button_painter *painter)
         vsx_array_object_set_attribute(painter->vao,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_UNSIGNED_BYTE,
+                                       GL_FIXED,
                                        true, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
@@ -212,30 +215,30 @@ static void
 store_quad(struct vertex *vertices,
            int x, int y,
            int w, int h,
-           int s, int t,
-           int tw, int th)
+           int s1, int t1,
+           int s2, int t2)
 {
         struct vertex *v = vertices;
 
         v->x = x;
         v->y = y;
-        v->s = s;
-        v->t = t;
+        v->s = s1;
+        v->t = t1;
         v++;
         v->x = x;
         v->y = y + h;
-        v->s = s;
-        v->t = t + th;
+        v->s = s1;
+        v->t = t2;
         v++;
         v->x = x + w;
         v->y = y;
-        v->s = s + tw;
-        v->t = t;
+        v->s = s2;
+        v->t = t1;
         v++;
         v->x = x + w;
         v->y = y + h;
-        v->s = s + tw;
-        v->t = t + th;
+        v->s = s2;
+        v->t = t2;
 }
 
 static void
@@ -243,26 +246,52 @@ generate_vertices(struct vsx_button_painter *painter,
                   struct vertex *vertices,
                   int area_width, int area_height)
 {
-        store_quad(vertices + 0,
-                   0, 0,
-                   10, 10,
-                   0, 0,
-                   128, 128);
-        store_quad(vertices + 4,
-                   area_width - 10, 0,
-                   10, 10,
-                   128, 0,
-                   127, 128);
-        store_quad(vertices + 8,
-                   0, area_height - 10,
-                   10, 10,
-                   0, 128,
-                   128, 127);
-        store_quad(vertices + 12,
-                   area_width - 10, area_height - 10,
-                   10, 10,
-                   128, 128,
-                   127, 127);
+        struct vertex *v = vertices;
+        int button_size = MIN(area_width, area_height / N_BUTTONS);
+        int y = 0;
+
+        if (button_size <= 0) {
+                /* This shouldn’t happen */
+                memset(vertices, 0, N_VERTICES * sizeof *vertices);
+                return;
+        }
+
+        for (int i = 0; i < N_BUTTONS; i++) {
+                int button_start = (i * area_height / N_BUTTONS +
+                                    area_height / N_BUTTONS / 2 -
+                                    button_size / 2);
+
+                /* Gap above each button */
+                store_quad(v,
+                           0, y,
+                           area_width, button_start - y,
+                           0, 0, 0, 0);
+                y = button_start;
+                v += 4;
+
+                int tex_coord_side_extra =
+                        (area_width - button_size) * 65536 / button_size / 2;
+
+                /* Button image */
+                store_quad(v,
+                           0, y,
+                           area_width, button_size,
+                           -tex_coord_side_extra,
+                           i * 65536 / N_BUTTONS,
+                           65536 + tex_coord_side_extra,
+                           (i + 1) * 65536 / N_BUTTONS);
+                y += button_size;
+                v += 4;
+        }
+
+        /* Gap under all the buttons */
+        store_quad(v,
+                   0, y,
+                   area_width, area_height - y,
+                   0, 0, 0, 0);
+        v += 4;
+
+        assert(v - vertices == N_VERTICES);
 }
 
 static void
