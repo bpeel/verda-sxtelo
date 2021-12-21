@@ -149,6 +149,9 @@ VSX_GL_FUNC(void,
 VSX_GL_FUNC(void,
             glViewport, (GLint x, GLint y,
                          GLsizei width, GLsizei height))
+VSX_GL_FUNC(void,
+            glScissor, (GLint x, GLint y,
+                        GLsizei width, GLsizei height))
 VSX_GL_FUNC(GLboolean,
             glIsBuffer, (GLuint buffer))
 VSX_GL_FUNC(GLboolean,

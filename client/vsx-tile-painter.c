@@ -310,11 +310,19 @@ paint_cb(void *painter_data,
 
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
 
+        vsx_gl.glEnable(GL_SCISSOR_TEST);
+        vsx_gl.glScissor(paint_state->board_scissor_x,
+                         paint_state->board_scissor_y,
+                         paint_state->board_scissor_width,
+                         paint_state->board_scissor_height);
+
         vsx_gl_draw_range_elements(GL_TRIANGLES,
                                    0, closure.tile_num * 4 - 1,
                                    closure.tile_num * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
+
+        vsx_gl.glDisable(GL_SCISSOR_TEST);
 }
 
 static struct vsx_signal *
