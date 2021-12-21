@@ -49,7 +49,7 @@ struct vsx_button_painter {
 
 struct vertex {
         int16_t x, y;
-        int32_t s, t;
+        float s, t;
 };
 
 #define N_BUTTONS 2
@@ -118,7 +118,7 @@ create_buffer(struct vsx_button_painter *painter)
         vsx_array_object_set_attribute(painter->vao,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_FIXED,
+                                       GL_FLOAT,
                                        true, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
@@ -215,8 +215,8 @@ static void
 store_quad(struct vertex *vertices,
            int x, int y,
            int w, int h,
-           int s1, int t1,
-           int s2, int t2)
+           float s1, float t1,
+           float s2, float t2)
 {
         struct vertex *v = vertices;
 
@@ -265,21 +265,21 @@ generate_vertices(struct vsx_button_painter *painter,
                 store_quad(v,
                            0, y,
                            area_width, button_start - y,
-                           0, 0, 0, 0);
+                           0.0f, 0.0f, 0.0f, 0.0f);
                 y = button_start;
                 v += 4;
 
-                int tex_coord_side_extra =
-                        (area_width - button_size) * 65536 / button_size / 2;
+                float tex_coord_side_extra =
+                        (area_width - button_size) / 2.0f / button_size;
 
                 /* Button image */
                 store_quad(v,
                            0, y,
                            area_width, button_size,
                            -tex_coord_side_extra,
-                           i * 65536 / N_BUTTONS,
-                           65536 + tex_coord_side_extra,
-                           (i + 1) * 65536 / N_BUTTONS);
+                           i / (float) N_BUTTONS,
+                           1.0f + tex_coord_side_extra,
+                           (i + 1.0f) / N_BUTTONS);
                 y += button_size;
                 v += 4;
         }
@@ -288,7 +288,7 @@ generate_vertices(struct vsx_button_painter *painter,
         store_quad(v,
                    0, y,
                    area_width, area_height - y,
-                   0, 0, 0, 0);
+                   0.0f, 0.0f, 0.0f, 0.0f);
         v += 4;
 
         assert(v - vertices == N_VERTICES);
