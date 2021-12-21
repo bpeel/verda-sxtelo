@@ -618,8 +618,6 @@ paint_cb(void *painter_data,
         if (painter->tex == 0)
                 return;
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-
         vsx_gl.glUseProgram(painter->program);
         vsx_array_object_bind(painter->vao);
 
