@@ -39,7 +39,7 @@ struct vsx_painter {
         void
         (* paint_cb)(void *painter,
                      struct vsx_game_state *game_state,
-                     const struct vsx_paint_state *paint_state);
+                     struct vsx_paint_state *paint_state);
 
         struct vsx_signal *
         (* get_redraw_needed_signal_cb)(void *painter);

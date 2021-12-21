@@ -611,12 +611,14 @@ paint_box_cb(const char *name,
 static void
 paint_cb(void *painter_data,
          struct vsx_game_state *game_state,
-         const struct vsx_paint_state *paint_state)
+         struct vsx_paint_state *paint_state)
 {
         struct vsx_board_painter *painter = painter_data;
 
         if (painter->tex == 0)
                 return;
+
+        vsx_paint_state_ensure_layout(paint_state);
 
         vsx_gl.glUseProgram(painter->program);
         vsx_array_object_bind(painter->vao);

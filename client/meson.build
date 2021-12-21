@@ -43,6 +43,7 @@ client_src = [
         'vsx-map-buffer.c',
         'vsx-mipmap.c',
         'vsx-monotonic.c',
+        'vsx-paint-state.c',
         'vsx-quad-buffer.c',
         'vsx-shader-data.c',
         'vsx-thread-linux.c',

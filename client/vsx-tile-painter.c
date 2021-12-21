@@ -258,12 +258,14 @@ tile_cb(int x, int y,
 static void
 paint_cb(void *painter_data,
          struct vsx_game_state *game_state,
-         const struct vsx_paint_state *paint_state)
+         struct vsx_paint_state *paint_state)
 {
         struct vsx_tile_painter *painter = painter_data;
 
         if (painter->tex == 0)
                 return;
+
+        vsx_paint_state_ensure_layout(paint_state);
 
         int n_tiles = vsx_game_state_get_n_tiles(game_state);
 

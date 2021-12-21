@@ -139,8 +139,7 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
-        painter->paint_state.width = 1;
-        painter->paint_state.height = 1;
+        vsx_paint_state_set_fb_size(&painter->paint_state, 1, 1);
         painter->viewport_dirty = true;
 
         vsx_signal_init(&painter->redraw_needed_signal);
@@ -157,96 +156,12 @@ error:
         return NULL;
 }
 
-static void
-fit_board_normal(struct vsx_paint_state *paint_state,
-                 float scale)
-{
-        paint_state->board_matrix[0] =
-                scale * 2.0f / paint_state->width;
-        paint_state->board_matrix[1] = 0.0f;
-        paint_state->board_matrix[2] = 0.0f;
-        paint_state->board_matrix[3] =
-                -scale * 2.0f / paint_state->height;
-        paint_state->board_translation[0] = -1.0f;
-        paint_state->board_translation[1] =
-                -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[3];
-}
-
-static void
-fit_board_rotated(struct vsx_paint_state *paint_state,
-                 float scale)
-{
-        paint_state->board_matrix[0] = 0.0f;
-        paint_state->board_matrix[1] =
-                -scale * 2.0f / paint_state->height;
-        paint_state->board_matrix[2] =
-                -scale * 2.0f / paint_state->width;
-        paint_state->board_matrix[3] = 0.0f;
-        paint_state->board_translation[0] =
-                -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[2];
-        paint_state->board_translation[1] = 1.0f;
-}
-
-static void
-calculate_transform(struct vsx_paint_state *paint_state)
-{
-        int large_axis, small_axis;
-
-        if (paint_state->width > paint_state->height) {
-                large_axis = paint_state->width;
-                small_axis = paint_state->height;
-                paint_state->board_rotated = false;
-        } else {
-                large_axis = paint_state->height;
-                small_axis = paint_state->width;
-                paint_state->board_rotated = true;
-        }
-
-        /* We want to know if the (possibly rotated) framebuffer
-         * width/height ratio is greater than the board width/height
-         * ratio. Otherwise we will fit the board so that the width
-         * fills the screen instead of the height.
-         *
-         * (a/b > c/d) == (a*d/b*d > c*b/b*d) == (a*d > c*b)
-         */
-        bool fit_small = (large_axis * VSX_BOARD_HEIGHT >
-                          VSX_BOARD_WIDTH * small_axis);
-
-        float scale = (fit_small ?
-                       small_axis / (float) VSX_BOARD_HEIGHT :
-                       large_axis / (float) VSX_BOARD_WIDTH);
-
-        if (paint_state->board_rotated)
-                fit_board_rotated(paint_state, scale);
-        else
-                fit_board_normal(paint_state, scale);
-
-
-        float x1 = ((paint_state->board_translation[0] + 1.0f) *
-                    paint_state->width / 2.0f);
-        float y1 = ((paint_state->board_translation[1] + 1.0f) *
-                    paint_state->height / 2.0f);
-        float x2 = ((VSX_BOARD_WIDTH * paint_state->board_matrix[0] +
-                     VSX_BOARD_HEIGHT * paint_state->board_matrix[2] +
-                     paint_state->board_translation[0] + 1.0f) *
-                    paint_state->width / 2.0f);
-        float y2 = ((VSX_BOARD_WIDTH * paint_state->board_matrix[1] +
-                     VSX_BOARD_HEIGHT * paint_state->board_matrix[3] +
-                     paint_state->board_translation[1] + 1.0f) *
-                    paint_state->height / 2.0f);
-        paint_state->board_scissor_x = roundf(fminf(x1, x2));
-        paint_state->board_scissor_y = roundf(fminf(y1, y2));
-        paint_state->board_scissor_width = roundf(fabsf(x2 - x1));
-        paint_state->board_scissor_height = roundf(fabsf(y2 - y1));
-}
-
 void
 vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
                              int width,
                              int height)
 {
-        painter->paint_state.width = MAX(1, width);
-        painter->paint_state.height = MAX(1, height);
+        vsx_paint_state_set_fb_size(&painter->paint_state, width, height);
         painter->viewport_dirty = true;
 }
 
@@ -258,7 +173,6 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
                 vsx_gl.glViewport(0, 0,
                                   painter->paint_state.width,
                                   painter->paint_state.height);
-                calculate_transform(&painter->paint_state);
 
                 painter->viewport_dirty = false;
         }

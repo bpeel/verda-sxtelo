@@ -19,9 +19,15 @@
 #ifndef VSX_PAINT_STATE_H
 #define VSX_PAINT_STATE_H
 
+#include <stdbool.h>
+
 struct vsx_paint_state {
         /* Size of the framebuffer */
         int width, height;
+
+        bool layout_dirty;
+
+        /* The rest of the data is lazily generated on demand */
 
         /* Position of the board in pixels within the framebuffer.
          * This doesn’t take into account the rotation so they are
@@ -39,5 +45,12 @@ struct vsx_paint_state {
         /* Board translation */
         float board_translation[2];
 };
+
+void
+vsx_paint_state_set_fb_size(struct vsx_paint_state *paint_state,
+                            int width, int height);
+
+void
+vsx_paint_state_ensure_layout(struct vsx_paint_state *paint_state);
 
 #endif /* VSX_PAINT_STATE_H */

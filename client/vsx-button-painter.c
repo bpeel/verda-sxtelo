@@ -297,12 +297,14 @@ generate_vertices(struct vsx_button_painter *painter,
 static void
 paint_cb(void *painter_data,
          struct vsx_game_state *game_state,
-         const struct vsx_paint_state *paint_state)
+         struct vsx_paint_state *paint_state)
 {
         struct vsx_button_painter *painter = painter_data;
 
         if (painter->tex == 0)
                 return;
+
+        vsx_paint_state_ensure_layout(paint_state);
 
         int area_width, area_height;
 
