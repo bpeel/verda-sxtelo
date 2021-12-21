@@ -176,11 +176,29 @@ create_cb(struct vsx_game_state *game_state,
 }
 
 static void
-calculate_transform(struct vsx_button_painter *painter,
-                    const struct vsx_paint_state *paint_state,
+calculate_area_size(struct vsx_button_painter *painter,
                     int *area_width,
                     int *area_height)
 {
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        if (paint_state->board_rotated) {
+                *area_width = (paint_state->height -
+                               paint_state->board_scissor_height);
+                *area_height = paint_state->width;
+        } else {
+                *area_width = (paint_state->width -
+                               paint_state->board_scissor_width);
+                *area_height = paint_state->height;
+        }
+}
+
+static void
+calculate_transform(struct vsx_button_painter *painter)
+{
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
         float matrix[4], translation[2];
 
         if (paint_state->board_rotated) {
@@ -192,9 +210,6 @@ calculate_transform(struct vsx_button_painter *painter,
                 translation[1] = ((paint_state->board_scissor_height -
                                    paint_state->height / 2.0f) *
                                   matrix[1]);
-                *area_width = (paint_state->height -
-                               paint_state->board_scissor_height);
-                *area_height = paint_state->width;
         } else {
                 matrix[0] = 2.0f / paint_state->width;
                 matrix[1] = 0.0f;
@@ -204,9 +219,6 @@ calculate_transform(struct vsx_button_painter *painter,
                                    paint_state->width / 2.0f) *
                                   matrix[0]);
                 translation[1] = 1.0f;
-                *area_width = (paint_state->width -
-                               paint_state->board_scissor_width);
-                *area_height = paint_state->height;
         }
 
         vsx_gl.glUniformMatrix2fv(painter->matrix_uniform,
@@ -309,16 +321,13 @@ paint_cb(void *painter_data)
         if (painter->tex == 0)
                 return;
 
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        vsx_paint_state_ensure_layout(&painter->toolbox->paint_state);
 
-        vsx_paint_state_ensure_layout(paint_state);
+        calculate_transform(painter);
 
         int area_width, area_height;
 
-        calculate_transform(painter,
-                            paint_state,
-                            &area_width,
-                            &area_height);
+        calculate_area_size(painter, &area_width, &area_height);
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
