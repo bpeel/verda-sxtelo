@@ -179,7 +179,7 @@ fit_board_rotated(struct vsx_paint_state *paint_state,
         paint_state->board_matrix[1] =
                 -scale * 2.0f / paint_state->height;
         paint_state->board_matrix[2] =
-                scale * 2.0f / paint_state->width;
+                -scale * 2.0f / paint_state->width;
         paint_state->board_matrix[3] = 0.0f;
         paint_state->board_translation[0] =
                 -VSX_BOARD_HEIGHT / 2.0f * paint_state->board_matrix[2];
@@ -234,10 +234,10 @@ calculate_transform(struct vsx_paint_state *paint_state)
                      VSX_BOARD_HEIGHT * paint_state->board_matrix[3] +
                      paint_state->board_translation[1] + 1.0f) *
                     paint_state->height / 2.0f);
-        paint_state->board_scissor_x = roundf(x1);
-        paint_state->board_scissor_y = roundf(y2);
-        paint_state->board_scissor_width = roundf(x2 - x1);
-        paint_state->board_scissor_height = roundf(y1 - y2);
+        paint_state->board_scissor_x = roundf(fminf(x1, x2));
+        paint_state->board_scissor_y = roundf(fminf(y1, y2));
+        paint_state->board_scissor_width = roundf(fabsf(x2 - x1));
+        paint_state->board_scissor_height = roundf(fabsf(y2 - y1));
 }
 
 void
