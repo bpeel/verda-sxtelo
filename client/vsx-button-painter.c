@@ -33,6 +33,7 @@
 #include "vsx-quad-buffer.h"
 
 struct vsx_button_painter {
+        struct vsx_game_state *game_state;
         struct vsx_painter_toolbox *toolbox;
 
         GLuint program;
@@ -152,10 +153,12 @@ init_program(struct vsx_button_painter *painter,
 }
 
 static void *
-create_cb(struct vsx_painter_toolbox *toolbox)
+create_cb(struct vsx_game_state *game_state,
+          struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_button_painter *painter = vsx_calloc(sizeof *painter);
 
+        painter->game_state = game_state;
         painter->toolbox = toolbox;
 
         vsx_signal_init(&painter->redraw_needed_signal);
@@ -299,8 +302,7 @@ generate_vertices(struct vsx_button_painter *painter,
 }
 
 static void
-paint_cb(void *painter_data,
-         struct vsx_game_state *game_state)
+paint_cb(void *painter_data)
 {
         struct vsx_button_painter *painter = painter_data;
 

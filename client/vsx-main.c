@@ -423,8 +423,7 @@ paint(struct vsx_main_data *main_data)
 {
         vsx_game_state_update(main_data->game_state);
 
-        vsx_game_painter_paint(main_data->game_painter,
-                               main_data->game_state);
+        vsx_game_painter_paint(main_data->game_painter);
 
         SDL_GL_SwapWindow(main_data->window);
 }
@@ -695,7 +694,8 @@ init_painter(struct vsx_main_data *main_data)
         struct vsx_error *error = NULL;
 
         struct vsx_game_painter *game_painter =
-                vsx_game_painter_new(main_data->asset_manager,
+                vsx_game_painter_new(main_data->game_state,
+                                     main_data->asset_manager,
                                      &error);
 
         if (game_painter == NULL) {
@@ -736,13 +736,13 @@ main(int argc, char **argv)
                 goto out;
         }
 
+        main_data->game_state = vsx_game_state_new(main_data->worker,
+                                                   main_data->connection);
+
         if (!init_painter(main_data)) {
                 ret = EXIT_FAILURE;
                 goto out;
         }
-
-        main_data->game_state = vsx_game_state_new(main_data->worker,
-                                                   main_data->connection);
 
         vsx_worker_lock(main_data->worker);
 

@@ -35,11 +35,11 @@ struct vsx_painter_toolbox {
 
 struct vsx_painter {
         void *
-        (* create_cb)(struct vsx_painter_toolbox *toolbox);
+        (* create_cb)(struct vsx_game_state *game_state,
+                      struct vsx_painter_toolbox *toolbox);
 
         void
-        (* paint_cb)(void *painter,
-                     struct vsx_game_state *game_state);
+        (* paint_cb)(void *painter);
 
         struct vsx_signal *
         (* get_redraw_needed_signal_cb)(void *painter);

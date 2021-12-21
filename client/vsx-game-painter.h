@@ -32,7 +32,8 @@
 struct vsx_game_painter;
 
 struct vsx_game_painter *
-vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
+vsx_game_painter_new(struct vsx_game_state *game_state,
+                     struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error);
 
 void
@@ -41,8 +42,7 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
                              int height);
 
 void
-vsx_game_painter_paint(struct vsx_game_painter *painter,
-                       struct vsx_game_state *game_state);
+vsx_game_painter_paint(struct vsx_game_painter *painter);
 
 struct vsx_signal *
 vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter);

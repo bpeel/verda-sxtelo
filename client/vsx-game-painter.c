@@ -82,13 +82,15 @@ init_redraw_needed_listener(struct vsx_game_painter *painter,
 }
 
 static void
-init_painters(struct vsx_game_painter *painter)
+init_painters(struct vsx_game_painter *painter,
+              struct vsx_game_state *game_state)
 {
         for (unsigned i = 0; i < N_PAINTERS; i++) {
                 struct painter_data *painter_data = painter->painters + i;
                 const struct vsx_painter *callbacks = painters[i];
 
-                painter_data->data = callbacks->create_cb(&painter->toolbox);
+                painter_data->data = callbacks->create_cb(game_state,
+                                                          &painter->toolbox);
 
                 painter_data->game_painter = painter;
 
@@ -132,7 +134,8 @@ destroy_toolbox(struct vsx_game_painter *painter)
 }
 
 struct vsx_game_painter *
-vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
+vsx_game_painter_new(struct vsx_game_state *game_state,
+                     struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error)
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
@@ -145,7 +148,7 @@ vsx_game_painter_new(struct vsx_asset_manager *asset_manager,
         if (!init_toolbox(painter, asset_manager, error))
                 goto error;
 
-        init_painters(painter);
+        init_painters(painter, game_state);
 
         return painter;
 
@@ -165,8 +168,7 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
 }
 
 void
-vsx_game_painter_paint(struct vsx_game_painter *painter,
-                       struct vsx_game_state *game_state)
+vsx_game_painter_paint(struct vsx_game_painter *painter)
 {
         if (painter->viewport_dirty) {
                 vsx_gl.glViewport(0, 0,
@@ -182,8 +184,7 @@ vsx_game_painter_paint(struct vsx_game_painter *painter,
                 if (painters[i]->paint_cb == NULL)
                         continue;
 
-                painters[i]->paint_cb(painter->painters[i].data,
-                                      game_state);
+                painters[i]->paint_cb(painter->painters[i].data);
         }
 }
 

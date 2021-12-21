@@ -32,6 +32,7 @@
 #include "vsx-board.h"
 
 struct vsx_tile_painter {
+        struct vsx_game_state *game_state;
         struct vsx_painter_toolbox *toolbox;
 
         GLuint program;
@@ -115,10 +116,12 @@ init_program(struct vsx_tile_painter *painter,
 }
 
 static void *
-create_cb(struct vsx_painter_toolbox *toolbox)
+create_cb(struct vsx_game_state *game_state,
+          struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
 
+        painter->game_state = game_state;
         painter->toolbox = toolbox;
 
         vsx_signal_init(&painter->redraw_needed_signal);
@@ -260,8 +263,7 @@ tile_cb(int x, int y,
 }
 
 static void
-paint_cb(void *painter_data,
-         struct vsx_game_state *game_state)
+paint_cb(void *painter_data)
 {
         struct vsx_tile_painter *painter = painter_data;
 
@@ -272,7 +274,7 @@ paint_cb(void *painter_data,
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        int n_tiles = vsx_game_state_get_n_tiles(game_state);
+        int n_tiles = vsx_game_state_get_n_tiles(painter->game_state);
 
         if (n_tiles <= 0)
                 return;
@@ -291,7 +293,7 @@ paint_cb(void *painter_data,
                                               true, /* flush_explicit */
                                               GL_DYNAMIC_DRAW);
 
-        vsx_game_state_foreach_tile(game_state, tile_cb, &closure);
+        vsx_game_state_foreach_tile(painter->game_state, tile_cb, &closure);
 
         vsx_map_buffer_flush(0, closure.tile_num * 4 * sizeof (struct vertex));
 

@@ -44,6 +44,7 @@ struct box_draw_command {
 };
 
 struct vsx_board_painter {
+        struct vsx_game_state *game_state;
         struct vsx_painter_toolbox *toolbox;
 
         GLuint program;
@@ -555,12 +556,14 @@ init_program(struct vsx_board_painter *painter,
 }
 
 static void *
-create_cb(struct vsx_painter_toolbox *toolbox)
+create_cb(struct vsx_game_state *game_state,
+          struct vsx_painter_toolbox *toolbox)
 {
         struct vsx_board_painter *painter = vsx_calloc(sizeof *painter);
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
+        painter->game_state = game_state;
         painter->toolbox = toolbox;
 
         init_program(painter, &toolbox->shader_data);
@@ -613,8 +616,7 @@ paint_box_cb(const char *name,
 }
 
 static void
-paint_cb(void *painter_data,
-         struct vsx_game_state *game_state)
+paint_cb(void *painter_data)
 {
         struct vsx_board_painter *painter = painter_data;
 
@@ -649,7 +651,9 @@ paint_cb(void *painter_data,
                 .painter = painter,
         };
 
-        vsx_game_state_foreach_player(game_state, paint_box_cb, &closure);
+        vsx_game_state_foreach_player(painter->game_state,
+                                      paint_box_cb,
+                                      &closure);
 
         assert(closure.player_num == VSX_GAME_STATE_N_VISIBLE_PLAYERS);
 }
