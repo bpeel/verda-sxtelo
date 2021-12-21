@@ -40,6 +40,13 @@ painters[] = {
 
 #define N_PAINTERS VSX_N_ELEMENTS(painters)
 
+struct finger {
+        /* Screen position of the finger when it was pressed */
+        int start_x, start_y;
+        /* The last position we received */
+        int last_x, last_y;
+};
+
 struct painter_data {
         void *data;
         struct vsx_listener listener;
@@ -55,7 +62,18 @@ struct vsx_game_painter {
         struct painter_data painters[N_PAINTERS];
 
         struct vsx_signal redraw_needed_signal;
+
+        struct finger fingers[2];
+        /* Bitmask of pressed fingers */
+        int fingers_pressed;
+
+        bool maybe_click;
 };
+
+/* Max distance in mm above which a mouse movement is no longer
+ * considered a click.
+ */
+#define MAX_CLICK_DISTANCE 3
 
 static void
 redraw_needed_cb(struct vsx_listener *listener,
@@ -167,6 +185,202 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
         vsx_paint_state_set_fb_size(&painter->toolbox.paint_state,
                                     width, height);
         painter->viewport_dirty = true;
+}
+
+static bool
+send_input_event(struct vsx_game_painter *painter,
+                 const struct vsx_input_event *event)
+{
+        /* Try the painters in reverse order so that the topmost
+         * painter will see the event first.
+         */
+        for (int i = N_PAINTERS - 1; i >= 0; i--) {
+                const struct vsx_painter *callbacks = painters[i];
+
+                if (callbacks->input_event_cb == NULL)
+                        continue;
+
+                if (callbacks->input_event_cb(painter->painters[i].data,
+                                              event))
+                        return true;
+        }
+
+        return false;
+}
+
+static void
+handle_click(struct vsx_game_painter *painter,
+             int x,
+             int y)
+{
+        struct vsx_input_event event = {
+                .type = VSX_INPUT_EVENT_TYPE_CLICK,
+                .click = {
+                        .x = x,
+                        .y = y,
+                },
+        };
+
+        send_input_event(painter, &event);
+}
+
+static void
+set_finger_start(struct vsx_game_painter *painter,
+                 int finger_num)
+{
+        struct finger *finger = painter->fingers + finger_num;
+
+        finger->start_x = finger->last_x;
+        finger->start_y = finger->last_y;
+}
+
+static void
+store_drag_start(struct vsx_game_painter *painter)
+{
+        set_finger_start(painter, 0);
+        set_finger_start(painter, 1);
+
+        struct vsx_input_event event;
+
+        switch (painter->fingers_pressed) {
+        case 1:
+                event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
+                event.drag.x = painter->fingers[0].last_x;
+                event.drag.y = painter->fingers[0].last_y;
+                break;
+        case 2:
+                event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
+                event.drag.x = painter->fingers[1].last_x;
+                event.drag.y = painter->fingers[1].last_y;
+                break;
+        case 3:
+                event.type = VSX_INPUT_EVENT_TYPE_ZOOM_START;
+                event.zoom.x0 = painter->fingers[0].last_x;
+                event.zoom.y0 = painter->fingers[0].last_y;
+                event.zoom.x1 = painter->fingers[1].last_x;
+                event.zoom.y1 = painter->fingers[1].last_y;
+                break;
+        default:
+                return;
+        }
+
+        send_input_event(painter, &event);
+}
+
+void
+vsx_game_painter_press_finger(struct vsx_game_painter *painter,
+                              int finger,
+                              int x,
+                              int y)
+{
+        if (finger < 0 || finger > 1)
+                return;
+
+        painter->maybe_click = (painter->fingers_pressed == 0 &&
+                                finger == 0);
+
+        painter->fingers[finger].last_x = x;
+        painter->fingers[finger].last_y = y;
+        painter->fingers_pressed |= (1 << finger);
+
+        store_drag_start(painter);
+}
+
+void
+vsx_game_painter_release_finger(struct vsx_game_painter *painter,
+                                int finger)
+{
+        if (finger < 0 || finger > 1)
+                return;
+
+        painter->fingers_pressed &= ~(1 << finger);
+
+        store_drag_start(painter);
+
+        if (painter->fingers_pressed == 0 && painter->maybe_click) {
+                handle_click(painter,
+                             painter->fingers[0].last_x,
+                             painter->fingers[0].last_y);
+        }
+
+        painter->maybe_click = false;
+}
+
+static void
+handle_drag(struct vsx_game_painter *painter,
+            const struct finger *finger)
+{
+        struct vsx_input_event event = {
+                .type = VSX_INPUT_EVENT_TYPE_DRAG,
+                .drag = {
+                        .x = finger->last_x,
+                        .y = finger->last_y,
+                },
+        };
+
+        send_input_event(painter, &event);
+}
+
+static void
+handle_zoom(struct vsx_game_painter *painter)
+{
+        struct vsx_input_event event = {
+                .type = VSX_INPUT_EVENT_TYPE_ZOOM,
+                .zoom = {
+                        .x0 = painter->fingers[0].last_x,
+                        .y0 = painter->fingers[0].last_y,
+                        .x1 = painter->fingers[1].last_x,
+                        .y1 = painter->fingers[1].last_y,
+                },
+        };
+
+        send_input_event(painter, &event);
+}
+
+void
+vsx_game_painter_move_finger(struct vsx_game_painter *painter,
+                             int finger,
+                             int x,
+                             int y)
+{
+        if (finger < 0 || finger > 1)
+                return;
+
+        painter->fingers[finger].last_x = x;
+        painter->fingers[finger].last_y = y;
+
+        if (painter->maybe_click && finger == 0) {
+                int dx_pixels = (painter->fingers[0].last_x -
+                                 painter->fingers[0].start_x);
+                int dy_pixels = (painter->fingers[0].last_y -
+                                 painter->fingers[0].start_y);
+                float dpi = painter->toolbox.paint_state.dpi;
+                float dx_mm = dx_pixels * 25.4f / dpi;
+                float dy_mm = dy_pixels * 25.4f / dpi;
+
+                if (dx_mm * dx_mm + dy_mm * dy_mm >=
+                    MAX_CLICK_DISTANCE * MAX_CLICK_DISTANCE)
+                        painter->maybe_click = false;
+        }
+
+        switch (painter->fingers_pressed) {
+        case 1:
+                handle_drag(painter, painter->fingers + 0);
+                break;
+        case 2:
+                handle_drag(painter, painter->fingers + 1);
+                break;
+        case 3:
+                handle_zoom(painter);
+                break;
+        }
+}
+
+void
+vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter)
+{
+        painter->fingers_pressed = 0;
+        painter->maybe_click = false;
 }
 
 void

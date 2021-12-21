@@ -73,6 +73,10 @@ struct vsx_main_data {
         struct vsx_game_state *game_state;
         struct vsx_asset_manager *asset_manager;
 
+        bool button_pressed;
+        int mouse_x, mouse_y;
+        Uint32 button_pressed_device;
+
         struct vsx_game_painter *game_painter;
         struct vsx_listener redraw_needed_listener;
 
@@ -174,6 +178,83 @@ update_fb_size(struct vsx_main_data *main_data,
 }
 
 static void
+handle_mouse_wheel(struct vsx_main_data *main_data,
+                   const SDL_MouseWheelEvent *event)
+{
+        if (event->y == 0 || main_data->button_pressed)
+                return;
+
+        vsx_game_painter_press_finger(main_data->game_painter,
+                                      0, /* finger */
+                                      main_data->mouse_x - 100,
+                                      main_data->mouse_y);
+        vsx_game_painter_press_finger(main_data->game_painter,
+                                      1, /* finger */
+                                      main_data->mouse_x + 100,
+                                      main_data->mouse_y);
+
+        int move_amount = 100 + event->y * 6;
+
+        vsx_game_painter_move_finger(main_data->game_painter,
+                                     0,
+                                     main_data->mouse_x - move_amount,
+                                     main_data->mouse_y);
+        vsx_game_painter_move_finger(main_data->game_painter,
+                                     1,
+                                     main_data->mouse_x + move_amount,
+                                     main_data->mouse_y);
+
+        vsx_game_painter_release_finger(main_data->game_painter, 0);
+        vsx_game_painter_release_finger(main_data->game_painter, 1);
+}
+
+static void
+handle_mouse_button(struct vsx_main_data *main_data,
+                    const SDL_MouseButtonEvent *event)
+{
+        if (event->button != 1)
+                return;
+
+        if (event->state == SDL_PRESSED) {
+                if (main_data->button_pressed)
+                        return;
+
+                main_data->button_pressed = true;
+                main_data->button_pressed_device = event->which;
+
+                vsx_game_painter_press_finger(main_data->game_painter,
+                                              0, /* finger */
+                                              event->x,
+                                              event->y);
+        } else {
+                if (!main_data->button_pressed ||
+                    main_data->button_pressed_device != event->which)
+                        return;
+
+                main_data->button_pressed = false;
+                vsx_game_painter_release_finger(main_data->game_painter,
+                                                0 /* finger */);
+        }
+}
+
+static void
+handle_mouse_motion(struct vsx_main_data *main_data,
+                    const SDL_MouseMotionEvent *event)
+{
+        main_data->mouse_x = event->x;
+        main_data->mouse_y = event->y;
+
+        if (!main_data->button_pressed ||
+            event->which != main_data->button_pressed_device)
+                return;
+
+        vsx_game_painter_move_finger(main_data->game_painter,
+                                     0, /* finger */
+                                     event->x,
+                                     event->y);
+}
+
+static void
 handle_event_locked(struct vsx_main_data *main_data,
                     const SDL_Event *event)
 {
@@ -201,6 +282,19 @@ handle_event_locked(struct vsx_main_data *main_data,
                         main_data->redraw_queued = true;
                         break;
                 }
+                goto handled;
+
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+                handle_mouse_button(main_data, &event->button);
+                goto handled;
+
+        case SDL_MOUSEWHEEL:
+                handle_mouse_wheel(main_data, &event->wheel);
+                goto handled;
+
+        case SDL_MOUSEMOTION:
+                handle_mouse_motion(main_data, &event->motion);
                 goto handled;
 
         case SDL_QUIT:

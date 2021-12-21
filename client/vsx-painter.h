@@ -26,6 +26,7 @@
 #include "vsx-game-state.h"
 #include "vsx-paint-state.h"
 #include "vsx-signal.h"
+#include "vsx-input-event.h"
 
 struct vsx_painter_toolbox {
         struct vsx_shader_data shader_data;
@@ -40,6 +41,10 @@ struct vsx_painter {
 
         void
         (* paint_cb)(void *painter);
+
+        bool
+        (* input_event_cb)(void *painter,
+                           const struct vsx_input_event *event);
 
         struct vsx_signal *
         (* get_redraw_needed_signal_cb)(void *painter);

@@ -45,6 +45,25 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
 void
 vsx_game_painter_paint(struct vsx_game_painter *painter);
 
+void
+vsx_game_painter_press_finger(struct vsx_game_painter *painter,
+                              int finger,
+                              int x,
+                              int y);
+
+void
+vsx_game_painter_release_finger(struct vsx_game_painter *painter,
+                                int finger);
+
+void
+vsx_game_painter_move_finger(struct vsx_game_painter *painter,
+                             int finger,
+                             int x,
+                             int y);
+
+void
+vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter);
+
 struct vsx_signal *
 vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter);
 
