@@ -60,6 +60,13 @@ struct vsx_game_state {
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
 
+        /* A counter that is incremented every time an update is
+         * peformed and every time a command is queued. This can be
+         * used to detect if a tile was updated after a command was
+         * sent.
+         */
+        uint32_t time_counter;
+
         pthread_mutex_t mutex;
 
         /* The following data is protected by the mutex and can be
@@ -188,6 +195,8 @@ update_tiles_locked(struct vsx_game_state *game_state)
                         state_tile->public.x = vsx_tile_get_x(tile);
                         state_tile->public.y = vsx_tile_get_y(tile);
                         state_tile->public.letter = vsx_tile_get_letter(tile);
+                        state_tile->public.update_time =
+                                game_state->time_counter;
 
                         /* Move the tile to the end of the list so
                          * that the list will always been in reverse
@@ -236,6 +245,8 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
 void
 vsx_game_state_update(struct vsx_game_state *game_state)
 {
+        game_state->time_counter++;
+
         vsx_worker_lock(game_state->worker);
         pthread_mutex_lock(&game_state->mutex);
 
@@ -312,6 +323,8 @@ event_cb(struct vsx_listener *listener,
 void
 vsx_game_state_shout(struct vsx_game_state *game_state)
 {
+        game_state->time_counter++;
+
         vsx_worker_lock(game_state->worker);
         vsx_connection_shout(game_state->connection);
         vsx_worker_unlock(game_state->worker);
@@ -320,6 +333,8 @@ vsx_game_state_shout(struct vsx_game_state *game_state)
 void
 vsx_game_state_turn(struct vsx_game_state *game_state)
 {
+        game_state->time_counter++;
+
         vsx_worker_lock(game_state->worker);
         vsx_connection_turn(game_state->connection);
         vsx_worker_unlock(game_state->worker);
@@ -350,6 +365,12 @@ vsx_game_state_new(struct vsx_worker *worker,
         vsx_worker_unlock(game_state->worker);
 
         return game_state;
+}
+
+uint32_t
+vsx_game_state_get_time_counter(struct vsx_game_state *game_state)
+{
+        return game_state->time_counter;
 }
 
 void

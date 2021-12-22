@@ -44,11 +44,18 @@ enum vsx_game_state_player_flag {
 struct vsx_game_state_tile {
         int16_t x, y;
         uint32_t letter;
+        /* The value from vsx_game_state_get_time_counter for when this
+         * tile was last modified.
+         */
+        uint32_t update_time;
 };
 
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
+
+uint32_t
+vsx_game_state_get_time_counter(struct vsx_game_state *game_state);
 
 size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
