@@ -28,7 +28,6 @@ cdata.set('VSX_SOURCE_ROOT', '"' + meson.source_root() + '"')
 # Paths
 vs_bindir = join_paths(get_option('prefix'), get_option('bindir'))
 
-openssl_dep = dependency('openssl')
 thread_dep = dependency('threads')
 
 if get_option('server')

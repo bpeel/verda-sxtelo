@@ -1,3 +1,5 @@
+openssl_dep = dependency('openssl')
+
 server_deps = [ openssl_dep, thread_dep ]
 
 inc_dirs = [ configinc, '../common' ]
