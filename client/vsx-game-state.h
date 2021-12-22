@@ -48,6 +48,8 @@ struct vsx_game_state_tile {
          * tile was last modified.
          */
         uint32_t update_time;
+        /* The if the last player that moved the tile is this client */
+        bool last_moved_by_self;
 };
 
 struct vsx_game_state *

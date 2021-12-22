@@ -178,6 +178,10 @@ update_tiles_locked(struct vsx_game_state *game_state)
         vsx_bitmask_element_t *elements =
                 (vsx_bitmask_element_t *) game_state->dirty_tiles.data;
 
+        const struct vsx_player *self =
+                vsx_connection_get_self(game_state->connection);
+        int self_num = self ? vsx_player_get_number(self) : -1;
+
         for (unsigned i = 0; i < n_elements; i++) {
                 int bit;
 
@@ -197,6 +201,9 @@ update_tiles_locked(struct vsx_game_state *game_state)
                         state_tile->public.letter = vsx_tile_get_letter(tile);
                         state_tile->public.update_time =
                                 game_state->time_counter;
+                        state_tile->public.last_moved_by_self =
+                                vsx_tile_get_last_player_moved(tile) ==
+                                self_num;
 
                         /* Move the tile to the end of the list so
                          * that the list will always been in reverse
