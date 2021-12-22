@@ -35,7 +35,7 @@ if get_option('server')
   subdir('server')
 endif
 
-if get_option('client')
+if get_option('client') or get_option('jni')
   subdir('client')
 endif
 

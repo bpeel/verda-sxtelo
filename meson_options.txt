@@ -1,3 +1,4 @@
 option('systemd', type : 'boolean', value : true)
 option('server', type : 'boolean', value : true)
 option('client', type : 'boolean', value : true)
+option('jni', type : 'boolean', value : false)

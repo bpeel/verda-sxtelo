@@ -1,5 +1,7 @@
 inc_dirs = [ configinc, '../common' ]
 
+m_dep = cc.find_library('m', required : false)
+
 connection_src = [
         '../common/vsx-bitmask.c',
         '../common/vsx-buffer.c',
@@ -17,20 +19,8 @@ connection_src = [
         '../common/vsx-util.c',
 ]
 
-sdl_dep = dependency('sdl2')
-m_dep = cc.find_library('m', required : false)
-
-client_deps = [ thread_dep, sdl_dep, m_dep ]
-
-client_headers = [
-        'vsx-connection.h',
-        'vsx-player.h',
-        'vsx-tile.h',
-]
-
-client_src = [
+client_common_src = [
         'vsx-array-object.c',
-        'vsx-asset-linux.c',
         'vsx-board-painter.c',
         'vsx-button-painter.c',
         'vsx-game-painter.c',
@@ -38,7 +28,6 @@ client_src = [
         'vsx-gl.c',
         'vsx-image.c',
         'vsx-image-loader.c',
-        'vsx-main.c',
         'vsx-main-thread.c',
         'vsx-map-buffer.c',
         'vsx-mipmap.c',
@@ -46,16 +35,60 @@ client_src = [
         'vsx-paint-state.c',
         'vsx-quad-buffer.c',
         'vsx-shader-data.c',
-        'vsx-thread-linux.c',
         'vsx-tile-painter.c',
         'vsx-tile-texture.c',
         'vsx-worker.c',
 ] + connection_src
 
-executable('verda-sxtelo-client', client_src,
-           dependencies: client_deps,
-           install: true,
-           include_directories: inc_dirs)
+if get_option('client')
+        sdl_dep = dependency('sdl2')
+
+        client_deps = [ thread_dep, sdl_dep, m_dep ]
+
+        client_src = [
+                'vsx-asset-linux.c',
+                'vsx-main.c',
+                'vsx-thread-linux.c',
+        ] + client_common_src
+
+        executable('verda-sxtelo-client', client_src,
+                   dependencies: client_deps,
+                   install: true,
+                   include_directories: inc_dirs)
+
+
+        test_image_loader_src = [
+                'vsx-image-loader.c',
+                'vsx-asset-linux.c',
+                'vsx-main-thread.c',
+                'vsx-thread-linux.c',
+                '../common/vsx-util.c',
+                'vsx-image.c',
+                '../common/vsx-error.c',
+                'test-image-loader.c',
+        ]
+        test_image_loader = executable('test-image-loader',
+                                       test_image_loader_src,
+                                       dependencies: [sdl_dep, thread_dep],
+                                       include_directories: inc_dirs)
+        test('image_loader', test_image_loader)
+endif
+
+if get_option('jni')
+        jni_src = [
+                'vsx-jni.c',
+                'vsx-asset-android.c',
+                'vsx-thread-jni.c',
+        ] + client_common_src
+
+        android_dep = cc.find_library('android', required : true)
+        log_dep = cc.find_library('log', required : true)
+
+        jni_lib = library('anagrams', jni_src,
+                          dependencies: [android_dep, log_dep, m_dep],
+                          include_directories: inc_dirs,
+                          install: true)
+endif
 
 test_client_connection_src = [
         'test-client-connection.c',
@@ -78,18 +111,3 @@ test_worker = executable('test-worker',
                          dependencies: [thread_dep],
                          include_directories: inc_dirs)
 test('worker', test_worker)
-
-test_image_loader_src = [
-        'vsx-image-loader.c',
-        'vsx-asset-linux.c',
-        'vsx-main-thread.c',
-        'vsx-thread-linux.c',
-        '../common/vsx-util.c',
-        'vsx-image.c',
-        '../common/vsx-error.c',
-        'test-image-loader.c',
-]
-test_image_loader = executable('test-image-loader', test_image_loader_src,
-                               dependencies: [sdl_dep, thread_dep],
-                               include_directories: inc_dirs)
-test('image_loader', test_image_loader)
