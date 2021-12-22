@@ -178,6 +178,34 @@ update_fb_size(struct vsx_main_data *main_data,
 }
 
 static void
+wake_up_locked(struct vsx_main_data *main_data)
+{
+        if (main_data->wakeup_queued)
+                return;
+
+        SDL_PushEvent(&main_data->wakeup_event);
+        main_data->wakeup_queued = true;
+}
+
+static void
+queue_redraw_unlocked(struct vsx_main_data *main_data)
+{
+        pthread_mutex_lock(&main_data->mutex);
+        main_data->redraw_queued = true;
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
+}
+
+static void
+queue_quit_unlocked(struct vsx_main_data *main_data)
+{
+        pthread_mutex_lock(&main_data->mutex);
+        main_data->should_quit = true;
+        wake_up_locked(main_data);
+        pthread_mutex_unlock(&main_data->mutex);
+}
+
+static void
 handle_mouse_wheel(struct vsx_main_data *main_data,
                    const SDL_MouseWheelEvent *event)
 {
@@ -255,8 +283,8 @@ handle_mouse_motion(struct vsx_main_data *main_data,
 }
 
 static void
-handle_event_locked(struct vsx_main_data *main_data,
-                    const SDL_Event *event)
+handle_event_unlocked(struct vsx_main_data *main_data,
+                      const SDL_Event *event)
 {
         int fb_width, fb_height;
 
@@ -264,7 +292,7 @@ handle_event_locked(struct vsx_main_data *main_data,
         case SDL_WINDOWEVENT:
                 switch (event->window.event) {
                 case SDL_WINDOWEVENT_CLOSE:
-                        main_data->should_quit = true;
+                        queue_quit_unlocked(main_data);
                         break;
                 case SDL_WINDOWEVENT_SHOWN:
                         SDL_GetWindowSize(main_data->window,
@@ -276,10 +304,10 @@ handle_event_locked(struct vsx_main_data *main_data,
                         update_fb_size(main_data,
                                        event->window.data1,
                                        event->window.data2);
-                        main_data->redraw_queued = true;
+                        queue_redraw_unlocked(main_data);
                         break;
                 case SDL_WINDOWEVENT_EXPOSED:
-                        main_data->redraw_queued = true;
+                        queue_redraw_unlocked(main_data);
                         break;
                 }
                 goto handled;
@@ -298,16 +326,16 @@ handle_event_locked(struct vsx_main_data *main_data,
                 goto handled;
 
         case SDL_QUIT:
-                main_data->should_quit = true;
+                queue_quit_unlocked(main_data);
                 goto handled;
         }
 
         if (event->type == main_data->wakeup_event.type) {
-                main_data->wakeup_queued = false;
-
-                pthread_mutex_unlock(&main_data->mutex);
-                vsx_main_thread_flush_idle_events();
                 pthread_mutex_lock(&main_data->mutex);
+                main_data->wakeup_queued = false;
+                pthread_mutex_unlock(&main_data->mutex);
+
+                vsx_main_thread_flush_idle_events();
 
                 goto handled;
         }
@@ -317,30 +345,11 @@ handled:
 }
 
 static void
-wake_up_locked(struct vsx_main_data *main_data)
-{
-        if (main_data->wakeup_queued)
-                return;
-
-        SDL_PushEvent(&main_data->wakeup_event);
-        main_data->wakeup_queued = true;
-}
-
-static void
 wakeup_cb(void *user_data)
 {
         struct vsx_main_data *main_data = user_data;
 
         pthread_mutex_lock(&main_data->mutex);
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
-}
-
-static void
-queue_redraw_unlocked(struct vsx_main_data *main_data)
-{
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->redraw_queued = true;
         wake_up_locked(main_data);
         pthread_mutex_unlock(&main_data->mutex);
 }
@@ -550,7 +559,9 @@ run_main_loop(struct vsx_main_data *main_data)
                 pthread_mutex_lock(&main_data->mutex);
 
                 if (had_event) {
-                        handle_event_locked(main_data, &event);
+                        pthread_mutex_unlock(&main_data->mutex);
+                        handle_event_unlocked(main_data, &event);
+                        pthread_mutex_lock(&main_data->mutex);
                 } else if (main_data->redraw_queued) {
                         main_data->redraw_queued = false;
 
