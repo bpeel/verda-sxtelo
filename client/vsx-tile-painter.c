@@ -224,37 +224,36 @@ struct tile_closure {
 };
 
 static void
-tile_cb(int x, int y,
-        uint32_t letter,
+tile_cb(const struct vsx_game_state_tile *tile,
         void *user_data)
 {
         struct tile_closure *closure = user_data;
 
         const struct vsx_tile_texture_letter *letter_data =
-                find_letter(letter);
+                find_letter(tile->letter);
 
         if (letter_data == NULL)
                 return;
 
         struct vertex *v = closure->vertices + closure->tile_num * 4;
 
-        v->x = x;
-        v->y = y;
+        v->x = tile->x;
+        v->y = tile->y;
         v->s = letter_data->s1;
         v->t = letter_data->t1;
         v++;
-        v->x = x;
-        v->y = y + TILE_SIZE;
+        v->x = tile->x;
+        v->y = tile->y + TILE_SIZE;
         v->s = letter_data->s1;
         v->t = letter_data->t2;
         v++;
-        v->x = x + TILE_SIZE;
-        v->y = y;
+        v->x = tile->x + TILE_SIZE;
+        v->y = tile->y;
         v->s = letter_data->s2;
         v->t = letter_data->t1;
         v++;
-        v->x = x + TILE_SIZE;
-        v->y = y + TILE_SIZE;
+        v->x = tile->x + TILE_SIZE;
+        v->y = tile->y + TILE_SIZE;
         v->s = letter_data->s2;
         v->t = letter_data->t2;
         v++;

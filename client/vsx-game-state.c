@@ -37,10 +37,9 @@ struct vsx_game_state_player {
         enum vsx_game_state_player_flag flags;
 };
 
-struct vsx_game_state_tile {
+struct vsx_game_state_tile_private {
+        struct vsx_game_state_tile public;
         struct vsx_list link;
-        int16_t x, y;
-        uint32_t letter;
 };
 
 struct vsx_game_state {
@@ -129,7 +128,8 @@ static void
 ensure_n_tiles(struct vsx_game_state *game_state,
                int n_tiles)
 {
-        size_t new_length = sizeof (struct vsx_game_state_tile *) * n_tiles;
+        size_t new_length =
+                sizeof (struct vsx_game_state_tile_private *) * n_tiles;
         size_t old_length = game_state->tiles_by_index.length;
 
         if (new_length > old_length) {
@@ -140,16 +140,17 @@ ensure_n_tiles(struct vsx_game_state *game_state,
         }
 }
 
-static struct vsx_game_state_tile *
+static struct vsx_game_state_tile_private *
 get_tile_by_index(struct vsx_game_state *game_state,
                   int tile_num)
 {
         ensure_n_tiles(game_state, tile_num + 1);
 
-        struct vsx_game_state_tile **tile_pointers =
-                (struct vsx_game_state_tile **) game_state->tiles_by_index.data;
+        struct vsx_game_state_tile_private **tile_pointers =
+                (struct vsx_game_state_tile_private **)
+                game_state->tiles_by_index.data;
 
-        struct vsx_game_state_tile *tile = tile_pointers[tile_num];
+        struct vsx_game_state_tile_private *tile = tile_pointers[tile_num];
 
         if (tile == NULL) {
                 tile = vsx_slab_allocate(&game_state->tile_allocator,
@@ -181,12 +182,12 @@ update_tiles_locked(struct vsx_game_state *game_state)
                                 vsx_connection_get_tile(game_state->connection,
                                                         tile_num);
 
-                        struct vsx_game_state_tile *state_tile =
+                        struct vsx_game_state_tile_private *state_tile =
                                 get_tile_by_index(game_state, tile_num);
 
-                        state_tile->x = vsx_tile_get_x(tile);
-                        state_tile->y = vsx_tile_get_y(tile);
-                        state_tile->letter = vsx_tile_get_letter(tile);
+                        state_tile->public.x = vsx_tile_get_x(tile);
+                        state_tile->public.y = vsx_tile_get_y(tile);
+                        state_tile->public.letter = vsx_tile_get_letter(tile);
 
                         /* Move the tile to the end of the list so
                          * that the list will always been in reverse
@@ -205,7 +206,7 @@ size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
 {
         return (game_state->tiles_by_index.length /
-                sizeof (struct vsx_game_state_tile *));
+                sizeof (struct vsx_game_state_tile_private *));
 }
 
 void
@@ -213,10 +214,10 @@ vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
                             vsx_game_state_foreach_tile_cb cb,
                             void *user_data)
 {
-        struct vsx_game_state_tile *tile;
+        struct vsx_game_state_tile_private *tile;
 
         vsx_list_for_each(tile, &game_state->tile_list, link) {
-                cb(tile->x, tile->y, tile->letter, user_data);
+                cb(&tile->public, user_data);
         }
 }
 

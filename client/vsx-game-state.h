@@ -41,6 +41,11 @@ enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_SHOUTING = (1 << 3),
 };
 
+struct vsx_game_state_tile {
+        int16_t x, y;
+        uint32_t letter;
+};
+
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
@@ -49,8 +54,7 @@ size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
 
 typedef void
-(* vsx_game_state_foreach_tile_cb)(int x, int y,
-                                   uint32_t letter,
+(* vsx_game_state_foreach_tile_cb)(const struct vsx_game_state_tile *tile,
                                    void *user_data);
 
 void
