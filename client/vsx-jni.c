@@ -225,6 +225,8 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 
                 vsx_signal_add(event_signal, &data->connection_listener);
 
+                vsx_connection_set_running(data->connection, true);
+
                 vsx_worker_unlock(data->worker);
         }
 
