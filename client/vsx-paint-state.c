@@ -26,6 +26,9 @@
 #include "vsx-board.h"
 #include "vsx-util.h"
 
+/* Minimum size in mm of the button area */
+#define BUTTON_AREA_MIN_WIDTH 15
+
 static void
 fit_board_normal(struct vsx_paint_state *paint_state,
                  float scale)
@@ -84,6 +87,17 @@ calculate_board_transform(struct vsx_paint_state *paint_state)
         float scale = (fit_small ?
                        small_axis / (float) VSX_BOARD_HEIGHT :
                        large_axis / (float) VSX_BOARD_WIDTH);
+
+        float min_button_area_size = (BUTTON_AREA_MIN_WIDTH *
+                                      paint_state->dpi /
+                                      25.4f);
+        if (min_button_area_size > paint_state->width / 2)
+                min_button_area_size = paint_state->width / 2;
+
+        float button_area_size = large_axis - VSX_BOARD_WIDTH * scale;
+
+        if (button_area_size < min_button_area_size)
+                scale = (large_axis - min_button_area_size) / VSX_BOARD_WIDTH;
 
         if (paint_state->board_rotated)
                 fit_board_rotated(paint_state, scale);
