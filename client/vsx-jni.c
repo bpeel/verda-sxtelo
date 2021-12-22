@@ -64,6 +64,8 @@ struct data {
         int fb_width, fb_height;
         int dpi;
 
+        struct vsx_listener connection_listener;
+
         struct vsx_game_painter *game_painter;
         struct vsx_listener redraw_needed_listener;
 };
@@ -141,6 +143,28 @@ wakeup_cb(void *user_data)
         call_void_surface_method(data, data->queue_flush_idle_method_id);
 }
 
+static void
+connection_event_cb(struct vsx_listener *listener,
+                    void *user_data)
+{
+        struct data *data = vsx_container_of(listener,
+                                             struct data,
+                                             connection_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                LOGE("Connection error: %s", event->error.error->message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
+                queue_redraw(data);
+                break;
+        default:
+                break;
+        }
+}
+
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -191,6 +215,17 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                                  5144);
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
+
+                vsx_worker_lock(data->worker);
+
+                struct vsx_signal *event_signal =
+                        vsx_connection_get_event_signal(data->connection);
+
+                data->connection_listener.notify = connection_event_cb;
+
+                vsx_signal_add(event_signal, &data->connection_listener);
+
+                vsx_worker_unlock(data->worker);
         }
 
         return (jlong) data;
