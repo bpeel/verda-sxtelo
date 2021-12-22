@@ -217,6 +217,10 @@ static bool
 handle_drag_start(struct vsx_tile_painter *painter,
                   const struct vsx_input_event *event)
 {
+        if (vsx_game_state_get_shout_state(painter->game_state) ==
+            VSX_GAME_STATE_SHOUT_STATE_OTHER)
+                return false;
+
         struct drag_start_tile_closure closure = {
                 .painter = painter,
         };
@@ -455,6 +459,15 @@ paint_cb(void *painter_data)
 
         if (n_tiles <= 0)
                 return;
+
+        /* Cancel any running drag if another player started shouting
+         * before the server heard about our attempt. That way the
+         * tile will snap back to where the server last reported it to
+         * be.
+         */
+        if (vsx_game_state_get_shout_state(painter->game_state) ==
+            VSX_GAME_STATE_SHOUT_STATE_OTHER)
+                painter->dragging_tile = -1;
 
         ensure_buffer_size(painter, n_tiles);
 
