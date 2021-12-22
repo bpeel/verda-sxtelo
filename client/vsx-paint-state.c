@@ -57,7 +57,7 @@ fit_board_rotated(struct vsx_paint_state *paint_state,
 }
 
 static void
-calculate_transform(struct vsx_paint_state *paint_state)
+calculate_board_transform(struct vsx_paint_state *paint_state)
 {
         int large_axis, small_axis;
 
@@ -109,6 +109,49 @@ calculate_transform(struct vsx_paint_state *paint_state)
         paint_state->board_scissor_height = roundf(fabsf(y2 - y1));
 }
 
+static void
+calculate_button_area_transform(struct vsx_paint_state *paint_state)
+{
+        float *matrix = paint_state->button_area_matrix;
+        float *translation = paint_state->button_area_translation;
+
+        if (paint_state->board_rotated) {
+                matrix[0] = 0.0f;
+                matrix[1] = -2.0f / paint_state->height;
+                matrix[2] = -2.0f / paint_state->width;
+                matrix[3] = 0.0f;
+                translation[0] = 1.0f;
+                translation[1] = ((paint_state->board_scissor_height -
+                                   paint_state->height / 2.0f) *
+                                  matrix[1]);
+        } else {
+                matrix[0] = 2.0f / paint_state->width;
+                matrix[1] = 0.0f;
+                matrix[2] = 0.0f;
+                matrix[3] = -2.0f / paint_state->height;
+                translation[0] = ((paint_state->board_scissor_width -
+                                   paint_state->width / 2.0f) *
+                                  matrix[0]);
+                translation[1] = 1.0f;
+        }
+}
+
+static void
+calculate_button_area_size(struct vsx_paint_state *paint_state)
+{
+        if (paint_state->board_rotated) {
+                paint_state->button_area_width =
+                        (paint_state->height -
+                         paint_state->board_scissor_height);
+                paint_state->button_area_height = paint_state->width;
+        } else {
+                paint_state->button_area_width =
+                        (paint_state->width -
+                         paint_state->board_scissor_width);
+                paint_state->button_area_height = paint_state->height;
+        }
+}
+
 void
 vsx_paint_state_set_fb_size(struct vsx_paint_state *paint_state,
                              int width,
@@ -127,5 +170,7 @@ vsx_paint_state_ensure_layout(struct vsx_paint_state *paint_state)
 
         paint_state->layout_dirty = false;
 
-        calculate_transform(paint_state);
+        calculate_board_transform(paint_state);
+        calculate_button_area_transform(paint_state);
+        calculate_button_area_size(paint_state);
 }

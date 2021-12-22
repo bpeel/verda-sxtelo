@@ -47,6 +47,16 @@ struct vsx_paint_state {
         float board_matrix[4];
         /* Board translation */
         float board_translation[2];
+
+        /* Transformation matrix for the button area */
+        float button_area_matrix[4];
+        /* Button area translation */
+        float button_area_translation[2];
+
+        /* Size in pixels of the button area, taking into account the
+         * rotation.
+         */
+        int button_area_width, button_area_height;
 };
 
 void
