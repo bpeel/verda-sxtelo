@@ -43,3 +43,9 @@ vsx_tile_get_letter(const struct vsx_tile *tile)
 {
         return tile->letter;
 }
+
+int
+vsx_tile_get_last_player_moved(const struct vsx_tile *tile)
+{
+        return tile->last_player_moved;
+}

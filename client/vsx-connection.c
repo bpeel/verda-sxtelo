@@ -528,6 +528,7 @@ handle_tile(struct vsx_connection *connection,
                 is_new = true;
         }
 
+        tile->last_player_moved = player;
         tile->x = x;
         tile->y = y;
         tile->letter = vsx_utf8_get_char(letter);

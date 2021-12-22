@@ -25,6 +25,7 @@
 
 struct vsx_tile {
         int num;
+        int last_player_moved;
         int16_t x, y;
         uint32_t letter;
 };
