@@ -42,6 +42,7 @@ enum vsx_game_state_player_flag {
 };
 
 struct vsx_game_state_tile {
+        int number;
         int16_t x, y;
         uint32_t letter;
         /* The value from vsx_game_state_get_time_counter for when this

@@ -196,6 +196,7 @@ update_tiles_locked(struct vsx_game_state *game_state)
                         struct vsx_game_state_tile_private *state_tile =
                                 get_tile_by_index(game_state, tile_num);
 
+                        state_tile->public.number = vsx_tile_get_number(tile);
                         state_tile->public.x = vsx_tile_get_x(tile);
                         state_tile->public.y = vsx_tile_get_y(tile);
                         state_tile->public.letter = vsx_tile_get_letter(tile);
