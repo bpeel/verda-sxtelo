@@ -340,6 +340,20 @@ vsx_game_state_turn(struct vsx_game_state *game_state)
         vsx_worker_unlock(game_state->worker);
 }
 
+void
+vsx_game_state_move_tile(struct vsx_game_state *game_state,
+                         int tile_num,
+                         int x, int y)
+{
+        game_state->time_counter++;
+
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_move_tile(game_state->connection,
+                                 tile_num,
+                                 x, y);
+        vsx_worker_unlock(game_state->worker);
+}
+
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection)

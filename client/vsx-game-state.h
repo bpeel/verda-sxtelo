@@ -89,6 +89,11 @@ void
 vsx_game_state_turn(struct vsx_game_state *game_state);
 
 void
+vsx_game_state_move_tile(struct vsx_game_state *game_state,
+                         int tile_num,
+                         int x, int y);
+
+void
 vsx_game_state_free(struct vsx_game_state *game_state);
 
 #endif /* VSX_GAME_STATE_H */
