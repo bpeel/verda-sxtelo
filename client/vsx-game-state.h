@@ -41,6 +41,15 @@ enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_SHOUTING = (1 << 3),
 };
 
+enum vsx_game_state_shout_state {
+        /* No-one is shouting */
+        VSX_GAME_STATE_SHOUT_STATE_NOONE,
+        /* The player themself is shouting */
+        VSX_GAME_STATE_SHOUT_STATE_SELF,
+        /* Someone else is shouting */
+        VSX_GAME_STATE_SHOUT_STATE_OTHER,
+};
+
 struct vsx_game_state_tile {
         int number;
         int16_t x, y;
@@ -81,6 +90,9 @@ void
 vsx_game_state_foreach_player(struct vsx_game_state *game_state,
                               vsx_game_state_foreach_player_cb,
                               void *user_data);
+
+enum vsx_game_state_shout_state
+vsx_game_state_get_shout_state(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_update(struct vsx_game_state *game_state);

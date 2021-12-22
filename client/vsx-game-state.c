@@ -49,6 +49,9 @@ struct vsx_game_state {
 
         struct vsx_game_state_player players[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
 
+        enum vsx_game_state_shout_state shout_state;
+        int shouting_player;
+
         /* Array of tile pointers indexed by tile number */
         struct vsx_buffer tiles_by_index;
         /* List of tiles in reverse order of last updated */
@@ -103,9 +106,29 @@ update_player_names_locked(struct vsx_game_state *game_state)
 }
 
 static void
+set_shout_state_for_player(struct vsx_game_state *game_state,
+                           const struct vsx_player *player)
+{
+        game_state->shout_state =
+                player == vsx_connection_get_self(game_state->connection) ?
+                VSX_GAME_STATE_SHOUT_STATE_SELF :
+                VSX_GAME_STATE_SHOUT_STATE_OTHER;
+}
+
+static void
 update_player_flags_locked(struct vsx_game_state *game_state)
 {
         int bit;
+
+        /* If the shouting player has been modified then remove the
+         * shout now so if a different player is shouting then it will
+         * be set to them instead. If the shouting player hasn’t
+         * actually changed then it will be reset anyway.
+         */
+        if (game_state->shout_state != VSX_GAME_STATE_SHOUT_STATE_NOONE &&
+            (game_state->dirty_player_flags &
+             (1 << game_state->shouting_player)))
+                game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
 
         while ((bit = ffs(game_state->dirty_player_flags))) {
                 int player_num = bit - 1;
@@ -122,8 +145,12 @@ update_player_flags_locked(struct vsx_game_state *game_state)
                         flags |= VSX_GAME_STATE_PLAYER_FLAG_TYPING;
                 if (vsx_player_has_next_turn(player))
                         flags |= VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN;
-                if (vsx_player_is_shouting(player))
+
+                if (vsx_player_is_shouting(player)) {
                         flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+
+                        set_shout_state_for_player(game_state, player);
+                }
 
                 game_state->players[player_num].flags = flags;
 
@@ -375,6 +402,8 @@ vsx_game_state_new(struct vsx_worker *worker,
         vsx_slab_init(&game_state->tile_allocator);
         vsx_list_init(&game_state->tile_list);
 
+        game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
+
         game_state->worker = worker;
         game_state->connection = connection;
 
@@ -393,6 +422,12 @@ uint32_t
 vsx_game_state_get_time_counter(struct vsx_game_state *game_state)
 {
         return game_state->time_counter;
+}
+
+enum vsx_game_state_shout_state
+vsx_game_state_get_shout_state(struct vsx_game_state *game_state)
+{
+        return game_state->shout_state;
 }
 
 void
