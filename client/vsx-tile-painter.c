@@ -220,7 +220,7 @@ find_letter(uint32_t letter)
 
 struct tile_closure {
         struct vertex *vertices;
-        int tile_num;
+        int quad_num;
 };
 
 static void
@@ -235,7 +235,7 @@ tile_cb(const struct vsx_game_state_tile *tile,
         if (letter_data == NULL)
                 return;
 
-        struct vertex *v = closure->vertices + closure->tile_num * 4;
+        struct vertex *v = closure->vertices + closure->quad_num * 4;
 
         v->x = tile->x;
         v->y = tile->y;
@@ -258,7 +258,7 @@ tile_cb(const struct vsx_game_state_tile *tile,
         v->t = letter_data->t2;
         v++;
 
-        closure->tile_num++;
+        closure->quad_num++;
 }
 
 static void
@@ -281,7 +281,7 @@ paint_cb(void *painter_data)
         ensure_buffer_size(painter, n_tiles);
 
         struct tile_closure closure = {
-                .tile_num = 0,
+                .quad_num = 0,
         };
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
@@ -294,7 +294,7 @@ paint_cb(void *painter_data)
 
         vsx_game_state_foreach_tile(painter->game_state, tile_cb, &closure);
 
-        vsx_map_buffer_flush(0, closure.tile_num * 4 * sizeof (struct vertex));
+        vsx_map_buffer_flush(0, closure.quad_num * 4 * sizeof (struct vertex));
 
         vsx_map_buffer_unmap();
 
@@ -302,7 +302,7 @@ paint_cb(void *painter_data)
          * tiles that the server sent had letters that we don’t
          * recognise.
          */
-        if (closure.tile_num <= 0)
+        if (closure.quad_num <= 0)
                 return;
 
         vsx_gl.glUseProgram(painter->program);
@@ -325,8 +325,8 @@ paint_cb(void *painter_data)
                          paint_state->board_scissor_height);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
-                                   0, closure.tile_num * 4 - 1,
-                                   closure.tile_num * 6,
+                                   0, closure.quad_num * 4 - 1,
+                                   closure.quad_num * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
