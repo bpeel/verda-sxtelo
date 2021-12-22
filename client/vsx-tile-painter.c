@@ -23,6 +23,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-quad-buffer.h"
@@ -45,6 +46,20 @@ struct vsx_tile_painter {
 
         GLuint tex;
         struct vsx_image_loader_token *image_token;
+
+        /* The tile that is currently being dragged or -1 if there is no tile */
+        int dragging_tile;
+        /* The game_state time counter value of when the dragging started */
+        uint32_t dragging_start_time;
+        /* The offset to add to the cursor board position to get the
+         * topleft of the tile.
+         */
+        int drag_offset_x, drag_offset_y;
+        /* The position that we last dragged the tile to so that we
+         * can paint at this position without having to wait for the
+         * server to tell us about it.
+         */
+        int drag_board_x, drag_board_y;
 
         struct vsx_signal redraw_needed_signal;
 
@@ -137,6 +152,144 @@ create_cb(struct vsx_game_state *game_state,
 }
 
 static void
+screen_coord_to_board(struct vsx_paint_state *paint_state,
+                      int screen_x, int screen_y,
+                      int *board_x, int *board_y)
+{
+        vsx_paint_state_ensure_layout(paint_state);
+
+        if (paint_state->board_scissor_width == 0 ||
+            paint_state->board_scissor_height == 0) {
+                *board_x = -1;
+                *board_y = -1;
+        } else if (paint_state->board_rotated) {
+                *board_x = ((screen_y -
+                             (paint_state->height -
+                              paint_state->board_scissor_y -
+                              paint_state->board_scissor_height)) *
+                            VSX_BOARD_WIDTH /
+                            paint_state->board_scissor_height);
+                *board_y = ((paint_state->board_scissor_width - 1 -
+                             (screen_x - paint_state->board_scissor_x)) *
+                            VSX_BOARD_HEIGHT /
+                            paint_state->board_scissor_width);
+        } else {
+                *board_x = ((screen_x - paint_state->board_scissor_x) *
+                            VSX_BOARD_WIDTH /
+                            paint_state->board_scissor_width);
+                *board_y = ((screen_y -
+                             (paint_state->height -
+                              paint_state->board_scissor_y -
+                              paint_state->board_scissor_height)) *
+                            VSX_BOARD_HEIGHT /
+                            paint_state->board_scissor_height);
+        }
+}
+
+struct drag_start_tile_closure {
+        struct vsx_tile_painter *painter;
+        int board_x, board_y;
+};
+
+static void
+drag_start_tile_cb(const struct vsx_game_state_tile *tile,
+                   void *user_data)
+{
+        struct drag_start_tile_closure *closure = user_data;
+        struct vsx_tile_painter *painter = closure->painter;
+
+        if (closure->board_x < tile->x ||
+            closure->board_x >= tile->x + TILE_SIZE ||
+            closure->board_y < tile->y ||
+            closure->board_y >= tile->y + TILE_SIZE)
+                return;
+
+        painter->dragging_tile = tile->number;
+        painter->drag_offset_x = tile->x - closure->board_x;
+        painter->drag_offset_y = tile->y - closure->board_y;
+        painter->dragging_start_time =
+                vsx_game_state_get_time_counter(painter->game_state);
+        painter->drag_board_x = tile->x;
+        painter->drag_board_y = tile->y;
+}
+
+static bool
+handle_drag_start(struct vsx_tile_painter *painter,
+                  const struct vsx_input_event *event)
+{
+        struct drag_start_tile_closure closure = {
+                .painter = painter,
+        };
+
+        screen_coord_to_board(&painter->toolbox->paint_state,
+                              event->drag.x, event->drag.y,
+                              &closure.board_x, &closure.board_y);
+
+        painter->dragging_tile = -1;
+
+        if (closure.board_x < 0 || closure.board_x >= VSX_BOARD_WIDTH ||
+            closure.board_y < 0 || closure.board_y >= VSX_BOARD_HEIGHT)
+                return false;
+
+        vsx_game_state_foreach_tile(painter->game_state,
+                                    drag_start_tile_cb,
+                                    &closure);
+
+        return painter->dragging_tile != -1;
+}
+
+static bool
+handle_drag(struct vsx_tile_painter *painter,
+            const struct vsx_input_event *event)
+{
+        if (painter->dragging_tile == -1)
+                return false;
+
+        int board_x, board_y;
+
+        screen_coord_to_board(&painter->toolbox->paint_state,
+                              event->drag.x, event->drag.y,
+                              &board_x, &board_y);
+
+        if (board_x < 0 || board_x >= VSX_BOARD_WIDTH ||
+            board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
+                return true;
+
+        painter->drag_board_x = board_x + painter->drag_offset_x;
+        painter->drag_board_y = board_y + painter->drag_offset_y;
+
+        vsx_game_state_move_tile(painter->game_state,
+                                 painter->dragging_tile,
+                                 painter->drag_board_x,
+                                 painter->drag_board_y);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+
+        return true;
+}
+
+static bool
+input_event_cb(void *painter_data,
+               const struct vsx_input_event *event)
+{
+        struct vsx_tile_painter *painter = painter_data;
+
+        switch (event->type) {
+        case VSX_INPUT_EVENT_TYPE_CLICK:
+        case VSX_INPUT_EVENT_TYPE_ZOOM_START:
+        case VSX_INPUT_EVENT_TYPE_ZOOM:
+                return false;
+
+        case VSX_INPUT_EVENT_TYPE_DRAG_START:
+                return handle_drag_start(painter, event);
+        case VSX_INPUT_EVENT_TYPE_DRAG:
+                return handle_drag(painter, event);
+        }
+
+        return false;
+}
+
+static void
 free_buffer(struct vsx_tile_painter *painter)
 {
         if (painter->vao) {
@@ -219,15 +372,49 @@ find_letter(uint32_t letter)
 }
 
 struct tile_closure {
+        struct vsx_tile_painter *painter;
         struct vertex *vertices;
         int quad_num;
+        const struct vsx_tile_texture_letter *dragged_letter_data;
 };
+
+static void
+store_tile_quad(struct tile_closure *closure,
+                int tile_x, int tile_y,
+                const struct vsx_tile_texture_letter *letter_data)
+{
+        struct vertex *v = closure->vertices + closure->quad_num * 4;
+
+        v->x = tile_x;
+        v->y = tile_y;
+        v->s = letter_data->s1;
+        v->t = letter_data->t1;
+        v++;
+        v->x = tile_x;
+        v->y = tile_y + TILE_SIZE;
+        v->s = letter_data->s1;
+        v->t = letter_data->t2;
+        v++;
+        v->x = tile_x + TILE_SIZE;
+        v->y = tile_y;
+        v->s = letter_data->s2;
+        v->t = letter_data->t1;
+        v++;
+        v->x = tile_x + TILE_SIZE;
+        v->y = tile_y + TILE_SIZE;
+        v->s = letter_data->s2;
+        v->t = letter_data->t2;
+        v++;
+
+        closure->quad_num++;
+}
 
 static void
 tile_cb(const struct vsx_game_state_tile *tile,
         void *user_data)
 {
         struct tile_closure *closure = user_data;
+        struct vsx_tile_painter *painter = closure->painter;
 
         const struct vsx_tile_texture_letter *letter_data =
                 find_letter(tile->letter);
@@ -235,30 +422,21 @@ tile_cb(const struct vsx_game_state_tile *tile,
         if (letter_data == NULL)
                 return;
 
-        struct vertex *v = closure->vertices + closure->quad_num * 4;
+        if (tile->number == painter->dragging_tile) {
+                if (!tile->last_moved_by_self &&
+                    tile->update_time > painter->dragging_start_time) {
+                        /* The tile has been moved by someone else
+                         * while we were trying to drag it. Cancel the
+                         * drag.
+                         */
+                        painter->dragging_tile = -1;
+                } else {
+                        closure->dragged_letter_data = letter_data;
+                        return;
+                }
+        }
 
-        v->x = tile->x;
-        v->y = tile->y;
-        v->s = letter_data->s1;
-        v->t = letter_data->t1;
-        v++;
-        v->x = tile->x;
-        v->y = tile->y + TILE_SIZE;
-        v->s = letter_data->s1;
-        v->t = letter_data->t2;
-        v++;
-        v->x = tile->x + TILE_SIZE;
-        v->y = tile->y;
-        v->s = letter_data->s2;
-        v->t = letter_data->t1;
-        v++;
-        v->x = tile->x + TILE_SIZE;
-        v->y = tile->y + TILE_SIZE;
-        v->s = letter_data->s2;
-        v->t = letter_data->t2;
-        v++;
-
-        closure->quad_num++;
+        store_tile_quad(closure, tile->x, tile->y, letter_data);
 }
 
 static void
@@ -281,7 +459,9 @@ paint_cb(void *painter_data)
         ensure_buffer_size(painter, n_tiles);
 
         struct tile_closure closure = {
+                .painter = painter,
                 .quad_num = 0,
+                .dragged_letter_data = NULL,
         };
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
@@ -293,6 +473,18 @@ paint_cb(void *painter_data)
                                               GL_DYNAMIC_DRAW);
 
         vsx_game_state_foreach_tile(painter->game_state, tile_cb, &closure);
+
+        /* Paint the dragged tile last so that it will always be above
+         * the others.
+         */
+        if (closure.dragged_letter_data) {
+                store_tile_quad(&closure,
+                                painter->drag_board_x,
+                                painter->drag_board_y,
+                                closure.dragged_letter_data);
+        }
+
+        assert(closure.quad_num <= n_tiles);
 
         vsx_map_buffer_flush(0, closure.quad_num * 4 * sizeof (struct vertex));
 
@@ -360,6 +552,7 @@ const struct vsx_painter
 vsx_tile_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
+        .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };
