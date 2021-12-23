@@ -299,9 +299,9 @@ VSX_JNI_RENDERER_PREFIX(redraw)(JNIEnv *env,
         if (data->game_painter == NULL)
                 return;
 
-        vsx_game_painter_paint(data->game_painter);
-
         data->redraw_queued = false;
+
+        vsx_game_painter_paint(data->game_painter);
 }
 
 JNIEXPORT void JNICALL
