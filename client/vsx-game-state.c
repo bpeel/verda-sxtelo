@@ -31,6 +31,7 @@
 #include "vsx-bitmask.h"
 #include "vsx-list.h"
 #include "vsx-slab.h"
+#include "vsx-main-thread.h"
 
 struct vsx_game_state_player {
         char *name;
@@ -70,6 +71,8 @@ struct vsx_game_state {
          */
         uint32_t time_counter;
 
+        struct vsx_signal modified_signal;
+
         pthread_mutex_t mutex;
 
         /* The following data is protected by the mutex and can be
@@ -80,7 +83,33 @@ struct vsx_game_state {
         uint32_t dirty_player_flags;
 
         struct vsx_buffer dirty_tiles;
+
+        struct vsx_main_thread_token *modified_idle_token;
 };
+
+static void
+modified_idle_cb(void *user_data)
+{
+        struct vsx_game_state *game_state = user_data;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        game_state->modified_idle_token = NULL;
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        vsx_signal_emit(&game_state->modified_signal, NULL);
+}
+
+static void
+queue_modified_signal_locked(struct vsx_game_state *game_state)
+{
+        if (game_state->modified_idle_token)
+                return;
+
+        game_state->modified_idle_token =
+                vsx_main_thread_queue_idle(modified_idle_cb, game_state);
+}
 
 static void
 update_player_names_locked(struct vsx_game_state *game_state)
@@ -316,6 +345,8 @@ handle_player_changed(struct vsx_game_state *game_state,
                 game_state->dirty_player_flags |= 1 << player_num;
         }
 
+        queue_modified_signal_locked(game_state);
+
         pthread_mutex_unlock(&game_state->mutex);
 }
 
@@ -329,6 +360,8 @@ handle_tile_changed(struct vsx_game_state *game_state,
         pthread_mutex_lock(&game_state->mutex);
 
         vsx_bitmask_set_buffer(&game_state->dirty_tiles, tile_num, true);
+
+        queue_modified_signal_locked(game_state);
 
         pthread_mutex_unlock(&game_state->mutex);
 }
@@ -397,6 +430,8 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         pthread_mutex_init(&game_state->mutex, NULL /* attr */);
 
+        vsx_signal_init(&game_state->modified_signal);
+
         vsx_buffer_init(&game_state->dirty_tiles);
         vsx_buffer_init(&game_state->tiles_by_index);
         vsx_slab_init(&game_state->tile_allocator);
@@ -430,6 +465,12 @@ vsx_game_state_get_shout_state(struct vsx_game_state *game_state)
         return game_state->shout_state;
 }
 
+struct vsx_signal *
+vsx_game_state_get_modified_signal(struct vsx_game_state *game_state)
+{
+        return &game_state->modified_signal;
+}
+
 void
 vsx_game_state_free(struct vsx_game_state *game_state)
 {
@@ -437,6 +478,9 @@ vsx_game_state_free(struct vsx_game_state *game_state)
 
         for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
                 vsx_free(game_state->players[i].name);
+
+        if (game_state->modified_idle_token)
+                vsx_main_thread_cancel_idle(game_state->modified_idle_token);
 
         vsx_buffer_destroy(&game_state->dirty_tiles);
         vsx_buffer_destroy(&game_state->tiles_by_index);

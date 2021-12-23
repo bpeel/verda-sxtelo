@@ -23,6 +23,7 @@
 
 #include "vsx-connection.h"
 #include "vsx-worker.h"
+#include "vsx-signal.h"
 
 /* This maintains a copy of the game state reported by the
  * vsx_connection so that it can be painted. The state is only
@@ -107,6 +108,10 @@ void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y);
+
+/* This signal will only ever be emitted from the main thread */
+struct vsx_signal *
+vsx_game_state_get_modified_signal(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_free(struct vsx_game_state *game_state);
