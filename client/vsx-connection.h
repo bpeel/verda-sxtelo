@@ -220,6 +220,13 @@ vsx_connection_set_address(struct vsx_connection *connection,
                            const struct vsx_netaddress *address);
 
 void
+vsx_connection_copy_event(struct vsx_connection_event *dest,
+                          const struct vsx_connection_event *src);
+
+void
+vsx_connection_destroy_event(struct vsx_connection_event *event);
+
+void
 vsx_connection_free(struct vsx_connection *connection);
 
 #endif /* VSX_CONNECTION_H */

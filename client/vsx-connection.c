@@ -1829,3 +1829,62 @@ vsx_connection_set_address(struct vsx_connection *connection,
             VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS)
                 start_connecting_running_state(connection);
 }
+
+void
+vsx_connection_copy_event(struct vsx_connection_event *dest,
+                          const struct vsx_connection_event *src)
+{
+        *dest = *src;
+
+        switch (src->type) {
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                dest->error.error = NULL;
+                vsx_set_error(&dest->error.error,
+                              src->error.error->domain,
+                              src->error.error->code,
+                              "%s",
+                              src->error.error->message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+                dest->message.message = vsx_strdup(src->message.message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
+                dest->player_name_changed.name =
+                        vsx_strdup(src->player_name_changed.name);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_END:
+        case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
+                break;
+        }
+}
+
+void
+vsx_connection_destroy_event(struct vsx_connection_event *event)
+{
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                vsx_error_free(event->error.error);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+                vsx_free((char *) event->message.message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
+                vsx_free((char *) event->player_name_changed.name);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_END:
+        case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
+                break;
+        }
+}

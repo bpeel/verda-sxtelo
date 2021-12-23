@@ -42,6 +42,12 @@ struct harness {
         struct vsx_listener event_listener;
         struct vsx_signal *event_signal;
 
+        /* All of the events get copied into this list and then
+         * destroyed when the harness is destroyed in order to
+         * test the event copying mechanism
+         */
+        struct vsx_list copied_events;
+
         int poll_fd;
         short poll_events;
         int64_t wakeup_time;
@@ -53,6 +59,11 @@ struct harness {
         const struct vsx_error_domain *expected_error_domain;
         int expected_error_code;
         const char *expected_error_message;
+};
+
+struct copied_event {
+        struct vsx_list link;
+        struct vsx_connection_event event;
 };
 
 struct frame_error_test
@@ -208,6 +219,10 @@ event_cb(struct vsx_listener *listener,
                                                    event_listener);
         const struct vsx_connection_event *event = data;
 
+        struct copied_event *copied_event = vsx_calloc(sizeof *copied_event);
+        vsx_connection_copy_event(&copied_event->event, event);
+        vsx_list_insert(harness->copied_events.prev, &copied_event->link);
+
         harness->events_triggered |= 1 << event->type;
 
         switch (event->type) {
@@ -248,6 +263,20 @@ wake_up_connection(struct harness *harness)
 }
 
 static void
+free_copied_events(struct harness *harness)
+{
+        struct copied_event *copied_event, *tmp;
+
+        vsx_list_for_each_safe(copied_event,
+                               tmp,
+                               &harness->copied_events,
+                               link) {
+                vsx_connection_destroy_event(&copied_event->event);
+                vsx_free(copied_event);
+        }
+}
+
+static void
 free_harness(struct harness *harness)
 {
         if (harness->server_fd != -1)
@@ -258,6 +287,8 @@ free_harness(struct harness *harness)
 
         if (harness->connection)
                 vsx_connection_free(harness->connection);
+
+        free_copied_events(harness);
 
         vsx_free(harness);
 }
@@ -309,6 +340,8 @@ static struct harness *
 create_harness(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
+
+        vsx_list_init(&harness->copied_events);
 
         harness->server_fd = -1;
 
