@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <pthread.h>
 #include <string.h>
 #include <SDL.h>
 
@@ -83,12 +82,6 @@ struct vsx_main_data {
         struct vsx_listener redraw_needed_listener;
 
         SDL_Event wakeup_event;
-
-        pthread_mutex_t mutex;
-
-        /* The following state is protected by the mutex */
-
-        bool wakeup_queued;
 
         bool redraw_queued;
 
@@ -169,34 +162,6 @@ update_fb_size(struct vsx_main_data *main_data,
 }
 
 static void
-wake_up_locked(struct vsx_main_data *main_data)
-{
-        if (main_data->wakeup_queued)
-                return;
-
-        SDL_PushEvent(&main_data->wakeup_event);
-        main_data->wakeup_queued = true;
-}
-
-static void
-queue_redraw_unlocked(struct vsx_main_data *main_data)
-{
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->redraw_queued = true;
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
-}
-
-static void
-queue_quit_unlocked(struct vsx_main_data *main_data)
-{
-        pthread_mutex_lock(&main_data->mutex);
-        main_data->should_quit = true;
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
-}
-
-static void
 handle_mouse_wheel(struct vsx_main_data *main_data,
                    const SDL_MouseWheelEvent *event)
 {
@@ -274,8 +239,8 @@ handle_mouse_motion(struct vsx_main_data *main_data,
 }
 
 static void
-handle_event_unlocked(struct vsx_main_data *main_data,
-                      const SDL_Event *event)
+handle_event(struct vsx_main_data *main_data,
+             const SDL_Event *event)
 {
         int fb_width, fb_height;
 
@@ -283,7 +248,7 @@ handle_event_unlocked(struct vsx_main_data *main_data,
         case SDL_WINDOWEVENT:
                 switch (event->window.event) {
                 case SDL_WINDOWEVENT_CLOSE:
-                        queue_quit_unlocked(main_data);
+                        main_data->should_quit = true;
                         break;
                 case SDL_WINDOWEVENT_SHOWN:
                         SDL_GetWindowSize(main_data->window,
@@ -295,10 +260,10 @@ handle_event_unlocked(struct vsx_main_data *main_data,
                         update_fb_size(main_data,
                                        event->window.data1,
                                        event->window.data2);
-                        queue_redraw_unlocked(main_data);
+                        main_data->redraw_queued = true;
                         break;
                 case SDL_WINDOWEVENT_EXPOSED:
-                        queue_redraw_unlocked(main_data);
+                        main_data->redraw_queued = true;
                         break;
                 }
                 goto handled;
@@ -317,17 +282,12 @@ handle_event_unlocked(struct vsx_main_data *main_data,
                 goto handled;
 
         case SDL_QUIT:
-                queue_quit_unlocked(main_data);
+                main_data->should_quit = true;
                 goto handled;
         }
 
         if (event->type == main_data->wakeup_event.type) {
-                pthread_mutex_lock(&main_data->mutex);
-                main_data->wakeup_queued = false;
-                pthread_mutex_unlock(&main_data->mutex);
-
                 vsx_main_thread_flush_idle_events();
-
                 goto handled;
         }
 
@@ -340,9 +300,7 @@ wakeup_cb(void *user_data)
 {
         struct vsx_main_data *main_data = user_data;
 
-        pthread_mutex_lock(&main_data->mutex);
-        wake_up_locked(main_data);
-        pthread_mutex_unlock(&main_data->mutex);
+        SDL_PushEvent(&main_data->wakeup_event);
 }
 
 static void
@@ -358,12 +316,8 @@ paint(struct vsx_main_data *main_data)
 static void
 run_main_loop(struct vsx_main_data *main_data)
 {
-        pthread_mutex_lock(&main_data->mutex);
-
         while (!main_data->should_quit) {
                 bool redraw_queued = main_data->redraw_queued;
-
-                pthread_mutex_unlock(&main_data->mutex);
 
                 SDL_Event event;
                 bool had_event;
@@ -373,22 +327,14 @@ run_main_loop(struct vsx_main_data *main_data)
                 else
                         had_event = SDL_WaitEvent(&event);
 
-                pthread_mutex_lock(&main_data->mutex);
-
                 if (had_event) {
-                        pthread_mutex_unlock(&main_data->mutex);
-                        handle_event_unlocked(main_data, &event);
-                        pthread_mutex_lock(&main_data->mutex);
+                        handle_event(main_data, &event);
                 } else if (main_data->redraw_queued) {
                         main_data->redraw_queued = false;
 
-                        pthread_mutex_unlock(&main_data->mutex);
                         paint(main_data);
-                        pthread_mutex_lock(&main_data->mutex);
                 }
         }
-
-        pthread_mutex_unlock(&main_data->mutex);
 }
 
 static struct vsx_connection *
@@ -459,8 +405,6 @@ free_main_data(struct vsx_main_data *main_data)
         if (main_data->asset_manager)
                 vsx_asset_manager_free(main_data->asset_manager);
 
-        pthread_mutex_destroy(&main_data->mutex);
-
         vsx_free(main_data);
 }
 
@@ -468,8 +412,6 @@ static struct vsx_main_data *
 create_main_data(void)
 {
         struct vsx_main_data *main_data = vsx_calloc(sizeof *main_data);
-
-        pthread_mutex_init(&main_data->mutex, NULL /* attr */);
 
         main_data->asset_manager = vsx_asset_manager_new();
 
@@ -606,7 +548,7 @@ game_state_modified_cb(struct vsx_listener *listener,
                                  struct vsx_main_data,
                                  modified_listener);
 
-        queue_redraw_unlocked(main_data);
+        main_data->redraw_queued = true;
 }
 
 static void
@@ -631,7 +573,7 @@ redraw_needed_cb(struct vsx_listener *listener,
                                  struct vsx_main_data,
                                  redraw_needed_listener);
 
-        queue_redraw_unlocked(main_data);
+        main_data->redraw_queued = true;
 }
 
 static bool
