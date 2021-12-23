@@ -27,7 +27,7 @@
 #include "vsx-util.h"
 
 /* Minimum size in mm of the button area */
-#define BUTTON_AREA_MIN_WIDTH 15
+#define BUTTON_AREA_MIN_WIDTH 10
 
 static void
 fit_board_normal(struct vsx_paint_state *paint_state,
