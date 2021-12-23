@@ -39,6 +39,7 @@ enum vsx_connection_event_type {
          */
         VSX_CONNECTION_EVENT_TYPE_ERROR,
         VSX_CONNECTION_EVENT_TYPE_MESSAGE,
+        VSX_CONNECTION_EVENT_TYPE_HEADER,
         /* Emitted whenever the details of a player have changed or a
          * new player has been created.
          */
@@ -59,6 +60,11 @@ struct vsx_connection_event {
                 struct {
                         struct vsx_error *error;
                 } error;
+
+                struct {
+                        uint8_t self_num;
+                        uint64_t person_id;
+                } header;
 
                 struct {
                         const struct vsx_player *player;

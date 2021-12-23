@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <poll.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "vsx-connection.h"
 #include "vsx-util.h"
@@ -694,20 +695,41 @@ check_event(struct harness *harness,
 }
 
 static bool
-send_player_id(struct harness *harness)
+check_header_cb(struct harness *harness,
+                const struct vsx_connection_event *event,
+                void *user_data)
 {
-        harness->events_triggered = 0;
-
-        if (!write_data(harness, player_id_header, sizeof player_id_header - 1))
-                return false;
-
-        if (harness->events_triggered != 0) {
+        if (event->header.self_num != 0) {
                 fprintf(stderr,
-                        "Unexpected event received after sending player id\n");
+                        "Expected self to be 0 in header but got %i\n",
+                        event->header.self_num);
+                return false;
+        }
+
+        const uint64_t expected_id = UINT64_C(0x6e6d6c6b6a696867);
+
+        if (event->header.person_id != expected_id) {
+                fprintf(stderr,
+                        "person_id does not match in header\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        event->header.person_id);
                 return false;
         }
 
         return true;
+}
+
+static bool
+send_player_id(struct harness *harness)
+{
+        return check_event(harness,
+                           VSX_CONNECTION_EVENT_TYPE_HEADER,
+                           check_header_cb,
+                           player_id_header,
+                           sizeof player_id_header - 1,
+                           NULL /* user_data */);
 }
 
 static bool

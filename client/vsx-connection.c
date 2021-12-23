@@ -371,6 +371,16 @@ handle_player_id(struct vsx_connection *connection,
         connection->has_person_id = true;
         connection->player_id_received_timestamp = vsx_monotonic_get();
 
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_HEADER,
+                .header = {
+                        .self_num = self_num,
+                        .person_id = connection->person_id,
+                },
+        };
+
+        vsx_signal_emit(&connection->event_signal, &event);
+
         return true;
 }
 
