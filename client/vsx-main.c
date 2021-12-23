@@ -95,16 +95,7 @@ struct vsx_main_data {
         bool redraw_queued;
 
         bool should_quit;
-
-        struct vsx_buffer log_buffer;
-        struct vsx_buffer alternate_log_buffer;
 };
-
-VSX_PRINTF_FORMAT(2, 3)
-static void
-format_print(struct vsx_main_data *main_data,
-             const char *format,
-             ...);
 
 static char *option_server = "gemelo.org";
 int option_server_port = 5144;
@@ -357,13 +348,6 @@ wakeup_cb(void *user_data)
 }
 
 static void
-handle_error(struct vsx_main_data *main_data,
-             const struct vsx_connection_event *event)
-{
-        format_print(main_data, "error: %s\n", event->error.error->message);
-}
-
-static void
 handle_running_state_changed(struct vsx_main_data *main_data,
                              const struct vsx_connection_event *event)
 {
@@ -376,72 +360,10 @@ handle_running_state_changed(struct vsx_main_data *main_data,
 }
 
 static void
-handle_message(struct vsx_main_data *main_data,
-               const struct vsx_connection_event *event)
-{
-        format_print(main_data,
-                     "%s: %s\n",
-                     vsx_player_get_name(event->message.player),
-                     event->message.message);
-}
-
-static void
-handle_n_tiles(struct vsx_main_data *main_data,
-               const struct vsx_connection_event *event)
-{
-
-        int n_tiles = event->n_tiles_changed.n_tiles;
-
-        format_print(main_data, "** number of tiles is %i\n", n_tiles);
-}
-
-static void
 handle_tile_changed(struct vsx_main_data *main_data,
                     const struct vsx_connection_event *event)
 {
-        char letter[7];
-        int letter_len;
-
-        const struct vsx_tile *tile = event->tile_changed.tile;
-
-        letter_len = vsx_utf8_encode(vsx_tile_get_letter(tile), letter);
-        letter[letter_len] = '\0';
-
-        format_print(main_data,
-                     "%s: %i (%i,%i) %s\n",
-                     event->tile_changed.new_tile ? "new_tile" : "tile changed",
-                     vsx_tile_get_number(tile),
-                     vsx_tile_get_x(tile), vsx_tile_get_y(tile),
-                     letter);
-
         queue_redraw_unlocked(main_data);
-}
-
-static void
-print_state_message(struct vsx_main_data *main_data)
-{
-        switch (vsx_connection_get_state(main_data->connection)) {
-        case VSX_CONNECTION_STATE_AWAITING_HEADER:
-                break;
-
-        case VSX_CONNECTION_STATE_IN_PROGRESS:
-                format_print(main_data,
-                             "You are now in a conversation with a stranger. "
-                             "Say hi!\n");
-                break;
-
-        case VSX_CONNECTION_STATE_DONE:
-                format_print(main_data,
-                             "The conversation has finished\n");
-                break;
-        }
-}
-
-static void
-handle_state_changed(struct vsx_main_data *main_data,
-                     const struct vsx_connection_event *event)
-{
-        print_state_message(main_data);
 }
 
 static void
@@ -462,72 +384,22 @@ event_cb(struct vsx_listener *listener,
         const struct vsx_connection_event *event = data;
 
         switch (event->type) {
-        case VSX_CONNECTION_EVENT_TYPE_ERROR:
-                handle_error(main_data, event);
-                break;
-        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
-                handle_message(main_data, event);
-                break;
-        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
-                handle_n_tiles(main_data, event);
-                break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(main_data, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
                 handle_running_state_changed(main_data, event);
                 break;
-        case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
-                handle_state_changed(main_data, event);
-                break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
                 handle_player_changed(main_data, event);
                 break;
+        case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
                 break;
         }
-}
-
-static void
-format_print(struct vsx_main_data *main_data,
-             const char *format,
-             ...)
-{
-        va_list ap;
-
-        va_start(ap, format);
-
-        pthread_mutex_lock(&main_data->mutex);
-
-        vsx_buffer_append_vprintf(&main_data->log_buffer, format, ap);
-
-        wake_up_locked(main_data);
-
-        pthread_mutex_unlock(&main_data->mutex);
-
-        va_end(ap);
-}
-
-static void
-handle_log_locked(struct vsx_main_data *main_data)
-{
-        if (main_data->log_buffer.length <= 0)
-                return;
-
-        struct vsx_buffer tmp = main_data->log_buffer;
-        main_data->log_buffer = main_data->alternate_log_buffer;
-        main_data->alternate_log_buffer = tmp;
-
-        vsx_buffer_set_length(&main_data->log_buffer, 0);
-
-        pthread_mutex_unlock(&main_data->mutex);
-
-        fwrite(main_data->alternate_log_buffer.data,
-               1,
-               main_data->alternate_log_buffer.length,
-               stdout);
-
-        pthread_mutex_lock(&main_data->mutex);
 }
 
 static void
@@ -571,8 +443,6 @@ run_main_loop(struct vsx_main_data *main_data)
                         paint(main_data);
                         pthread_mutex_lock(&main_data->mutex);
                 }
-
-                handle_log_locked(main_data);
         }
 
         pthread_mutex_unlock(&main_data->mutex);
@@ -646,9 +516,6 @@ free_main_data(struct vsx_main_data *main_data)
         if (main_data->asset_manager)
                 vsx_asset_manager_free(main_data->asset_manager);
 
-        vsx_buffer_destroy(&main_data->log_buffer);
-        vsx_buffer_destroy(&main_data->alternate_log_buffer);
-
         pthread_mutex_destroy(&main_data->mutex);
 
         vsx_free(main_data);
@@ -660,9 +527,6 @@ create_main_data(void)
         struct vsx_main_data *main_data = vsx_calloc(sizeof *main_data);
 
         pthread_mutex_init(&main_data->mutex, NULL /* attr */);
-
-        vsx_buffer_init(&main_data->log_buffer);
-        vsx_buffer_init(&main_data->alternate_log_buffer);
 
         main_data->asset_manager = vsx_asset_manager_new();
 
@@ -893,8 +757,6 @@ main(int argc, char **argv)
         vsx_signal_add(event_signal, &main_data->event_listener);
 
         vsx_connection_set_running(main_data->connection, true);
-
-        print_state_message(main_data);
 
         vsx_worker_unlock(main_data->worker);
 
