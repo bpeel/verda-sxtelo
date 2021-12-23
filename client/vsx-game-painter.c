@@ -57,6 +57,8 @@ struct vsx_game_painter {
         struct vsx_painter_toolbox toolbox;
         bool shader_data_inited;
 
+        struct vsx_game_state *game_state;
+
         bool viewport_dirty;
 
         struct painter_data painters[N_PAINTERS];
@@ -100,14 +102,13 @@ init_redraw_needed_listener(struct vsx_game_painter *painter,
 }
 
 static void
-init_painters(struct vsx_game_painter *painter,
-              struct vsx_game_state *game_state)
+init_painters(struct vsx_game_painter *painter)
 {
         for (unsigned i = 0; i < N_PAINTERS; i++) {
                 struct painter_data *painter_data = painter->painters + i;
                 const struct vsx_painter *callbacks = painters[i];
 
-                painter_data->data = callbacks->create_cb(game_state,
+                painter_data->data = callbacks->create_cb(painter->game_state,
                                                           &painter->toolbox);
 
                 painter_data->game_painter = painter;
@@ -159,6 +160,8 @@ vsx_game_painter_new(struct vsx_game_state *game_state,
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
 
+        painter->game_state = game_state;
+
         vsx_paint_state_set_fb_size(&painter->toolbox.paint_state, 1, 1);
         painter->toolbox.paint_state.dpi = dpi;
         painter->viewport_dirty = true;
@@ -168,7 +171,7 @@ vsx_game_painter_new(struct vsx_game_state *game_state,
         if (!init_toolbox(painter, asset_manager, error))
                 goto error;
 
-        init_painters(painter, game_state);
+        init_painters(painter);
 
         return painter;
 
