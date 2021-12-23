@@ -348,18 +348,6 @@ wakeup_cb(void *user_data)
 }
 
 static void
-handle_running_state_changed(struct vsx_main_data *main_data,
-                             const struct vsx_connection_event *event)
-{
-        if (!event->running_state_changed.running) {
-                pthread_mutex_lock(&main_data->mutex);
-                wake_up_locked(main_data);
-                main_data->should_quit = true;
-                pthread_mutex_unlock(&main_data->mutex);
-        }
-}
-
-static void
 handle_tile_changed(struct vsx_main_data *main_data,
                     const struct vsx_connection_event *event)
 {
@@ -387,12 +375,10 @@ event_cb(struct vsx_listener *listener,
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(main_data, event);
                 break;
-        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
-                handle_running_state_changed(main_data, event);
-                break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
                 handle_player_changed(main_data, event);
                 break;
+        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_ERROR:
         case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
