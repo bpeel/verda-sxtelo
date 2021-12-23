@@ -389,6 +389,8 @@ vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter)
 void
 vsx_game_painter_paint(struct vsx_game_painter *painter)
 {
+        vsx_game_state_update(painter->game_state);
+
         if (painter->viewport_dirty) {
                 vsx_gl.glViewport(0, 0,
                                   painter->toolbox.paint_state.width,

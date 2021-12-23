@@ -306,8 +306,6 @@ wakeup_cb(void *user_data)
 static void
 paint(struct vsx_main_data *main_data)
 {
-        vsx_game_state_update(main_data->game_state);
-
         vsx_game_painter_paint(main_data->game_painter);
 
         SDL_GL_SwapWindow(main_data->window);
