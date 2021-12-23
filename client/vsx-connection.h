@@ -48,18 +48,14 @@ enum vsx_connection_event_type {
         /* Emitted whenever the details of a player have changed or a
          * new player has been created.
          */
-        VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
-};
-
-enum vsx_connection_player_changed_flags {
-        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME = (1 << 0),
-        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS = (1 << 1),
-        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING = (1 << 2),
 };
 
 struct vsx_connection_event {
@@ -77,8 +73,15 @@ struct vsx_connection_event {
 
                 struct {
                         const struct vsx_player *player;
-                        enum vsx_connection_player_changed_flags flags;
-                } player_changed;
+                } player_name_changed;
+
+                struct {
+                        const struct vsx_player *player;
+                } player_flags_changed;
+
+                struct {
+                        const struct vsx_player *player;
+                } player_shouting_changed;
 
                 struct {
                         bool new_tile;

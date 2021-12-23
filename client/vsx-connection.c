@@ -547,15 +547,13 @@ handle_tile(struct vsx_connection *connection,
 }
 
 static void
-emit_player_changed(struct vsx_connection *connection,
-                    struct vsx_player *player,
-                    enum vsx_connection_player_changed_flags flags)
+emit_shouting_changed(struct vsx_connection *connection,
+                      struct vsx_player *player)
 {
         struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                .player_changed = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
+                .player_shouting_changed = {
                         .player = player,
-                        .flags = flags,
                 },
         };
 
@@ -575,9 +573,7 @@ remove_shout(struct vsx_connection *connection)
 
         player->shouting = false;
 
-        emit_player_changed(connection,
-                            player,
-                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING);
+        emit_shouting_changed(connection, player);
 }
 
 static bool
@@ -611,9 +607,14 @@ handle_player_name(struct vsx_connection *connection,
         vsx_free(player->name);
         player->name = vsx_strdup(name);
 
-        emit_player_changed(connection,
-                            player,
-                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME);
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                .player_name_changed = {
+                        .player = player,
+                },
+        };
+
+        vsx_signal_emit(&connection->event_signal, &event);
 
         return true;
 }
@@ -646,9 +647,14 @@ handle_player(struct vsx_connection *connection,
 
         player->flags = flags;
 
-        emit_player_changed(connection,
-                            player,
-                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS);
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                .player_flags_changed = {
+                        .player = player,
+                },
+        };
+
+        vsx_signal_emit(&connection->event_signal, &event);
 
         return true;
 }
@@ -688,10 +694,7 @@ handle_player_shouted(struct vsx_connection *connection,
 
                 player->shouting = true;
 
-                enum vsx_connection_player_changed_flags flags =
-                        VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING;
-
-                emit_player_changed(connection, player, flags);
+                emit_shouting_changed(connection, player);
         }
 
         return true;

@@ -587,10 +587,10 @@ test_slow_ws_response(void)
         }
 
         if ((harness->events_triggered &
-             (1 << VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED)) == 0) {
+             (1 << VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED)) == 0) {
                 fprintf(stderr,
-                        "Connection didn’t send player_changed event after "
-                        "receiving command\n");
+                        "Connection didn’t send player_name_changed event "
+                        "after receiving command\n");
                 ret = false;
                 goto out;
         }
@@ -727,31 +727,32 @@ send_player_id_no_event(struct harness *harness)
                           sizeof player_id_header - 1);
 }
 
-struct check_player_changed_closure {
-        enum vsx_connection_player_changed_flags flags;
-};
-
 static bool
-check_player_changed_cb(struct harness *harness,
-                        const struct vsx_connection_event *event,
-                        void *user_data)
+check_player_name_changed_cb(struct harness *harness,
+                             const struct vsx_connection_event *event,
+                             void *user_data)
 {
-        struct check_player_changed_closure *closure = user_data;
-
-        if (event->player_changed.player == NULL ||
-            event->player_changed.player !=
+        if (event->player_name_changed.player == NULL ||
+            event->player_name_changed.player !=
             vsx_connection_get_self(harness->connection)) {
                 fprintf(stderr,
                         "Changed player is not self\n");
                 return false;
         }
 
-        if (event->player_changed.flags != closure->flags) {
+        return true;
+}
+
+static bool
+check_player_flags_changed_cb(struct harness *harness,
+                              const struct vsx_connection_event *event,
+                              void *user_data)
+{
+        if (event->player_flags_changed.player == NULL ||
+            event->player_flags_changed.player !=
+            vsx_connection_get_self(harness->connection)) {
                 fprintf(stderr,
-                        "Expected flags 0x%x in player changed event but "
-                        "received 0x%x\n",
-                        closure->flags,
-                        event->player_changed.flags);
+                        "Changed player is not self\n");
                 return false;
         }
 
@@ -769,26 +770,20 @@ send_player_data(struct harness *harness)
                 /* player */
                 "\x82\x03\x05\x00\x01";
 
-        struct check_player_changed_closure closure = {
-                .flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME,
-        };
-
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                         check_player_changed_cb,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                         check_player_name_changed_cb,
                          name_header,
                          sizeof name_header - 1,
-                         &closure))
+                         NULL))
                 return false;
 
-        closure.flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS;
-
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                         check_player_changed_cb,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                         check_player_flags_changed_cb,
                          data_header,
                          sizeof data_header - 1,
-                         &closure))
+                         NULL))
                 return false;
 
         return true;
@@ -1204,7 +1199,7 @@ check_player_added_cb(struct harness *harness,
                       const struct vsx_connection_event *event,
                       void *user_data)
 {
-        const struct vsx_player *other = event->player_changed.player;
+        const struct vsx_player *other = event->player_name_changed.player;
         int number = vsx_player_get_number(other);
 
         if (number != 1) {
@@ -1223,13 +1218,6 @@ check_player_added_cb(struct harness *harness,
                 return false;
         }
 
-        if (event->player_changed.flags !=
-            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME) {
-                fprintf(stderr,
-                        "Player changed flags are not just the name\n");
-                return false;
-        }
-
         return true;
 }
 
@@ -1240,7 +1228,7 @@ add_player(struct harness *harness)
                 "\x82\x09\x04\x01George\x00";
 
         return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                           VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
                            check_player_added_cb,
                            add_player_message,
                            sizeof add_player_message - 1,
@@ -1251,21 +1239,14 @@ static bool
 check_shouter_num(const struct vsx_player *expected_shouter,
                   const struct vsx_connection_event *event)
 {
-        const struct vsx_player *shouter = event->player_changed.player;
+        const struct vsx_player *shouter =
+                event->player_shouting_changed.player;
 
         if (expected_shouter != shouter) {
                 fprintf(stderr,
                         "Expected shouter to be %i but got %i\n",
                         vsx_player_get_number(expected_shouter),
                         vsx_player_get_number(shouter));
-                return false;
-        }
-
-        if (event->player_changed.flags !=
-            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING) {
-                fprintf(stderr,
-                        "Player changed event after shout is not changing "
-                        "shout\n");
                 return false;
         }
 
@@ -1305,7 +1286,8 @@ check_reset_shouting_player_cb(struct harness *harness,
                                const struct vsx_connection_event *event,
                                void *user_data)
 {
-        const struct vsx_player *shouter = event->player_changed.player;
+        const struct vsx_player *shouter =
+                event->player_shouting_changed.player;
         const struct vsx_player *expected_shouter = user_data;
 
         if (expected_shouter != shouter) {
@@ -1313,14 +1295,6 @@ check_reset_shouting_player_cb(struct harness *harness,
                         "Expected shouter reset to be %i but got %i\n",
                         vsx_player_get_number(expected_shouter),
                         vsx_player_get_number(shouter));
-                return false;
-        }
-
-        if (event->player_changed.flags !=
-            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING) {
-                fprintf(stderr,
-                        "Player changed event after reset shout is not "
-                        "changing shout\n");
                 return false;
         }
 
@@ -1369,8 +1343,11 @@ check_reset_shouting_player(struct harness *harness,
         /* Now advance actually enough time */
         replacement_monotonic_time += 500001;
 
+        enum vsx_connection_event_type event_type =
+                VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED;
+
         return check_event_with_ignore(harness,
-                                       VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                       event_type,
                                        VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                        check_reset_shouting_player_cb,
                                        (const uint8_t *) "", /* data */
@@ -1394,8 +1371,11 @@ test_receive_shout(void)
         replacement_monotonic_time = vsx_monotonic_get();
         replace_monotonic_time = true;
 
+        enum vsx_connection_event_type event_type =
+                VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED;
+
         if (!check_event_with_ignore(harness,
-                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                     event_type,
                                      VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                      check_self_shouted_cb,
                                      self_shout_message,
@@ -1422,7 +1402,7 @@ test_receive_shout(void)
                 "\x82\x02\x06\x01";
 
         if (!check_event_with_ignore(harness,
-                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                                     event_type,
                                      VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                      check_other_shouted_cb,
                                      other_shout_message,

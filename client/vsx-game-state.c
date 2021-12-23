@@ -323,10 +323,10 @@ vsx_game_state_update(struct vsx_game_state *game_state)
 }
 
 static void
-handle_player_changed(struct vsx_game_state *game_state,
-                      const struct vsx_connection_event *event)
+handle_player_name_changed(struct vsx_game_state *game_state,
+                           const struct vsx_connection_event *event)
 {
-        const struct vsx_player *player = event->player_changed.player;
+        const struct vsx_player *player = event->player_name_changed.player;
         int player_num = vsx_player_get_number(player);
 
         if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
@@ -334,16 +334,45 @@ handle_player_changed(struct vsx_game_state *game_state,
 
         pthread_mutex_lock(&game_state->mutex);
 
-        if ((event->player_changed.flags &
-             VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME)) {
-                game_state->dirty_player_names |= 1 << player_num;
-        }
+        game_state->dirty_player_names |= 1 << player_num;
 
-        if ((event->player_changed.flags &
-             (VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS |
-              VSX_CONNECTION_PLAYER_CHANGED_FLAGS_SHOUTING))) {
-                game_state->dirty_player_flags |= 1 << player_num;
-        }
+        queue_modified_signal_locked(game_state);
+
+        pthread_mutex_unlock(&game_state->mutex);
+}
+
+static void
+handle_player_flags_changed(struct vsx_game_state *game_state,
+                            const struct vsx_connection_event *event)
+{
+        const struct vsx_player *player = event->player_flags_changed.player;
+        int player_num = vsx_player_get_number(player);
+
+        if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
+                return;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        game_state->dirty_player_flags |= 1 << player_num;
+
+        queue_modified_signal_locked(game_state);
+
+        pthread_mutex_unlock(&game_state->mutex);
+}
+
+static void
+handle_player_shouting_changed(struct vsx_game_state *game_state,
+                               const struct vsx_connection_event *event)
+{
+        const struct vsx_player *player = event->player_shouting_changed.player;
+        int player_num = vsx_player_get_number(player);
+
+        if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
+                return;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        game_state->dirty_player_flags |= 1 << player_num;
 
         queue_modified_signal_locked(game_state);
 
@@ -377,8 +406,14 @@ event_cb(struct vsx_listener *listener,
         const struct vsx_connection_event *event = data;
 
         switch (event->type) {
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
-                handle_player_changed(game_state, event);
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
+                handle_player_name_changed(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+                handle_player_flags_changed(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+                handle_player_shouting_changed(game_state, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(game_state, event);
