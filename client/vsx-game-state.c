@@ -43,6 +43,11 @@ struct vsx_game_state_tile_private {
         struct vsx_list link;
 };
 
+struct queued_event {
+        struct vsx_list link;
+        struct vsx_connection_event event;
+};
+
 struct vsx_game_state {
         /* This data is only accessed from the main thread and doesn’t
          * need a mutex.
@@ -52,6 +57,8 @@ struct vsx_game_state {
 
         enum vsx_game_state_shout_state shout_state;
         int shouting_player;
+
+        int self;
 
         /* Array of tile pointers indexed by tile number */
         struct vsx_buffer tiles_by_index;
@@ -64,8 +71,8 @@ struct vsx_game_state {
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
 
-        /* A counter that is incremented every time an update is
-         * peformed and every time a command is queued. This can be
+        /* A counter that is incremented every time an event is
+         * received and every time a command is queued. This can be
          * used to detect if a tile was updated after a command was
          * sent.
          */
@@ -79,112 +86,20 @@ struct vsx_game_state {
          * modified from any thread.
          */
 
-        uint32_t dirty_player_names;
-        uint32_t dirty_player_flags;
+        struct vsx_list event_queue;
+        struct vsx_main_thread_token *flush_queue_token;
 
-        struct vsx_buffer dirty_tiles;
-
-        struct vsx_main_thread_token *modified_idle_token;
+        struct vsx_list freed_events;
 };
 
 static void
-modified_idle_cb(void *user_data)
-{
-        struct vsx_game_state *game_state = user_data;
-
-        pthread_mutex_lock(&game_state->mutex);
-
-        game_state->modified_idle_token = NULL;
-
-        pthread_mutex_unlock(&game_state->mutex);
-
-        vsx_signal_emit(&game_state->modified_signal, NULL);
-}
-
-static void
-queue_modified_signal_locked(struct vsx_game_state *game_state)
-{
-        if (game_state->modified_idle_token)
-                return;
-
-        game_state->modified_idle_token =
-                vsx_main_thread_queue_idle(modified_idle_cb, game_state);
-}
-
-static void
-update_player_names_locked(struct vsx_game_state *game_state)
-{
-        int bit;
-
-        while ((bit = ffs(game_state->dirty_player_names))) {
-                int player_num = bit - 1;
-
-                const struct vsx_player *player =
-                        vsx_connection_get_player(game_state->connection,
-                                                  player_num);
-
-                vsx_free(game_state->players[player_num].name);
-
-                const char *new_name = vsx_player_get_name(player);
-
-                game_state->players[player_num].name =
-                        new_name ? vsx_strdup(new_name) : NULL;
-
-                game_state->dirty_player_names &= ~(1 << player_num);
-        }
-}
-
-static void
 set_shout_state_for_player(struct vsx_game_state *game_state,
-                           const struct vsx_player *player)
+                           int player_num)
 {
         game_state->shout_state =
-                player == vsx_connection_get_self(game_state->connection) ?
+                player_num == game_state->self ?
                 VSX_GAME_STATE_SHOUT_STATE_SELF :
                 VSX_GAME_STATE_SHOUT_STATE_OTHER;
-}
-
-static void
-update_player_flags_locked(struct vsx_game_state *game_state)
-{
-        int bit;
-
-        /* If the shouting player has been modified then remove the
-         * shout now so if a different player is shouting then it will
-         * be set to them instead. If the shouting player hasn’t
-         * actually changed then it will be reset anyway.
-         */
-        if (game_state->shout_state != VSX_GAME_STATE_SHOUT_STATE_NOONE &&
-            (game_state->dirty_player_flags &
-             (1 << game_state->shouting_player)))
-                game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
-
-        while ((bit = ffs(game_state->dirty_player_flags))) {
-                int player_num = bit - 1;
-
-                const struct vsx_player *player =
-                        vsx_connection_get_player(game_state->connection,
-                                                  player_num);
-
-                enum vsx_game_state_player_flag flags = 0;
-
-                if (vsx_player_is_connected(player))
-                        flags |= VSX_GAME_STATE_PLAYER_FLAG_CONNECTED;
-                if (vsx_player_is_typing(player))
-                        flags |= VSX_GAME_STATE_PLAYER_FLAG_TYPING;
-                if (vsx_player_has_next_turn(player))
-                        flags |= VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN;
-
-                if (vsx_player_is_shouting(player)) {
-                        flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
-
-                        set_shout_state_for_player(game_state, player);
-                }
-
-                game_state->players[player_num].flags = flags;
-
-                game_state->dirty_player_flags &= ~(1 << player_num);
-        }
 }
 
 static void
@@ -226,55 +141,6 @@ get_tile_by_index(struct vsx_game_state *game_state,
         return tile;
 }
 
-static void
-update_tiles_locked(struct vsx_game_state *game_state)
-{
-        size_t n_elements =
-                game_state->dirty_tiles.length / sizeof (vsx_bitmask_element_t);
-        vsx_bitmask_element_t *elements =
-                (vsx_bitmask_element_t *) game_state->dirty_tiles.data;
-
-        const struct vsx_player *self =
-                vsx_connection_get_self(game_state->connection);
-        int self_num = self ? vsx_player_get_number(self) : -1;
-
-        for (unsigned i = 0; i < n_elements; i++) {
-                int bit;
-
-                while ((bit = ffsl(elements[i]))) {
-                        int tile_num = (i * VSX_BITMASK_BITS_PER_ELEMENT +
-                                        bit - 1);
-
-                        const struct vsx_tile *tile =
-                                vsx_connection_get_tile(game_state->connection,
-                                                        tile_num);
-
-                        struct vsx_game_state_tile_private *state_tile =
-                                get_tile_by_index(game_state, tile_num);
-
-                        state_tile->public.number = vsx_tile_get_number(tile);
-                        state_tile->public.x = vsx_tile_get_x(tile);
-                        state_tile->public.y = vsx_tile_get_y(tile);
-                        state_tile->public.letter = vsx_tile_get_letter(tile);
-                        state_tile->public.update_time =
-                                game_state->time_counter;
-                        state_tile->public.last_moved_by_self =
-                                vsx_tile_get_last_player_moved(tile) ==
-                                self_num;
-
-                        /* Move the tile to the end of the list so
-                         * that the list will always been in reverse
-                         * order of most recently updated.
-                         */
-                        vsx_list_remove(&state_tile->link);
-                        vsx_list_insert(game_state->tile_list.prev,
-                                        &state_tile->link);
-
-                        elements[i] &= ~(1UL << (bit - 1));
-                }
-        }
-}
-
 size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
 {
@@ -306,106 +172,106 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
         }
 }
 
-void
-vsx_game_state_update(struct vsx_game_state *game_state)
+static void
+handle_header(struct vsx_game_state *game_state,
+              const struct vsx_connection_event *event)
 {
-        game_state->time_counter++;
-
-        vsx_worker_lock(game_state->worker);
-        pthread_mutex_lock(&game_state->mutex);
-
-        update_player_names_locked(game_state);
-        update_player_flags_locked(game_state);
-        update_tiles_locked(game_state);
-
-        pthread_mutex_unlock(&game_state->mutex);
-        vsx_worker_unlock(game_state->worker);
+        game_state->self = event->header.self_num;
 }
 
 static void
 handle_player_name_changed(struct vsx_game_state *game_state,
                            const struct vsx_connection_event *event)
 {
-        const struct vsx_player *player = event->player_name_changed.player;
-        int player_num = vsx_player_get_number(player);
+        int player_num = event->player_name_changed.player_num;
 
         if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
                 return;
 
-        pthread_mutex_lock(&game_state->mutex);
+        struct vsx_game_state_player *player =
+                game_state->players + player_num;
 
-        game_state->dirty_player_names |= 1 << player_num;
-
-        queue_modified_signal_locked(game_state);
-
-        pthread_mutex_unlock(&game_state->mutex);
+        vsx_free(player->name);
+        player->name = vsx_strdup(event->player_name_changed.name);
 }
 
 static void
 handle_player_flags_changed(struct vsx_game_state *game_state,
                             const struct vsx_connection_event *event)
 {
-        const struct vsx_player *player = event->player_flags_changed.player;
-        int player_num = vsx_player_get_number(player);
+        int player_num = event->player_shouting_changed.player_num;
 
         if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
                 return;
 
-        pthread_mutex_lock(&game_state->mutex);
+        struct vsx_game_state_player *player =
+                game_state->players + player_num;
 
-        game_state->dirty_player_flags |= 1 << player_num;
-
-        queue_modified_signal_locked(game_state);
-
-        pthread_mutex_unlock(&game_state->mutex);
+        /* Leave the shouting flag as it was */
+        player->flags = ((player->flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING) |
+                         event->player_flags_changed.flags);
 }
 
 static void
 handle_player_shouting_changed(struct vsx_game_state *game_state,
                                const struct vsx_connection_event *event)
 {
-        const struct vsx_player *player = event->player_shouting_changed.player;
-        int player_num = vsx_player_get_number(player);
+        int player_num = event->player_shouting_changed.player_num;
 
         if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
                 return;
 
-        pthread_mutex_lock(&game_state->mutex);
+        struct vsx_game_state_player *player =
+                game_state->players + player_num;
 
-        game_state->dirty_player_flags |= 1 << player_num;
+        if (event->player_shouting_changed.shouting) {
+                player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
 
-        queue_modified_signal_locked(game_state);
+                game_state->shouting_player = player_num;
+                set_shout_state_for_player(game_state, player_num);
+        } else {
+                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
 
-        pthread_mutex_unlock(&game_state->mutex);
+                if (player_num == game_state->shouting_player) {
+                        game_state->shouting_player = -1;
+                        game_state->shout_state =
+                                VSX_GAME_STATE_SHOUT_STATE_NOONE;
+                }
+        }
 }
 
 static void
 handle_tile_changed(struct vsx_game_state *game_state,
                     const struct vsx_connection_event *event)
 {
-        const struct vsx_tile *tile = event->tile_changed.tile;
-        int tile_num = vsx_tile_get_number(tile);
+        struct vsx_game_state_tile_private *state_tile =
+                get_tile_by_index(game_state, event->tile_changed.num);
 
-        pthread_mutex_lock(&game_state->mutex);
+        state_tile->public.number = event->tile_changed.num;
+        state_tile->public.x = event->tile_changed.x;
+        state_tile->public.y = event->tile_changed.y;
+        state_tile->public.letter = event->tile_changed.letter;
+        state_tile->public.update_time = game_state->time_counter;
+        state_tile->public.last_moved_by_self =
+                event->tile_changed.last_player_moved == game_state->self;
 
-        vsx_bitmask_set_buffer(&game_state->dirty_tiles, tile_num, true);
-
-        queue_modified_signal_locked(game_state);
-
-        pthread_mutex_unlock(&game_state->mutex);
+        /* Move the tile to the end of the list so that the list will
+         * always been in reverse order of most recently updated.
+         */
+        vsx_list_remove(&state_tile->link);
+        vsx_list_insert(game_state->tile_list.prev, &state_tile->link);
 }
 
 static void
-event_cb(struct vsx_listener *listener,
-         void *data)
+handle_event(struct vsx_game_state *game_state,
+             const struct vsx_connection_event *event)
 {
-        struct vsx_game_state *game_state =
-                vsx_container_of(listener,
-                                 struct vsx_game_state,
-                                 event_listener);
-        const struct vsx_connection_event *event = data;
+        game_state->time_counter++;
 
         switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+                handle_header(game_state, event);
+                break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
                 handle_player_name_changed(game_state, event);
                 break;
@@ -421,6 +287,81 @@ event_cb(struct vsx_listener *listener,
         default:
                 break;
         }
+}
+
+static void
+flush_queue_cb(void *data)
+{
+        struct vsx_game_state *game_state = data;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        game_state->flush_queue_token = NULL;
+
+        struct vsx_list event_queue;
+        vsx_list_init(&event_queue);
+        vsx_list_insert_list(&event_queue, &game_state->event_queue);
+        vsx_list_init(&game_state->event_queue);
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        struct queued_event *queued_event;
+
+        vsx_list_for_each(queued_event, &event_queue, link) {
+                handle_event(game_state, &queued_event->event);
+                vsx_connection_destroy_event(&queued_event->event);
+        }
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        vsx_list_insert_list(&game_state->freed_events, &event_queue);
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        vsx_signal_emit(&game_state->modified_signal, NULL);
+}
+
+static void
+event_cb(struct vsx_listener *listener,
+         void *data)
+{
+        const struct vsx_connection_event *event = data;
+
+        /* Ignore poll_changed events because they will be frequent
+         * and only interesting for the vsx_worker.
+         */
+        if (event->type == VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED)
+                return;
+
+        struct vsx_game_state *game_state =
+                vsx_container_of(listener,
+                                 struct vsx_game_state,
+                                 event_listener);
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        struct queued_event *queued_event;
+
+        if (vsx_list_empty(&game_state->freed_events)) {
+                queued_event = vsx_alloc(sizeof *queued_event);
+        } else {
+                queued_event = vsx_container_of(game_state->freed_events.next,
+                                                struct queued_event,
+                                                link);
+                vsx_list_remove(&queued_event->link);
+        }
+
+        vsx_connection_copy_event(&queued_event->event, event);
+
+        vsx_list_insert(game_state->event_queue.prev, &queued_event->link);
+
+        if (game_state->flush_queue_token == NULL) {
+                game_state->flush_queue_token =
+                        vsx_main_thread_queue_idle(flush_queue_cb,
+                                                   game_state);
+        }
+
+        pthread_mutex_unlock(&game_state->mutex);
 }
 
 void
@@ -467,7 +408,9 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         vsx_signal_init(&game_state->modified_signal);
 
-        vsx_buffer_init(&game_state->dirty_tiles);
+        vsx_list_init(&game_state->event_queue);
+        vsx_list_init(&game_state->freed_events);
+
         vsx_buffer_init(&game_state->tiles_by_index);
         vsx_slab_init(&game_state->tile_allocator);
         vsx_list_init(&game_state->tile_list);
@@ -506,6 +449,33 @@ vsx_game_state_get_modified_signal(struct vsx_game_state *game_state)
         return &game_state->modified_signal;
 }
 
+static void
+free_event_queue(struct vsx_game_state *game_state)
+{
+        struct queued_event *queued_event, *tmp;
+
+        vsx_list_for_each_safe(queued_event,
+                               tmp,
+                               &game_state->event_queue,
+                               link) {
+                vsx_connection_destroy_event(&queued_event->event);
+                vsx_free(queued_event);
+        }
+}
+
+static void
+free_freed_events(struct vsx_game_state *game_state)
+{
+        struct queued_event *queued_event, *tmp;
+
+        vsx_list_for_each_safe(queued_event,
+                               tmp,
+                               &game_state->freed_events,
+                               link) {
+                vsx_free(queued_event);
+        }
+}
+
 void
 vsx_game_state_free(struct vsx_game_state *game_state)
 {
@@ -514,10 +484,12 @@ vsx_game_state_free(struct vsx_game_state *game_state)
         for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
                 vsx_free(game_state->players[i].name);
 
-        if (game_state->modified_idle_token)
-                vsx_main_thread_cancel_idle(game_state->modified_idle_token);
+        if (game_state->flush_queue_token)
+                vsx_main_thread_cancel_idle(game_state->flush_queue_token);
 
-        vsx_buffer_destroy(&game_state->dirty_tiles);
+        free_event_queue(game_state);
+        free_freed_events(game_state);
+
         vsx_buffer_destroy(&game_state->tiles_by_index);
         vsx_slab_destroy(&game_state->tile_allocator);
 
