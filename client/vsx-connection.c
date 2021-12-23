@@ -464,6 +464,7 @@ handle_message(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_MESSAGE,
                 .message = {
                         .player = get_or_create_player(connection, person),
+                        .player_num = person,
                         .message = text,
                 },
         };
@@ -537,6 +538,11 @@ handle_tile(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
                 .tile_changed = {
                         .new_tile = is_new,
+                        .num = num,
+                        .last_player_moved = player,
+                        .x = x,
+                        .y = y,
+                        .letter = vsx_utf8_get_char(letter),
                         .tile = tile,
                 },
         };
@@ -554,6 +560,8 @@ emit_shouting_changed(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
                 .player_shouting_changed = {
                         .player = player,
+                        .player_num = vsx_player_get_number(player),
+                        .shouting = vsx_player_is_shouting(player),
                 },
         };
 
@@ -611,6 +619,8 @@ handle_player_name(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
                 .player_name_changed = {
                         .player = player,
+                        .player_num = num,
+                        .name = name,
                 },
         };
 
@@ -651,6 +661,8 @@ handle_player(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
                 .player_flags_changed = {
                         .player = player,
+                        .player_num = num,
+                        .flags = flags,
                 },
         };
 

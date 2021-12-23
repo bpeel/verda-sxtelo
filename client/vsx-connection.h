@@ -68,23 +68,34 @@ struct vsx_connection_event {
 
                 struct {
                         const struct vsx_player *player;
+                        uint8_t player_num;
                         const char *message;
                 } message;
 
                 struct {
                         const struct vsx_player *player;
+                        uint8_t player_num;
+                        const char *name;
                 } player_name_changed;
 
                 struct {
+                        uint8_t player_num;
+                        uint8_t flags;
                         const struct vsx_player *player;
                 } player_flags_changed;
 
                 struct {
+                        uint8_t player_num;
+                        bool shouting;
                         const struct vsx_player *player;
                 } player_shouting_changed;
 
                 struct {
                         bool new_tile;
+                        uint8_t num;
+                        uint8_t last_player_moved;
+                        int16_t x, y;
+                        uint32_t letter;
                         const struct vsx_tile *tile;
                 } tile_changed;
 

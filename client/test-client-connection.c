@@ -732,9 +732,18 @@ check_player_name_changed_cb(struct harness *harness,
                              const struct vsx_connection_event *event,
                              void *user_data)
 {
+        const struct vsx_player *self =
+                vsx_connection_get_self(harness->connection);
+
         if (event->player_name_changed.player == NULL ||
-            event->player_name_changed.player !=
-            vsx_connection_get_self(harness->connection)) {
+            event->player_name_changed.player != self) {
+                fprintf(stderr,
+                        "Changed player is not self\n");
+                return false;
+        }
+
+        if (event->player_name_changed.player_num !=
+            vsx_player_get_number(self)) {
                 fprintf(stderr,
                         "Changed player is not self\n");
                 return false;
@@ -748,11 +757,27 @@ check_player_flags_changed_cb(struct harness *harness,
                               const struct vsx_connection_event *event,
                               void *user_data)
 {
+        const struct vsx_player *self =
+                vsx_connection_get_self(harness->connection);
+
         if (event->player_flags_changed.player == NULL ||
-            event->player_flags_changed.player !=
-            vsx_connection_get_self(harness->connection)) {
+            event->player_flags_changed.player != self) {
                 fprintf(stderr,
                         "Changed player is not self\n");
+                return false;
+        }
+
+        if (event->player_flags_changed.player_num !=
+            vsx_player_get_number(self)) {
+                fprintf(stderr,
+                        "Changed player is not self\n");
+                return false;
+        }
+
+        if (event->player_flags_changed.flags != 1) {
+                fprintf(stderr,
+                        "Expected changed flags to be 1, got %i\n",
+                        event->player_flags_changed.flags);
                 return false;
         }
 
@@ -1218,6 +1243,20 @@ check_player_added_cb(struct harness *harness,
                 return false;
         }
 
+        if (event->player_name_changed.player_num != 1) {
+                fprintf(stderr,
+                        "Expected other player to have number 1 but got %i\n",
+                        number);
+                return false;
+        }
+
+        if (strcmp(event->player_name_changed.name, "George")) {
+                fprintf(stderr,
+                        "Other player is not called George: %s\n",
+                        event->player_name_changed.name);
+                return false;
+        }
+
         return true;
 }
 
@@ -1251,6 +1290,21 @@ check_shouter_num(const struct vsx_player *expected_shouter,
         }
 
         if (!vsx_player_is_shouting(shouter)) {
+                fprintf(stderr,
+                        "Received shout event but player is not shouting\n");
+                return false;
+        }
+
+        if (vsx_player_get_number(expected_shouter) !=
+            event->player_shouting_changed.player_num) {
+                fprintf(stderr,
+                        "Expected shouter to be %i but got %i\n",
+                        vsx_player_get_number(expected_shouter),
+                        event->player_shouting_changed.player_num);
+                return false;
+        }
+
+        if (!event->player_shouting_changed.shouting) {
                 fprintf(stderr,
                         "Received shout event but player is not shouting\n");
                 return false;
@@ -1302,6 +1356,21 @@ check_reset_shouting_player_cb(struct harness *harness,
                 fprintf(stderr,
                         "Received shout reset event but player is still "
                         "shouting\n");
+                return false;
+        }
+
+        if (vsx_player_get_number(expected_shouter) !=
+            event->player_shouting_changed.player_num) {
+                fprintf(stderr,
+                        "Expected shouter reset to be %i but got %i\n",
+                        vsx_player_get_number(expected_shouter),
+                        event->player_shouting_changed.player_num);
+                return false;
+        }
+
+        if (event->player_shouting_changed.shouting) {
+                fprintf(stderr,
+                        "Received shout reset event but player is shouting\n");
                 return false;
         }
 
@@ -1676,6 +1745,28 @@ check_tile_changed_cb(struct harness *harness,
                         vsx_tile_get_x(tile),
                         vsx_tile_get_y(tile),
                         vsx_tile_get_letter(tile),
+                        event->tile_changed.new_tile ? "new" : "old");
+                return false;
+        }
+
+        if (event->tile_changed.num != closure->num ||
+            event->tile_changed.x != closure->x ||
+            event->tile_changed.y != closure->y ||
+            event->tile_changed.letter != closure->letter ||
+            event->tile_changed.new_tile != closure->is_new) {
+                fprintf(stderr,
+                        "Tile from event does not match sent tile:\n"
+                        " Expected: %i %i,%i %c %s\n"
+                        " Received: %i %i,%i %c %s\n",
+                        closure->num,
+                        closure->x,
+                        closure->y,
+                        closure->letter,
+                        closure->is_new ? "new" : "old",
+                        event->tile_changed.num,
+                        event->tile_changed.x,
+                        event->tile_changed.y,
+                        event->tile_changed.letter,
                         event->tile_changed.new_tile ? "new" : "old");
                 return false;
         }
