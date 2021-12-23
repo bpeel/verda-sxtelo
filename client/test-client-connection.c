@@ -694,29 +694,20 @@ check_event(struct harness *harness,
 }
 
 static bool
-check_state_in_progress_cb(struct harness *harness,
-                           const struct vsx_connection_event *event,
-                           void *user_data)
+send_player_id(struct harness *harness)
 {
-        if (event->state_changed.state != VSX_CONNECTION_STATE_IN_PROGRESS) {
+        harness->events_triggered = 0;
+
+        if (!write_data(harness, player_id_header, sizeof player_id_header - 1))
+                return false;
+
+        if (harness->events_triggered != 0) {
                 fprintf(stderr,
-                        "Expected state to be in-progress, but got %i\n",
-                        event->state_changed.state);
+                        "Unexpected event received after sending player id\n");
                 return false;
         }
 
         return true;
-}
-
-static bool
-send_player_id(struct harness *harness)
-{
-        return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                           check_state_in_progress_cb,
-                           player_id_header,
-                           sizeof player_id_header - 1,
-                           NULL /* user_data */);
 }
 
 static bool
@@ -2159,23 +2150,10 @@ out:
 }
 
 static bool
-check_end_state_cb(struct harness *harness,
-                   const struct vsx_connection_event *event,
-                   void *user_data)
+check_end_cb(struct harness *harness,
+             const struct vsx_connection_event *event,
+             void *user_data)
 {
-        if (event->state_changed.state != VSX_CONNECTION_STATE_DONE) {
-                fprintf(stderr,
-                        "State is not DONE after sending END\n");
-                return false;
-        }
-
-        if (event->state_changed.state !=
-            vsx_connection_get_state(harness->connection)) {
-                fprintf(stderr,
-                        "State in event does not match connection state\n");
-                return false;
-        }
-
         return true;
 }
 
@@ -2243,8 +2221,8 @@ test_end(bool do_shutdown)
         bool ret = true;
 
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                         check_end_state_cb,
+                         VSX_CONNECTION_EVENT_TYPE_END,
+                         check_end_cb,
                          (const uint8_t *) "\x82\x01\x08", 3,
                          NULL /* user_data */)) {
                 ret = false;

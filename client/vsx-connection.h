@@ -29,12 +29,6 @@
 
 struct vsx_connection;
 
-enum vsx_connection_state {
-        VSX_CONNECTION_STATE_AWAITING_HEADER,
-        VSX_CONNECTION_STATE_IN_PROGRESS,
-        VSX_CONNECTION_STATE_DONE
-};
-
 enum vsx_connection_event_type {
         /* Emitted whenever the connection encounters an error. These
          * could be either an I/O error from the underlying socket or
@@ -54,7 +48,7 @@ enum vsx_connection_event_type {
         VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
-        VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_END,
         VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
 };
 
@@ -106,10 +100,6 @@ struct vsx_connection_event {
                 struct {
                         bool running;
                 } running_state_changed;
-
-                struct {
-                        enum vsx_connection_state state;
-                } state_changed;
 
                 struct {
                         /* The next monotonic time that the connection
@@ -176,9 +166,6 @@ vsx_connection_move_tile(struct vsx_connection *connection,
 void
 vsx_connection_set_n_tiles(struct vsx_connection *connection,
                            int n_tiles);
-
-enum vsx_connection_state
-vsx_connection_get_state(struct vsx_connection *connection);
 
 void
 vsx_connection_send_message(struct vsx_connection *connection,

@@ -128,7 +128,7 @@ struct vsx_connection {
         bool has_person_id;
         uint64_t person_id;
         enum vsx_connection_running_state running_state;
-        enum vsx_connection_state state;
+        bool had_end;
         bool typing;
         bool sent_typing_state;
         bool write_finished;
@@ -293,23 +293,6 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
         update_poll(connection);
 }
 
-static void
-vsx_connection_set_state(struct vsx_connection *connection,
-                         enum vsx_connection_state state)
-{
-        if (connection->state == state)
-                return;
-
-        connection->state = state;
-
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                .state_changed = { .state = state },
-        };
-
-        vsx_signal_emit(&connection->event_signal, &event);
-}
-
 static void *
 get_pointer_from_buffer(struct vsx_buffer *buf, int num)
 {
@@ -387,11 +370,6 @@ handle_player_id(struct vsx_connection *connection,
 
         connection->has_person_id = true;
         connection->player_id_received_timestamp = vsx_monotonic_get();
-
-        if (connection->state == VSX_CONNECTION_STATE_AWAITING_HEADER) {
-                vsx_connection_set_state(connection,
-                                         VSX_CONNECTION_STATE_IN_PROGRESS);
-        }
 
         return true;
 }
@@ -749,7 +727,13 @@ handle_end(struct vsx_connection *connection,
                 return false;
         }
 
-        vsx_connection_set_state(connection, VSX_CONNECTION_STATE_DONE);
+        connection->had_end = true;
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_END,
+        };
+
+        vsx_signal_emit(&connection->event_signal, &event);
 
         return true;
 }
@@ -981,7 +965,7 @@ handle_read(struct vsx_connection *connection)
                         vsx_error_free(error);
                 }
         } else if (got == 0) {
-                if (connection->state == VSX_CONNECTION_STATE_DONE) {
+                if (connection->had_end) {
                         vsx_connection_set_running(connection, false);
                 } else {
                         struct vsx_error *error = NULL;
@@ -1471,8 +1455,7 @@ calculate_poll_events(struct vsx_connection *connection)
                 if (!connection->write_finished) {
                         if (has_pending_data(connection)) {
                                 events |= POLLOUT;
-                        } else if (connection->state ==
-                                   VSX_CONNECTION_STATE_DONE) {
+                        } else if (connection->had_end) {
                                 shutdown(connection->sock, SHUT_WR);
 
                                 connection->write_finished = true;
@@ -1716,12 +1699,6 @@ bool
 vsx_connection_get_typing(struct vsx_connection *connection)
 {
         return connection->typing;
-}
-
-enum vsx_connection_state
-vsx_connection_get_state(struct vsx_connection *connection)
-{
-        return connection->state;
 }
 
 void
