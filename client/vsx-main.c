@@ -82,8 +82,6 @@ struct vsx_main_data {
         struct vsx_game_painter *game_painter;
         struct vsx_listener redraw_needed_listener;
 
-        struct vsx_listener event_listener;
-
         SDL_Event wakeup_event;
 
         pthread_mutex_t mutex;
@@ -345,47 +343,6 @@ wakeup_cb(void *user_data)
         pthread_mutex_lock(&main_data->mutex);
         wake_up_locked(main_data);
         pthread_mutex_unlock(&main_data->mutex);
-}
-
-static void
-handle_tile_changed(struct vsx_main_data *main_data,
-                    const struct vsx_connection_event *event)
-{
-        queue_redraw_unlocked(main_data);
-}
-
-static void
-handle_player_changed(struct vsx_main_data *main_data,
-                      const struct vsx_connection_event *event)
-{
-        queue_redraw_unlocked(main_data);
-}
-
-static void
-event_cb(struct vsx_listener *listener,
-         void *data)
-{
-        struct vsx_main_data *main_data =
-                vsx_container_of(listener,
-                                 struct vsx_main_data,
-                                 event_listener);
-        const struct vsx_connection_event *event = data;
-
-        switch (event->type) {
-        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
-                handle_tile_changed(main_data, event);
-                break;
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED:
-                handle_player_changed(main_data, event);
-                break;
-        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
-        case VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED:
-        case VSX_CONNECTION_EVENT_TYPE_ERROR:
-        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
-        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
-        case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
-                break;
-        }
 }
 
 static void
@@ -734,13 +691,6 @@ main(int argc, char **argv)
         }
 
         vsx_worker_lock(main_data->worker);
-
-        struct vsx_signal *event_signal =
-                vsx_connection_get_event_signal(main_data->connection);
-
-        main_data->event_listener.notify = event_cb;
-
-        vsx_signal_add(event_signal, &main_data->event_listener);
 
         vsx_connection_set_running(main_data->connection, true);
 
