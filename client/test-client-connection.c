@@ -778,20 +778,18 @@ check_player_name_changed_cb(struct harness *harness,
                              const struct vsx_connection_event *event,
                              void *user_data)
 {
-        const struct vsx_player *self =
-                vsx_connection_get_self(harness->connection);
-
-        if (event->player_name_changed.player == NULL ||
-            event->player_name_changed.player != self) {
+        if (event->player_name_changed.player_num != 0) {
                 fprintf(stderr,
                         "Changed player is not self\n");
                 return false;
         }
 
-        if (event->player_name_changed.player_num !=
-            vsx_player_get_number(self)) {
+        if (strcmp(event->player_name_changed.name, "test_player")) {
                 fprintf(stderr,
-                        "Changed player is not self\n");
+                        "self name does not match\n"
+                        " Expected: test_player\n"
+                        " Received: %s\n",
+                        event->player_name_changed.name);
                 return false;
         }
 
@@ -803,18 +801,7 @@ check_player_flags_changed_cb(struct harness *harness,
                               const struct vsx_connection_event *event,
                               void *user_data)
 {
-        const struct vsx_player *self =
-                vsx_connection_get_self(harness->connection);
-
-        if (event->player_flags_changed.player == NULL ||
-            event->player_flags_changed.player != self) {
-                fprintf(stderr,
-                        "Changed player is not self\n");
-                return false;
-        }
-
-        if (event->player_flags_changed.player_num !=
-            vsx_player_get_number(self)) {
+        if (event->player_flags_changed.player_num != 0) {
                 fprintf(stderr,
                         "Changed player is not self\n");
                 return false;
@@ -882,41 +869,6 @@ create_negotiated_harness(void)
 
         if (!send_player_data(harness))
                 goto error;
-
-        const struct vsx_player *self =
-                vsx_connection_get_self(harness->connection);
-        const char *name = vsx_player_get_name(self);
-
-        if (strcmp(name, "test_player")) {
-                fprintf(stderr,
-                        "self name does not match\n"
-                        " Expected: test_player\n"
-                        " Received: %s\n",
-                        name);
-                goto error;
-        }
-
-        if (!vsx_player_is_connected(self)) {
-                fprintf(stderr, "self is not connected\n");
-                goto error;
-        }
-
-        if (vsx_player_is_typing(self)) {
-                fprintf(stderr, "self is typing after connecting\n");
-                goto error;
-        }
-
-        if (vsx_player_has_next_turn(self)) {
-                fprintf(stderr, "self has next turn after connecting\n");
-                goto error;
-        }
-
-        if (vsx_player_get_number(self) != 0) {
-                fprintf(stderr,
-                        "self number is not 0 (%i)\n",
-                        vsx_player_get_number(self));
-                goto error;
-        }
 
         return harness;
 
@@ -1227,16 +1179,6 @@ check_n_tiles_changed_cb(struct harness *harness,
                 return false;
         }
 
-        if (event->n_tiles_changed.n_tiles !=
-            vsx_connection_get_n_tiles(harness->connection)) {
-                fprintf(stderr,
-                        "n_tiles in event does not match connection value "
-                        "(%i != %i)\n",
-                        event->n_tiles_changed.n_tiles,
-                        vsx_connection_get_n_tiles(harness->connection));
-                return false;
-        }
-
         return true;
 }
 
@@ -1270,29 +1212,10 @@ check_player_added_cb(struct harness *harness,
                       const struct vsx_connection_event *event,
                       void *user_data)
 {
-        const struct vsx_player *other = event->player_name_changed.player;
-        int number = vsx_player_get_number(other);
-
-        if (number != 1) {
-                fprintf(stderr,
-                        "Expected other player to have number 1 but got %i\n",
-                        number);
-                return false;
-        }
-
-        const char *name = vsx_player_get_name(other);
-
-        if (strcmp(name, "George")) {
-                fprintf(stderr,
-                        "Other player is not called George: %s\n",
-                        name);
-                return false;
-        }
-
         if (event->player_name_changed.player_num != 1) {
                 fprintf(stderr,
                         "Expected other player to have number 1 but got %i\n",
-                        number);
+                        event->player_name_changed.player_num);
                 return false;
         }
 
@@ -1321,31 +1244,13 @@ add_player(struct harness *harness)
 }
 
 static bool
-check_shouter_num(const struct vsx_player *expected_shouter,
+check_shouter_num(int expected_shouter,
                   const struct vsx_connection_event *event)
 {
-        const struct vsx_player *shouter =
-                event->player_shouting_changed.player;
-
-        if (expected_shouter != shouter) {
+        if (expected_shouter != event->player_shouting_changed.player_num) {
                 fprintf(stderr,
                         "Expected shouter to be %i but got %i\n",
-                        vsx_player_get_number(expected_shouter),
-                        vsx_player_get_number(shouter));
-                return false;
-        }
-
-        if (!vsx_player_is_shouting(shouter)) {
-                fprintf(stderr,
-                        "Received shout event but player is not shouting\n");
-                return false;
-        }
-
-        if (vsx_player_get_number(expected_shouter) !=
-            event->player_shouting_changed.player_num) {
-                fprintf(stderr,
-                        "Expected shouter to be %i but got %i\n",
-                        vsx_player_get_number(expected_shouter),
+                        expected_shouter,
                         event->player_shouting_changed.player_num);
                 return false;
         }
@@ -1364,10 +1269,7 @@ check_self_shouted_cb(struct harness *harness,
                       const struct vsx_connection_event *event,
                       void *user_data)
 {
-        const struct vsx_player *self =
-                vsx_connection_get_self (harness->connection);
-
-        return check_shouter_num(self, event);
+        return check_shouter_num(0, event);
 }
 
 static bool
@@ -1375,41 +1277,25 @@ check_other_shouted_cb(struct harness *harness,
                        const struct vsx_connection_event *event,
                        void *user_data)
 {
-        const struct vsx_player *other =
-                vsx_connection_get_player(harness->connection, 1);
-
-        return check_shouter_num(other, event);
+        return check_shouter_num(1, event);
 }
+
+struct check_reset_shouting_player_closure {
+        int expected_shouter;
+};
 
 static bool
 check_reset_shouting_player_cb(struct harness *harness,
                                const struct vsx_connection_event *event,
                                void *user_data)
 {
-        const struct vsx_player *shouter =
-                event->player_shouting_changed.player;
-        const struct vsx_player *expected_shouter = user_data;
+        struct check_reset_shouting_player_closure *closure = user_data;
+        int expected_shouter = closure->expected_shouter;
 
-        if (expected_shouter != shouter) {
+        if (expected_shouter != event->player_shouting_changed.player_num) {
                 fprintf(stderr,
                         "Expected shouter reset to be %i but got %i\n",
-                        vsx_player_get_number(expected_shouter),
-                        vsx_player_get_number(shouter));
-                return false;
-        }
-
-        if (vsx_player_is_shouting(shouter)) {
-                fprintf(stderr,
-                        "Received shout reset event but player is still "
-                        "shouting\n");
-                return false;
-        }
-
-        if (vsx_player_get_number(expected_shouter) !=
-            event->player_shouting_changed.player_num) {
-                fprintf(stderr,
-                        "Expected shouter reset to be %i but got %i\n",
-                        vsx_player_get_number(expected_shouter),
+                        expected_shouter,
                         event->player_shouting_changed.player_num);
                 return false;
         }
@@ -1425,7 +1311,7 @@ check_reset_shouting_player_cb(struct harness *harness,
 
 static bool
 check_reset_shouting_player(struct harness *harness,
-                            const struct vsx_player *player)
+                            int player_num)
 {
         if (llabs(harness->wakeup_time -
                   (replacement_monotonic_time + 10 * 1000000)) >
@@ -1461,13 +1347,17 @@ check_reset_shouting_player(struct harness *harness,
         enum vsx_connection_event_type event_type =
                 VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED;
 
+        struct check_reset_shouting_player_closure closure = {
+                .expected_shouter = player_num,
+        };
+
         return check_event_with_ignore(harness,
                                        event_type,
                                        VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                        check_reset_shouting_player_cb,
                                        (const uint8_t *) "", /* data */
                                        0, /* data_len */
-                                       (void *) player);
+                                       &closure);
 }
 
 static bool
@@ -1500,10 +1390,7 @@ test_receive_shout(void)
                 goto out;
         }
 
-        const struct vsx_player *self =
-                vsx_connection_get_self(harness->connection);
-
-        if (!check_reset_shouting_player(harness, self)) {
+        if (!check_reset_shouting_player(harness, 0)) {
                 ret = false;
                 goto out;
         }
@@ -1527,10 +1414,7 @@ test_receive_shout(void)
                 goto out;
         }
 
-        const struct vsx_player *other =
-                vsx_connection_get_player(harness->connection, 1);
-
-        if (!check_reset_shouting_player(harness, other)) {
+        if (!check_reset_shouting_player(harness, 1)) {
                 ret = false;
                 goto out;
         }
@@ -1761,7 +1645,6 @@ struct send_tile_closure {
         int x;
         int y;
         char letter;
-        bool is_new;
 };
 
 static bool
@@ -1771,49 +1654,22 @@ check_tile_changed_cb(struct harness *harness,
 {
         struct send_tile_closure *closure = user_data;
 
-        const struct vsx_tile *tile = event->tile_changed.tile;
-
-        if (vsx_tile_get_number(tile) != closure->num ||
-            vsx_tile_get_x(tile) != closure->x ||
-            vsx_tile_get_y(tile) != closure->y ||
-            vsx_tile_get_letter(tile) != closure->letter ||
-            event->tile_changed.new_tile != closure->is_new) {
-                fprintf(stderr,
-                        "Tile from event does not match sent tile:\n"
-                        " Expected: %i %i,%i %c %s\n"
-                        " Received: %i %i,%i %c %s\n",
-                        closure->num,
-                        closure->x,
-                        closure->y,
-                        closure->letter,
-                        closure->is_new ? "new" : "old",
-                        vsx_tile_get_number(tile),
-                        vsx_tile_get_x(tile),
-                        vsx_tile_get_y(tile),
-                        vsx_tile_get_letter(tile),
-                        event->tile_changed.new_tile ? "new" : "old");
-                return false;
-        }
-
         if (event->tile_changed.num != closure->num ||
             event->tile_changed.x != closure->x ||
             event->tile_changed.y != closure->y ||
-            event->tile_changed.letter != closure->letter ||
-            event->tile_changed.new_tile != closure->is_new) {
+            event->tile_changed.letter != closure->letter) {
                 fprintf(stderr,
                         "Tile from event does not match sent tile:\n"
-                        " Expected: %i %i,%i %c %s\n"
-                        " Received: %i %i,%i %c %s\n",
+                        " Expected: %i %i,%i %c\n"
+                        " Received: %i %i,%i %c\n",
                         closure->num,
                         closure->x,
                         closure->y,
                         closure->letter,
-                        closure->is_new ? "new" : "old",
                         event->tile_changed.num,
                         event->tile_changed.x,
                         event->tile_changed.y,
-                        event->tile_changed.letter,
-                        event->tile_changed.new_tile ? "new" : "old");
+                        event->tile_changed.letter);
                 return false;
         }
 
@@ -1826,8 +1682,7 @@ send_tile(struct harness *harness,
           int x,
           int y,
           char letter,
-          uint8_t player,
-          bool is_new)
+          uint8_t player)
 {
         uint8_t add_tile_message[] =
                 "\x82\x09\x03\x00\x01\x00\x02\x00g\x00\x00";
@@ -1845,7 +1700,6 @@ send_tile(struct harness *harness,
                 .x = x,
                 .y = y,
                 .letter = letter,
-                .is_new = is_new,
         };
 
         return check_event(harness,
@@ -1873,8 +1727,7 @@ test_move_tile(void)
                                i * 2,
                                i * 2 + 1,
                                'a' + i,
-                               i /* player */,
-                               true /* is_new */)) {
+                               i /* player */)) {
                         ret = false;
                         goto out;
                 }
@@ -1953,65 +1806,6 @@ out:
         return ret;
 }
 
-struct check_tiles_closure {
-        struct harness *harness;
-        int next_tile_num;
-        bool succeeded;
-};
-
-static void
-check_tiles_cb(const struct vsx_tile *tile,
-               void *user_data)
-{
-        struct check_tiles_closure *closure = user_data;
-        int tile_num = closure->next_tile_num++;
-
-        if (tile_num != vsx_tile_get_number(tile)) {
-                fprintf(stderr,
-                        "Tiles reported out of order. Expected %i got %i\n",
-                        tile_num,
-                        vsx_tile_get_number(tile));
-                closure->succeeded = false;
-                return;
-        }
-
-        int16_t x = tile_num * 257;
-        int y = (tile_num & 1) ? -tile_num : tile_num;
-
-        if (x != vsx_tile_get_x(tile) ||
-            y != vsx_tile_get_y(tile)) {
-                fprintf(stderr,
-                        "Wrong tile position reported.\n"
-                        " Expected: %i,%i\n"
-                        " Received: %i,%i\n",
-                        x, y,
-                        vsx_tile_get_x(tile),
-                        vsx_tile_get_y(tile));
-                closure->succeeded = false;
-                return;
-        }
-
-        char letter = tile_num % 26 + 'A';
-
-        if (letter != vsx_tile_get_letter(tile)) {
-                fprintf(stderr,
-                        "Reported tile letter does not match. (%c != %c)\n",
-                        letter,
-                        vsx_tile_get_letter(tile));
-                closure->succeeded = false;
-                return;
-        }
-
-        if (vsx_connection_get_tile(closure->harness->connection,
-                                    tile_num) != tile) {
-                fprintf(stderr,
-                        "Tile reported by get_tile not same as iterating "
-                        "tiles\n");
-                closure->succeeded = false;
-                return;
-        }
-}
-
 static bool
 test_send_all_tiles(void)
 {
@@ -2038,8 +1832,7 @@ test_send_all_tiles(void)
                                x,
                                (tile_num & 1) ? -tile_num : tile_num,
                                tile_num % 26 + 'A',
-                               tile_num / 2,
-                               true /* is_new */)) {
+                               tile_num / 2)) {
                         ret = false;
                         goto out;
                 }
@@ -2051,31 +1844,7 @@ test_send_all_tiles(void)
                        257,
                        -1,
                        'B',
-                       0,
-                       false /* is_new */)) {
-                ret = false;
-                goto out;
-        }
-
-        struct check_tiles_closure closure = {
-                .harness = harness,
-                .next_tile_num = 0,
-                .succeeded = true,
-        };
-
-        vsx_connection_foreach_tile(harness->connection,
-                                    check_tiles_cb,
-                                    &closure);
-
-        if (!closure.succeeded) {
-                ret = false;
-                goto out;
-        }
-
-        if (closure.next_tile_num != 256) {
-                fprintf(stderr,
-                        "vsx_connection_foreach_tile didn’t report "
-                        "all the tiles\n");
+                       0)) {
                 ret = false;
                 goto out;
         }
@@ -2086,55 +1855,44 @@ out:
         return ret;
 }
 
-struct check_players_closure {
-        struct harness *harness;
-        int next_player_num;
-        bool succeeded;
+struct check_add_all_player_name_closure {
+        int player_num;
 };
 
-static void
-check_players_cb(const struct vsx_player *player,
-                 void *user_data)
+static bool
+check_add_all_player_name_cb(struct harness *harness,
+                             const struct vsx_connection_event *event,
+                             void *user_data)
 {
-        struct check_players_closure *closure = user_data;
-        int player_num = closure->next_player_num++;
+        struct check_add_all_player_name_closure *closure = user_data;
 
-        if (player_num != vsx_player_get_number(player)) {
+        if (event->player_name_changed.player_num != closure->player_num) {
                 fprintf(stderr,
-                        "Players reported out of order. Expected %i got %i\n",
-                        player_num,
-                        vsx_player_get_number(player));
-                closure->succeeded = false;
-                return;
+                        "Changed player num does not match (%i != %i)\n",
+                        event->player_name_changed.player_num,
+                        closure->player_num);
+                return false;
         }
 
         struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+        vsx_buffer_append_printf(&buf, "Player %i", closure->player_num);
 
-        if (player_num == 1)
-                vsx_buffer_append_string(&buf, "George");
-        else
-                vsx_buffer_append_printf(&buf, "Player %i", player_num);
-
-        if (strcmp(vsx_player_get_name(player), (const char *) buf.data)) {
-                fprintf(stderr,
-                        "Wrong player name reported.\n"
-                        " Expected: %s\n"
-                        " Received: %s\n",
-                        (const char *) buf.data,
-                        vsx_player_get_name(player));
-                closure->succeeded = false;
-        }
+        int comp = strcmp((const char *) buf.data,
+                          event->player_name_changed.name);
 
         vsx_buffer_destroy(&buf);
 
-        if (vsx_connection_get_player(closure->harness->connection,
-                                      player_num) != player) {
+        if (comp) {
                 fprintf(stderr,
-                        "Player reported by get_player not same as iterating "
-                        "players\n");
-                closure->succeeded = false;
-                return;
+                        "Changed player name does not match expected\n"
+                        " Expected: Player %i\n"
+                        " Received: %s\n",
+                        closure->player_num,
+                        event->player_name_changed.name);
+                return false;
         }
+
+        return true;
 }
 
 static bool
@@ -2162,7 +1920,15 @@ test_send_all_players(void)
                 buf.data[1] = buf.length - 2;
                 buf.data[3] = player_num;
 
-                if (!write_data(harness, buf.data, buf.length)) {
+                struct check_add_all_player_name_closure closure = {
+                        .player_num = player_num,
+                };
+
+                if (!check_event(harness,
+                                 VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                                 check_add_all_player_name_cb,
+                                 buf.data, buf.length,
+                                 &closure)) {
                         ret = false;
                         goto out;
                 }
@@ -2170,29 +1936,6 @@ test_send_all_players(void)
 
         /* Update one of the players */
         if (!add_player(harness)) {
-                ret = false;
-                goto out;
-        }
-
-        struct check_players_closure closure = {
-                .harness = harness,
-                .next_player_num = 0,
-                .succeeded = true,
-        };
-
-        vsx_connection_foreach_player(harness->connection,
-                                      check_players_cb,
-                                      &closure);
-
-        if (!closure.succeeded) {
-                ret = false;
-                goto out;
-        }
-
-        if (closure.next_player_num != 256) {
-                fprintf(stderr,
-                        "vsx_connection_foreach_player didn’t report "
-                        "all the players\n");
                 ret = false;
                 goto out;
         }

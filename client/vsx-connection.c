@@ -29,8 +29,6 @@
 #include <poll.h>
 #include <errno.h>
 
-#include "vsx-player-private.h"
-#include "vsx-tile-private.h"
 #include "vsx-proto.h"
 #include "vsx-list.h"
 #include "vsx-util.h"
@@ -124,7 +122,6 @@ struct vsx_connection {
 
         char *room;
         char *player_name;
-        struct vsx_player *self;
         bool has_person_id;
         uint64_t person_id;
         enum vsx_connection_running_state running_state;
@@ -170,23 +167,6 @@ struct vsx_connection {
          * changes.
          */
         struct vsx_connection_event poll_changed_event;
-
-        /* Array of pointers to players, indexed by player num. This can
-         * have NULL gaps.
-         */
-        struct vsx_buffer players;
-
-        /* Slab allocator for vsx_tile */
-        struct vsx_slab_allocator tile_allocator;
-        /* Array of pointers to tiles, indexed by tile num. This can have
-         * NULL gaps.
-         */
-        struct vsx_buffer tiles;
-
-        /* The total number of tiles that the game will have according
-         * to what was sent to us by the server.
-         */
-        int n_tiles;
 
         /* true if we have received a sync message since the last time
          * we reconnected.
@@ -293,51 +273,6 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
         update_poll(connection);
 }
 
-static void *
-get_pointer_from_buffer(struct vsx_buffer *buf, int num)
-{
-        size_t n_entries = buf->length / sizeof (void *);
-
-        if (num >= n_entries)
-                return NULL;
-
-        return ((void **) buf->data)[num];
-}
-
-static void
-set_pointer_in_buffer(struct vsx_buffer *buf,
-                      int num,
-                      void *value)
-{
-        size_t n_entries = buf->length / sizeof (void *);
-
-        if (num >= n_entries) {
-                size_t old_length = buf->length;
-                vsx_buffer_set_length(buf, (num + 1) * sizeof (void *));
-                memset(buf->data + old_length,
-                       0,
-                       num * sizeof (void *) - old_length);
-        }
-
-        ((void **) buf->data)[num] = value;
-}
-
-static struct vsx_player *
-get_or_create_player(struct vsx_connection *connection,
-                     int player_num)
-{
-        struct vsx_player *player =
-                get_pointer_from_buffer(&connection->players, player_num);
-
-        if (player == NULL) {
-                player = vsx_calloc(sizeof *player);
-                player->num = player_num;
-                set_pointer_in_buffer(&connection->players, player_num, player);
-        }
-
-        return player;
-}
-
 static bool
 handle_player_id(struct vsx_connection *connection,
                  const uint8_t *payload,
@@ -362,11 +297,6 @@ handle_player_id(struct vsx_connection *connection,
                               "The server sent an invalid player_id command");
                 return false;
         }
-
-        connection->self = get_or_create_player(connection, self_num);
-
-        /* Assume that self is connected until told otherwise */
-        connection->self->flags |= VSX_PLAYER_CONNECTED;
 
         connection->has_person_id = true;
         connection->player_id_received_timestamp = vsx_monotonic_get();
@@ -405,8 +335,6 @@ handle_n_tiles(struct vsx_connection *connection,
                               "The server sent an invalid n_tiles command");
                 return false;
         }
-
-        connection->n_tiles = n_tiles;
 
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
@@ -451,7 +379,6 @@ handle_message(struct vsx_connection *connection,
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_MESSAGE,
                 .message = {
-                        .player = get_or_create_player(connection, person),
                         .player_num = person,
                         .message = text,
                 },
@@ -500,38 +427,14 @@ handle_tile(struct vsx_connection *connection,
                 return false;
         }
 
-        bool is_new = false;
-
-        struct vsx_tile *tile =
-                get_pointer_from_buffer(&connection->tiles, num);
-
-        if (tile == NULL) {
-                tile = vsx_slab_allocate(&connection->tile_allocator,
-                                         sizeof *tile,
-                                         alignof *tile);
-
-                tile->num = num;
-
-                set_pointer_in_buffer(&connection->tiles, num, tile);
-
-                is_new = true;
-        }
-
-        tile->last_player_moved = player;
-        tile->x = x;
-        tile->y = y;
-        tile->letter = vsx_utf8_get_char(letter);
-
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
                 .tile_changed = {
-                        .new_tile = is_new,
                         .num = num,
                         .last_player_moved = player,
                         .x = x,
                         .y = y,
                         .letter = vsx_utf8_get_char(letter),
-                        .tile = tile,
                 },
         };
 
@@ -542,14 +445,14 @@ handle_tile(struct vsx_connection *connection,
 
 static void
 emit_shouting_changed(struct vsx_connection *connection,
-                      struct vsx_player *player)
+                      int player_num,
+                      bool shouting)
 {
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
                 .player_shouting_changed = {
-                        .player = player,
-                        .player_num = vsx_player_get_number(player),
-                        .shouting = vsx_player_is_shouting(player),
+                        .player_num = player_num,
+                        .shouting = shouting,
                 },
         };
 
@@ -559,17 +462,14 @@ emit_shouting_changed(struct vsx_connection *connection,
 static void
 remove_shout(struct vsx_connection *connection)
 {
-        if (connection->shouting_player == -1)
-                return;
+        int shouting_player = connection->shouting_player;
 
-        struct vsx_player *player =
-                get_or_create_player(connection, connection->shouting_player);
+        if (shouting_player == -1)
+                return;
 
         connection->shouting_player = -1;
 
-        player->shouting = false;
-
-        emit_shouting_changed(connection, player);
+        emit_shouting_changed(connection, shouting_player, false);
 }
 
 static bool
@@ -598,15 +498,9 @@ handle_player_name(struct vsx_connection *connection,
                 return false;
         }
 
-        struct vsx_player *player = get_or_create_player(connection, num);
-
-        vsx_free(player->name);
-        player->name = vsx_strdup(name);
-
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
                 .player_name_changed = {
-                        .player = player,
                         .player_num = num,
                         .name = name,
                 },
@@ -641,14 +535,9 @@ handle_player(struct vsx_connection *connection,
                 return false;
         }
 
-        struct vsx_player *player = get_or_create_player(connection, num);
-
-        player->flags = flags;
-
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
                 .player_flags_changed = {
-                        .player = player,
                         .player_num = num,
                         .flags = flags,
                 },
@@ -689,12 +578,7 @@ handle_player_shouted(struct vsx_connection *connection,
 
                 connection->shouting_player = player_num;
 
-                struct vsx_player *player =
-                        get_or_create_player(connection, player_num);
-
-                player->shouting = true;
-
-                emit_shouting_changed(connection, player);
+                emit_shouting_changed(connection, player_num, true);
         }
 
         return true;
@@ -1632,11 +1516,6 @@ vsx_connection_new(const char *room,
 
         connection->next_message_num = 0;
 
-        vsx_buffer_init(&connection->players);
-
-        vsx_slab_init(&connection->tile_allocator);
-        vsx_buffer_init(&connection->tiles);
-
         vsx_list_init(&connection->tiles_to_move);
         vsx_list_init(&connection->messages_to_send);
 
@@ -1666,26 +1545,6 @@ free_messages_to_send(struct vsx_connection *connection)
         }
 }
 
-static void
-free_players(struct vsx_connection *connection)
-{
-        int n_players =
-                connection->players.length / sizeof (struct vsx_player *);
-
-        for (int i = 0; i < n_players; i++) {
-                struct vsx_player *player =
-                        ((struct vsx_player **) connection->players.data)[i];
-
-                if (player == NULL)
-                        continue;
-
-                vsx_free(player->name);
-                vsx_free(player);
-        }
-
-        vsx_buffer_destroy(&connection->players);
-}
-
 void
 vsx_connection_free(struct vsx_connection *connection)
 {
@@ -1693,11 +1552,6 @@ vsx_connection_free(struct vsx_connection *connection)
 
         vsx_free(connection->room);
         vsx_free(connection->player_name);
-
-        free_players(connection);
-
-        vsx_buffer_destroy(&connection->tiles);
-        vsx_slab_destroy(&connection->tile_allocator);
 
         free_tiles_to_move(connection);
         free_messages_to_send(connection);
@@ -1750,72 +1604,10 @@ vsx_connection_leave(struct vsx_connection *connection)
         update_poll(connection);
 }
 
-const struct vsx_player *
-vsx_connection_get_player(struct vsx_connection *connection, int player_num)
-{
-        return get_pointer_from_buffer(&connection->players, player_num);
-}
-
-void
-vsx_connection_foreach_player(struct vsx_connection *connection,
-                              vsx_connection_foreach_player_cb callback,
-                              void *user_data)
-{
-        int n_players =
-                connection->players.length / sizeof (struct vsx_player *);
-
-        for (int i = 0; i < n_players; i++) {
-                struct vsx_player *player =
-                        ((struct vsx_player **)connection->players.data)[i];
-
-                if (player == NULL)
-                        continue;
-
-                callback(player, user_data);
-        }
-}
-
-const struct vsx_player *
-vsx_connection_get_self(struct vsx_connection *connection)
-{
-        return connection->self;
-}
-
-const struct vsx_tile *
-vsx_connection_get_tile(struct vsx_connection *connection,
-                        int tile_num)
-{
-        return get_pointer_from_buffer(&connection->tiles, tile_num);
-}
-
-void
-vsx_connection_foreach_tile(struct vsx_connection *connection,
-                            vsx_connection_foreach_tile_cb callback,
-                            void *user_data)
-{
-        int n_tiles = connection->tiles.length / sizeof (struct vsx_tile *);
-
-        for (int i = 0; i < n_tiles; i++) {
-                struct vsx_tile *tile =
-                        ((struct vsx_tile **)connection->tiles.data)[i];
-
-                if (tile == NULL)
-                        continue;
-
-                callback(tile, user_data);
-        }
-}
-
 struct vsx_signal *
 vsx_connection_get_event_signal(struct vsx_connection *connection)
 {
         return &connection->event_signal;
-}
-
-int
-vsx_connection_get_n_tiles(struct vsx_connection *connection)
-{
-        return connection->n_tiles;
 }
 
 void

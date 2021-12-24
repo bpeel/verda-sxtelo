@@ -10,11 +10,9 @@ connection_src = [
         '../common/vsx-file-error.c',
         '../common/vsx-list.c',
         '../common/vsx-netaddress.c',
-        'vsx-player.c',
         '../common/vsx-proto.c',
         '../common/vsx-slab.c',
         '../common/vsx-socket.c',
-        'vsx-tile.c',
         '../common/vsx-utf8.c',
         '../common/vsx-util.c',
 ]

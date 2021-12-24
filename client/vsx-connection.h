@@ -21,8 +21,6 @@
 
 #include <stdint.h>
 
-#include "vsx-player.h"
-#include "vsx-tile.h"
 #include "vsx-signal.h"
 #include "vsx-netaddress.h"
 #include "vsx-error.h"
@@ -67,13 +65,11 @@ struct vsx_connection_event {
                 } header;
 
                 struct {
-                        const struct vsx_player *player;
                         uint8_t player_num;
                         const char *message;
                 } message;
 
                 struct {
-                        const struct vsx_player *player;
                         uint8_t player_num;
                         const char *name;
                 } player_name_changed;
@@ -81,22 +77,18 @@ struct vsx_connection_event {
                 struct {
                         uint8_t player_num;
                         uint8_t flags;
-                        const struct vsx_player *player;
                 } player_flags_changed;
 
                 struct {
                         uint8_t player_num;
                         bool shouting;
-                        const struct vsx_player *player;
                 } player_shouting_changed;
 
                 struct {
-                        bool new_tile;
                         uint8_t num;
                         uint8_t last_player_moved;
                         int16_t x, y;
                         uint32_t letter;
-                        const struct vsx_tile *tile;
                 } tile_changed;
 
                 struct {
@@ -179,38 +171,6 @@ vsx_connection_send_message(struct vsx_connection *connection,
 
 void
 vsx_connection_leave(struct vsx_connection *connection);
-
-const struct vsx_player *
-vsx_connection_get_player(struct vsx_connection *connection,
-                          int player_num);
-
-typedef void
-(* vsx_connection_foreach_player_cb)(const struct vsx_player *player,
-                                     void *user_data);
-
-void
-vsx_connection_foreach_player(struct vsx_connection *connection,
-                              vsx_connection_foreach_player_cb callback,
-                              void *user_data);
-
-const struct vsx_player *
-vsx_connection_get_self(struct vsx_connection *connection);
-
-const struct vsx_tile *
-vsx_connection_get_tile(struct vsx_connection *connection,
-                        int tile_num);
-
-int
-vsx_connection_get_n_tiles(struct vsx_connection *connetion);
-
-typedef void
-(* vsx_connection_foreach_tile_cb)(const struct vsx_tile *tile,
-                                   void *user_data);
-
-void
-vsx_connection_foreach_tile(struct vsx_connection *connection,
-                            vsx_connection_foreach_tile_cb callback,
-                            void *user_data);
 
 struct vsx_signal *
 vsx_connection_get_event_signal(struct vsx_connection *connection);
