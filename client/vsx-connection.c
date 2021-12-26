@@ -197,6 +197,8 @@ static void
 emit_event(struct vsx_connection *connection,
            struct vsx_connection_event *event)
 {
+        event->synced = connection->synced;
+
         vsx_signal_emit(&connection->event_signal, event);
 }
 
@@ -1490,12 +1492,6 @@ vsx_connection_get_running(struct vsx_connection *connection)
 {
         return (connection->running_state !=
                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED);
-}
-
-bool
-vsx_connection_is_synced(struct vsx_connection *connection)
-{
-        return connection->synced;
 }
 
 struct vsx_connection *

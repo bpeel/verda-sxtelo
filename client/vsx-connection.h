@@ -54,6 +54,15 @@ enum vsx_connection_event_type {
 struct vsx_connection_event {
         enum vsx_connection_event_type type;
 
+        /* True if this as a new event triggered from a normal event
+         * that has recently occured, or false if this event is
+         * triggered because the connection is catching up to the
+         * server state such as after first connecting or
+         * reconnecting. This can be used for example to decide
+         * whether to animate the event.
+         */
+        bool synced;
+
         union {
                 struct {
                         struct vsx_error *error;
@@ -139,9 +148,6 @@ vsx_connection_set_running(struct vsx_connection *connection,
 
 bool
 vsx_connection_get_running(struct vsx_connection *connection);
-
-bool
-vsx_connection_is_synced(struct vsx_connection *connection);
 
 bool
 vsx_connection_get_typing(struct vsx_connection *connection);

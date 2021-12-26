@@ -1947,6 +1947,42 @@ out:
         return ret;
 }
 
+struct check_synced_closure {
+        bool synced;
+};
+
+static bool
+check_synced_cb(struct harness *harness,
+                const struct vsx_connection_event *event,
+                void *user_data)
+{
+        struct check_synced_closure *closure = user_data;
+
+        closure->synced = event->synced;
+
+        return true;
+}
+
+static bool
+check_synced(struct harness *harness, bool *synced)
+{
+        struct check_synced_closure closure;
+
+        /* Change a player name so that we can check the synced value
+         * in the corresponding event.
+         */
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                         check_synced_cb,
+                         (const uint8_t *) "\x82\x05\x04\x00!!\x00", 7,
+                         &closure))
+                return false;
+
+        *synced = closure.synced;
+
+        return true;
+}
+
 static bool
 test_sync(void)
 {
@@ -1958,8 +1994,15 @@ test_sync(void)
         bool ret = true;
 
         for (int i = 0; i < 2; i++) {
+                bool synced;
+
+                if (!check_synced(harness, &synced)) {
+                        ret = false;
+                        goto out;
+                }
+
                 /* A new connection shouldn’t be synced */
-                if (vsx_connection_is_synced(harness->connection)) {
+                if (synced) {
                         fprintf(stderr,
                                 "Newly %s connection is already synced\n",
                                 i == 0 ? "created" : "reconnected");
@@ -1972,7 +2015,12 @@ test_sync(void)
                         goto out;
                 }
 
-                if (!vsx_connection_is_synced(harness->connection)) {
+                if (!check_synced(harness, &synced)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!synced) {
                         fprintf(stderr,
                                 "Connection is not synced after sending sync "
                                 "command\n");
