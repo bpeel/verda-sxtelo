@@ -45,6 +45,8 @@ struct box_draw_command {
 
 struct vsx_board_painter {
         struct vsx_game_state *game_state;
+        struct vsx_listener event_listener;
+
         struct vsx_painter_toolbox *toolbox;
 
         GLuint program;
@@ -378,6 +380,26 @@ _Static_assert(VSX_N_ELEMENTS(player_boxes) == VSX_GAME_STATE_N_VISIBLE_PLAYERS,
 #define N_BOARD_VERTICES (N_BOARD_QUADS * 4)
 
 static void
+event_cb(struct vsx_listener *listener,
+         void *user_data)
+{
+        struct vsx_board_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_board_painter,
+                                 event_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+        default:
+                break;
+        }
+}
+
+static void
 texture_load_cb(const struct vsx_image *image,
                 struct vsx_error *error,
                 void *data)
@@ -574,6 +596,10 @@ create_cb(struct vsx_game_state *game_state,
                                                      "board.mpng",
                                                      texture_load_cb,
                                                      painter);
+
+        painter->event_listener.notify = event_cb;
+        vsx_signal_add(vsx_game_state_get_event_signal(game_state),
+                       &painter->event_listener);
 
         return painter;
 }
