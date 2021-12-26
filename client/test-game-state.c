@@ -683,6 +683,15 @@ test_send_all_tiles(void)
                 }
         }
 
+        if (vsx_game_state_get_n_tiles(harness->game_state) != 256) {
+                fprintf(stderr,
+                        "After sending all tiles the game state reported "
+                        "%zu tiles\n",
+                        vsx_game_state_get_n_tiles(harness->game_state));
+                ret = false;
+                goto out;
+        }
+
 out:
         free_harness(harness);
 
