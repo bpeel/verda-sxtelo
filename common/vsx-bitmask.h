@@ -81,7 +81,7 @@ vsx_bitmask_get(const vsx_bitmask_element_t *elements,
                 int flag_num)
 {
         return (elements[vsx_bitmask_get_element(flag_num)] &
-                ~(1UL << vsx_bitmask_get_bit(flag_num)));
+                (1UL << vsx_bitmask_get_bit(flag_num)));
 }
 
 #endif /* VSX_BITMASK_H */
