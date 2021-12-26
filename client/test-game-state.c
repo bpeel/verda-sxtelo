@@ -698,12 +698,253 @@ out:
         return ret;
 }
 
+struct check_players_closure {
+        struct harness *harness;
+        int next_player_num;
+        bool succeeded;
+};
+
+static void
+check_players_cb(const char *name,
+                 enum vsx_game_state_player_flag flags,
+                 void *user_data)
+{
+        struct check_players_closure *closure = user_data;
+        int player_num = closure->next_player_num++;
+
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+        if (player_num == 1)
+                vsx_buffer_append_string(&buf, "George");
+        else
+                vsx_buffer_append_printf(&buf, "Player %i", player_num);
+
+        if (strcmp(name, (const char *) buf.data)) {
+                fprintf(stderr,
+                        "Wrong player name reported.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        (const char *) buf.data,
+                        name);
+                closure->succeeded = false;
+        }
+
+        int expected_flags = player_num & 0x3;
+
+        if (expected_flags != flags) {
+                fprintf(stderr,
+                        "Wrong flags reported.\n"
+                        " Expected: 0x%x\n"
+                        " Received: 0x%x\n",
+                        expected_flags,
+                        flags);
+                closure->succeeded = false;
+        }
+
+        vsx_buffer_destroy(&buf);
+}
+
+static bool
+check_player_added_cb(struct harness *harness,
+                      const struct vsx_connection_event *event,
+                      void *user_data)
+{
+        if (event->player_name_changed.player_num != 1) {
+                fprintf(stderr,
+                        "Expected other player to have number 1 but got %i\n",
+                        event->player_name_changed.player_num);
+                return false;
+        }
+
+        if (strcmp(event->player_name_changed.name, "George")) {
+                fprintf(stderr,
+                        "Other player is not called George: %s\n",
+                        event->player_name_changed.name);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+add_player(struct harness *harness)
+{
+        static const uint8_t add_player_message[] =
+                "\x82\x09\x04\x01George\x00";
+
+        return check_event(harness,
+                           VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                           check_player_added_cb,
+                           add_player_message,
+                           sizeof add_player_message - 1,
+                           NULL /* user_data */);
+}
+
+struct check_player_added_closure {
+        int player_num;
+};
+
+static bool
+check_player_name_added_cb(struct harness *harness,
+                           const struct vsx_connection_event *event,
+                           void *user_data)
+{
+        struct check_player_added_closure *closure = user_data;
+
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+        bool ret = true;
+
+        vsx_buffer_append_printf(&buf, "Player %i", closure->player_num);
+
+        if (strcmp((char *) buf.data, event->player_name_changed.name)) {
+                fprintf(stderr,
+                        "Player name different\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        (const char *) buf.data,
+                        event->player_name_changed.name);
+                ret = false;
+                goto out;
+        }
+
+        if (event->player_name_changed.player_num != closure->player_num) {
+                fprintf(stderr,
+                        "Expected name change event for %i but got %i\n",
+                        closure->player_num,
+                        event->player_name_changed.player_num);
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_buffer_destroy(&buf);
+        return ret;
+}
+
+static bool
+check_player_flags_added_cb(struct harness *harness,
+                            const struct vsx_connection_event *event,
+                            void *user_data)
+{
+        struct check_player_added_closure *closure = user_data;
+
+        if (event->player_flags_changed.player_num != closure->player_num) {
+                fprintf(stderr,
+                        "Expected flags changed event for %i but got %i\n",
+                        closure->player_num,
+                        event->player_flags_changed.player_num);
+                return false;
+        }
+
+        int expected_flags = closure->player_num & 0x3;
+
+        if (event->player_flags_changed.flags != expected_flags) {
+                fprintf(stderr,
+                        "Expected flags to be 0x%x but got 0x%x\n",
+                        expected_flags,
+                        event->player_flags_changed.flags);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_send_all_players(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+        /* Add all of the possible players */
+        for (int i = 0; i < 256; i++) {
+                /* Send them in a strange order */
+                int player_num = i ^ 1;
+
+                vsx_buffer_set_length(&buf, 0);
+                vsx_buffer_append_string(&buf, "\x82\xff\x04\xff");
+                vsx_buffer_append_printf(&buf, "Player %i", player_num);
+                buf.length++;
+                buf.data[1] = buf.length - 2;
+                buf.data[3] = player_num;
+
+                struct check_player_added_closure closure = {
+                        .player_num = player_num,
+                };
+
+                if (!check_event(harness,
+                                 VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                                 check_player_name_added_cb,
+                                 buf.data, buf.length,
+                                 &closure)) {
+                        ret = false;
+                        goto out;
+                }
+
+                vsx_buffer_set_length(&buf, 0);
+                vsx_buffer_append_string(&buf, "\x82\x03\x05");
+                vsx_buffer_append_c(&buf, player_num);
+                vsx_buffer_append_c(&buf, player_num & 0x3);
+
+                if (!check_event(harness,
+                                 VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                                 check_player_flags_added_cb,
+                                 buf.data, buf.length,
+                                 &closure)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        /* Update one of the players */
+        if (!add_player(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        struct check_players_closure closure = {
+                .harness = harness,
+                .next_player_num = 0,
+                .succeeded = true,
+        };
+
+        vsx_game_state_foreach_player(harness->game_state,
+                                      check_players_cb,
+                                      &closure);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.next_player_num != VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
+                fprintf(stderr,
+                        "vsx_game_state_foreach_player didn’t report "
+                        "all the players\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_buffer_destroy(&buf);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
         int ret = EXIT_SUCCESS;
 
         if (!test_send_all_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_all_players())
                 ret = EXIT_FAILURE;
 
         vsx_main_thread_clean_up();
