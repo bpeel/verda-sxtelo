@@ -111,10 +111,6 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
 
 /* This signal will only ever be emitted from the main thread */
 struct vsx_signal *
-vsx_game_state_get_modified_signal(struct vsx_game_state *game_state);
-
-/* This signal will only ever be emitted from the main thread */
-struct vsx_signal *
 vsx_game_state_get_event_signal(struct vsx_game_state *game_state);
 
 void

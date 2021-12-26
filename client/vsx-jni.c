@@ -50,7 +50,6 @@ struct data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
-        struct vsx_listener modified_listener;
 
         /* Weak pointer to the surface view so that we can queue redraws */
         jobject surface;
@@ -143,29 +142,6 @@ wakeup_cb(void *user_data)
         call_void_surface_method(data, data->queue_flush_idle_method_id);
 }
 
-static void
-game_state_modified_cb(struct vsx_listener *listener,
-                       void *user_data)
-{
-        struct data *data =
-                vsx_container_of(listener, struct data, modified_listener);
-
-        queue_redraw(data);
-}
-
-static void
-init_game_state(struct data *data)
-{
-        data->game_state = vsx_game_state_new(data->worker,
-                                              data->connection);
-
-        struct vsx_signal *modified_signal =
-                vsx_game_state_get_modified_signal(data->game_state);
-
-        data->modified_listener.notify = game_state_modified_cb;
-        vsx_signal_add(modified_signal, &data->modified_listener);
-}
-
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -215,7 +191,8 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                                  "gemelo.org",
                                                  5144);
 
-                init_game_state(data);
+                data->game_state = vsx_game_state_new(data->worker,
+                                                      data->connection);
 
                 vsx_worker_lock(data->worker);
 

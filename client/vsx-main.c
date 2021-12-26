@@ -72,7 +72,6 @@ struct vsx_main_data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
-        struct vsx_listener modified_listener;
 
         bool button_pressed;
         int mouse_x, mouse_y;
@@ -538,31 +537,6 @@ init_sdl(struct vsx_main_data *main_data)
 }
 
 static void
-game_state_modified_cb(struct vsx_listener *listener,
-                       void *user_data)
-{
-        struct vsx_main_data *main_data =
-                vsx_container_of(listener,
-                                 struct vsx_main_data,
-                                 modified_listener);
-
-        main_data->redraw_queued = true;
-}
-
-static void
-init_game_state(struct vsx_main_data *main_data)
-{
-        main_data->game_state = vsx_game_state_new(main_data->worker,
-                                                   main_data->connection);
-
-        struct vsx_signal *modified_signal =
-                vsx_game_state_get_modified_signal(main_data->game_state);
-
-        main_data->modified_listener.notify = game_state_modified_cb;
-        vsx_signal_add(modified_signal, &main_data->modified_listener);
-}
-
-static void
 redraw_needed_cb(struct vsx_listener *listener,
                  void *signal_data)
 {
@@ -623,7 +597,8 @@ main(int argc, char **argv)
                 goto out;
         }
 
-        init_game_state(main_data);
+        main_data->game_state = vsx_game_state_new(main_data->worker,
+                                                   main_data->connection);
 
         if (!init_painter(main_data)) {
                 ret = EXIT_FAILURE;
