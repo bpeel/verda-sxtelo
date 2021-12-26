@@ -1948,14 +1948,6 @@ out:
 }
 
 static bool
-check_end_cb(struct harness *harness,
-             const struct vsx_connection_event *event,
-             void *user_data)
-{
-        return true;
-}
-
-static bool
 test_sync(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2006,6 +1998,14 @@ out:
         free_harness(harness);
 
         return ret;
+}
+
+static bool
+check_end_cb(struct harness *harness,
+             const struct vsx_connection_event *event,
+             void *user_data)
+{
+        return true;
 }
 
 static bool
