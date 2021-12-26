@@ -34,6 +34,8 @@
 
 struct vsx_tile_painter {
         struct vsx_game_state *game_state;
+        struct vsx_listener event_listener;
+
         struct vsx_painter_toolbox *toolbox;
 
         GLuint program;
@@ -72,6 +74,25 @@ struct vertex {
 };
 
 #define TILE_SIZE 20
+
+static void
+event_cb(struct vsx_listener *listener,
+         void *user_data)
+{
+        struct vsx_tile_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_tile_painter,
+                                 event_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+        default:
+                break;
+        }
+}
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -147,6 +168,10 @@ create_cb(struct vsx_game_state *game_state,
                                                      "tiles.mpng",
                                                      texture_load_cb,
                                                      painter);
+
+        painter->event_listener.notify = event_cb;
+        vsx_signal_add(vsx_game_state_get_event_signal(game_state),
+                       &painter->event_listener);
 
         return painter;
 }
