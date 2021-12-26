@@ -194,6 +194,13 @@ struct vsx_connection {
 };
 
 static void
+emit_event(struct vsx_connection *connection,
+           struct vsx_connection_event *event)
+{
+        vsx_signal_emit(&connection->event_signal, event);
+}
+
+static void
 vsx_connection_signal_error(struct vsx_connection *connection,
                             struct vsx_error *error)
 {
@@ -202,7 +209,7 @@ vsx_connection_signal_error(struct vsx_connection *connection,
                 .error = { .error = error },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 }
 
 static void
@@ -309,7 +316,7 @@ handle_player_id(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -343,7 +350,7 @@ handle_n_tiles(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -384,7 +391,7 @@ handle_message(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -438,7 +445,7 @@ handle_tile(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -456,7 +463,7 @@ emit_shouting_changed(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 }
 
 static void
@@ -506,7 +513,7 @@ handle_player_name(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -543,7 +550,7 @@ handle_player(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -627,7 +634,7 @@ handle_end(struct vsx_connection *connection,
                 .type = VSX_CONNECTION_EVENT_TYPE_END,
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -1399,8 +1406,7 @@ update_poll(struct vsx_connection *connection)
                 connection->poll_changed_event.poll_changed.wakeup_time =
                         wakeup_timestamp;
 
-                vsx_signal_emit(&connection->event_signal,
-                                &connection->poll_changed_event);
+                emit_event(connection, &connection->poll_changed_event);
         }
 }
 
@@ -1476,7 +1482,7 @@ vsx_connection_set_running(struct vsx_connection *connection,
                 .running_state_changed = { .running = running },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 }
 
 bool
