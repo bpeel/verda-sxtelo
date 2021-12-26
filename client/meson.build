@@ -109,3 +109,18 @@ test_worker = executable('test-worker',
                          dependencies: [thread_dep],
                          include_directories: inc_dirs)
 test('worker', test_worker)
+
+test_game_state_src = [
+        'test-game-state.c',
+        'vsx-game-state.c',
+        'vsx-main-thread.c',
+        'vsx-monotonic.c',
+        'vsx-thread-linux.c',
+        'vsx-worker.c',
+] + connection_src
+
+test_game_state = executable('test-game-state',
+                             test_game_state_src,
+                             dependencies: [thread_dep],
+                             include_directories: inc_dirs)
+test('game-state', test_game_state)
