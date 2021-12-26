@@ -79,6 +79,7 @@ struct vsx_game_state {
         uint32_t time_counter;
 
         struct vsx_signal modified_signal;
+        struct vsx_signal event_signal;
 
         pthread_mutex_t mutex;
 
@@ -309,6 +310,8 @@ flush_queue_cb(void *data)
 
         vsx_list_for_each(queued_event, &event_queue, link) {
                 handle_event(game_state, &queued_event->event);
+                vsx_signal_emit(&game_state->event_signal,
+                                &queued_event->event);
                 vsx_connection_destroy_event(&queued_event->event);
         }
 
@@ -407,6 +410,7 @@ vsx_game_state_new(struct vsx_worker *worker,
         pthread_mutex_init(&game_state->mutex, NULL /* attr */);
 
         vsx_signal_init(&game_state->modified_signal);
+        vsx_signal_init(&game_state->event_signal);
 
         vsx_list_init(&game_state->event_queue);
         vsx_list_init(&game_state->freed_events);
@@ -447,6 +451,12 @@ struct vsx_signal *
 vsx_game_state_get_modified_signal(struct vsx_game_state *game_state)
 {
         return &game_state->modified_signal;
+}
+
+struct vsx_signal *
+vsx_game_state_get_event_signal(struct vsx_game_state *game_state)
+{
+        return &game_state->event_signal;
 }
 
 static void
