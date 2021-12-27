@@ -218,19 +218,20 @@ handle_player_shouting_changed(struct vsx_game_state *game_state,
 {
         int player_num = event->player_shouting_changed.player_num;
 
-        if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
-                return;
-
         struct vsx_game_state_player *player =
-                game_state->players + player_num;
+                player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS ?
+                game_state->players + player_num :
+                NULL;
 
         if (event->player_shouting_changed.shouting) {
-                player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+                if (player)
+                        player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
 
                 game_state->shouting_player = player_num;
                 set_shout_state_for_player(game_state, player_num);
         } else {
-                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+                if (player)
+                        player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
 
                 if (player_num == game_state->shouting_player) {
                         game_state->shouting_player = -1;
