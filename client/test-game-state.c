@@ -1169,6 +1169,56 @@ out:
         return ret;
 }
 
+static bool
+test_non_visible_shouting(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        static const uint8_t add_players_message[] =
+                "\x82\x04\x04\x01g\x00"
+                "\x82\x04\x04\x02h\x00"
+                "\x82\x04\x04\x03i\x00"
+                "\x82\x04\x04\x04j\x00"
+                "\x82\x04\x04\x05k\x00"
+                "\x82\x04\x04\x06l\x00";
+
+        if (!write_data(harness,
+                        add_players_message,
+                        (sizeof add_players_message) - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Ignore the messages */
+        if (!wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_shout(harness,
+                        6, /* player_num */
+                        -1 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_shout(harness,
+                        1, /* player_num */
+                        6 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1181,6 +1231,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_shouting())
+                ret = EXIT_FAILURE;
+
+        if (!test_non_visible_shouting())
                 ret = EXIT_FAILURE;
 
         vsx_main_thread_clean_up();
