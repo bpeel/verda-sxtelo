@@ -35,10 +35,18 @@
 #include "vsx-board.h"
 #include "vsx-buffer.h"
 #include "vsx-slab.h"
+#include "vsx-monotonic.h"
 
 struct vsx_tile_painter_tile {
         int num;
         int16_t current_x, current_y;
+        int16_t start_x, start_y;
+        int16_t target_x, target_y;
+
+        bool animating;
+        int64_t animation_start_time;
+        int64_t animation_end_time;
+
         const struct vsx_tile_texture_letter *letter_data;
         struct vsx_list link;
 };
@@ -92,6 +100,12 @@ struct vertex {
 };
 
 #define TILE_SIZE 20
+
+/* The speed of tile animations measured in board units per second.
+ *
+ * 0.5 second to travel the width of the board.
+ */
+#define ANIMATION_SPEED (VSX_BOARD_WIDTH * 2)
 
 static void
 ensure_n_tiles(struct vsx_tile_painter *painter,
@@ -169,6 +183,49 @@ find_letter(uint32_t letter)
 }
 
 static void
+start_animation(struct vsx_tile_painter_tile *tile)
+{
+        if (tile->current_x != tile->target_x ||
+            tile->current_y != tile->target_y) {
+                tile->animating = true;
+                tile->animation_start_time = vsx_monotonic_get();
+
+                tile->start_x = tile->current_x;
+                tile->start_y = tile->current_y;
+
+                int dx = tile->start_x - tile->target_x;
+                int dy = tile->start_y - tile->target_y;
+
+                float animation_distance = sqrtf(dx * dx + dy * dy);
+
+                int64_t animation_ms = roundf(animation_distance *
+                                              1000.0f /
+                                              ANIMATION_SPEED);
+
+                tile->animation_end_time =
+                        tile->animation_start_time + animation_ms * 1000;
+        } else {
+                tile->animating = false;
+        }
+}
+
+static void
+cancel_drag(struct vsx_tile_painter *painter)
+{
+        struct vsx_tile_painter_tile *tile = painter->dragging_tile;
+
+        if (tile == NULL)
+                return;
+
+        tile->current_x = painter->drag_board_x;
+        tile->current_y = painter->drag_board_y;
+
+        start_animation(tile);
+
+        painter->dragging_tile = NULL;
+}
+
+static void
 handle_tile_event(struct vsx_tile_painter *painter,
                   const struct vsx_connection_event *event)
 {
@@ -176,19 +233,30 @@ handle_tile_event(struct vsx_tile_painter *painter,
         struct vsx_tile_painter_tile *tile =
                 get_tile_by_index(painter, event->tile_changed.num, &is_new);
 
-        if (is_new)
+        if (is_new) {
                 tile->letter_data = find_letter(event->tile_changed.letter);
+                tile->current_x = VSX_BOARD_WIDTH;
+                tile->current_y = VSX_BOARD_HEIGHT / 4;
+        }
 
-        tile->current_x = event->tile_changed.x;
-        tile->current_y = event->tile_changed.y;
+        tile->target_x = event->tile_changed.x;
+        tile->target_y = event->tile_changed.y;
 
-        if (tile == painter->dragging_tile &&
-            event->tile_changed.last_player_moved !=
-            vsx_game_state_get_self(painter->game_state)) {
-                /* The tile has been moved by someone else while we
-                 * were trying to drag it. Cancel the drag.
-                 */
-                painter->dragging_tile = NULL;
+        if (tile == painter->dragging_tile) {
+                if (event->tile_changed.last_player_moved !=
+                    vsx_game_state_get_self(painter->game_state)) {
+                        /* The tile has been moved by someone else
+                         * while we were trying to drag it. Cancel the
+                         * drag.
+                         */
+                        cancel_drag(painter);
+                }
+        } else if (event->synced) {
+                start_animation(tile);
+        } else {
+                tile->animating = false;
+                tile->current_x = tile->target_x;
+                tile->current_y = tile->target_y;
         }
 
         /* Move the tile to the end of the list so that it will be
@@ -367,7 +435,7 @@ handle_drag_start(struct vsx_tile_painter *painter,
                               event->drag.x, event->drag.y,
                               &board_x, &board_y);
 
-        painter->dragging_tile = NULL;
+        cancel_drag(painter);
 
         if (board_x < 0 || board_x >= VSX_BOARD_WIDTH ||
             board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
@@ -458,6 +526,56 @@ free_buffer(struct vsx_tile_painter *painter)
                 vsx_gl.glDeleteBuffers(1, &painter->element_buffer);
                 painter->element_buffer = 0;
         }
+}
+
+static int
+interpolate_animation(int start_pos, int end_pos,
+                      int64_t start_time, int64_t end_time,
+                      int64_t now)
+{
+        return (start_pos +
+                (now - start_time) *
+                (end_pos - start_pos) /
+                (end_time - start_time));
+}
+
+static bool
+update_tile_animations(struct vsx_tile_painter *painter)
+{
+        bool any_tiles_animating = false;
+        int64_t now = vsx_monotonic_get();
+
+        struct vsx_tile_painter_tile *tile;
+
+        vsx_list_for_each(tile, &painter->tile_list, link) {
+                if (!tile->animating)
+                        continue;
+
+                if (now >= tile->animation_end_time) {
+                        tile->animating = false;
+                        tile->current_x = tile->target_x;
+                        tile->current_y = tile->target_y;
+                        continue;
+                }
+
+                int64_t start_time = tile->animation_start_time;
+                int64_t end_time = tile->animation_end_time;
+
+                tile->current_x = interpolate_animation(tile->start_x,
+                                                        tile->target_x,
+                                                        start_time,
+                                                        end_time,
+                                                        now);
+                tile->current_y = interpolate_animation(tile->start_y,
+                                                        tile->target_y,
+                                                        start_time,
+                                                        end_time,
+                                                        now);
+
+                any_tiles_animating = true;
+        }
+
+        return any_tiles_animating;
 }
 
 static void
@@ -593,7 +711,9 @@ paint_cb(void *painter_data)
          */
         if (vsx_game_state_get_shout_state(painter->game_state) ==
             VSX_GAME_STATE_SHOUT_STATE_OTHER)
-                painter->dragging_tile = NULL;
+                cancel_drag(painter);
+
+        bool any_tiles_animating = update_tile_animations(painter);
 
         ensure_buffer_size(painter, n_tiles);
 
@@ -648,6 +768,9 @@ paint_cb(void *painter_data)
                                    NULL /* indices */);
 
         vsx_gl.glDisable(GL_SCISSOR_TEST);
+
+        if (any_tiles_animating)
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static struct vsx_signal *
