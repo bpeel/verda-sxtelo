@@ -1288,6 +1288,47 @@ out:
         return ret;
 }
 
+static bool
+test_send_commands(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_shout(harness->game_state);
+
+        if (!expect_data(harness, (const uint8_t *) "\x82\x01\x8a", 3)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_turn(harness->game_state);
+
+        if (!expect_data(harness, (const uint8_t *) "\x82\x01\x89", 3)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_move_tile(harness->game_state,
+                                 5, /* tile_num */
+                                 4, 2 /* x/y */);
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x06\x88\x05\x04\x00\x02\x00",
+                         8)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1303,6 +1344,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_non_visible_shouting())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_commands())
                 ret = EXIT_FAILURE;
 
         vsx_main_thread_clean_up();
