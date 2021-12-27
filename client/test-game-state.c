@@ -1289,6 +1289,26 @@ out:
 }
 
 static bool
+check_time_counter(struct harness *harness,
+                   uint32_t expected_value)
+{
+        uint32_t actual_value =
+                vsx_game_state_get_time_counter(harness->game_state);
+
+        if (expected_value != actual_value) {
+                fprintf(stderr,
+                        "time counter does not have expected value.\n"
+                        " Expected: %" PRIu32 "\n"
+                        " Received: %" PRIu32 "\n",
+                        expected_value,
+                        actual_value);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
 test_send_commands(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1298,6 +1318,9 @@ test_send_commands(void)
 
         bool ret = true;
 
+        uint32_t start_time_counter =
+                vsx_game_state_get_time_counter(harness->game_state);
+
         vsx_game_state_shout(harness->game_state);
 
         if (!expect_data(harness, (const uint8_t *) "\x82\x01\x8a", 3)) {
@@ -1305,9 +1328,19 @@ test_send_commands(void)
                 goto out;
         }
 
+        if (!check_time_counter(harness, start_time_counter + 1)) {
+                ret = false;
+                goto out;
+        }
+
         vsx_game_state_turn(harness->game_state);
 
         if (!expect_data(harness, (const uint8_t *) "\x82\x01\x89", 3)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_time_counter(harness, start_time_counter + 2)) {
                 ret = false;
                 goto out;
         }
@@ -1320,6 +1353,11 @@ test_send_commands(void)
                          (const uint8_t *)
                          "\x82\x06\x88\x05\x04\x00\x02\x00",
                          8)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_time_counter(harness, start_time_counter + 3)) {
                 ret = false;
                 goto out;
         }
