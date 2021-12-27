@@ -217,25 +217,26 @@ struct drag_start_tile_closure {
 };
 
 static void
-drag_start_tile_cb(const struct vsx_game_state_tile *tile,
+drag_start_tile_cb(const struct vsx_connection_event *event,
+                   uint32_t update_time,
                    void *user_data)
 {
         struct drag_start_tile_closure *closure = user_data;
         struct vsx_tile_painter *painter = closure->painter;
 
-        if (closure->board_x < tile->x ||
-            closure->board_x >= tile->x + TILE_SIZE ||
-            closure->board_y < tile->y ||
-            closure->board_y >= tile->y + TILE_SIZE)
+        if (closure->board_x < event->tile_changed.x ||
+            closure->board_x >= event->tile_changed.x + TILE_SIZE ||
+            closure->board_y < event->tile_changed.y ||
+            closure->board_y >= event->tile_changed.y + TILE_SIZE)
                 return;
 
-        painter->dragging_tile = tile->number;
-        painter->drag_offset_x = tile->x - closure->board_x;
-        painter->drag_offset_y = tile->y - closure->board_y;
+        painter->dragging_tile = event->tile_changed.num;
+        painter->drag_offset_x = event->tile_changed.x - closure->board_x;
+        painter->drag_offset_y = event->tile_changed.y - closure->board_y;
         painter->dragging_start_time =
                 vsx_game_state_get_time_counter(painter->game_state);
-        painter->drag_board_x = tile->x;
-        painter->drag_board_y = tile->y;
+        painter->drag_board_x = event->tile_changed.x;
+        painter->drag_board_y = event->tile_changed.y;
 }
 
 static bool
@@ -439,21 +440,23 @@ store_tile_quad(struct tile_closure *closure,
 }
 
 static void
-tile_cb(const struct vsx_game_state_tile *tile,
+tile_cb(const struct vsx_connection_event *event,
+        uint32_t update_time,
         void *user_data)
 {
         struct tile_closure *closure = user_data;
         struct vsx_tile_painter *painter = closure->painter;
 
         const struct vsx_tile_texture_letter *letter_data =
-                find_letter(tile->letter);
+                find_letter(event->tile_changed.letter);
 
         if (letter_data == NULL)
                 return;
 
-        if (tile->number == painter->dragging_tile) {
-                if (!tile->last_moved_by_self &&
-                    tile->update_time > painter->dragging_start_time) {
+        if (event->tile_changed.num == painter->dragging_tile) {
+                if (event->tile_changed.last_player_moved !=
+                    vsx_game_state_get_self(painter->game_state) &&
+                    update_time > painter->dragging_start_time) {
                         /* The tile has been moved by someone else
                          * while we were trying to drag it. Cancel the
                          * drag.
@@ -465,7 +468,10 @@ tile_cb(const struct vsx_game_state_tile *tile,
                 }
         }
 
-        store_tile_quad(closure, tile->x, tile->y, letter_data);
+        store_tile_quad(closure,
+                        event->tile_changed.x,
+                        event->tile_changed.y,
+                        letter_data);
 }
 
 static void

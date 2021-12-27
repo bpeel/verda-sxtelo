@@ -51,18 +51,6 @@ enum vsx_game_state_shout_state {
         VSX_GAME_STATE_SHOUT_STATE_OTHER,
 };
 
-struct vsx_game_state_tile {
-        int number;
-        int16_t x, y;
-        uint32_t letter;
-        /* The value from vsx_game_state_get_time_counter for when this
-         * tile was last modified.
-         */
-        uint32_t update_time;
-        /* The if the last player that moved the tile is this client */
-        bool last_moved_by_self;
-};
-
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
@@ -74,7 +62,8 @@ size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
 
 typedef void
-(* vsx_game_state_foreach_tile_cb)(const struct vsx_game_state_tile *tile,
+(* vsx_game_state_foreach_tile_cb)(const struct vsx_connection_event *tile,
+                                   uint32_t update_time,
                                    void *user_data);
 
 void

@@ -600,11 +600,12 @@ struct check_tiles_closure {
 };
 
 static void
-check_tiles_cb(const struct vsx_game_state_tile *tile,
+check_tiles_cb(const struct vsx_connection_event *event,
+               uint32_t update_time,
                void *user_data)
 {
         struct check_tiles_closure *closure = user_data;
-        int tile_num = tile->number;
+        int tile_num = event->tile_changed.num;
 
         if (tile_num < 0 || tile_num > 255) {
                 fprintf(stderr,
@@ -627,24 +628,24 @@ check_tiles_cb(const struct vsx_game_state_tile *tile,
         int16_t x = tile_num * 257;
         int y = (tile_num & 1) ? -tile_num : tile_num;
 
-        if (x != tile->x || y != tile->y) {
+        if (x != event->tile_changed.x || y != event->tile_changed.y) {
                 fprintf(stderr,
                         "Wrong tile position reported.\n"
                         " Expected: %i,%i\n"
                         " Received: %i,%i\n",
                         x, y,
-                        tile->x, tile->y);
+                        event->tile_changed.x, event->tile_changed.y);
                 closure->succeeded = false;
                 return;
         }
 
         char letter = tile_num % 26 + 'A';
 
-        if (letter != tile->letter) {
+        if (letter != event->tile_changed.letter) {
                 fprintf(stderr,
                         "Reported tile letter does not match. (%c != %c)\n",
                         letter,
-                        tile->letter);
+                        event->tile_changed.letter);
                 closure->succeeded = false;
                 return;
         }

@@ -38,8 +38,9 @@ struct vsx_game_state_player {
         enum vsx_game_state_player_flag flags;
 };
 
-struct vsx_game_state_tile_private {
-        struct vsx_game_state_tile public;
+struct vsx_game_state_tile {
+        struct vsx_connection_event event;
+        uint32_t update_time;
         struct vsx_list link;
 };
 
@@ -107,7 +108,7 @@ ensure_n_tiles(struct vsx_game_state *game_state,
                int n_tiles)
 {
         size_t new_length =
-                sizeof (struct vsx_game_state_tile_private *) * n_tiles;
+                sizeof (struct vsx_game_state_tile *) * n_tiles;
         size_t old_length = game_state->tiles_by_index.length;
 
         if (new_length > old_length) {
@@ -118,17 +119,17 @@ ensure_n_tiles(struct vsx_game_state *game_state,
         }
 }
 
-static struct vsx_game_state_tile_private *
+static struct vsx_game_state_tile *
 get_tile_by_index(struct vsx_game_state *game_state,
                   int tile_num)
 {
         ensure_n_tiles(game_state, tile_num + 1);
 
-        struct vsx_game_state_tile_private **tile_pointers =
-                (struct vsx_game_state_tile_private **)
+        struct vsx_game_state_tile **tile_pointers =
+                (struct vsx_game_state_tile **)
                 game_state->tiles_by_index.data;
 
-        struct vsx_game_state_tile_private *tile = tile_pointers[tile_num];
+        struct vsx_game_state_tile *tile = tile_pointers[tile_num];
 
         if (tile == NULL) {
                 tile = vsx_slab_allocate(&game_state->tile_allocator,
@@ -145,7 +146,7 @@ size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
 {
         return (game_state->tiles_by_index.length /
-                sizeof (struct vsx_game_state_tile_private *));
+                sizeof (struct vsx_game_state_tile *));
 }
 
 void
@@ -153,10 +154,10 @@ vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
                             vsx_game_state_foreach_tile_cb cb,
                             void *user_data)
 {
-        struct vsx_game_state_tile_private *tile;
+        struct vsx_game_state_tile *tile;
 
         vsx_list_for_each(tile, &game_state->tile_list, link) {
-                cb(&tile->public, user_data);
+                cb(&tile->event, tile->update_time, user_data);
         }
 }
 
@@ -245,22 +246,18 @@ static void
 handle_tile_changed(struct vsx_game_state *game_state,
                     const struct vsx_connection_event *event)
 {
-        struct vsx_game_state_tile_private *state_tile =
+        struct vsx_game_state_tile *tile =
                 get_tile_by_index(game_state, event->tile_changed.num);
 
-        state_tile->public.number = event->tile_changed.num;
-        state_tile->public.x = event->tile_changed.x;
-        state_tile->public.y = event->tile_changed.y;
-        state_tile->public.letter = event->tile_changed.letter;
-        state_tile->public.update_time = game_state->time_counter;
-        state_tile->public.last_moved_by_self =
-                event->tile_changed.last_player_moved == game_state->self;
+        tile->event = *event;
+        tile->event.synced = false;
+        tile->update_time = game_state->time_counter;
 
         /* Move the tile to the end of the list so that the list will
          * always been in reverse order of most recently updated.
          */
-        vsx_list_remove(&state_tile->link);
-        vsx_list_insert(game_state->tile_list.prev, &state_tile->link);
+        vsx_list_remove(&tile->link);
+        vsx_list_insert(game_state->tile_list.prev, &tile->link);
 }
 
 static void
