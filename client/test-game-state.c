@@ -478,12 +478,22 @@ send_player_id(struct harness *harness)
 {
         static const uint8_t player_id_header[] = "\x82\x0a\x00ghijklmn\x00";
 
-        return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_HEADER,
-                           check_header_cb,
-                           player_id_header,
-                           sizeof player_id_header - 1,
-                           NULL /* user_data */);
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_HEADER,
+                         check_header_cb,
+                         player_id_header,
+                         sizeof player_id_header - 1,
+                         NULL /* user_data */))
+                return false;
+
+        if (vsx_game_state_get_self(harness->game_state) != 0) {
+                fprintf(stderr,
+                        "self is not 0 (=%i)\n",
+                        vsx_game_state_get_self(harness->game_state));
+                return false;
+        }
+
+        return true;
 }
 
 static struct harness *
@@ -1418,10 +1428,58 @@ out:
         return ret;
 }
 
+static bool
+test_self(void)
+{
+        struct harness *harness = create_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        if (!read_ws_request(harness) ||
+            !write_data(harness, (const uint8_t *) "\r\n\r\n", 4) ||
+            !read_new_player_request(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!write_data(harness,
+                        (const uint8_t *)
+                        "\x82\x0a\x00ghijklmn\x10",
+                        12)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_game_state_get_self(harness->game_state) != 16) {
+                fprintf(stderr,
+                        "unexpected self value.\n"
+                        " Expected: 16\n"
+                        " Received: %i\n",
+                        vsx_game_state_get_self(harness->game_state));
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
         int ret = EXIT_SUCCESS;
+
+        if (!test_self())
+                ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())
                 ret = EXIT_FAILURE;

@@ -444,6 +444,12 @@ vsx_game_state_get_shout_state(struct vsx_game_state *game_state)
         return game_state->shout_state;
 }
 
+int
+vsx_game_state_get_self(struct vsx_game_state *game_state)
+{
+        return game_state->self;
+}
+
 struct vsx_signal *
 vsx_game_state_get_event_signal(struct vsx_game_state *game_state)
 {

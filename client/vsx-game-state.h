@@ -92,6 +92,9 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
                               vsx_game_state_foreach_player_cb,
                               void *user_data);
 
+int
+vsx_game_state_get_self(struct vsx_game_state *game_state);
+
 enum vsx_game_state_shout_state
 vsx_game_state_get_shout_state(struct vsx_game_state *game_state);
 
