@@ -390,11 +390,11 @@ free_main_data(struct vsx_main_data *main_data)
 
         finish_sdl(main_data);
 
-        if (main_data->worker)
-                vsx_worker_free(main_data->worker);
-
         if (main_data->game_state)
                 vsx_game_state_free(main_data->game_state);
+
+        if (main_data->worker)
+                vsx_worker_free(main_data->worker);
 
         if (main_data->connection)
                 vsx_connection_free(main_data->connection);
