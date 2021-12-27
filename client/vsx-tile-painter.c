@@ -24,6 +24,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
+#include <stdalign.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-quad-buffer.h"
@@ -31,6 +33,15 @@
 #include "vsx-mipmap.h"
 #include "vsx-gl.h"
 #include "vsx-board.h"
+#include "vsx-buffer.h"
+#include "vsx-slab.h"
+
+struct vsx_tile_painter_tile {
+        int num;
+        int16_t current_x, current_y;
+        const struct vsx_tile_texture_letter *letter_data;
+        struct vsx_list link;
+};
 
 struct vsx_tile_painter {
         struct vsx_game_state *game_state;
@@ -49,10 +60,17 @@ struct vsx_tile_painter {
         GLuint tex;
         struct vsx_image_loader_token *image_token;
 
-        /* The tile that is currently being dragged or -1 if there is no tile */
-        int dragging_tile;
-        /* The game_state time counter value of when the dragging started */
-        uint32_t dragging_start_time;
+        /* Array of tile pointers indexed by tile number */
+        struct vsx_buffer tiles_by_index;
+        /* List of tiles in reverse order of last updated */
+        struct vsx_list tile_list;
+        /* Slab allocator for the tiles */
+        struct vsx_slab_allocator tile_allocator;
+
+        /* The tile that is currently being dragged or NULL if there
+         * is no tile.
+         */
+        struct vsx_tile_painter_tile *dragging_tile;
         /* The offset to add to the cursor board position to get the
          * topleft of the tile.
          */
@@ -76,6 +94,113 @@ struct vertex {
 #define TILE_SIZE 20
 
 static void
+ensure_n_tiles(struct vsx_tile_painter *painter,
+               int n_tiles)
+{
+        size_t new_length =
+                sizeof (struct vsx_tile_painter_tile *) * n_tiles;
+        size_t old_length = painter->tiles_by_index.length;
+
+        if (new_length > old_length) {
+                vsx_buffer_set_length(&painter->tiles_by_index, new_length);
+                memset(painter->tiles_by_index.data + old_length,
+                       0,
+                       new_length - old_length);
+        }
+}
+
+static struct vsx_tile_painter_tile *
+get_tile_by_index(struct vsx_tile_painter *painter,
+                  int tile_num,
+                  bool *is_new)
+{
+        ensure_n_tiles(painter, tile_num + 1);
+
+        struct vsx_tile_painter_tile **tile_pointers =
+                (struct vsx_tile_painter_tile **)
+                painter->tiles_by_index.data;
+
+        struct vsx_tile_painter_tile *tile = tile_pointers[tile_num];
+
+        if (tile == NULL) {
+                size_t alignment = alignof(struct vsx_tile_painter_tile);
+
+                tile = vsx_slab_allocate(&painter->tile_allocator,
+                                         sizeof *tile,
+                                         alignment);
+                tile_pointers[tile_num] = tile;
+                vsx_list_insert(painter->tile_list.prev, &tile->link);
+
+                tile->num = tile_num;
+
+                *is_new = true;
+        } else {
+                *is_new = false;
+        }
+
+        return tile;
+}
+
+static size_t
+get_n_tiles(struct vsx_tile_painter *painter)
+{
+        return (painter->tiles_by_index.length /
+                sizeof (struct vsx_tile_painter_tile *));
+}
+
+static const struct vsx_tile_texture_letter *
+find_letter(uint32_t letter)
+{
+        int min = 0, max = VSX_TILE_TEXTURE_N_LETTERS;
+
+        while (min < max) {
+                int mid = (min + max) / 2;
+                uint32_t mid_letter = vsx_tile_texture_letters[mid].letter;
+
+                if (mid_letter > letter)
+                        max = mid;
+                else if (mid_letter == letter)
+                        return vsx_tile_texture_letters + mid;
+                else
+                        min = mid + 1;
+        }
+
+        return NULL;
+}
+
+static void
+handle_tile_event(struct vsx_tile_painter *painter,
+                  const struct vsx_connection_event *event)
+{
+        bool is_new;
+        struct vsx_tile_painter_tile *tile =
+                get_tile_by_index(painter, event->tile_changed.num, &is_new);
+
+        if (is_new)
+                tile->letter_data = find_letter(event->tile_changed.letter);
+
+        tile->current_x = event->tile_changed.x;
+        tile->current_y = event->tile_changed.y;
+
+        if (tile == painter->dragging_tile &&
+            event->tile_changed.last_player_moved !=
+            vsx_game_state_get_self(painter->game_state)) {
+                /* The tile has been moved by someone else while we
+                 * were trying to drag it. Cancel the drag.
+                 */
+                painter->dragging_tile = NULL;
+        }
+
+        /* Move the tile to the end of the list so that it will be
+         * drawn last.
+         */
+        vsx_list_remove(&tile->link);
+        vsx_list_insert(painter->tile_list.prev, &tile->link);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
 event_cb(struct vsx_listener *listener,
          void *user_data)
 {
@@ -87,7 +212,7 @@ event_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                handle_tile_event(painter, event);
                 break;
         default:
                 break;
@@ -132,6 +257,16 @@ texture_load_cb(const struct vsx_image *image,
 }
 
 static void
+init_tiles_cb(const struct vsx_connection_event *event,
+              uint32_t update_time,
+              void *user_data)
+{
+        struct vsx_tile_painter *painter = user_data;
+
+        handle_tile_event(painter, event);
+}
+
+static void
 init_program(struct vsx_tile_painter *painter,
              struct vsx_shader_data *shader_data)
 {
@@ -160,6 +295,10 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
+        vsx_buffer_init(&painter->tiles_by_index);
+        vsx_slab_init(&painter->tile_allocator);
+        vsx_list_init(&painter->tile_list);
+
         vsx_signal_init(&painter->redraw_needed_signal);
 
         init_program(painter, &toolbox->shader_data);
@@ -172,6 +311,10 @@ create_cb(struct vsx_game_state *game_state,
         painter->event_listener.notify = event_cb;
         vsx_signal_add(vsx_game_state_get_event_signal(game_state),
                        &painter->event_listener);
+
+        vsx_game_state_foreach_tile(painter->game_state,
+                                    init_tiles_cb,
+                                    painter);
 
         return painter;
 }
@@ -211,34 +354,6 @@ screen_coord_to_board(struct vsx_paint_state *paint_state,
         }
 }
 
-struct drag_start_tile_closure {
-        struct vsx_tile_painter *painter;
-        int board_x, board_y;
-};
-
-static void
-drag_start_tile_cb(const struct vsx_connection_event *event,
-                   uint32_t update_time,
-                   void *user_data)
-{
-        struct drag_start_tile_closure *closure = user_data;
-        struct vsx_tile_painter *painter = closure->painter;
-
-        if (closure->board_x < event->tile_changed.x ||
-            closure->board_x >= event->tile_changed.x + TILE_SIZE ||
-            closure->board_y < event->tile_changed.y ||
-            closure->board_y >= event->tile_changed.y + TILE_SIZE)
-                return;
-
-        painter->dragging_tile = event->tile_changed.num;
-        painter->drag_offset_x = event->tile_changed.x - closure->board_x;
-        painter->drag_offset_y = event->tile_changed.y - closure->board_y;
-        painter->dragging_start_time =
-                vsx_game_state_get_time_counter(painter->game_state);
-        painter->drag_board_x = event->tile_changed.x;
-        painter->drag_board_y = event->tile_changed.y;
-}
-
 static bool
 handle_drag_start(struct vsx_tile_painter *painter,
                   const struct vsx_input_event *event)
@@ -247,32 +362,42 @@ handle_drag_start(struct vsx_tile_painter *painter,
             VSX_GAME_STATE_SHOUT_STATE_OTHER)
                 return false;
 
-        struct drag_start_tile_closure closure = {
-                .painter = painter,
-        };
+        int board_x, board_y;
 
         screen_coord_to_board(&painter->toolbox->paint_state,
                               event->drag.x, event->drag.y,
-                              &closure.board_x, &closure.board_y);
+                              &board_x, &board_y);
 
-        painter->dragging_tile = -1;
+        painter->dragging_tile = NULL;
 
-        if (closure.board_x < 0 || closure.board_x >= VSX_BOARD_WIDTH ||
-            closure.board_y < 0 || closure.board_y >= VSX_BOARD_HEIGHT)
+        if (board_x < 0 || board_x >= VSX_BOARD_WIDTH ||
+            board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
                 return false;
 
-        vsx_game_state_foreach_tile(painter->game_state,
-                                    drag_start_tile_cb,
-                                    &closure);
+        struct vsx_tile_painter_tile *tile;
 
-        return painter->dragging_tile != -1;
+        vsx_list_for_each(tile, &painter->tile_list, link) {
+                if (board_x < tile->current_x ||
+                    board_x >= tile->current_x + TILE_SIZE ||
+                    board_y < tile->current_y ||
+                    board_y >= tile->current_y + TILE_SIZE)
+                        continue;
+
+                painter->dragging_tile = tile;
+                painter->drag_offset_x = tile->current_x - board_x;
+                painter->drag_offset_y = tile->current_y - board_y;
+                painter->drag_board_x = tile->current_x;
+                painter->drag_board_y = tile->current_y;
+        }
+
+        return painter->dragging_tile != NULL;
 }
 
 static bool
 handle_drag(struct vsx_tile_painter *painter,
             const struct vsx_input_event *event)
 {
-        if (painter->dragging_tile == -1)
+        if (painter->dragging_tile == NULL)
                 return false;
 
         int board_x, board_y;
@@ -289,7 +414,7 @@ handle_drag(struct vsx_tile_painter *painter,
         painter->drag_board_y = board_y + painter->drag_offset_y;
 
         vsx_game_state_move_tile(painter->game_state,
-                                 painter->dragging_tile,
+                                 painter->dragging_tile->num,
                                  painter->drag_board_x,
                                  painter->drag_board_y);
 
@@ -381,39 +506,12 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
         painter->buffer_n_tiles = n_tiles;
 }
 
-static const struct vsx_tile_texture_letter *
-find_letter(uint32_t letter)
-{
-        int min = 0, max = VSX_TILE_TEXTURE_N_LETTERS;
-
-        while (min < max) {
-                int mid = (min + max) / 2;
-                uint32_t mid_letter = vsx_tile_texture_letters[mid].letter;
-
-                if (mid_letter > letter)
-                        max = mid;
-                else if (mid_letter == letter)
-                        return vsx_tile_texture_letters + mid;
-                else
-                        min = mid + 1;
-        }
-
-        return NULL;
-}
-
-struct tile_closure {
-        struct vsx_tile_painter *painter;
-        struct vertex *vertices;
-        int quad_num;
-        const struct vsx_tile_texture_letter *dragged_letter_data;
-};
-
-static void
-store_tile_quad(struct tile_closure *closure,
+static struct vertex *
+store_tile_quad(struct vertex *vertices,
                 int tile_x, int tile_y,
                 const struct vsx_tile_texture_letter *letter_data)
 {
-        struct vertex *v = closure->vertices + closure->quad_num * 4;
+        struct vertex *v = vertices;
 
         v->x = tile_x;
         v->y = tile_y;
@@ -436,42 +534,40 @@ store_tile_quad(struct tile_closure *closure,
         v->t = letter_data->t2;
         v++;
 
-        closure->quad_num++;
+        return v;
 }
 
-static void
-tile_cb(const struct vsx_connection_event *event,
-        uint32_t update_time,
-        void *user_data)
+static size_t
+generate_tile_vertices(struct vsx_tile_painter *painter,
+                       struct vertex *vertices)
 {
-        struct tile_closure *closure = user_data;
-        struct vsx_tile_painter *painter = closure->painter;
+        struct vertex *v = vertices;
+        struct vsx_tile_painter_tile *tile;
 
-        const struct vsx_tile_texture_letter *letter_data =
-                find_letter(event->tile_changed.letter);
+        vsx_list_for_each(tile, &painter->tile_list, link) {
+                if (tile == painter->dragging_tile)
+                        continue;
 
-        if (letter_data == NULL)
-                return;
+                if (tile->letter_data == NULL)
+                        continue;
 
-        if (event->tile_changed.num == painter->dragging_tile) {
-                if (event->tile_changed.last_player_moved !=
-                    vsx_game_state_get_self(painter->game_state) &&
-                    update_time > painter->dragging_start_time) {
-                        /* The tile has been moved by someone else
-                         * while we were trying to drag it. Cancel the
-                         * drag.
-                         */
-                        painter->dragging_tile = -1;
-                } else {
-                        closure->dragged_letter_data = letter_data;
-                        return;
-                }
+                v = store_tile_quad(v,
+                                    tile->current_x,
+                                    tile->current_y,
+                                    tile->letter_data);
         }
 
-        store_tile_quad(closure,
-                        event->tile_changed.x,
-                        event->tile_changed.y,
-                        letter_data);
+        /* Paint the dragged tile last so that it will always be above
+         * the others.
+         */
+        if (painter->dragging_tile && painter->dragging_tile->letter_data) {
+                v = store_tile_quad(v,
+                                    painter->drag_board_x,
+                                    painter->drag_board_y,
+                                    painter->dragging_tile->letter_data);
+        }
+
+        return v - vertices;
 }
 
 static void
@@ -486,7 +582,7 @@ paint_cb(void *painter_data)
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        int n_tiles = vsx_game_state_get_n_tiles(painter->game_state);
+        int n_tiles = get_n_tiles(painter);
 
         if (n_tiles <= 0)
                 return;
@@ -498,39 +594,25 @@ paint_cb(void *painter_data)
          */
         if (vsx_game_state_get_shout_state(painter->game_state) ==
             VSX_GAME_STATE_SHOUT_STATE_OTHER)
-                painter->dragging_tile = -1;
+                painter->dragging_tile = NULL;
 
         ensure_buffer_size(painter, n_tiles);
 
-        struct tile_closure closure = {
-                .painter = painter,
-                .quad_num = 0,
-                .dragged_letter_data = NULL,
-        };
-
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
-        closure.vertices = vsx_map_buffer_map(GL_ARRAY_BUFFER,
-                                              painter->buffer_n_tiles *
-                                              4 * sizeof (struct vertex),
-                                              true, /* flush_explicit */
-                                              GL_DYNAMIC_DRAW);
+        struct vertex *vertices =
+                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                                   painter->buffer_n_tiles *
+                                   4 * sizeof (struct vertex),
+                                   true, /* flush_explicit */
+                                   GL_DYNAMIC_DRAW);
 
-        vsx_game_state_foreach_tile(painter->game_state, tile_cb, &closure);
+        size_t n_vertices = generate_tile_vertices(painter, vertices);
+        size_t n_quads = n_vertices / 4;
 
-        /* Paint the dragged tile last so that it will always be above
-         * the others.
-         */
-        if (closure.dragged_letter_data) {
-                store_tile_quad(&closure,
-                                painter->drag_board_x,
-                                painter->drag_board_y,
-                                closure.dragged_letter_data);
-        }
+        assert(n_quads <= n_tiles);
 
-        assert(closure.quad_num <= n_tiles);
-
-        vsx_map_buffer_flush(0, closure.quad_num * 4 * sizeof (struct vertex));
+        vsx_map_buffer_flush(0, n_vertices * sizeof (struct vertex));
 
         vsx_map_buffer_unmap();
 
@@ -538,7 +620,7 @@ paint_cb(void *painter_data)
          * tiles that the server sent had letters that we don’t
          * recognise.
          */
-        if (closure.quad_num <= 0)
+        if (n_vertices <= 0)
                 return;
 
         vsx_gl.glUseProgram(painter->program);
@@ -561,8 +643,8 @@ paint_cb(void *painter_data)
                          paint_state->board_scissor_height);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
-                                   0, closure.quad_num * 4 - 1,
-                                   closure.quad_num * 6,
+                                   0, n_vertices - 1,
+                                   n_quads * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
@@ -588,6 +670,9 @@ free_cb(void *painter_data)
                 vsx_image_loader_cancel(painter->image_token);
         if (painter->tex)
                 vsx_gl.glDeleteTextures(1, &painter->tex);
+
+        vsx_buffer_destroy(&painter->tiles_by_index);
+        vsx_slab_destroy(&painter->tile_allocator);
 
         vsx_free(painter);
 }
