@@ -69,6 +69,7 @@ struct check_event_listener {
         enum vsx_connection_event_type expected_type;
         check_event_func cb;
         struct harness *harness;
+        uint32_t expected_time_counter;
         void *user_data;
 };
 
@@ -162,6 +163,7 @@ check_event_cb(struct vsx_listener *listener, void *data)
                 vsx_container_of(listener,
                                  struct check_event_listener,
                                  listener);
+        struct harness *harness = ce_listener->harness;
         const struct vsx_connection_event *event = data;
 
         if (ce_listener->result != CHECK_EVENT_RESULT_NO_MESSAGE) {
@@ -175,13 +177,24 @@ check_event_cb(struct vsx_listener *listener, void *data)
                         ce_listener->expected_type,
                         event->type);
                 ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-        } else if (ce_listener->cb(ce_listener->harness,
-                                   event,
-                                   ce_listener->user_data)) {
-                ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
-        } else {
+        } else if (!ce_listener->cb(ce_listener->harness,
+                                    event,
+                                    ce_listener->user_data)) {
                 ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+        } else if (ce_listener->expected_time_counter !=
+                   vsx_game_state_get_time_counter(harness->game_state)) {
+                fprintf(stderr,
+                        "Time value does not match expected\n"
+                        " Expected %" PRIu32 "\n"
+                        " Received %" PRIu32 "\n",
+                        ce_listener->expected_time_counter,
+                        vsx_game_state_get_time_counter(harness->game_state));
+                ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+        } else {
+                ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
         }
+
+        ce_listener->expected_time_counter++;
 }
 
 static bool
@@ -198,6 +211,8 @@ check_event(struct harness *harness,
                 .expected_type = expected_type,
                 .cb = cb,
                 .harness = harness,
+                .expected_time_counter =
+                vsx_game_state_get_time_counter(harness->game_state) + 1,
                 .user_data = user_data,
         };
 
