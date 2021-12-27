@@ -480,7 +480,9 @@ free_freed_events(struct vsx_game_state *game_state)
 void
 vsx_game_state_free(struct vsx_game_state *game_state)
 {
+        vsx_worker_lock(game_state->worker);
         vsx_list_remove(&game_state->event_listener.link);
+        vsx_worker_unlock(game_state->worker);
 
         for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
                 vsx_free(game_state->players[i].name);
