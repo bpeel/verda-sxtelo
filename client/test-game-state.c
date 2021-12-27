@@ -128,7 +128,7 @@ main_thread_wakeup_cb(void *user_data)
 }
 
 static bool
-wait_for_idle_queue(struct harness *harness)
+wait_for_idle_queue_no_flush(struct harness *harness)
 {
         /* Wait for up to a second to give the worker thread some time
          * to queue an idle event.
@@ -151,6 +151,16 @@ wait_for_idle_queue(struct harness *harness)
 
 idle_queued:
         harness->idle_queued = false;
+
+        return true;
+}
+
+static bool
+wait_for_idle_queue(struct harness *harness)
+{
+        if (!wait_for_idle_queue_no_flush(harness))
+                return false;
+
         vsx_main_thread_flush_idle_events();
 
         return true;
@@ -1382,6 +1392,32 @@ out:
         return ret;
 }
 
+static bool
+test_dangling_events(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Update n_tiles so that the game state will queue an event */
+        if (!write_data(harness, (const uint8_t *) "\x82\x02\x02\x10", 4) ||
+            !wait_for_idle_queue_no_flush(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Now let the harness be freed before the game state gets a
+         * chance to emit the event.
+         */
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1401,6 +1437,14 @@ main(int argc, char **argv)
 
         if (!test_send_commands())
                 ret = EXIT_FAILURE;
+
+        if (!test_dangling_events())
+                ret = EXIT_FAILURE;
+
+        /* Flush any pending main thread events to make sure they were
+         * all cleaned up
+         */
+        vsx_main_thread_flush_idle_events();
 
         vsx_main_thread_clean_up();
 
