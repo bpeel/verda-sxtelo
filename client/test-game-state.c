@@ -938,6 +938,60 @@ out:
         return ret;
 }
 
+struct check_shouting_flags_closure {
+        int shouting_player;
+        int player_num;
+        bool succeeded;
+};
+
+static void
+check_shouting_flags_cb(const char *name,
+                        enum vsx_game_state_player_flag flags,
+                        void *user_data)
+{
+        struct check_shouting_flags_closure *closure = user_data;
+
+        enum vsx_game_state_player_flag expected_flag;
+
+        if (closure->shouting_player == closure->player_num)
+                expected_flag = VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+        else
+                expected_flag = 0;
+
+        enum vsx_game_state_player_flag actual_flag =
+                (flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING);
+
+        if (expected_flag != actual_flag) {
+                fprintf(stderr,
+                        "Shouting flag not as expected for player %i.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        closure->player_num,
+                        expected_flag,
+                        actual_flag);
+                closure->succeeded = false;
+        }
+
+        closure->player_num++;
+}
+
+static bool
+check_shouting_flags(struct harness *harness,
+                     int shouting_player)
+{
+        struct check_shouting_flags_closure closure = {
+                .shouting_player = shouting_player,
+                .succeeded = true,
+                .player_num = 0,
+        };
+
+        vsx_game_state_foreach_player(harness->game_state,
+                                      check_shouting_flags_cb,
+                                      &closure);
+
+        return closure.succeeded;
+}
+
 struct check_shouting_closure {
         int clear_shouting_player;
         int set_shouting_player;
@@ -1104,11 +1158,21 @@ test_shouting(void)
                 goto out;
         }
 
+        if (!check_shouting_flags(harness, 1)) {
+                ret = false;
+                goto out;
+        }
+
         int64_t shout_start_time = vsx_monotonic_get();
 
         if (!send_shout(harness,
                         0, /* player_num */
                         1 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_shouting_flags(harness, 0)) {
                 ret = false;
                 goto out;
         }
@@ -1160,6 +1224,11 @@ test_shouting(void)
                         "Expected shout to be cleared after 10 seconds but it "
                         "took %f\n",
                         delay);
+                ret = false;
+                goto out;
+        }
+
+        if (!check_shouting_flags(harness, -1)) {
                 ret = false;
                 goto out;
         }
