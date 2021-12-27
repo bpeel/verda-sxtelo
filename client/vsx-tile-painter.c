@@ -83,6 +83,12 @@ struct vsx_tile_painter {
          * topleft of the tile.
          */
         int drag_offset_x, drag_offset_y;
+        /* This becomes true after a drag event is received that is
+         * far enough way to start the dragging.
+         */
+        bool drag_validated;
+        /* The event position of the start of the drag. */
+        int drag_start_event_x, drag_start_event_y;
 
         /* Tile that we will move next to if any other tile is
          * clicked, or NULL if no snap position is known. The position
@@ -110,6 +116,11 @@ struct vertex {
  * 0.5 second to travel the width of the board.
  */
 #define ANIMATION_SPEED (VSX_BOARD_WIDTH * 2)
+
+/* Min distance in mm that a tile has to be dragged before it will
+ * start moving.
+ */
+#define MIN_DRAG_DISTANCE 3
 
 static void
 ensure_n_tiles(struct vsx_tile_painter *painter,
@@ -521,6 +532,9 @@ handle_drag_start(struct vsx_tile_painter *painter,
                 return false;
 
         painter->dragging_tile = tile;
+        painter->drag_validated = false;
+        painter->drag_start_event_x = event->drag.x;
+        painter->drag_start_event_y = event->drag.y;
         painter->drag_offset_x = tile->current_x - board_x;
         painter->drag_offset_y = tile->current_y - board_y;
         tile->animating = false;
@@ -538,6 +552,20 @@ handle_drag(struct vsx_tile_painter *painter,
 
         if (tile == NULL)
                 return false;
+
+        if (!painter->drag_validated) {
+                int dx_pixels = painter->drag_start_event_x - event->drag.x;
+                int dy_pixels = painter->drag_start_event_y - event->drag.y;
+                float dpi = painter->toolbox->paint_state.dpi;
+                float dx_mm = dx_pixels * 25.4f / dpi;
+                float dy_mm = dy_pixels * 25.4f / dpi;
+
+                if (dx_mm * dx_mm + dy_mm * dy_mm >=
+                    MIN_DRAG_DISTANCE * MIN_DRAG_DISTANCE)
+                        painter->drag_validated = true;
+                else
+                        return true;
+        }
 
         int board_x, board_y;
 
