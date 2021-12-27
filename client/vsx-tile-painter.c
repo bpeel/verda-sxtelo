@@ -84,6 +84,15 @@ struct vsx_tile_painter {
          */
         int drag_offset_x, drag_offset_y;
 
+        /* Tile that we will move next to if any other tile is
+         * clicked, or NULL if no snap position is known. The position
+         * is stored separately from the tile so that we don’t have to
+         * wait for the animation to finish or for the server to
+         * report the correct place before snapping another tile.
+         */
+        struct vsx_tile_painter_tile *snap_tile;
+        int snap_x, snap_y;
+
         struct vsx_signal redraw_needed_signal;
 
         int buffer_n_tiles;
@@ -245,9 +254,10 @@ handle_tile_event(struct vsx_tile_painter *painter,
         tile->target_x = event->tile_changed.x;
         tile->target_y = event->tile_changed.y;
 
+        int self = vsx_game_state_get_self(painter->game_state);
+
         if (tile == painter->dragging_tile) {
-                if (event->tile_changed.last_player_moved !=
-                    vsx_game_state_get_self(painter->game_state)) {
+                if (event->tile_changed.last_player_moved != self) {
                         /* The tile has been moved by someone else
                          * while we were trying to drag it. Cancel the
                          * drag.
@@ -261,6 +271,9 @@ handle_tile_event(struct vsx_tile_painter *painter,
                 tile->current_x = tile->target_x;
                 tile->current_y = tile->target_y;
         }
+
+        if (is_new || event->tile_changed.last_player_moved != self)
+                painter->snap_tile = NULL;
 
         raise_tile(painter, tile);
 
@@ -420,6 +433,71 @@ screen_coord_to_board(struct vsx_paint_state *paint_state,
         }
 }
 
+static struct vsx_tile_painter_tile *
+find_tile_at_pos(struct vsx_tile_painter *painter,
+                 int board_x, int board_y)
+{
+        if (board_x < 0 || board_x >= VSX_BOARD_WIDTH ||
+            board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
+                return NULL;
+
+        struct vsx_tile_painter_tile *found_tile = NULL;
+        struct vsx_tile_painter_tile *tile;
+
+        vsx_list_for_each(tile, &painter->tile_list, link) {
+                if (board_x < tile->current_x ||
+                    board_x >= tile->current_x + TILE_SIZE ||
+                    board_y < tile->current_y ||
+                    board_y >= tile->current_y + TILE_SIZE)
+                        continue;
+
+                found_tile = tile;
+        }
+
+        return found_tile;
+}
+
+static bool
+handle_click(struct vsx_tile_painter *painter,
+             const struct vsx_input_event *event)
+{
+        cancel_drag(painter);
+
+        if (painter->snap_tile == NULL)
+                return false;
+
+        int snap_x = painter->snap_x;
+        int snap_y = painter->snap_y;
+
+        if (snap_x < 0 || snap_y < 0 ||
+            snap_x + TILE_SIZE > VSX_BOARD_WIDTH ||
+            snap_y + TILE_SIZE > VSX_BOARD_HEIGHT) {
+                painter->snap_tile = NULL;
+                return false;
+        }
+
+        int board_x, board_y;
+
+        screen_coord_to_board(&painter->toolbox->paint_state,
+                              event->click.x, event->click.y,
+                              &board_x, &board_y);
+
+        struct vsx_tile_painter_tile *tile =
+                find_tile_at_pos(painter, board_x, board_y);
+
+        if (tile == NULL || tile == painter->snap_tile)
+                return false;
+
+        painter->snap_tile = tile;
+        vsx_game_state_move_tile(painter->game_state,
+                                 tile->num,
+                                 painter->snap_x,
+                                 painter->snap_y);
+        painter->snap_x += TILE_SIZE;
+
+        return true;
+}
+
 static bool
 handle_drag_start(struct vsx_tile_painter *painter,
                   const struct vsx_input_event *event)
@@ -436,34 +514,20 @@ handle_drag_start(struct vsx_tile_painter *painter,
 
         cancel_drag(painter);
 
-        if (board_x < 0 || board_x >= VSX_BOARD_WIDTH ||
-            board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
+        struct vsx_tile_painter_tile *tile =
+                find_tile_at_pos(painter, board_x, board_y);
+
+        if (tile == NULL)
                 return false;
 
-        struct vsx_tile_painter_tile *tile;
+        painter->dragging_tile = tile;
+        painter->drag_offset_x = tile->current_x - board_x;
+        painter->drag_offset_y = tile->current_y - board_y;
+        tile->animating = false;
+        raise_tile(painter, tile);
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 
-        vsx_list_for_each(tile, &painter->tile_list, link) {
-                if (board_x < tile->current_x ||
-                    board_x >= tile->current_x + TILE_SIZE ||
-                    board_y < tile->current_y ||
-                    board_y >= tile->current_y + TILE_SIZE)
-                        continue;
-
-                painter->dragging_tile = tile;
-        }
-
-        if (painter->dragging_tile) {
-                tile = painter->dragging_tile;
-                painter->drag_offset_x = tile->current_x - board_x;
-                painter->drag_offset_y = tile->current_y - board_y;
-                tile->animating = false;
-                raise_tile(painter, tile);
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-
-                return true;
-        }
-
-        return false;
+        return true;
 }
 
 static bool
@@ -488,6 +552,10 @@ handle_drag(struct vsx_tile_painter *painter,
         tile->current_x = board_x + painter->drag_offset_x;
         tile->current_y = board_y + painter->drag_offset_y;
 
+        painter->snap_tile = tile;
+        painter->snap_x = tile->current_x + TILE_SIZE;
+        painter->snap_y = tile->current_y;
+
         raise_tile(painter, painter->dragging_tile);
 
         vsx_game_state_move_tile(painter->game_state,
@@ -507,11 +575,12 @@ input_event_cb(void *painter_data,
         struct vsx_tile_painter *painter = painter_data;
 
         switch (event->type) {
-        case VSX_INPUT_EVENT_TYPE_CLICK:
         case VSX_INPUT_EVENT_TYPE_ZOOM_START:
         case VSX_INPUT_EVENT_TYPE_ZOOM:
                 return false;
 
+        case VSX_INPUT_EVENT_TYPE_CLICK:
+                return handle_click(painter, event);
         case VSX_INPUT_EVENT_TYPE_DRAG_START:
                 return handle_drag_start(painter, event);
         case VSX_INPUT_EVENT_TYPE_DRAG:
