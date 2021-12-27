@@ -83,11 +83,6 @@ struct vsx_tile_painter {
          * topleft of the tile.
          */
         int drag_offset_x, drag_offset_y;
-        /* The position that we last dragged the tile to so that we
-         * can paint at this position without having to wait for the
-         * server to tell us about it.
-         */
-        int drag_board_x, drag_board_y;
 
         struct vsx_signal redraw_needed_signal;
 
@@ -217,12 +212,20 @@ cancel_drag(struct vsx_tile_painter *painter)
         if (tile == NULL)
                 return;
 
-        tile->current_x = painter->drag_board_x;
-        tile->current_y = painter->drag_board_y;
-
         start_animation(tile);
 
         painter->dragging_tile = NULL;
+}
+
+static void
+raise_tile(struct vsx_tile_painter *painter,
+           struct vsx_tile_painter_tile *tile)
+{
+        /* Move the tile to the end of the list so that it will be
+         * drawn last.
+         */
+        vsx_list_remove(&tile->link);
+        vsx_list_insert(painter->tile_list.prev, &tile->link);
 }
 
 static void
@@ -259,11 +262,7 @@ handle_tile_event(struct vsx_tile_painter *painter,
                 tile->current_y = tile->target_y;
         }
 
-        /* Move the tile to the end of the list so that it will be
-         * drawn last.
-         */
-        vsx_list_remove(&tile->link);
-        vsx_list_insert(painter->tile_list.prev, &tile->link);
+        raise_tile(painter, tile);
 
         vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
@@ -451,20 +450,29 @@ handle_drag_start(struct vsx_tile_painter *painter,
                         continue;
 
                 painter->dragging_tile = tile;
-                painter->drag_offset_x = tile->current_x - board_x;
-                painter->drag_offset_y = tile->current_y - board_y;
-                painter->drag_board_x = tile->current_x;
-                painter->drag_board_y = tile->current_y;
         }
 
-        return painter->dragging_tile != NULL;
+        if (painter->dragging_tile) {
+                tile = painter->dragging_tile;
+                painter->drag_offset_x = tile->current_x - board_x;
+                painter->drag_offset_y = tile->current_y - board_y;
+                tile->animating = false;
+                raise_tile(painter, tile);
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+
+                return true;
+        }
+
+        return false;
 }
 
 static bool
 handle_drag(struct vsx_tile_painter *painter,
             const struct vsx_input_event *event)
 {
-        if (painter->dragging_tile == NULL)
+        struct vsx_tile_painter_tile *tile = painter->dragging_tile;
+
+        if (tile == NULL)
                 return false;
 
         int board_x, board_y;
@@ -477,13 +485,15 @@ handle_drag(struct vsx_tile_painter *painter,
             board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
                 return true;
 
-        painter->drag_board_x = board_x + painter->drag_offset_x;
-        painter->drag_board_y = board_y + painter->drag_offset_y;
+        tile->current_x = board_x + painter->drag_offset_x;
+        tile->current_y = board_y + painter->drag_offset_y;
+
+        raise_tile(painter, painter->dragging_tile);
 
         vsx_game_state_move_tile(painter->game_state,
                                  painter->dragging_tile->num,
-                                 painter->drag_board_x,
-                                 painter->drag_board_y);
+                                 tile->current_x,
+                                 tile->current_y);
 
         vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 
@@ -662,9 +672,6 @@ generate_tile_vertices(struct vsx_tile_painter *painter,
         struct vsx_tile_painter_tile *tile;
 
         vsx_list_for_each(tile, &painter->tile_list, link) {
-                if (tile == painter->dragging_tile)
-                        continue;
-
                 if (tile->letter_data == NULL)
                         continue;
 
@@ -672,16 +679,6 @@ generate_tile_vertices(struct vsx_tile_painter *painter,
                                     tile->current_x,
                                     tile->current_y,
                                     tile->letter_data);
-        }
-
-        /* Paint the dragged tile last so that it will always be above
-         * the others.
-         */
-        if (painter->dragging_tile && painter->dragging_tile->letter_data) {
-                v = store_tile_quad(v,
-                                    painter->drag_board_x,
-                                    painter->drag_board_y,
-                                    painter->dragging_tile->letter_data);
         }
 
         return v - vertices;
