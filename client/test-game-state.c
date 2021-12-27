@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include "vsx-connection.h"
 #include "vsx-worker.h"
@@ -36,6 +37,7 @@
 #include "vsx-game-state.h"
 #include "vsx-main-thread.h"
 #include "vsx-bitmask.h"
+#include "vsx-monotonic.h"
 
 #define TEST_PORT 6138
 
@@ -936,6 +938,237 @@ out:
         return ret;
 }
 
+struct check_shouting_closure {
+        int clear_shouting_player;
+        int set_shouting_player;
+        struct vsx_listener listener;
+        bool succeeded;
+};
+
+static void
+check_shouting_cb(struct vsx_listener *listener,
+                  void *user_data)
+{
+        struct check_shouting_closure *closure =
+                vsx_container_of(listener,
+                                 struct check_shouting_closure,
+                                 listener);
+        const struct vsx_connection_event *event = user_data;
+
+        if (event->type != VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED) {
+                fprintf(stderr,
+                        "Received unexpected event %i after setting player "
+                        "shouting.\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
+        int player_num = event->player_shouting_changed.player_num;
+
+        if (event->player_shouting_changed.shouting) {
+                if (closure->set_shouting_player == -1) {
+                        fprintf(stderr,
+                                "Received set shout event for %i when none "
+                                "expected\n",
+                                player_num);
+                        closure->succeeded = false;
+                        return;
+                }
+                if (closure->set_shouting_player != player_num) {
+                        fprintf(stderr,
+                                "Received set shout event for %i but "
+                                "expected %i\n",
+                                player_num,
+                                closure->set_shouting_player);
+                        closure->succeeded = false;
+                        return;
+                }
+
+                closure->set_shouting_player = -1;
+        } else {
+                if (closure->clear_shouting_player == -1) {
+                        fprintf(stderr,
+                                "Received clear shout event for %i when none "
+                                "expected\n",
+                                player_num);
+                        closure->succeeded = false;
+                        return;
+                }
+                if (closure->clear_shouting_player != player_num) {
+                        fprintf(stderr,
+                                "Received clear shout event for %i but "
+                                "expected %i\n",
+                                player_num,
+                                closure->clear_shouting_player);
+                        closure->succeeded = false;
+                        return;
+                }
+
+                closure->clear_shouting_player = -1;
+        }
+}
+
+static bool
+check_shouting_events(struct harness *harness,
+                      int set_player_num,
+                      int clear_player_num)
+{
+        struct check_shouting_closure closure = {
+                .clear_shouting_player = clear_player_num,
+                .set_shouting_player = set_player_num,
+                .succeeded = true,
+                .listener = {
+                        .notify = check_shouting_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.listener);
+
+        bool ret = wait_for_idle_queue(harness);
+
+        vsx_list_remove(&closure.listener.link);
+
+        if (!ret || !closure.succeeded)
+                return false;
+
+        if (closure.set_shouting_player != -1) {
+                fprintf(stderr, "No set shouting player event received.\n");
+                return false;
+        }
+
+        if (closure.clear_shouting_player != -1) {
+                fprintf(stderr, "No clear shouting player event received.\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+send_shout(struct harness *harness,
+           int player_num,
+           int clear_player_num)
+{
+        uint8_t message[4] = "\x82\x02\x06\x00";
+        message[3] = player_num;
+
+        if (!write_data(harness, message, sizeof message))
+                return false;
+
+        if (!check_shouting_events(harness, player_num, clear_player_num))
+                return false;
+
+        enum vsx_game_state_shout_state expected_state =
+                player_num == 0 ?
+                VSX_GAME_STATE_SHOUT_STATE_SELF :
+                VSX_GAME_STATE_SHOUT_STATE_OTHER;
+        enum vsx_game_state_shout_state actual_state =
+                vsx_game_state_get_shout_state(harness->game_state);
+
+        if (expected_state != actual_state) {
+                fprintf(stderr,
+                        "Shouting state does not match expected after "
+                        "player %i shouted.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        player_num,
+                        expected_state,
+                        actual_state);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_shouting(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (!add_player(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_shout(harness,
+                        1, /* player_num */
+                        -1 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        int64_t shout_start_time = vsx_monotonic_get();
+
+        if (!send_shout(harness,
+                        0, /* player_num */
+                        1 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        struct timespec sleep_time = {
+                .tv_sec = 9,
+                .tv_nsec = 500 * 1000 * 1000, /* 500ms */
+        };
+        nanosleep(&sleep_time, NULL /* rem */);
+
+        vsx_main_thread_flush_idle_events();
+
+        enum vsx_game_state_shout_state actual_state =
+                vsx_game_state_get_shout_state(harness->game_state);
+
+        if (actual_state != VSX_GAME_STATE_SHOUT_STATE_SELF) {
+                fprintf(stderr,
+                        "Shout state after 9.5 seconds is wrong (%i != %i)\n",
+                        VSX_GAME_STATE_SHOUT_STATE_SELF,
+                        actual_state);
+                ret = false;
+                goto out;
+        }
+
+        /* This should wait long enough to see the shout clear event */
+        if (!check_shouting_events(harness,
+                                   -1, /* set_player_num */
+                                   0 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        actual_state =
+                vsx_game_state_get_shout_state(harness->game_state);
+
+        if (actual_state != VSX_GAME_STATE_SHOUT_STATE_NOONE) {
+                fprintf(stderr,
+                        "Shout state after clear shout is wrong (%i != %i)\n",
+                        VSX_GAME_STATE_SHOUT_STATE_NOONE,
+                        actual_state);
+                ret = false;
+                goto out;
+        }
+
+        float delay = (vsx_monotonic_get() - shout_start_time) / 1.0E6f;
+
+        if (fabsf(delay - 10.0f) >= 0.5f) {
+                fprintf(stderr,
+                        "Expected shout to be cleared after 10 seconds but it "
+                        "took %f\n",
+                        delay);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -945,6 +1178,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_players())
+                ret = EXIT_FAILURE;
+
+        if (!test_shouting())
                 ret = EXIT_FAILURE;
 
         vsx_main_thread_clean_up();
