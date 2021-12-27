@@ -55,15 +55,11 @@ struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
 
-uint32_t
-vsx_game_state_get_time_counter(struct vsx_game_state *game_state);
-
 size_t
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
 
 typedef void
 (* vsx_game_state_foreach_tile_cb)(const struct vsx_connection_event *tile,
-                                   uint32_t update_time,
                                    void *user_data);
 
 void

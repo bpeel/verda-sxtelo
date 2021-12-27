@@ -258,7 +258,6 @@ texture_load_cb(const struct vsx_image *image,
 
 static void
 init_tiles_cb(const struct vsx_connection_event *event,
-              uint32_t update_time,
               void *user_data)
 {
         struct vsx_tile_painter *painter = user_data;

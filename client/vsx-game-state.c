@@ -40,7 +40,6 @@ struct vsx_game_state_player {
 
 struct vsx_game_state_tile {
         struct vsx_connection_event event;
-        uint32_t update_time;
         struct vsx_list link;
 };
 
@@ -71,13 +70,6 @@ struct vsx_game_state {
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
-
-        /* A counter that is incremented every time an event is
-         * received and every time a command is queued. This can be
-         * used to detect if a tile was updated after a command was
-         * sent.
-         */
-        uint32_t time_counter;
 
         struct vsx_signal event_signal;
 
@@ -157,7 +149,7 @@ vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
         struct vsx_game_state_tile *tile;
 
         vsx_list_for_each(tile, &game_state->tile_list, link) {
-                cb(&tile->event, tile->update_time, user_data);
+                cb(&tile->event, user_data);
         }
 }
 
@@ -251,7 +243,6 @@ handle_tile_changed(struct vsx_game_state *game_state,
 
         tile->event = *event;
         tile->event.synced = false;
-        tile->update_time = game_state->time_counter;
 
         /* Move the tile to the end of the list so that the list will
          * always been in reverse order of most recently updated.
@@ -264,8 +255,6 @@ static void
 handle_event(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
-        game_state->time_counter++;
-
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
                 handle_header(game_state, event);
@@ -365,8 +354,6 @@ event_cb(struct vsx_listener *listener,
 void
 vsx_game_state_shout(struct vsx_game_state *game_state)
 {
-        game_state->time_counter++;
-
         vsx_worker_lock(game_state->worker);
         vsx_connection_shout(game_state->connection);
         vsx_worker_unlock(game_state->worker);
@@ -375,8 +362,6 @@ vsx_game_state_shout(struct vsx_game_state *game_state)
 void
 vsx_game_state_turn(struct vsx_game_state *game_state)
 {
-        game_state->time_counter++;
-
         vsx_worker_lock(game_state->worker);
         vsx_connection_turn(game_state->connection);
         vsx_worker_unlock(game_state->worker);
@@ -387,8 +372,6 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y)
 {
-        game_state->time_counter++;
-
         vsx_worker_lock(game_state->worker);
         vsx_connection_move_tile(game_state->connection,
                                  tile_num,
@@ -427,12 +410,6 @@ vsx_game_state_new(struct vsx_worker *worker,
         vsx_worker_unlock(game_state->worker);
 
         return game_state;
-}
-
-uint32_t
-vsx_game_state_get_time_counter(struct vsx_game_state *game_state)
-{
-        return game_state->time_counter;
 }
 
 enum vsx_game_state_shout_state
