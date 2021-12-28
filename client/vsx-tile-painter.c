@@ -880,6 +880,8 @@ free_cb(void *painter_data)
 {
         struct vsx_tile_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->event_listener.link);
+
         free_buffer(painter);
 
         if (painter->image_token)
