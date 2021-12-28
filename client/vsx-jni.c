@@ -175,25 +175,36 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 
         vsx_main_thread_set_wakeup_func(wakeup_cb, data);
 
+        return (jlong) data;
+}
 
-        data->connection = vsx_connection_new("eo:test", /* room */
-                                              "test" /* player_name */);
-
-        struct vsx_error *error = NULL;
-
-        data->worker = vsx_worker_new(data->connection, &error);
+static bool
+ensure_game_state(struct data *data)
+{
+        if (data->connection == NULL) {
+                data->connection = vsx_connection_new("eo:test", /* room */
+                                                      "test" /* player_name */);
+        }
 
         if (data->worker == NULL) {
-                LOGE("vsx_worker_new failed: %s", error->message);
-                vsx_error_free(error);
-        } else {
-                vsx_worker_queue_address_resolve(data->worker,
-                                                 "gemelo.org",
-                                                 5144);
+                struct vsx_error *error = NULL;
 
+                data->worker = vsx_worker_new(data->connection, &error);
+
+                if (data->worker == NULL) {
+                        LOGE("vsx_worker_new failed: %s", error->message);
+                        vsx_error_free(error);
+                        return false;
+                } else {
+                        vsx_worker_queue_address_resolve(data->worker,
+                                                         "gemelo.org",
+                                                         5144);
+                }
+        }
+
+        if (data->game_state == NULL) {
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
-
                 vsx_worker_lock(data->worker);
 
                 vsx_connection_set_running(data->connection, true);
@@ -201,7 +212,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                 vsx_worker_unlock(data->worker);
         }
 
-        return (jlong) data;
+        return true;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -213,7 +224,7 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
 
         destroy_graphics(data);
 
-        if (data->game_state == NULL)
+        if (!ensure_game_state(data))
                 return JNI_FALSE;
 
         data->gl_lib = dlopen("libGLESv2.so", 0);
