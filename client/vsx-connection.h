@@ -162,6 +162,10 @@ vsx_connection_get_person_id(struct vsx_connection *connection,
                              uint64_t *person_id);
 
 void
+vsx_connection_set_person_id(struct vsx_connection *connection,
+                             uint64_t person_id);
+
+void
 vsx_connection_shout(struct vsx_connection *connection);
 
 void

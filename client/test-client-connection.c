@@ -337,7 +337,7 @@ accept_connection(struct harness *harness)
 }
 
 static struct harness *
-create_harness(void)
+create_harness_no_start(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
 
@@ -400,28 +400,50 @@ create_harness(void)
         harness->event_listener.notify = event_cb;
         vsx_signal_add(harness->event_signal, &harness->event_listener);
 
-        vsx_connection_set_running(harness->connection, true);
-
-        if (!wake_up_connection(harness))
-                goto error;
-
-        if (harness->poll_fd == -1) {
-                fprintf(stderr,
-                        "After starting the connection, there is no poll fd\n");
-                goto error;
-        }
-
-        if (!wake_up_connection(harness))
-                goto error;
-
-        if (!accept_connection(harness))
-                goto error;
-
         return harness;
 
 error:
         free_harness(harness);
         return NULL;
+}
+
+static bool
+start_connection(struct harness *harness)
+{
+        vsx_connection_set_running(harness->connection, true);
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->poll_fd == -1) {
+                fprintf(stderr,
+                        "After starting the connection, there is no poll fd\n");
+                return false;
+        }
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (!accept_connection(harness))
+                return false;
+
+        return true;
+}
+
+static struct harness *
+create_harness(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        if (!start_connection(harness)) {
+                free_harness(harness);
+                return NULL;
+        }
+
+        return harness;
 }
 
 static void
@@ -2257,7 +2279,7 @@ test_leak_pendings(void)
 }
 
 static bool
-test_person_id(void)
+test_get_person_id(void)
 {
         struct harness *harness = create_harness();
 
@@ -2307,6 +2329,89 @@ test_person_id(void)
                         " Received: 0x%" PRIx64 "\n",
                         expected_id,
                         person_id);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_set_person_id(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        uint64_t expected_id = 0xfedcba9876543210;
+
+        vsx_connection_set_person_id(harness->connection, expected_id);
+
+        uint64_t received_id;
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &received_id)) {
+                fprintf(stderr, "Failed to get person ID after setting it.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (received_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID not as set:\n"
+                        " Expected 0x%" PRIx64 "\n"
+                        " Received 0x%" PRIx64 "\n",
+                        expected_id,
+                        received_id);
+                ret = false;
+                goto out;
+        }
+
+        if (!start_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        /* Make sure that the connection sends a reconnect command
+         * with the chosen person ID instead of trying to create a new
+         * person.
+         */
+        const uint8_t expected_data[] =
+                "\x82\x0b\x81\x10\x32\x54\x76\x98\xba\xdc\xfe\x00\x00";
+
+        if (!expect_data(harness, expected_data, (sizeof expected_data) - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Make sure that we can can’t change the person ID after it
+         * is set once.
+         */
+        vsx_connection_set_person_id(harness->connection, 5);
+
+        received_id = 0;
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &received_id)) {
+                fprintf(stderr, "Failed to get person ID after setting it.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (received_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID changed after setting it a second time:\n"
+                        " Expected 0x%" PRIx64 "\n"
+                        " Received 0x%" PRIx64 "\n",
+                        expected_id,
+                        received_id);
                 ret = false;
                 goto out;
         }
@@ -2384,7 +2489,10 @@ main(int argc, char **argv)
         if (!test_write_buffer_full())
                 ret = EXIT_FAILURE;
 
-        if (!test_person_id())
+        if (!test_get_person_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_set_person_id())
                 ret = EXIT_FAILURE;
 
         if (!test_leak_pendings())

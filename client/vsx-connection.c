@@ -1625,6 +1625,17 @@ vsx_connection_get_person_id(struct vsx_connection *connection,
 }
 
 void
+vsx_connection_set_person_id(struct vsx_connection *connection,
+                             uint64_t person_id)
+{
+        if (connection->has_person_id)
+                return;
+
+        connection->person_id = person_id;
+        connection->has_person_id = true;
+}
+
+void
 vsx_connection_set_address(struct vsx_connection *connection,
                            const struct vsx_netaddress *address)
 {
