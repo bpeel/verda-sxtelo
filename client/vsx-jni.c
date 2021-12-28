@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <string.h>
 #include <android/log.h>
+#include <stdarg.h>
 
 #include "vsx-gl.h"
 #include "vsx-util.h"
@@ -50,6 +51,10 @@ struct data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
+        struct vsx_listener event_listener;
+
+        bool has_person_id;
+        uint64_t person_id;
 
         /* Weak pointer to the surface view so that we can queue redraws */
         jobject surface;
@@ -58,6 +63,7 @@ struct data {
         bool redraw_queued;
 
         jmethodID queue_flush_idle_method_id;
+        jmethodID queue_set_person_id_method_id;
 
         /* Graphics data that needs to be recreated when the context changes */
         void *gl_lib;
@@ -94,7 +100,8 @@ destroy_graphics(struct data *data)
 
 static void
 call_void_surface_method(struct data *data,
-                         jmethodID method)
+                         jmethodID method,
+                         ...)
 {
         JNIEnv *env;
 
@@ -105,7 +112,13 @@ call_void_surface_method(struct data *data,
         if (surface == NULL)
                 return;
 
-        (*env)->CallVoidMethod(env, surface, method);
+        va_list ap;
+
+        va_start(ap, method);
+
+        (*env)->CallVoidMethodV(env, surface, method, ap);
+
+        va_end(ap);
 }
 
 static void
@@ -142,6 +155,23 @@ wakeup_cb(void *user_data)
         call_void_surface_method(data, data->queue_flush_idle_method_id);
 }
 
+static void
+event_cb(struct vsx_listener *listener,
+         void *signal_data)
+{
+        struct data *data = vsx_container_of(listener,
+                                             struct data,
+                                             event_listener);
+        struct vsx_connection_event *event = signal_data;
+
+        if (event->type != VSX_CONNECTION_EVENT_TYPE_HEADER)
+                return;
+
+        call_void_surface_method(data,
+                                 data->queue_set_person_id_method_id,
+                                 event->header.person_id);
+}
+
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -167,6 +197,12 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "queueFlushIdleEvents",
                                     "()V");
 
+        data->queue_set_person_id_method_id =
+                (*env)->GetMethodID(env,
+                                    data->surface_class,
+                                    "queueSetPersonId",
+                                    "(J)V");
+
         vsx_thread_set_jvm(data->jvm);
 
         data->asset_manager = vsx_asset_manager_new(env, asset_manager_jni);
@@ -184,6 +220,11 @@ ensure_game_state(struct data *data)
         if (data->connection == NULL) {
                 data->connection = vsx_connection_new("eo:test", /* room */
                                                       "test" /* player_name */);
+
+                if (data->has_person_id) {
+                        vsx_connection_set_person_id(data->connection,
+                                                     data->person_id);
+                }
         }
 
         if (data->worker == NULL) {
@@ -205,6 +246,12 @@ ensure_game_state(struct data *data)
         if (data->game_state == NULL) {
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
+
+                data->event_listener.notify = event_cb;
+                struct vsx_signal *event_signal =
+                        vsx_game_state_get_event_signal(data->game_state);
+                vsx_signal_add(event_signal, &data->event_listener);
+
                 vsx_worker_lock(data->worker);
 
                 vsx_connection_set_running(data->connection, true);
@@ -257,6 +304,18 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
                                      data->fb_height);
 
         return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setPersonId)(JNIEnv *env,
+                                     jobject this,
+                                     jlong native_data,
+                                     jlong person_id)
+{
+        struct data *data = GET_DATA(native_data);
+
+        data->has_person_id = true;
+        data->person_id = person_id;
 }
 
 JNIEXPORT void JNICALL

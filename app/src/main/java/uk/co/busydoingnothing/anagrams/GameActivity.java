@@ -29,6 +29,7 @@ import android.view.View;
 public class GameActivity extends AppCompatActivity
 {
   private static String TAG = "GameActivity";
+  private static String PERSON_ID_KEY = "VsxPersonId";
 
   private GameView surface;
 
@@ -40,6 +41,10 @@ public class GameActivity extends AppCompatActivity
     setContentView(R.layout.game);
 
     surface = (GameView) findViewById(R.id.gl_view);
+
+    if (savedInstanceState != null &&
+        savedInstanceState.containsKey(PERSON_ID_KEY))
+      surface.setPersonId(savedInstanceState.getLong(PERSON_ID_KEY));
   }
 
   @Override
@@ -56,5 +61,16 @@ public class GameActivity extends AppCompatActivity
     super.onStop();
 
     surface.onPause();
+  }
+
+  @Override
+  protected void onSaveInstanceState(Bundle outState)
+  {
+    super.onSaveInstanceState(outState);
+
+    Long personId = surface.getPersonId();
+
+    if (personId != null)
+      outState.putLong(PERSON_ID_KEY, personId);
   }
 }

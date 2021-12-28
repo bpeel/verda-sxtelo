@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.res.AssetManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -33,6 +34,9 @@ public class GameView extends GLSurfaceView
   private GameRenderer renderer;
   private long nativeData;
   private int dpi;
+  private Context context;
+  private boolean hasPersonId = false;
+  private long personId;
 
   static {
     System.loadLibrary("anagrams");
@@ -52,6 +56,8 @@ public class GameView extends GLSurfaceView
 
   private void initialize(Context context)
   {
+    this.context = context;
+
     dpi = (int) (context.getResources().getDisplayMetrics().densityDpi + 0.5f);
 
     setEGLContextClientVersion(2);
@@ -135,6 +141,38 @@ public class GameView extends GLSurfaceView
     queueEvent(new Runnable() {
         public void run() {
           renderer.flushIdleEvents(nativeData);
+        }
+      });
+  }
+
+  public void setPersonId(long personId)
+  {
+    this.hasPersonId = true;
+    this.personId = personId;
+    queueEvent(new Runnable() {
+        public void run() {
+          renderer.setPersonId(nativeData, personId);
+        }
+      });
+  }
+
+  public Long getPersonId()
+  {
+    if (hasPersonId)
+      return new Long(personId);
+    else
+      return null;
+  }
+
+  public void queueSetPersonId(long personId)
+  {
+    Handler mainHandler = new Handler(context.getMainLooper());
+
+    mainHandler.post(new Runnable() {
+        @Override
+        public void run()
+        {
+          setPersonId(personId);
         }
       });
   }
@@ -223,6 +261,7 @@ public class GameView extends GLSurfaceView
     private native long createNativeData(GLSurfaceView surface,
                                          AssetManager assetManager,
                                          int dpi);
+    private native void setPersonId(long nativeData, long personId);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,
                                int width, int height);
