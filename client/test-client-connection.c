@@ -2256,6 +2256,66 @@ test_leak_pendings(void)
         return true;
 }
 
+static bool
+test_person_id(void)
+{
+        struct harness *harness = create_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n") ||
+            !read_new_player_request(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        uint64_t person_id = UINT64_MAX;
+
+        if (vsx_connection_get_person_id(harness->connection,
+                                         &person_id)) {
+                fprintf(stderr,
+                        "Person ID is already available before header was "
+                        "sent.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!send_player_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &person_id)) {
+                fprintf(stderr,
+                        "Person ID is not available even after sending the "
+                        "header.\n");
+                ret = false;
+                goto out;
+        }
+
+        const uint64_t expected_id = UINT64_C(0x6e6d6c6b6a696867);
+
+        if (person_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID is not as expected.\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        person_id);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2322,6 +2382,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_write_buffer_full())
+                ret = EXIT_FAILURE;
+
+        if (!test_person_id())
                 ret = EXIT_FAILURE;
 
         if (!test_leak_pendings())

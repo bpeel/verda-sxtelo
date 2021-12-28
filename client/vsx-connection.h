@@ -20,6 +20,7 @@
 #define VSX_CONNECTION_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "vsx-signal.h"
 #include "vsx-netaddress.h"
@@ -155,6 +156,10 @@ vsx_connection_get_typing(struct vsx_connection *connection);
 void
 vsx_connection_set_typing(struct vsx_connection *connection,
                           bool typing);
+
+bool
+vsx_connection_get_person_id(struct vsx_connection *connection,
+                             uint64_t *person_id);
 
 void
 vsx_connection_shout(struct vsx_connection *connection);

@@ -1612,6 +1612,18 @@ vsx_connection_get_event_signal(struct vsx_connection *connection)
         return &connection->event_signal;
 }
 
+bool
+vsx_connection_get_person_id(struct vsx_connection *connection,
+                             uint64_t *person_id)
+{
+        if (connection->has_person_id) {
+                *person_id = connection->person_id;
+                return true;
+        }
+
+        return false;
+}
+
 void
 vsx_connection_set_address(struct vsx_connection *connection,
                            const struct vsx_netaddress *address)
