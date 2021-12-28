@@ -697,6 +697,8 @@ free_cb(void *painter_data)
 {
         struct vsx_board_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->event_listener.link);
+
         if (painter->vao)
                 vsx_array_object_free(painter->vao);
         if (painter->vbo)
