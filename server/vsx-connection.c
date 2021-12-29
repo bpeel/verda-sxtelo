@@ -1171,8 +1171,9 @@ vsx_connection_parse_eof (VsxConnection *conn,
    * shutdown sequence because the state will be changed to DONE when
    * the END command gets sent.
    */
-  if (conn->person == NULL
-      || vsx_player_is_connected (conn->person->player))
+  if (!vsx_connection_is_finished (conn)
+      && (conn->person == NULL
+          || vsx_player_is_connected (conn->person->player)))
     {
       vsx_set_error (error,
                      &vsx_connection_error,
