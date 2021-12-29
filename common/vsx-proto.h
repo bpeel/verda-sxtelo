@@ -118,13 +118,13 @@ vsx_proto_write_int16_t(uint8_t *buffer, int16_t value)
 int
 vsx_proto_write_command_v(uint8_t *buffer,
                           size_t buffer_length,
-                          uint8_t command,
+                          int command,
                           va_list ap);
 
 int
 vsx_proto_write_command(uint8_t *buffer,
                         size_t buffer_length,
-                        uint8_t command,
+                        int command,
                         ...);
 
 static inline uint8_t

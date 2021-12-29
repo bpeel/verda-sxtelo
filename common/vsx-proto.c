@@ -109,7 +109,7 @@ vsx_proto_write_frame_header(uint8_t *buffer,
 int
 vsx_proto_write_command_v(uint8_t *buffer,
                           size_t buffer_length,
-                          uint8_t command,
+                          int command,
                           va_list ap)
 {
         int pos;
@@ -171,7 +171,7 @@ done:
 int
 vsx_proto_write_command(uint8_t *buffer,
                         size_t buffer_length,
-                        uint8_t command,
+                        int command,
                         ...)
 {
         int ret;
