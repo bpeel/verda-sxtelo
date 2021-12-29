@@ -1242,6 +1242,11 @@ ChatSession.prototype.handleEnd = function (mr)
   this.setError ();
 };
 
+ChatSession.prototype.handleBadPlayerId = function (mr)
+{
+  this.setError ();
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1265,6 +1270,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleSync (mr);
   else if (msgType == 0x08)
     this.handleEnd (mr);
+  else if (msgType == 0x09)
+    this.handleBadPlayerId (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
