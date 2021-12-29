@@ -55,7 +55,8 @@ The player_id must be a valid ID given from a previous PLAYER_ID
 message from the server. num_messages_received should be the number of
 messages that the client successfully received from a previous
 connection. The server will continue sending messages from that point
-on.
+on. Otherwise if the server no longer recognises the player it will
+send a BAD_PLAYER_ID message.
 
 KEEP_ALIVE (0x83)
 -----------------
@@ -243,6 +244,12 @@ This is sent when the player has left the game and no more messages
 will be sent. The client can use this to detect the difference between
 the connection randomly dropping (in which case it should reconnect)
 and the server finishing its data.
+
+BAD_PLAYER_ID (0x09)
+--------------------
+
+This is sent after a RECONNECT command if the server doesn’t recognise
+the player ID.
 
 Timeouts
 ========

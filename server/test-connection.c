@@ -132,10 +132,6 @@ frame_error_tests[] =
       "Client sent a reconnect request but already specified a player"
     },
     {
-      BIN_STR("\x82\xb\x81gggggggghh"),
-      "Client tried to reconnect to non-existant player 0x6767676767676767"
-    },
-    {
       BIN_STR("\x82\x1\x83"),
       "Client sent a command without a person",
     },
@@ -2043,6 +2039,63 @@ test_ping (void)
   return ret;
 }
 
+static bool
+test_bad_player_id (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  bool ret = true;
+
+  struct vsx_error *error = NULL;
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (const uint8_t *) "\x82\xb\x81gggggggghh",
+                                  13,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error after sending reconnect command: %s",
+               error->message);
+      vsx_error_free (error);
+      ret = false;
+    }
+  else
+    {
+      uint8_t buf[1 + 1 + 1];
+      size_t got = vsx_connection_fill_output_buffer (harness->conn,
+                                                      buf,
+                                                      sizeof buf);
+
+      if (got != sizeof buf)
+        {
+          fprintf (stderr,
+                   "Expected bad_player_id message but got %zu bytes\n",
+                   got);
+          ret = false;
+        }
+      else if (memcmp (buf, "\x82\x01\x09", sizeof buf))
+        {
+          fprintf (stderr,
+                   "Expected bad_player_id message. Got command 0x%02x\n",
+                   buf[2]);
+          ret = false;
+        }
+      else if (!vsx_connection_is_finished (harness->conn))
+        {
+          fprintf (stderr,
+                   "Connection is not finished after sending bad_player_id "
+                   "message\n");
+          ret = false;
+        }
+    }
+
+  free_harness (harness);
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -2091,6 +2144,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_ping ())
+    ret = EXIT_FAILURE;
+
+  if (!test_bad_player_id ())
     ret = EXIT_FAILURE;
 
   vsx_main_context_free (vsx_main_context_get_default (NULL /* error */));

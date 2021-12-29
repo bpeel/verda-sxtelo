@@ -67,6 +67,7 @@
 #define VSX_PROTO_PLAYER_SHOUTED 0x06
 #define VSX_PROTO_SYNC 0x07
 #define VSX_PROTO_END 0x08
+#define VSX_PROTO_BAD_PLAYER_ID 0x09
 
 enum vsx_proto_type {
         VSX_PROTO_TYPE_UINT8,

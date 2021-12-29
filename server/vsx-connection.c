@@ -54,6 +54,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 3),
   VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 4),
   VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 5),
+  VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID = (1 << 6),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -316,13 +317,8 @@ handle_reconnect (VsxConnection *conn,
 
   if (person == NULL)
     {
-      vsx_set_error (error,
-                     &vsx_connection_error,
-                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
-                     "Client tried to reconnect to non-existant player "
-                     "0x%016" PRIx64,
-                     player_id);
-      return false;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID;
+      return true;
     }
 
   int total_n_messages = vsx_conversation_get_n_messages (person->conversation);
@@ -1045,6 +1041,24 @@ write_sync (VsxConnection *conn,
                                   VSX_PROTO_TYPE_NONE);
 }
 
+static int
+write_bad_player_id (VsxConnection *conn,
+                     uint8_t *buffer,
+                     size_t buffer_size)
+{
+  int wrote = vsx_proto_write_command (buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_BAD_PLAYER_ID,
+
+                                       VSX_PROTO_TYPE_NONE);
+
+  if (wrote != -1)
+    conn->state = VSX_CONNECTION_STATE_DONE;
+
+  return wrote;
+}
+
 size_t
 vsx_connection_fill_output_buffer (VsxConnection *conn,
                                    uint8_t *buffer,
@@ -1067,6 +1081,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { .func = write_message },
       { .func = write_end },
       { VSX_CONNECTION_DIRTY_FLAG_SYNC, write_sync },
+      { VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID, write_bad_player_id },
     };
 
   size_t total_wrote = 0;
