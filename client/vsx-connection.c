@@ -220,6 +220,7 @@ close_socket(struct vsx_connection *connection)
         if (connection->sock != -1) {
                 vsx_close(connection->sock);
                 connection->sock = -1;
+                connection->keep_alive_timestamp = INT64_MAX;
         }
 }
 
