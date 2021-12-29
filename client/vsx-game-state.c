@@ -126,7 +126,7 @@ get_tile_by_index(struct vsx_game_state *game_state,
         if (tile == NULL) {
                 tile = vsx_slab_allocate(&game_state->tile_allocator,
                                          sizeof *tile,
-                                         alignof *tile);
+                                         alignof (struct vsx_game_state_tile));
                 tile_pointers[tile_num] = tile;
                 vsx_list_insert(game_state->tile_list.prev, &tile->link);
         }
