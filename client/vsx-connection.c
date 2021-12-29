@@ -125,7 +125,7 @@ struct vsx_connection {
         bool has_person_id;
         uint64_t person_id;
         enum vsx_connection_running_state running_state;
-        bool had_end;
+        bool finished;
         bool typing;
         bool sent_typing_state;
         bool write_finished;
@@ -631,13 +631,52 @@ handle_end(struct vsx_connection *connection,
                 return false;
         }
 
-        connection->had_end = true;
+        connection->finished = true;
 
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_END,
         };
 
         emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
+handle_bad_player_id(struct vsx_connection *connection,
+                     const uint8_t *payload,
+                     size_t payload_length,
+                     struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid bad player ID "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_BAD_PLAYER_ID,
+                      "The player ID no longer exists");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
 
         return true;
 }
@@ -692,6 +731,10 @@ process_message(struct vsx_connection *connection,
                 return handle_end(connection,
                                   payload, payload_length,
                                   error);
+        case VSX_PROTO_BAD_PLAYER_ID:
+                return handle_bad_player_id(connection,
+                                            payload, payload_length,
+                                            error);
         }
 
         return true;
@@ -869,7 +912,7 @@ handle_read(struct vsx_connection *connection)
                         vsx_error_free(error);
                 }
         } else if (got == 0) {
-                if (connection->had_end) {
+                if (connection->finished) {
                         vsx_connection_set_running(connection, false);
                 } else {
                         struct vsx_error *error = NULL;
@@ -1359,7 +1402,7 @@ calculate_poll_events(struct vsx_connection *connection)
                 if (!connection->write_finished) {
                         if (has_pending_data(connection)) {
                                 events |= POLLOUT;
-                        } else if (connection->had_end) {
+                        } else if (connection->finished) {
                                 shutdown(connection->sock, SHUT_WR);
 
                                 connection->write_finished = true;
