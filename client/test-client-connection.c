@@ -1551,7 +1551,7 @@ test_send_message(void)
         buf[0] = 0x82;
         buf[1] = 0x7e; /* 16-bit payload length */
         buf[2] = payload_length >> 8;
-        buf[3] = payload_length & 0xff;
+        buf[3] = (char) (payload_length & 0xff);
         buf[4] = 0x85;
         memset(buf + 5, 'a', VSX_PROTO_MAX_MESSAGE_LENGTH - 3);
         strcpy(buf + 5 + VSX_PROTO_MAX_MESSAGE_LENGTH - 3, "ĉ");
