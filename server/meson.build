@@ -100,3 +100,15 @@ test_connection = executable('test-connection',
                              dependencies: server_deps,
                              include_directories: inc_dirs)
 test('connection', test_connection)
+
+test_hash_table_src = [
+        'vsx-hash-table.c',
+        '../common/vsx-list.c',
+        '../common/vsx-util.c',
+        'test-hash-table.c',
+]
+
+test_hash_table = executable('test-hash-table',
+                             test_hash_table_src,
+                             include_directories: inc_dirs)
+test('hash-table', test_hash_table)
