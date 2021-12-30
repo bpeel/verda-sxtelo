@@ -26,6 +26,8 @@
 #ifndef VSX_LIST_H
 #define VSX_LIST_H
 
+#include <stddef.h>
+
 /**
  * vsx_list - linked list
  *
