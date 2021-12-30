@@ -25,10 +25,10 @@
 
 /* This list implementation is based on the Wayland source code */
 
+#include "vsx-list.h"
+
 #include <stdlib.h>
 #include <string.h>
-
-#include "vsx-list.h"
 
 void
 vsx_list_init(struct vsx_list *list)
