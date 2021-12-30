@@ -20,12 +20,14 @@
 #define VSX_CONVERSATION_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "vsx-player.h"
 #include "vsx-signal.h"
 #include "vsx-object.h"
 #include "vsx-tile-data.h"
 #include "vsx-buffer.h"
+#include "vsx-hash-table.h"
 
 #define VSX_CONVERSATION_MAX_PLAYERS 32
 
@@ -33,9 +35,13 @@
  * to shout again */
 #define VSX_CONVERSATION_SHOUT_TIME (10 * 1000 * 1000)
 
+typedef uint64_t VsxConversationId;
+
 typedef struct
 {
   VsxObject parent;
+
+  struct vsx_hash_table_entry hash_entry;
 
   struct vsx_signal changed_signal;
 
@@ -100,7 +106,8 @@ vsx_conversation_get_message (VsxConversation *conversation,
 }
 
 VsxConversation *
-vsx_conversation_new (const VsxTileData *tile_data);
+vsx_conversation_new (VsxConversationId id,
+                      const VsxTileData *tile_data);
 
 void
 vsx_conversation_set_n_tiles (VsxConversation *conversation,

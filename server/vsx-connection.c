@@ -243,8 +243,9 @@ handle_new_player (VsxConnection *conn,
   else
     {
       VsxConversation *conversation =
-        vsx_conversation_set_get_conversation (conn->conversation_set,
-                                               room_name);
+        vsx_conversation_set_get_pending_conversation (conn->conversation_set,
+                                                       room_name,
+                                                       &conn->socket_address);
 
       conn->person = vsx_person_set_generate_person (conn->person_set,
                                                      player_name,

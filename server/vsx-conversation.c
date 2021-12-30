@@ -310,13 +310,16 @@ shuffle_tiles (VsxConversation *self)
 }
 
 VsxConversation *
-vsx_conversation_new (const VsxTileData *tile_data)
+vsx_conversation_new (VsxConversationId id,
+                      const VsxTileData *tile_data)
 {
   VsxConversation *self = vsx_calloc (sizeof *self);
   const char *t;
   int i;
 
   vsx_object_init (self, &vsx_conversation_class);
+
+  self->hash_entry.id = id;
 
   self->log_id = next_log_id++;
   self->n_tiles_in_play = 0;

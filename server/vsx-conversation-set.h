@@ -20,6 +20,7 @@
 #define VSX_CONVERSATION_SET_H
 
 #include "vsx-conversation.h"
+#include "vsx-netaddress.h"
 
 /* This class represents a list of pending conversations. It only
    contains conversations that can still be joined. As soon as the
@@ -33,6 +34,16 @@ vsx_conversation_set_new (void);
 
 VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
-                                       const char *room_name);
+                                       VsxConversationId id);
+
+VsxConversation *
+vsx_conversation_set_generate_conversation (VsxConversationSet *set,
+                                            const char *language_code,
+                                            const struct vsx_netaddress *addr);
+
+VsxConversation *
+vsx_conversation_set_get_pending_conversation (VsxConversationSet *set,
+                                               const char *room_name,
+                                               const struct vsx_netaddress *a);
 
 #endif /* VSX_CONVERSATION_SET_H */

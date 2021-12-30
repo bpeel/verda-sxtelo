@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011, 2013  Neil Roberts
+ * Copyright (C) 2011, 2013, 2021  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,31 +24,43 @@
 
 #include "vsx-log.h"
 #include "vsx-list.h"
+#include "vsx-hash-table.h"
+#include "vsx-generate-id.h"
 
 typedef struct
 {
   struct vsx_list link;
+
+  /* This is set if the conversation is open to everyone who knows the
+   * room name. It becomes NULL when the game starts in order to avoid
+   * joining a game that has already started.
+   */
   char *room_name;
+
   VsxConversation *conversation;
   VsxConversationSet *set;
   struct vsx_listener conversation_changed_listener;
-} VsxConversationSetPending;
+} VsxConversationSetListener;
 
 struct _VsxConversationSet
 {
   VsxObject parent;
 
-  struct vsx_list pending_conversations;
+  struct vsx_hash_table hash_table;
+
+  struct vsx_list listeners;
 };
 
 static void
-remove_pending (VsxConversationSetPending *pending)
+remove_listener (VsxConversationSetListener *listener)
 {
-  vsx_list_remove (&pending->link);
-  vsx_list_remove (&pending->conversation_changed_listener.link);
-  vsx_object_unref (pending->conversation);
-  vsx_free (pending->room_name);
-  vsx_free (pending);
+  vsx_list_remove (&listener->link);
+  vsx_list_remove (&listener->conversation_changed_listener.link);
+  vsx_hash_table_remove (&listener->set->hash_table,
+                         &listener->conversation->hash_entry);
+  vsx_object_unref (listener->conversation);
+  vsx_free (listener->room_name);
+  vsx_free (listener);
 }
 
 static bool
@@ -67,27 +79,41 @@ static void
 conversation_changed_cb (struct vsx_listener *listener,
                          void *user_data)
 {
-  VsxConversationSetPending *pending =
+  VsxConversationSetListener *c_listener =
     vsx_container_of (listener,
-                      VsxConversationSetPending,
+                      VsxConversationSetListener,
                       conversation_changed_listener);
   VsxConversationChangedData *data = user_data;
 
-  /* If the conversation has started then we'll remove it so that no
-   * new players can join. */
+  /* If the conversation has started then we’ll mark it as no longer
+   * pending so that no new players can join. People who have the
+   * conversation ID and who specifically want to join this game still
+   * can though, even after it has started.
+   */
   if (data->conversation->state != VSX_CONVERSATION_AWAITING_START)
-    remove_pending (pending);
-  else if (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
-           conversation_is_empty (data->conversation))
     {
-      /* We'll also do this if everyone leaves the room because it
-       * would be a bit rubbish to join a game where everyone has
-       * already left. If we don't do this then conversations that
-       * never start would end up leaking */
-      vsx_log ("Game %i abandoned without starting",
-               data->conversation->log_id);
+      vsx_free (c_listener->room_name);
+      c_listener->room_name = NULL;
+    }
 
-      remove_pending (pending);
+  if (data->type == VSX_CONVERSATION_PLAYER_CHANGED &&
+      conversation_is_empty (data->conversation))
+    {
+      /* If everyone has left the game then we’ll abandon it to avoid
+       * leaking it.
+       */
+      if (data->conversation->state == VSX_CONVERSATION_AWAITING_START)
+        {
+          vsx_log ("Game %i abandoned without starting",
+                   data->conversation->log_id);
+        }
+      else
+        {
+          vsx_log ("Freed game %i after everyone left",
+                   data->conversation->log_id);
+        }
+
+      remove_listener (c_listener);
     }
 }
 
@@ -96,12 +122,14 @@ vsx_conversation_set_free (void *object)
 {
   VsxConversationSet *self = object;
 
-  VsxConversationSetPending *pending, *tmp;
+  VsxConversationSetListener *listener, *tmp;
 
-  vsx_list_for_each_safe (pending, tmp, &self->pending_conversations, link)
+  vsx_list_for_each_safe (listener, tmp, &self->listeners, link)
     {
-      remove_pending (pending);
+      remove_listener (listener);
     }
+
+  vsx_hash_table_destroy (&self->hash_table);
 
   vsx_free (self);
 }
@@ -111,18 +139,6 @@ vsx_conversation_set_class =
 {
   .free = vsx_conversation_set_free,
 };
-
-VsxConversationSet *
-vsx_conversation_set_new (void)
-{
-  VsxConversationSet *self = vsx_calloc (sizeof *self);
-
-  vsx_object_init (self, &vsx_conversation_set_class);
-
-  vsx_list_init (&self->pending_conversations);
-
-  return self;
-}
 
 static const VsxTileData *
 get_tile_data_for_room_name (const char *room_name)
@@ -149,37 +165,110 @@ get_tile_data_for_room_name (const char *room_name)
   return vsx_tile_data;
 }
 
+static const VsxTileData *
+get_tile_data_for_language_code (const char *language_code)
+{
+  /* Look for some tile data for the corresponding language code */
+  for (int i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+    {
+      if (!strcmp (vsx_tile_data[i].language_code, language_code))
+        return vsx_tile_data + i;
+    }
+
+  /* No language found, just use the first one */
+  return vsx_tile_data;
+}
+
+VsxConversationSet *
+vsx_conversation_set_new (void)
+{
+  VsxConversationSet *self = vsx_calloc (sizeof *self);
+
+  vsx_object_init (self, &vsx_conversation_set_class);
+
+  vsx_list_init (&self->listeners);
+  vsx_hash_table_init (&self->hash_table);
+
+  return self;
+}
+
+static VsxConversationSetListener *
+generate_conversation (VsxConversationSet *set,
+                       const VsxTileData *tile_data,
+                       const struct vsx_netaddress *addr)
+{
+  VsxConversationId id;
+
+  /* Keep generating ids until we find one that isn't used. It's
+   * hopefully pretty unlikely that it will generate a clash.
+   */
+  do
+    id = vsx_generate_id (addr);
+  while (vsx_hash_table_get (&set->hash_table, id));
+
+  VsxConversationSetListener *listener = vsx_alloc (sizeof *listener);
+
+  listener->conversation = vsx_conversation_new (id, tile_data);
+
+  listener->room_name = NULL;
+  listener->set = set;
+
+  /* Listen for the changed signal so we can remove the conversation
+     from the list once the game has begun */
+  listener->conversation_changed_listener.notify =
+    conversation_changed_cb;
+  vsx_signal_add (&listener->conversation->changed_signal,
+                  &listener->conversation_changed_listener);
+
+  vsx_list_insert (&set->listeners, &listener->link);
+
+  vsx_hash_table_add (&set->hash_table, &listener->conversation->hash_entry);
+
+  return listener;
+}
+
+VsxConversation *
+vsx_conversation_set_generate_conversation (VsxConversationSet *set,
+                                            const char *language_code,
+                                            const struct vsx_netaddress *addr)
+{
+  const VsxTileData *tile_data = get_tile_data_for_language_code(language_code);
+
+  VsxConversationSetListener *listener =
+    generate_conversation (set, tile_data, addr);
+
+  return vsx_object_ref (listener->conversation);
+}
+
 VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
-                                       const char *room_name)
+                                       VsxConversationId id)
 {
-  VsxConversationSetPending *pending;
+  struct vsx_hash_table_entry *entry =
+    vsx_hash_table_get (&set->hash_table, id);
 
-  vsx_list_for_each (pending, &set->pending_conversations, link)
+  return entry ? vsx_container_of (entry, VsxConversation, hash_entry) : NULL;
+}
+
+VsxConversation *
+vsx_conversation_set_get_pending_conversation (VsxConversationSet *set,
+                                               const char *room_name,
+                                               const struct vsx_netaddress *add)
+{
+  VsxConversationSetListener *listener;
+
+  vsx_list_for_each (listener, &set->listeners, link)
     {
-      if (!strcmp (pending->room_name, room_name))
-        return vsx_object_ref (pending->conversation);
+      if (listener->room_name && !strcmp (listener->room_name, room_name))
+        return vsx_object_ref (listener->conversation);
     }
 
   const VsxTileData *tile_data = get_tile_data_for_room_name (room_name);
 
   /* If there's no conversation with that name then we'll create it */
-  VsxConversation *conversation = vsx_conversation_new (tile_data);
+  listener = generate_conversation (set, tile_data, add);
 
-  pending = vsx_alloc (sizeof *pending);
+  listener->room_name = vsx_strdup (room_name);
 
-  pending->room_name = vsx_strdup (room_name);
-  pending->set = set;
-  pending->conversation = vsx_object_ref (conversation);
-
-  /* Listen for the changed signal so we can remove the conversation
-     from the list once the game has begun */
-  pending->conversation_changed_listener.notify =
-    conversation_changed_cb;
-  vsx_signal_add (&conversation->changed_signal,
-                  &pending->conversation_changed_listener);
-
-  vsx_list_insert (&set->pending_conversations, &pending->link);
-
-  return conversation;
+  return vsx_object_ref (listener->conversation);
 }
