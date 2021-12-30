@@ -100,7 +100,7 @@ vsx_conversation_get_message (VsxConversation *conversation,
 }
 
 VsxConversation *
-vsx_conversation_new (const char *room_name);
+vsx_conversation_new (const VsxTileData *tile_data);
 
 void
 vsx_conversation_set_n_tiles (VsxConversation *conversation,

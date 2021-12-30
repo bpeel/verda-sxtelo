@@ -124,6 +124,31 @@ vsx_conversation_set_new (void)
   return self;
 }
 
+static const VsxTileData *
+get_tile_data_for_room_name (const char *room_name)
+{
+  const char *colon = strchr (room_name, ':');
+  int i;
+
+  /* The language code can be specified by prefixing the room name
+   * separated by a colon. If we didn’t find one then just use the
+   * first tile set. */
+  if (colon == NULL)
+    return vsx_tile_data;
+
+  /* Look for some tile data for the corresponding room */
+  for (i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+    {
+      const VsxTileData *tile_data = vsx_tile_data + i;
+      if (strlen (tile_data->language_code) == colon - room_name &&
+          !memcmp (tile_data->language_code, room_name, colon - room_name))
+        return tile_data;
+    }
+
+  /* No language found, just use the first one */
+  return vsx_tile_data;
+}
+
 VsxConversation *
 vsx_conversation_set_get_conversation (VsxConversationSet *set,
                                        const char *room_name)
@@ -136,8 +161,10 @@ vsx_conversation_set_get_conversation (VsxConversationSet *set,
         return vsx_object_ref (pending->conversation);
     }
 
+  const VsxTileData *tile_data = get_tile_data_for_room_name (room_name);
+
   /* If there's no conversation with that name then we'll create it */
-  VsxConversation *conversation = vsx_conversation_new (room_name);
+  VsxConversation *conversation = vsx_conversation_new (tile_data);
 
   pending = vsx_alloc (sizeof *pending);
 
