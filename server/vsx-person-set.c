@@ -24,6 +24,7 @@
 #include "vsx-generate-id.h"
 #include "vsx-list.h"
 #include "vsx-util.h"
+#include "vsx-hash-table.h"
 
 #define VSX_PERSON_SET_REMOVE_SILENT_PEOPLE_INTERVAL 5
 
@@ -33,19 +34,10 @@ struct _VsxPersonSet
 
   struct vsx_list people;
 
-  int n_people;
-  int hash_size;
-  VsxPerson **hash_table;
+  struct vsx_hash_table hash_table;
 
   VsxMainContextSource *people_timer_source;
 };
-
-static int
-get_hash_pos (VsxPersonSet *set,
-              uint64_t id)
-{
-  return id % set->hash_size;
-}
 
 static void
 vsx_person_set_free (void *object)
@@ -54,12 +46,12 @@ vsx_person_set_free (void *object)
 
   VsxPerson *person, *tmp;
 
+  vsx_hash_table_destroy (&self->hash_table);
+
   vsx_list_for_each_safe (person, tmp, &self->people, link)
     {
       vsx_object_unref (person);
     }
-
-  vsx_free (self->hash_table);
 
   if (self->people_timer_source)
     vsx_main_context_remove_source (self->people_timer_source);
@@ -82,23 +74,9 @@ remove_person (VsxPersonSet *set,
 
   vsx_list_remove (&person->link);
 
-  int pos = get_hash_pos (set, person->id);
-  VsxPerson **prev = set->hash_table + pos;
-  while (true)
-    {
-      assert (*prev);
-
-      if (*prev == person)
-        break;
-
-      prev = &(*prev)->hash_next;
-    }
-
-  *prev = person->hash_next;
+  vsx_hash_table_remove (&set->hash_table, &person->hash_entry);
 
   vsx_object_unref (person);
-
-  set->n_people--;
 }
 
 static void
@@ -135,38 +113,9 @@ vsx_person_set_new (void)
 
   vsx_list_init (&self->people);
 
-  self->hash_size = 8;
-  self->hash_table = vsx_calloc (self->hash_size
-                                 * sizeof *self->hash_table);
+  vsx_hash_table_init (&self->hash_table);
 
   return self;
-}
-
-static void
-add_person_to_hash (VsxPersonSet *set,
-                    VsxPerson *person)
-{
-  int pos = get_hash_pos (set, person->id);
-
-  person->hash_next = set->hash_table[pos];
-  set->hash_table[pos] = person;
-}
-
-static void
-grow_hash_table (VsxPersonSet *set)
-{
-  vsx_free (set->hash_table);
-
-  set->hash_size *= 2;
-
-  set->hash_table = vsx_calloc (set->hash_size * sizeof *set->hash_table);
-
-  VsxPerson *person;
-
-  vsx_list_for_each (person, &set->people, link)
-    {
-      add_person_to_hash (set, person);
-    }
 }
 
 VsxPerson *
@@ -185,17 +134,10 @@ VsxPerson *
 vsx_person_set_get_person (VsxPersonSet *set,
                            VsxPersonId id)
 {
-  int pos = get_hash_pos (set, id);
+  struct vsx_hash_table_entry *entry =
+    vsx_hash_table_get (&set->hash_table, id);
 
-  for (VsxPerson *person = set->hash_table[pos];
-       person;
-       person = person->hash_next)
-    {
-      if (person->id == id)
-        return person;
-    }
-
-  return NULL;
+  return entry ? vsx_container_of (entry, VsxPerson, hash_entry) : NULL;
 }
 
 VsxPerson *
@@ -211,17 +153,15 @@ vsx_person_set_generate_person (VsxPersonSet *set,
      hopefully pretty unlikely that it will generate a clash */
   do
     id = vsx_generate_id (address);
-  while (vsx_person_set_get_person (set, id));
+  while (vsx_hash_table_get (&set->hash_table, id));
 
   person = vsx_person_new (id, player_name, conversation);
 
-  if ((set->n_people + 1) > set->hash_size * 3 / 4)
-    grow_hash_table (set);
-
   vsx_list_insert (&set->people, &person->link);
-  add_person_to_hash (set, vsx_object_ref (person));
 
-  set->n_people++;
+  vsx_hash_table_add (&set->hash_table, &person->hash_entry);
+
+  vsx_object_ref (person);
 
   if (set->people_timer_source == NULL)
     set->people_timer_source =

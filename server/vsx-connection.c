@@ -964,7 +964,7 @@ write_player_id (VsxConnection *conn,
                                   VSX_PROTO_PLAYER_ID,
 
                                   VSX_PROTO_TYPE_UINT64,
-                                  conn->person->id,
+                                  conn->person->hash_entry.id,
 
                                   VSX_PROTO_TYPE_UINT8,
                                   conn->person->player->num,

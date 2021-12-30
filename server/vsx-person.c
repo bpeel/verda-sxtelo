@@ -59,7 +59,7 @@ vsx_person_new (VsxPersonId id,
 
   vsx_person_make_noise (person);
 
-  person->id = id;
+  person->hash_entry.id = id;
   person->conversation = vsx_object_ref (conversation);
   person->message_offset = vsx_conversation_get_n_messages (conversation);
 

@@ -871,10 +871,11 @@ test_reconnect (void)
     }
   else
     {
-      if (!test_reconnect_ok (harness, person->id))
+      if (!test_reconnect_ok (harness, person->hash_entry.id))
         ret = false;
 
-      if (!test_reconnect_bad_n_messages_received (harness, person->id))
+      if (!test_reconnect_bad_n_messages_received (harness,
+                                                   person->hash_entry.id))
         ret = false;
 
       vsx_object_unref (person);

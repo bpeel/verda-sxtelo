@@ -26,6 +26,7 @@
 #include "vsx-player.h"
 #include "vsx-signal.h"
 #include "vsx-list.h"
+#include "vsx-hash-table.h"
 
 typedef uint64_t VsxPersonId;
 
@@ -39,9 +40,7 @@ struct _VsxPerson
   struct vsx_list link;
 
   /* Used to implement the hash table */
-  VsxPerson *hash_next;
-
-  VsxPersonId id;
+  struct vsx_hash_table_entry hash_entry;
 
   VsxConversation *conversation;
 
