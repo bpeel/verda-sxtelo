@@ -18,39 +18,42 @@ if get_option('systemd')
                  install_dir : service_dir)
 endif
 
-server_src = [
-        'vsx-base64.c',
+server_common = [
         '../common/vsx-buffer.c',
-        'vsx-config.c',
-        'vsx-connection.c',
         'vsx-conversation.c',
         'vsx-conversation-set.c',
         '../common/vsx-error.c',
         '../common/vsx-file-error.c',
         'vsx-generate-id.c',
         'vsx-hash-table.c',
-        'vsx-key-value.c',
         '../common/vsx-list.c',
         'vsx-log.c',
-        'vsx-main.c',
         'vsx-main-context.c',
-        '../common/vsx-netaddress.c',
-        'vsx-normalize-name.c',
         'vsx-object.c',
-        'vsx-person.c',
-        'vsx-person-set.c',
+        '../common/vsx-netaddress.c',
         'vsx-player.c',
-        '../common/vsx-proto.c',
-        'vsx-server.c',
         '../common/vsx-slab.c',
         'vsx-slice.c',
-        '../common/vsx-socket.c',
-        'vsx-ssl-error.c',
         'vsx-tile-data.c',
         '../common/vsx-utf8.c',
         '../common/vsx-util.c',
-        'vsx-ws-parser.c',
 ]
+
+server_src = [
+        'vsx-base64.c',
+        'vsx-config.c',
+        'vsx-connection.c',
+        'vsx-key-value.c',
+        'vsx-main.c',
+        'vsx-normalize-name.c',
+        'vsx-person.c',
+        'vsx-person-set.c',
+        '../common/vsx-proto.c',
+        'vsx-server.c',
+        '../common/vsx-socket.c',
+        'vsx-ssl-error.c',
+        'vsx-ws-parser.c',
+] + server_common
 
 executable('verda-sxtelo', server_src,
            dependencies: server_deps,
@@ -71,32 +74,15 @@ test('ws-parser', test_ws_parser)
 
 test_connection_src = [
         'vsx-base64.c',
-        '../common/vsx-buffer.c',
         'vsx-connection.c',
-        'vsx-conversation.c',
-        'vsx-conversation-set.c',
-        '../common/vsx-error.c',
-        '../common/vsx-file-error.c',
-        'vsx-generate-id.c',
-        'vsx-hash-table.c',
-        '../common/vsx-list.c',
-        'vsx-log.c',
-        'vsx-main-context.c',
-        'vsx-object.c',
-        '../common/vsx-netaddress.c',
         'vsx-normalize-name.c',
         'vsx-person.c',
         'vsx-person-set.c',
-        'vsx-player.c',
         '../common/vsx-proto.c',
-        '../common/vsx-slab.c',
-        'vsx-slice.c',
-        'vsx-tile-data.c',
-        '../common/vsx-utf8.c',
-        '../common/vsx-util.c',
         'vsx-ws-parser.c',
         'test-connection.c',
-]
+] + server_common
+
 test_connection = executable('test-connection',
                              test_connection_src,
                              dependencies: server_deps,
@@ -114,3 +100,13 @@ test_hash_table = executable('test-hash-table',
                              test_hash_table_src,
                              include_directories: inc_dirs)
 test('hash-table', test_hash_table)
+
+test_conversation_set_src = [
+        'test-conversation-set.c',
+] + server_common
+
+test_conversation_set = executable('test-conversation-set',
+                                   test_conversation_set_src,
+                                   dependencies: server_deps,
+                                   include_directories: inc_dirs)
+test('conversation-set', test_conversation_set)
