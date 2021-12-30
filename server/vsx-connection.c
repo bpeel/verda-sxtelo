@@ -259,14 +259,14 @@ handle_new_player (VsxConnection *conn,
         {
           vsx_log ("New player “%s” created game %i in “%s”",
                    player_name,
-                   conversation->id,
+                   conversation->log_id,
                    room_name);
         }
       else
         {
           vsx_log ("New player “%s” joined game %i",
                    player_name,
-                   conversation->id);
+                   conversation->log_id);
         }
 
       start_following_person (conn);

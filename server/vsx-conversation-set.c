@@ -85,7 +85,7 @@ conversation_changed_cb (struct vsx_listener *listener,
        * already left. If we don't do this then conversations that
        * never start would end up leaking */
       vsx_log ("Game %i abandoned without starting",
-               data->conversation->id);
+               data->conversation->log_id);
 
       remove_pending (pending);
     }

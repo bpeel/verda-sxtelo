@@ -60,7 +60,7 @@ typedef struct
 
   int64_t last_shout_time;
 
-  int id;
+  int log_id;
 } VsxConversation;
 
 typedef struct

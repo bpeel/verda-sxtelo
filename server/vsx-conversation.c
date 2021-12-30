@@ -32,7 +32,7 @@
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
 
-static uint16_t next_id = 0;
+static uint16_t next_log_id = 0;
 
 static void
 vsx_conversation_free (void *object)
@@ -40,7 +40,7 @@ vsx_conversation_free (void *object)
   VsxConversation *self = object;
   int i;
 
-  vsx_log ("Game %i destroyed", self->id);
+  vsx_log ("Game %i destroyed", self->log_id);
 
   int n_messages = vsx_conversation_get_n_messages (self);
 
@@ -111,7 +111,7 @@ vsx_conversation_start (VsxConversation *conversation)
       vsx_log (conversation->n_connected_players == 1 ?
                "Game %i started with %i player" :
                "Game %i started with %i players",
-               conversation->id,
+               conversation->log_id,
                conversation->n_connected_players);
       conversation->state = VSX_CONVERSATION_IN_PROGRESS;
       vsx_conversation_changed (conversation,
@@ -255,7 +255,7 @@ vsx_conversation_player_left (VsxConversation *conversation,
 
   vsx_log ("Player “%s” left game %i",
            player->name,
-           conversation->id);
+           conversation->log_id);
 
   had_next_turn = vsx_player_has_next_turn (player);
 
@@ -344,7 +344,7 @@ vsx_conversation_new (const char *room_name)
 
   vsx_object_init (self, &vsx_conversation_class);
 
-  self->id = next_id++;
+  self->log_id = next_log_id++;
   self->n_tiles_in_play = 0;
   self->total_n_tiles = VSX_TILE_DATA_N_TILES;
 
