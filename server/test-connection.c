@@ -443,6 +443,36 @@ read_n_tiles (VsxConnection *conn,
 }
 
 static bool
+read_conversation_id (VsxConnection *conn)
+{
+  uint8_t buf[1 + 1 + 1 + 8];
+
+  size_t got = vsx_connection_fill_output_buffer (conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read conversation ID\n",
+               got,
+               sizeof buf);
+      return false;
+    }
+
+  if (buf[2] != VSX_PROTO_CONVERSATION_ID)
+    {
+      fprintf (stderr,
+               "Expected conversation ID command but received 0x%02x\n",
+               buf[2]);
+      return false;
+    }
+
+  return true;
+}
+
+static bool
 read_player_name (VsxConnection *conn,
                   int expected_player_num,
                   const char *expected_name)
@@ -582,6 +612,9 @@ read_connect_header (VsxConnection *conn,
                buf[2]);
       return false;
     }
+
+  if (!read_conversation_id (conn))
+    return false;
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
     return false;

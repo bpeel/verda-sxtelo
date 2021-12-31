@@ -51,10 +51,11 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_WS_HEADER = (1 << 0),
   VSX_CONNECTION_DIRTY_FLAG_PONG = (1 << 1),
   VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 2),
-  VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 3),
-  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 4),
-  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 5),
-  VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID = (1 << 6),
+  VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID = (1 << 3),
+  VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 4),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 5),
+  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 6),
+  VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID = (1 << 7),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -172,6 +173,7 @@ static void
 start_following_person (VsxConnection *conn)
 {
   conn->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID
+                        | VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID
                         | VSX_CONNECTION_DIRTY_FLAG_N_TILES
                         | VSX_CONNECTION_DIRTY_FLAG_SYNC);
 
@@ -974,6 +976,22 @@ write_player_id (VsxConnection *conn,
 }
 
 static int
+write_conversation_id (VsxConnection *conn,
+                       uint8_t *buffer,
+                       size_t buffer_size)
+{
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_CONVERSATION_ID,
+
+                                  VSX_PROTO_TYPE_UINT64,
+                                  conn->person->conversation->hash_entry.id,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_n_tiles (VsxConnection *conn,
                uint8_t *buffer,
                size_t buffer_size)
@@ -1074,6 +1092,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_WS_HEADER, write_ws_response },
       { VSX_CONNECTION_DIRTY_FLAG_PONG, write_pong },
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
+      { VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID, write_conversation_id },
       { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
       { .func = write_player_name },
       { .func = write_player },

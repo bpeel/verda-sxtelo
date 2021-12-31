@@ -156,6 +156,15 @@ This is sent as the first message whenever NEW_PLAYER or RECONNECT is
 sent. “num” is the player number within the game, ie, the first player
 to join receives 0, the second 1 and so on.
 
+CONVERSATION_ID (0x0a)
+----------------------
+
+• uint64_t id
+
+This is sent for every game no matter how it was created, immediately
+after the player ID. The ID can be used to join the game with the
+JOIN_GAME message.
+
 MESSAGE (0x01)
 --------------
 
