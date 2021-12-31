@@ -97,12 +97,18 @@ struct check_event_listener {
 #define BIN_STR(x) ((const uint8_t *) (x)), (sizeof (x)) - 1
 
 static const uint8_t player_id_header[] = "\x82\x0a\x00ghijklmn\x00";
+static const uint8_t conversation_id_header[] =
+        "\x82\x09\x0a\x80\x81\x82\x83\x84\x85\x86\x87";
 
 static const struct frame_error_test
 frame_error_tests[] = {
         {
                 BIN_STR("\x82\x09\x00\x00ghijklm"),
                 "The server sent an invalid player_id command"
+        },
+        {
+                BIN_STR("\x82\x08\x0aghijklm"),
+                "The server sent an invalid conversation_id command"
         },
         {
                 BIN_STR("\x82\x04\x02six"),
@@ -792,6 +798,37 @@ send_player_id(struct harness *harness)
 }
 
 static bool
+check_conversation_id_cb(struct harness *harness,
+                         const struct vsx_connection_event *event,
+                         void *user_data)
+{
+        const uint64_t expected_id = UINT64_C(0x8786858483828180);
+
+        if (event->conversation_id.id != expected_id) {
+                fprintf(stderr,
+                        "conversation_id does not match in event\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        event->conversation_id.id);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+send_conversation_id(struct harness *harness)
+{
+        return check_event(harness,
+                           VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID,
+                           check_conversation_id_cb,
+                           conversation_id_header,
+                           sizeof conversation_id_header - 1,
+                           NULL /* user_data */);
+}
+
+static bool
 send_player_id_no_event(struct harness *harness)
 {
         return write_data(harness,
@@ -891,6 +928,9 @@ create_negotiated_harness(void)
                 goto error;
 
         if (!send_player_id(harness))
+                goto error;
+
+        if (!send_conversation_id(harness))
                 goto error;
 
         if (!send_player_data(harness))

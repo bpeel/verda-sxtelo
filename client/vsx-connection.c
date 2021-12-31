@@ -325,6 +325,41 @@ handle_player_id(struct vsx_connection *connection,
 }
 
 static bool
+handle_conversation_id(struct vsx_connection *connection,
+                       const uint8_t *payload,
+                       size_t payload_length,
+                       struct vsx_error **error)
+{
+        uint64_t id;
+
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_UINT64,
+                                    &id,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid conversation_id "
+                              "command");
+                return false;
+        }
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID,
+                .conversation_id = {
+                        .id = id,
+                },
+        };
+
+        emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
 handle_n_tiles(struct vsx_connection *connection,
                const uint8_t *payload,
                size_t payload_length,
@@ -699,6 +734,10 @@ process_message(struct vsx_connection *connection,
                 return handle_player_id(connection,
                                         payload, payload_length,
                                         error);
+        case VSX_PROTO_CONVERSATION_ID:
+                return handle_conversation_id(connection,
+                                              payload, payload_length,
+                                              error);
         case VSX_PROTO_N_TILES:
                 return handle_n_tiles(connection,
                                       payload, payload_length,
@@ -1714,6 +1753,7 @@ vsx_connection_copy_event(struct vsx_connection_event *dest,
                         vsx_strdup(src->player_name_changed.name);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
@@ -1739,6 +1779,7 @@ vsx_connection_destroy_event(struct vsx_connection_event *event)
                 vsx_free((char *) event->player_name_changed.name);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
