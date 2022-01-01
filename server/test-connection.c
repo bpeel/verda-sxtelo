@@ -132,6 +132,24 @@ frame_error_tests[] =
       "Client sent a reconnect request but already specified a player"
     },
     {
+      BIN_STR("\x82\x5\x8cgggg"),
+      "Invalid new private game command received"
+    },
+    {
+      BIN_STR("\x82\x0d\x8c" "eo\0Zamenhof\0"
+              "\x82\x0d\x8c" "eo\0Zamenhof\0"),
+      "Client sent a new private game request but already specified a player"
+    },
+    {
+      BIN_STR("\x82\x5\x8dgggg"),
+      "Invalid join game command received"
+    },
+    {
+      BIN_STR("\x82\x0d\x8c" "eo\0Zamenhof\0"
+              "\x82\x12\x8dggggggggZamenhof\0"),
+      "Client sent a join game request but already specified a player"
+    },
+    {
       BIN_STR("\x82\x1\x83"),
       "Client sent a command without a person",
     },
@@ -153,6 +171,14 @@ frame_error_tests[] =
     },
     {
       BIN_STR("\x82\x13\x80gefault\0Zamenhof\x1b\0"),
+      "Client sent an invalid player name",
+    },
+    {
+      BIN_STR("\x82\x0e\x8c" "eo\0Zamenhof\x1b\0"),
+      "Client sent an invalid player name",
+    },
+    {
+      BIN_STR("\x82\x13\x8d" "ggggggggZamenhof\x1b\0"),
       "Client sent an invalid player name",
     },
     {
@@ -409,6 +435,47 @@ test_close_in_frame (void)
 }
 
 static bool
+read_player_id (VsxConnection *conn,
+                uint64_t *person_id_out,
+                uint8_t *player_num_out)
+{
+  uint8_t buf[1 + 1 + 1 + sizeof (uint64_t) + 1];
+
+  size_t got = vsx_connection_fill_output_buffer (conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read the player ID\n",
+               got,
+               sizeof buf);
+      return false;
+    }
+
+  if (buf[2] != VSX_PROTO_PLAYER_ID)
+    {
+      fprintf (stderr,
+               "Expected player ID command but received 0x%02x\n",
+               buf[2]);
+      return false;
+    }
+
+  if (person_id_out)
+    {
+      memcpy (person_id_out, buf + 3, sizeof *person_id_out);
+      *person_id_out = VSX_UINT64_FROM_LE (*person_id_out);
+    }
+
+  if (player_num_out)
+    *player_num_out = buf[3 + sizeof (uint64_t)];
+
+  return true;
+}
+
+static bool
 read_n_tiles (VsxConnection *conn,
               uint8_t *n_tiles_out)
 {
@@ -443,7 +510,8 @@ read_n_tiles (VsxConnection *conn,
 }
 
 static bool
-read_conversation_id (VsxConnection *conn)
+read_conversation_id (VsxConnection *conn,
+                      uint64_t *conversation_id_out)
 {
   uint8_t buf[1 + 1 + 1 + 8];
 
@@ -467,6 +535,12 @@ read_conversation_id (VsxConnection *conn)
                "Expected conversation ID command but received 0x%02x\n",
                buf[2]);
       return false;
+    }
+
+  if (conversation_id_out)
+    {
+      memcpy (conversation_id_out, buf + 3, sizeof *conversation_id_out);
+      *conversation_id_out = VSX_UINT64_FROM_LE (*conversation_id_out);
     }
 
   return true;
@@ -589,31 +663,10 @@ read_connect_header (VsxConnection *conn,
                      uint64_t *person_id_out,
                      uint8_t *player_num_out)
 {
-  uint8_t buf[1 + 1 + 1 + sizeof (uint64_t) + 1];
+  if (!read_player_id (conn, person_id_out, player_num_out))
+    return false;
 
-  size_t got = vsx_connection_fill_output_buffer (conn,
-                                                  buf,
-                                                  sizeof buf);
-
-  if (got != sizeof buf)
-    {
-      fprintf (stderr,
-               "Only got %zu bytes out of %zu "
-               "when trying to read the player ID\n",
-               got,
-               sizeof buf);
-      return false;
-    }
-
-  if (buf[2] != VSX_PROTO_PLAYER_ID)
-    {
-      fprintf (stderr,
-               "Expected player ID command but received 0x%02x\n",
-               buf[2]);
-      return false;
-    }
-
-  if (!read_conversation_id (conn))
+  if (!read_conversation_id (conn, NULL /* conversation_id_out */))
     return false;
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
@@ -629,16 +682,61 @@ read_connect_header (VsxConnection *conn,
                     VSX_PLAYER_CONNECTED))
     return false;
 
-  if (person_id_out)
+  return true;
+}
+
+static bool
+check_new_player (Harness *harness,
+                  const char *player_name,
+                  VsxPerson **person_out)
+{
+  bool ret = true;
+  uint64_t person_id;
+  uint8_t player_num;
+
+  if (!read_connect_header (harness->conn, &person_id, &player_num))
     {
-      memcpy (person_id_out, buf + 3, sizeof *person_id_out);
-      *person_id_out = VSX_UINT64_FROM_LE (*person_id_out);
+      ret = false;
+    }
+  else
+    {
+      VsxPerson *person = vsx_person_set_get_person (harness->person_set,
+                                                     person_id);
+
+      if (person == NULL)
+        {
+          fprintf (stderr,
+                   "Returned person ID (%" PRIu64 ") doesn’t exist after "
+                   "creating player\n",
+                   person_id);
+          ret = false;
+        }
+      else if (strcmp (person->player->name, player_name))
+        {
+          fprintf (stderr,
+                   "The player name does not match:\n"
+                   " Expected: %s\n"
+                   " Received: %s\n",
+                   player_name,
+                   person->player->name);
+          ret = false;
+        }
+      else if (person->conversation->n_players - 1 != player_num)
+        {
+          fprintf (stderr,
+                   "New player is not last player (%i / %i)\n",
+                   player_num,
+                   person->conversation->n_players);
+          ret = false;
+        }
+      else
+        {
+          if (person_out)
+            *person_out = vsx_object_ref (person);
+        }
     }
 
-  if (player_num_out)
-    *player_num_out = buf[3 + sizeof (uint64_t)];
-
-  return true;
+  return ret;
 }
 
 static bool
@@ -671,52 +769,9 @@ create_player (Harness *harness,
       vsx_error_free (error);
       ret = false;
     }
-  else
+  else if (!check_new_player (harness, player_name, person_out))
     {
-      uint64_t person_id;
-      uint8_t player_num;
-
-      if (!read_connect_header (harness->conn, &person_id, &player_num))
-        {
-          ret = false;
-        }
-      else
-        {
-          VsxPerson *person = vsx_person_set_get_person (harness->person_set,
-                                                         person_id);
-
-          if (person == NULL)
-            {
-              fprintf (stderr,
-                       "Returned person ID (%" PRIu64 ") doesn’t exist after "
-                       "creating player\n",
-                       person_id);
-              ret = false;
-            }
-          else if (strcmp (person->player->name, player_name))
-            {
-              fprintf (stderr,
-                       "The player name does not match:\n"
-                       " Expected: %s\n"
-                       " Received: %s\n",
-                       player_name,
-                       person->player->name);
-              ret = false;
-            }
-          else if (person->conversation->n_players - 1 != player_num)
-            {
-              fprintf (stderr,
-                       "New player is not last player (%i / %i)\n",
-                       player_num,
-                       person->conversation->n_players);
-              ret = false;
-            }
-          else
-            {
-              if (person_out)
-                *person_out = vsx_object_ref (person);
-            }
-        }
+      ret = false;
     }
 
   vsx_buffer_destroy (&buf);
@@ -2074,6 +2129,47 @@ test_ping (void)
 }
 
 static bool
+check_error_message (Harness *harness,
+                     const char *command_name,
+                     int command_num)
+{
+  uint8_t buf[1 + 1 + 1];
+  size_t got = vsx_connection_fill_output_buffer (harness->conn,
+                                                  buf,
+                                                  sizeof buf);
+  uint8_t expected[] = { 0x82, 0x01, command_num };
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Expected %s message but got %zu bytes\n",
+               command_name,
+               got);
+      return false;
+    }
+
+  if (memcmp (buf, expected, sizeof buf))
+    {
+      fprintf (stderr,
+               "Expected %s message. Got command 0x%02x\n",
+               command_name,
+               buf[2]);
+      return false;
+    }
+
+  if (!vsx_connection_is_finished (harness->conn))
+    {
+      fprintf (stderr,
+               "Connection is not finished after sending %s "
+               "message\n",
+               command_name);
+      return false;
+    }
+
+  return true;
+}
+
+static bool
 test_bad_player_id (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -2096,37 +2192,241 @@ test_bad_player_id (void)
       vsx_error_free (error);
       ret = false;
     }
-  else
+  else if (!check_error_message (harness,
+                                 "bad_player_id",
+                                 0x09))
     {
-      uint8_t buf[1 + 1 + 1];
-      size_t got = vsx_connection_fill_output_buffer (harness->conn,
-                                                      buf,
-                                                      sizeof buf);
-
-      if (got != sizeof buf)
-        {
-          fprintf (stderr,
-                   "Expected bad_player_id message but got %zu bytes\n",
-                   got);
-          ret = false;
-        }
-      else if (memcmp (buf, "\x82\x01\x09", sizeof buf))
-        {
-          fprintf (stderr,
-                   "Expected bad_player_id message. Got command 0x%02x\n",
-                   buf[2]);
-          ret = false;
-        }
-      else if (!vsx_connection_is_finished (harness->conn))
-        {
-          fprintf (stderr,
-                   "Connection is not finished after sending bad_player_id "
-                   "message\n");
-          ret = false;
-        }
+      ret = false;
     }
 
   free_harness (harness);
+  return ret;
+}
+
+static bool
+test_bad_conversation_id (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  bool ret = true;
+
+  struct vsx_error *error = NULL;
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  (const uint8_t *) "\x82\xb\x8dggggggggh\0",
+                                  13,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error after sending join game command: %s",
+               error->message);
+      vsx_error_free (error);
+      ret = false;
+    }
+  else if (!check_error_message (harness,
+                                 "bad_conversation_id",
+                                 0x0b /* command num */))
+    {
+      ret = false;
+    }
+
+  free_harness (harness);
+  return ret;
+}
+
+static bool
+join_conversation_by_id (Harness *harness,
+                         VsxConversation *conversation)
+{
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+  VsxConnection *other_conn = vsx_connection_new (&harness->socket_address,
+                                                  harness->conversation_set,
+                                                  harness->person_set);
+  bool ret = true;
+
+  if (!negotiate_connection (other_conn))
+    {
+      ret = false;
+      goto out;
+    }
+
+  struct vsx_error *error = NULL;
+  uint64_t conversation_id = VSX_UINT64_TO_LE (conversation->hash_entry.id);
+
+  vsx_buffer_append_string (&buf, "\x82\x0d\x8d");
+  vsx_buffer_append (&buf, &conversation_id, sizeof conversation_id);
+  vsx_buffer_append_string (&buf, "Bob");
+  buf.length++;
+
+  if (!vsx_connection_parse_data (other_conn, buf.data, buf.length, &error))
+    {
+      fprintf (stderr,
+               "Unexpected error while joining game by ID: %s\n",
+               error->message);
+      vsx_error_free (error);
+      ret = false;
+      goto out;
+    }
+
+  uint64_t new_conversation_id;
+
+  if (!read_player_id (other_conn,
+                       NULL, /* person_id_out */
+                       NULL /* player_num_out */)
+      || !read_conversation_id (other_conn, &new_conversation_id)
+      || !read_n_tiles (other_conn, NULL /* n_tiles_out */)
+      || !read_player_name (other_conn,
+                            0, /* expected_player_num */
+                            "Zamenhof")
+      || !read_player_name (other_conn,
+                            1, /* expected_player_num */
+                            "Bob")
+      || !read_player (other_conn,
+                       0, /* expected_player_num */
+                       VSX_PLAYER_CONNECTED)
+      || !read_player (other_conn,
+                       1, /* expected_player_num */
+                       VSX_PLAYER_CONNECTED))
+    {
+      ret = false;
+      goto out;
+    }
+
+  if (new_conversation_id != conversation->hash_entry.id)
+    {
+      fprintf (stderr,
+               "Conversation ID after joining does not match.\n"
+               " Expected: %" PRIx64 "\n"
+               " Received: %" PRIx64 "\n",
+               conversation->hash_entry.id,
+               new_conversation_id);
+      ret = false;
+      goto out;
+    }
+
+  VsxPlayer *player = conversation->players[conversation->n_players - 1];
+
+  if (strcmp (player->name, "Bob"))
+    {
+      fprintf (stderr,
+               "Name of last player after joining conversation does not match\n"
+               " Expected: Bob\n"
+               " Received: %s\n",
+               player->name);
+      ret = false;
+      goto out;
+  }
+
+ out:
+  vsx_buffer_destroy (&buf);
+  vsx_connection_free (other_conn);
+  return ret;
+}
+
+static bool
+test_join_public_conversation_by_id (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  bool ret = true;
+
+  VsxPerson *person;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = false;
+    }
+  else
+    {
+      if (!join_conversation_by_id (harness, person->conversation))
+        ret = false;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
+static bool
+create_private_conversation (Harness *harness,
+                             const char *language_code,
+                             const char *player_name,
+                             VsxPerson **person_out)
+{
+  struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+  vsx_buffer_append_c (&buf, 0x82);
+  vsx_buffer_append_c (&buf, strlen (language_code) + strlen (player_name) + 3);
+  vsx_buffer_append_c (&buf, 0x8c);
+  vsx_buffer_append_string (&buf, language_code);
+  vsx_buffer_append_c (&buf, 0);
+  vsx_buffer_append_string (&buf, player_name);
+  vsx_buffer_append_c (&buf, 0);
+
+  bool ret = true;
+  struct vsx_error *error = NULL;
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  buf.data,
+                                  buf.length,
+                                  &error))
+    {
+      fprintf (stderr,
+               "Unexpected error while creating private game: %s\n",
+               error->message);
+      vsx_error_free (error);
+      ret = false;
+    }
+  else if (!check_new_player (harness, player_name, person_out))
+    {
+      ret = false;
+    }
+
+  vsx_buffer_destroy (&buf);
+
+  return ret;
+}
+
+static bool
+test_private_conversation (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  bool ret = true;
+
+  VsxPerson *person;
+
+  if (!create_private_conversation (harness,
+                                    "eo",
+                                    "Zamenhof",
+                                    &person))
+    {
+      ret = false;
+    }
+  else
+    {
+      if (!join_conversation_by_id (harness, person->conversation))
+        ret = false;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
   return ret;
 }
 
@@ -2181,6 +2481,15 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_bad_player_id ())
+    ret = EXIT_FAILURE;
+
+  if (!test_bad_conversation_id ())
+    ret = EXIT_FAILURE;
+
+  if (!test_join_public_conversation_by_id ())
+    ret = EXIT_FAILURE;
+
+  if (!test_private_conversation ())
     ret = EXIT_FAILURE;
 
   vsx_main_context_free (vsx_main_context_get_default (NULL /* error */));

@@ -55,7 +55,7 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 4),
   VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 5),
   VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 6),
-  VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID = (1 << 7),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR = (1 << 7),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -95,6 +95,11 @@ struct _VsxConnection
   [VSX_BITMASK_N_ELEMENTS_FOR_SIZE (VSX_TILE_DATA_N_TILES)];
 
   int pending_shout;
+
+  /* If DIRTY_FLAG_PENDING_ERROR is set, then a message with this
+   * message number will be sent.
+   */
+  uint8_t pending_error;
 
   uint8_t read_buf[1024];
   size_t read_buf_pos;
@@ -186,6 +191,151 @@ start_following_person (VsxConnection *conn)
   conn->conversation_changed_listener.notify = conversation_changed_cb;
   vsx_signal_add (&conn->person->conversation->changed_signal,
                   &conn->conversation_changed_listener);
+}
+
+static bool
+handle_new_private_game (VsxConnection *conn,
+                         struct vsx_error **error)
+{
+  const char *language_code, *player_name;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &language_code,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &player_name,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid new private game command received");
+      return false;
+    }
+
+  if (conn->person)
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent a new private game request but already "
+                     "specified a player");
+      return false;
+    }
+
+  bool ret = true;
+  char *normalized_player_name = vsx_strdup (player_name);
+
+  if (!vsx_normalize_name (normalized_player_name))
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an invalid player name");
+      ret = false;
+    }
+  else
+    {
+      VsxConversation *conversation =
+        vsx_conversation_set_generate_conversation (conn->conversation_set,
+                                                    language_code,
+                                                    &conn->socket_address);
+
+      conn->person = vsx_person_set_generate_person (conn->person_set,
+                                                     player_name,
+                                                     &conn->socket_address,
+                                                     conversation);
+
+      vsx_object_unref (conversation);
+
+      vsx_log ("New player “%s” created private game %i",
+               player_name,
+               conversation->log_id);
+
+      start_following_person (conn);
+    }
+
+  vsx_free (normalized_player_name);
+
+  return ret;
+}
+
+static bool
+handle_join_game (VsxConnection *conn,
+                  struct vsx_error **error)
+{
+  uint64_t conversation_id;
+  const char *player_name;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_UINT64,
+                               &conversation_id,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &player_name,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid join game command received");
+      return false;
+    }
+
+  if (conn->person)
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent a join game request but already "
+                     "specified a player");
+      return false;
+    }
+
+  VsxConversation *conversation =
+    vsx_conversation_set_get_conversation (conn->conversation_set,
+                                           conversation_id);
+
+  bool ret = true;
+  char *normalized_player_name = vsx_strdup (player_name);
+
+  if (!vsx_normalize_name (normalized_player_name))
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Client sent an invalid player name");
+      ret = false;
+    }
+  else if (conversation == NULL)
+    {
+      conn->pending_error = VSX_PROTO_BAD_CONVERSATION_ID;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR;
+    }
+  else
+    {
+      conn->person = vsx_person_set_generate_person (conn->person_set,
+                                                     player_name,
+                                                     &conn->socket_address,
+                                                     conversation);
+
+      vsx_log ("New player “%s” joined game %i",
+               player_name,
+               conversation->log_id);
+
+      start_following_person (conn);
+    }
+
+  vsx_free (normalized_player_name);
+
+  return ret;
 }
 
 static bool
@@ -320,7 +470,8 @@ handle_reconnect (VsxConnection *conn,
 
   if (person == NULL)
     {
-      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID;
+      conn->pending_error = VSX_PROTO_BAD_PLAYER_ID;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR;
       return true;
     }
 
@@ -612,6 +763,10 @@ process_message (VsxConnection *conn,
 
   switch (conn->message_data[0])
     {
+    case VSX_PROTO_NEW_PRIVATE_GAME:
+      return handle_new_private_game (conn, error);
+    case VSX_PROTO_JOIN_GAME:
+      return handle_join_game (conn, error);
     case VSX_PROTO_NEW_PLAYER:
       return handle_new_player (conn, error);
     case VSX_PROTO_RECONNECT:
@@ -1061,14 +1216,14 @@ write_sync (VsxConnection *conn,
 }
 
 static int
-write_bad_player_id (VsxConnection *conn,
+write_pending_error (VsxConnection *conn,
                      uint8_t *buffer,
                      size_t buffer_size)
 {
   int wrote = vsx_proto_write_command (buffer,
                                        buffer_size,
 
-                                       VSX_PROTO_BAD_PLAYER_ID,
+                                       conn->pending_error,
 
                                        VSX_PROTO_TYPE_NONE);
 
@@ -1101,7 +1256,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { .func = write_message },
       { .func = write_end },
       { VSX_CONNECTION_DIRTY_FLAG_SYNC, write_sync },
-      { VSX_CONNECTION_DIRTY_FLAG_BAD_PLAYER_ID, write_bad_player_id },
+      { VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR, write_pending_error },
     };
 
   size_t total_wrote = 0;

@@ -24,7 +24,27 @@ Messages to the server
 ======================
 
 The client initiates the communication by sending one of the following
-messages:
+four messages:
+
+NEW_PRIVATE_GAME (0x8c)
+-----------------------
+
+• string language_code
+• string person_name
+
+Creates a new game without a room name. Another player can join the
+game using the JOIN_GAME message with the conversation ID sent by the
+server.
+
+JOIN_GAME (0x8d)
+----------------
+
+• uint64_t conversation_id
+• string person_name
+
+Joins an existing game created with one of the other two messages. The
+ID can be acquired via the CONVERSATION_ID message. If the game no
+longer exists the server will send a BAD_CONVERSATION_ID message.
 
 NEW_PLAYER (0x80)
 -----------------
@@ -32,15 +52,16 @@ NEW_PLAYER (0x80)
 • string room_name
 • string person_name
 
-Creates a new person in the given ‘room’ with the given name. The web
-client always just uses the room ‘default’. This should be sent when
-the client first starts and hasn't tried connecting before. The server
-will create a player ID and send it in a PLAYER_ID message. The names
-can use any valid Unicode characters. The rooms are created on the fly
-by the server. Eventually this could be used to play against specific
-people. If there is already a game in that room that has not started
-then the new person will immediately join that game. Otherwise a new
-game will be created.
+Creates a new person in the given ‘room’ with the given name. This is
+intended to be used to make a game that can be joined by anybody who
+knows the room name. The web client always just uses the room
+‘default’. This should be sent when the client first starts and hasn't
+tried connecting before. The server will create a player ID and send
+it in a PLAYER_ID message. The names can use any valid Unicode
+characters. The rooms are created on the fly by the server. If there
+is already a game in that room that has not started then the new
+person will immediately join that game. Otherwise a new game will be
+created.
 
 The names can not be longer than 256 bytes.
 
@@ -259,6 +280,12 @@ BAD_PLAYER_ID (0x09)
 
 This is sent after a RECONNECT command if the server doesn’t recognise
 the player ID.
+
+BAD_CONVERSATION_ID (0x0b)
+--------------------------
+
+This is sent after a JOIN_GAME command if the server doesn’t recognise
+the conversation ID.
 
 Timeouts
 ========
