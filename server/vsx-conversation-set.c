@@ -48,7 +48,14 @@ struct _VsxConversationSet
 
   struct vsx_hash_table hash_table;
 
-  struct vsx_list listeners;
+  /* List of conversations that have a room name and can still be
+   * joined. Once the game starts or can no longer be joined the
+   * listener will move to the other list so this one can be quickly
+   * scanned for pending games.
+   */
+  struct vsx_list pending_listeners;
+  /* All the other conversations */
+  struct vsx_list other_listeners;
 };
 
 static void
@@ -90,8 +97,11 @@ conversation_changed_cb (struct vsx_listener *listener,
    * conversation ID and who specifically want to join this game still
    * can though, even after it has started.
    */
-  if (data->conversation->state != VSX_CONVERSATION_AWAITING_START)
+  if (c_listener->room_name
+      && data->conversation->state != VSX_CONVERSATION_AWAITING_START)
     {
+      vsx_list_remove (&c_listener->link);
+      vsx_list_insert (&c_listener->set->other_listeners, &c_listener->link);
       vsx_free (c_listener->room_name);
       c_listener->room_name = NULL;
     }
@@ -118,16 +128,23 @@ conversation_changed_cb (struct vsx_listener *listener,
 }
 
 static void
+remove_listeners (struct vsx_list *list)
+{
+  VsxConversationSetListener *listener, *tmp;
+
+  vsx_list_for_each_safe (listener, tmp, list, link)
+    {
+      remove_listener (listener);
+    }
+}
+
+static void
 vsx_conversation_set_free (void *object)
 {
   VsxConversationSet *self = object;
 
-  VsxConversationSetListener *listener, *tmp;
-
-  vsx_list_for_each_safe (listener, tmp, &self->listeners, link)
-    {
-      remove_listener (listener);
-    }
+  remove_listeners (&self->pending_listeners);
+  remove_listeners (&self->other_listeners);
 
   vsx_hash_table_destroy (&self->hash_table);
 
@@ -186,7 +203,8 @@ vsx_conversation_set_new (void)
 
   vsx_object_init (self, &vsx_conversation_set_class);
 
-  vsx_list_init (&self->listeners);
+  vsx_list_init (&self->pending_listeners);
+  vsx_list_init (&self->other_listeners);
   vsx_hash_table_init (&self->hash_table);
 
   return self;
@@ -220,8 +238,6 @@ generate_conversation (VsxConversationSet *set,
   vsx_signal_add (&listener->conversation->changed_signal,
                   &listener->conversation_changed_listener);
 
-  vsx_list_insert (&set->listeners, &listener->link);
-
   vsx_hash_table_add (&set->hash_table, &listener->conversation->hash_entry);
 
   return listener;
@@ -236,6 +252,8 @@ vsx_conversation_set_generate_conversation (VsxConversationSet *set,
 
   VsxConversationSetListener *listener =
     generate_conversation (set, tile_data, addr);
+
+  vsx_list_insert (&set->other_listeners, &listener->link);
 
   return vsx_object_ref (listener->conversation);
 }
@@ -257,9 +275,9 @@ vsx_conversation_set_get_pending_conversation (VsxConversationSet *set,
 {
   VsxConversationSetListener *listener;
 
-  vsx_list_for_each (listener, &set->listeners, link)
+  vsx_list_for_each (listener, &set->pending_listeners, link)
     {
-      if (listener->room_name && !strcmp (listener->room_name, room_name))
+      if (!strcmp (listener->room_name, room_name))
         return vsx_object_ref (listener->conversation);
     }
 
@@ -267,6 +285,8 @@ vsx_conversation_set_get_pending_conversation (VsxConversationSet *set,
 
   /* If there's no conversation with that name then we'll create it */
   listener = generate_conversation (set, tile_data, add);
+
+  vsx_list_insert (&set->pending_listeners, &listener->link);
 
   listener->room_name = vsx_strdup (room_name);
 
