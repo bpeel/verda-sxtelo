@@ -402,8 +402,7 @@ create_harness_no_start(void)
                 goto error;
         }
 
-        harness->connection = vsx_connection_new("test_room",
-                                                 "test_player");
+        harness->connection = vsx_connection_new();
 
         harness->event_signal =
                 vsx_connection_get_event_signal(harness->connection);
@@ -442,6 +441,8 @@ wake_up_and_accept_connection(struct harness *harness)
 static bool
 start_connection(struct harness *harness)
 {
+        vsx_connection_set_room(harness->connection, "test_room");
+        vsx_connection_set_player_name(harness->connection, "test_player");
         vsx_connection_set_address(harness->connection,
                                    &harness->local_address);
 
@@ -2599,6 +2600,9 @@ test_address_block_connect(void)
         if (harness == NULL)
                 return false;
 
+        vsx_connection_set_room(harness->connection, "test_room");
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
         vsx_connection_set_running(harness->connection, true);
 
         bool ret = true;
@@ -2610,6 +2614,45 @@ test_address_block_connect(void)
 
         vsx_connection_set_address(harness->connection,
                                    &harness->local_address);
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_room_block_connect(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_room(harness->connection, "test_room");
 
         if (!wake_up_and_accept_connection(harness)) {
                 ret = false;
@@ -2702,6 +2745,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_address_block_connect())
+                ret = EXIT_FAILURE;
+
+        if (!test_room_block_connect())
                 ret = EXIT_FAILURE;
 
         return ret;

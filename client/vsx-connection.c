@@ -100,7 +100,12 @@ enum vsx_connection_running_state {
         VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
         VSX_CONNECTION_RUNNING_STATE_RUNNING,
         VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT,
-        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS,
+        /* The connection is missing some configuration properties
+         * that are needed before connecting, such as the address or a
+         * player name. Once these are set by the higher layers it
+         * will automatically start trying to connect.
+         */
+        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION,
 };
 
 struct vsx_connection_tile_to_move {
@@ -1495,6 +1500,30 @@ update_poll(struct vsx_connection *connection)
         }
 }
 
+static bool
+has_configuration(struct vsx_connection *connection)
+{
+        /* We always need a server address to connect to */
+        if (!connection->has_address)
+                return false;
+
+        /* If we have a person ID that we don’t need any of the other
+         * information.
+         */
+        if (connection->has_person_id)
+                return true;
+
+        /* In order to make a person we always need the name */
+        if (connection->player_name == NULL)
+                return false;
+
+        /* We also need a room name to join */
+        if (connection->room == NULL)
+                return false;
+
+        return true;
+}
+
 static void
 start_connecting_running_state(struct vsx_connection *connection)
 {
@@ -1503,7 +1532,7 @@ start_connecting_running_state(struct vsx_connection *connection)
          */
         connection->reconnect_timeout = 0;
 
-        if (connection->has_address) {
+        if (has_configuration(connection)) {
                 connection->reconnect_timestamp = vsx_monotonic_get();
 
                 connection->running_state =
@@ -1513,7 +1542,7 @@ start_connecting_running_state(struct vsx_connection *connection)
         } else {
                 connection->reconnect_timestamp = INT64_MAX;
                 connection->running_state =
-                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS;
+                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION;
         }
 }
 
@@ -1548,7 +1577,7 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         update_poll(connection);
                         break;
 
-                case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS:
+                case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION:
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         break;
@@ -1578,8 +1607,7 @@ vsx_connection_get_running(struct vsx_connection *connection)
 }
 
 struct vsx_connection *
-vsx_connection_new(const char *room,
-                   const char *player_name)
+vsx_connection_new(void)
 {
         struct vsx_connection *connection = vsx_calloc(sizeof *connection);
 
@@ -1595,9 +1623,6 @@ vsx_connection_new(const char *room,
                 VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
 
         connection->sock = -1;
-
-        connection->room = vsx_strdup(room);
-        connection->player_name = vsx_strdup(player_name);
 
         connection->next_message_num = 0;
 
@@ -1707,6 +1732,14 @@ vsx_connection_get_person_id(struct vsx_connection *connection,
         return false;
 }
 
+static void
+maybe_start_connecting_running_state(struct vsx_connection *connection)
+{
+        if (connection->running_state ==
+            VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION)
+                start_connecting_running_state(connection);
+}
+
 void
 vsx_connection_set_person_id(struct vsx_connection *connection,
                              uint64_t person_id)
@@ -1716,6 +1749,32 @@ vsx_connection_set_person_id(struct vsx_connection *connection,
 
         connection->person_id = person_id;
         connection->has_person_id = true;
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_player_name(struct vsx_connection *connection,
+                               const char *player_name)
+{
+        if (connection->player_name)
+                return;
+
+        connection->player_name = vsx_strdup(player_name);
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_room(struct vsx_connection *connection,
+                        const char *room)
+{
+        if (connection->room)
+                return;
+
+        connection->room = vsx_strdup(room);
+
+        maybe_start_connecting_running_state(connection);
 }
 
 void
@@ -1725,9 +1784,7 @@ vsx_connection_set_address(struct vsx_connection *connection,
         connection->has_address = true;
         connection->address = *address;
 
-        if (connection->running_state ==
-            VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_ADDRESS)
-                start_connecting_running_state(connection);
+        maybe_start_connecting_running_state(connection);
 }
 
 void

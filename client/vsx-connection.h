@@ -142,8 +142,15 @@ extern struct vsx_error_domain
 vsx_connection_error;
 
 struct vsx_connection *
-vsx_connection_new(const char *room,
-                   const char *player_name);
+vsx_connection_new(void);
+
+void
+vsx_connection_set_player_name(struct vsx_connection *connection,
+                               const char *player_name);
+
+void
+vsx_connection_set_room(struct vsx_connection *connection,
+                        const char *room);
 
 void
 vsx_connection_wake_up(struct vsx_connection *connection,

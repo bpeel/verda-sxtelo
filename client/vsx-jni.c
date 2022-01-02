@@ -218,8 +218,10 @@ static bool
 ensure_game_state(struct data *data)
 {
         if (data->connection == NULL) {
-                data->connection = vsx_connection_new("eo:test", /* room */
-                                                      "test" /* player_name */);
+                data->connection = vsx_connection_new();
+
+                vsx_connection_set_room(data->connection, "eo:test");
+                vsx_connection_set_player_name(data->connection, "test");
 
                 if (data->has_person_id) {
                         vsx_connection_set_person_id(data->connection,

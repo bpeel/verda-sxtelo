@@ -314,8 +314,9 @@ create_harness(void)
                 goto error;
         }
 
-        harness->connection = vsx_connection_new("test_room",
-                                                 "test_player");
+        harness->connection = vsx_connection_new();
+        vsx_connection_set_room(harness->connection, "test_room");
+        vsx_connection_set_player_name(harness->connection, "test_player");
         vsx_connection_set_address(harness->connection, &local_address);
 
         struct vsx_error *error = NULL;
