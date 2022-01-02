@@ -1781,6 +1781,9 @@ void
 vsx_connection_set_address(struct vsx_connection *connection,
                            const struct vsx_netaddress *address)
 {
+        if (connection->has_address)
+                return;
+
         connection->has_address = true;
         connection->address = *address;
 
