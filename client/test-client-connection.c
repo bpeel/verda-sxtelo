@@ -38,6 +38,7 @@
 
 struct harness {
         int server_sock;
+        struct vsx_netaddress local_address;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
         struct vsx_signal *event_signal;
@@ -351,6 +352,9 @@ create_harness_no_start(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
 
+        harness->poll_fd = -1;
+        harness->wakeup_time = INT64_MAX;
+
         vsx_list_init(&harness->copied_events);
 
         harness->server_fd = -1;
@@ -370,9 +374,7 @@ create_harness_no_start(void)
                    SOL_SOCKET, SO_REUSEADDR,
                    &true_value, sizeof true_value);
 
-        struct vsx_netaddress local_address;
-
-        if (!vsx_netaddress_from_string(&local_address,
+        if (!vsx_netaddress_from_string(&harness->local_address,
                                         "127.0.0.1",
                                         TEST_PORT)) {
                 fprintf(stderr, "error getting localhost address\n");
@@ -381,7 +383,8 @@ create_harness_no_start(void)
 
         struct vsx_netaddress_native native_local_address;
 
-        vsx_netaddress_to_native(&local_address, &native_local_address);
+        vsx_netaddress_to_native(&harness->local_address,
+                                 &native_local_address);
 
         if (bind(harness->server_sock,
                  &native_local_address.sockaddr,
@@ -401,8 +404,6 @@ create_harness_no_start(void)
 
         harness->connection = vsx_connection_new("test_room",
                                                  "test_player");
-        vsx_connection_set_address(harness->connection,
-                                   &local_address);
 
         harness->event_signal =
                 vsx_connection_get_event_signal(harness->connection);
@@ -418,10 +419,8 @@ error:
 }
 
 static bool
-start_connection(struct harness *harness)
+wake_up_and_accept_connection(struct harness *harness)
 {
-        vsx_connection_set_running(harness->connection, true);
-
         if (!wake_up_connection(harness))
                 return false;
 
@@ -438,6 +437,17 @@ start_connection(struct harness *harness)
                 return false;
 
         return true;
+}
+
+static bool
+start_connection(struct harness *harness)
+{
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        return wake_up_and_accept_connection(harness);
 }
 
 static struct harness *
@@ -2555,6 +2565,62 @@ out:
         return ret;
 }
 
+static bool
+test_connection_is_blocking_for_config(struct harness *harness)
+{
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Expected harness to be waiting for config but it "
+                        "has a poll FD.\n");
+                return false;
+        }
+
+        if (harness->wakeup_time != INT64_MAX) {
+                fprintf(stderr,
+                        "Expected harness to be waiting for config it it "
+                        "has a timeout in %f seconds.\n",
+                        (harness->wakeup_time -
+                         vsx_monotonic_get()) /
+                        1000000.0f);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_address_block_connect(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2633,6 +2699,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_leak_pendings())
+                ret = EXIT_FAILURE;
+
+        if (!test_address_block_connect())
                 ret = EXIT_FAILURE;
 
         return ret;
