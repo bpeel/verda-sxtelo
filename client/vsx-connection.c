@@ -125,6 +125,9 @@ struct vsx_connection {
         bool has_address;
         struct vsx_netaddress address;
 
+        bool has_conversation_id;
+        uint64_t conversation_id;
+
         char *room;
         char *player_name;
         bool has_person_id;
@@ -1029,6 +1032,63 @@ write_ws_request(struct vsx_connection *connection,
 }
 
 static int
+write_join_conversation_header(struct vsx_connection *connection,
+                               uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_JOIN_GAME,
+
+                                       VSX_PROTO_TYPE_UINT64,
+                                       connection->conversation_id,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
+write_join_public_game_header(struct vsx_connection *connection,
+                              uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_NEW_PLAYER,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->room,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
+write_create_private_game_header(struct vsx_connection *connection,
+                                 uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_NEW_PRIVATE_GAME,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       "eo", /* language code */
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_header(struct vsx_connection *connection,
              uint8_t *buffer, size_t buffer_size)
 {
@@ -1045,18 +1105,26 @@ write_header(struct vsx_connection *connection,
 
                                                VSX_PROTO_TYPE_NONE);
         } else {
-                return vsx_proto_write_command(buffer,
-                                               buffer_size,
+                /* If we don’t have a person ID then we need to create
+                 * a new person. For that we need a player name. The
+                 * connection shouldn’t have started if this isn’t set
+                 * yet.
+                 */
+                assert(connection->player_name != NULL);
 
-                                               VSX_PROTO_NEW_PLAYER,
-
-                                               VSX_PROTO_TYPE_STRING,
-                                               connection->room,
-
-                                               VSX_PROTO_TYPE_STRING,
-                                               connection->player_name,
-
-                                               VSX_PROTO_TYPE_NONE);
+                if (connection->has_conversation_id) {
+                        return write_join_conversation_header(connection,
+                                                              buffer,
+                                                              buffer_size);
+                } else if (connection->room != NULL) {
+                        return write_join_public_game_header(connection,
+                                                             buffer,
+                                                             buffer_size);
+                } else {
+                        return write_create_private_game_header(connection,
+                                                                buffer,
+                                                                buffer_size);
+                }
         }
 }
 
@@ -1517,10 +1585,6 @@ has_configuration(struct vsx_connection *connection)
         if (connection->player_name == NULL)
                 return false;
 
-        /* We also need a room name to join */
-        if (connection->room == NULL)
-                return false;
-
         return true;
 }
 
@@ -1773,6 +1837,19 @@ vsx_connection_set_room(struct vsx_connection *connection,
                 return;
 
         connection->room = vsx_strdup(room);
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_conversation_id(struct vsx_connection *connection,
+                                   uint64_t conversation_id)
+{
+        if (connection->has_conversation_id)
+                return;
+
+        connection->has_conversation_id = true;
+        connection->conversation_id = conversation_id;
 
         maybe_start_connecting_running_state(connection);
 }

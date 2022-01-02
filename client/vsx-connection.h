@@ -153,6 +153,10 @@ vsx_connection_set_room(struct vsx_connection *connection,
                         const char *room);
 
 void
+vsx_connection_set_conversation_id(struct vsx_connection *connection,
+                                   uint64_t conversation_id);
+
+void
 vsx_connection_wake_up(struct vsx_connection *connection,
                        short poll_events);
 

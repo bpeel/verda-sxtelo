@@ -2626,7 +2626,7 @@ out:
 }
 
 static bool
-test_room_block_connect(void)
+test_player_name_block_connect(void)
 {
         struct harness *harness = create_harness_no_start();
 
@@ -2647,14 +2647,91 @@ test_room_block_connect(void)
 
         vsx_connection_set_player_name(harness->connection, "test_player");
 
-        if (!test_connection_is_blocking_for_config(harness)) {
+        if (!wake_up_and_accept_connection(harness)) {
                 ret = false;
                 goto out;
         }
 
-        vsx_connection_set_room(harness->connection, "test_room");
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_new_private_game(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
 
         if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *) "\x82\x10\x8c" "eo\0test_player\0",
+                         18)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_join_private_game(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        vsx_connection_set_conversation_id(harness->connection,
+                                           0x8081828384858687);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x15\x8d"
+                         "\x87\x86\x85\x84\x83\x82\x81\x80"
+                         "test_player\0",
+                         23)) {
                 ret = false;
                 goto out;
         }
@@ -2747,7 +2824,13 @@ main(int argc, char **argv)
         if (!test_address_block_connect())
                 ret = EXIT_FAILURE;
 
-        if (!test_room_block_connect())
+        if (!test_player_name_block_connect())
+                ret = EXIT_FAILURE;
+
+        if (!test_new_private_game())
+                ret = EXIT_FAILURE;
+
+        if (!test_join_private_game())
                 ret = EXIT_FAILURE;
 
         return ret;
