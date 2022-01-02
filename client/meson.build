@@ -124,3 +124,14 @@ test_game_state = executable('test-game-state',
                              dependencies: [thread_dep],
                              include_directories: inc_dirs)
 test('game-state', test_game_state)
+
+test_id_url_src = [
+        'vsx-id-url.c',
+        '../common/vsx-util.c',
+        'test-id-url.c',
+]
+
+test_id_url = executable('test-id-url',
+                         test_id_url_src,
+                         include_directories: inc_dirs)
+test('id-url', test_id_url)
