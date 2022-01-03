@@ -73,6 +73,7 @@ struct vsx_main_data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
+        struct vsx_listener event_listener;
 
         bool button_pressed;
         int mouse_x, mouse_y;
@@ -571,6 +572,34 @@ init_sdl(struct vsx_main_data *main_data)
 }
 
 static void
+event_cb(struct vsx_listener *listener,
+         void *user_data)
+{
+        const struct vsx_connection_event *event = user_data;
+
+        if (event->type == VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID) {
+                char buf[VSX_ID_URL_ENCODED_SIZE + 1];
+
+                vsx_id_url_encode(event->conversation_id.id, buf);
+
+                printf("%s\n", buf);
+        }
+}
+
+static void
+init_game_state(struct vsx_main_data *main_data)
+{
+        main_data->game_state = vsx_game_state_new(main_data->worker,
+                                                   main_data->connection);
+
+        main_data->event_listener.notify = event_cb;
+
+        struct vsx_signal *signal =
+                vsx_game_state_get_event_signal(main_data->game_state);
+        vsx_signal_add(signal, &main_data->event_listener);
+}
+
+static void
 redraw_needed_cb(struct vsx_listener *listener,
                  void *signal_data)
 {
@@ -631,8 +660,7 @@ main(int argc, char **argv)
                 goto out;
         }
 
-        main_data->game_state = vsx_game_state_new(main_data->worker,
-                                                   main_data->connection);
+        init_game_state(main_data);
 
         if (!init_painter(main_data)) {
                 ret = EXIT_FAILURE;
