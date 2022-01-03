@@ -45,6 +45,7 @@ if get_option('client')
 
         client_src = [
                 'vsx-asset-linux.c',
+                'vsx-id-url.c',
                 'vsx-main.c',
                 'vsx-thread-linux.c',
         ] + client_common_src

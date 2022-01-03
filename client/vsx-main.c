@@ -41,6 +41,7 @@
 #include "vsx-asset-linux.h"
 #include "vsx-game-painter.h"
 #include "vsx-main-thread.h"
+#include "vsx-id-url.h"
 
 #define MIN_GL_MAJOR_VERSION 2
 #define MIN_GL_MINOR_VERSION 0
@@ -89,10 +90,12 @@ struct vsx_main_data {
 
 static char *option_server = "gemelo.org";
 int option_server_port = 5144;
-static char *option_room = "default";
+static char *option_room = NULL;
 static char *option_player_name = NULL;
+static bool option_conversation_id_specified = false;
+static uint64_t option_conversation_id;
 
-static const char options[] = "-hs:p:r:n:";
+static const char options[] = "-hs:p:r:n:u:";
 
 static void
 usage(void)
@@ -104,7 +107,21 @@ usage(void)
                " -s <hostname>        The name of the server to connect to\n"
                " -p <port>            The port on the server to connect to\n"
                " -r <room>            The room to connect to\n"
-               " -n <player>          The player name\n");
+               " -n <player>          The player name\n"
+               " -u <url>             An invite URL of a game to join\n");
+}
+
+static bool
+parse_invite_url(const char *url)
+{
+        if (!vsx_id_url_decode(url, &option_conversation_id)) {
+                fprintf(stderr, "invite URL invalid: %s\n", url);
+                return false;
+        }
+
+        option_conversation_id_specified = true;
+
+        return true;
 }
 
 static bool
@@ -143,6 +160,11 @@ process_arguments(int argc, char **argv)
 
                 case 'n':
                         option_player_name = optarg;
+                        break;
+
+                case 'u':
+                        if (!parse_invite_url(optarg))
+                                return false;
                         break;
                 }
         }
@@ -347,8 +369,15 @@ create_connection(void)
 
         struct vsx_connection *connection = vsx_connection_new();
 
-        vsx_connection_set_room(connection, option_room);
         vsx_connection_set_player_name(connection, player_name);
+
+        if (option_room)
+                vsx_connection_set_room(connection, option_room);
+
+        if (option_conversation_id_specified) {
+                vsx_connection_set_conversation_id(connection,
+                                                   option_conversation_id);
+        }
 
         return connection;
 }
