@@ -37,6 +37,21 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- Intent for handling game invite URLs -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="https"
+              android:host="gemelo.org"
+              android:pathPrefix="/j/" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="http"
+              android:host="gemelo.org"
+              android:pathPrefix="/j/"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>

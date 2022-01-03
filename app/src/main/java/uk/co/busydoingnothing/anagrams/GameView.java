@@ -156,6 +156,15 @@ public class GameView extends GLSurfaceView
       });
   }
 
+  public void setInviteUrl(String url)
+  {
+    queueEvent(new Runnable() {
+        public void run() {
+          renderer.setInviteUrl(nativeData, url);
+        }
+      });
+  }
+
   public Long getPersonId()
   {
     if (hasPersonId)
@@ -262,6 +271,7 @@ public class GameView extends GLSurfaceView
                                          AssetManager assetManager,
                                          int dpi);
     private native void setPersonId(long nativeData, long personId);
+    private native void setInviteUrl(long nativeData, String inviteUrl);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,
                                int width, int height);

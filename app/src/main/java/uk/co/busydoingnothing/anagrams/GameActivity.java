@@ -20,6 +20,7 @@ package uk.co.busydoingnothing.anagrams;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.opengl.GLSurfaceView;
@@ -45,6 +46,28 @@ public class GameActivity extends AppCompatActivity
     if (savedInstanceState != null &&
         savedInstanceState.containsKey(PERSON_ID_KEY))
       surface.setPersonId(savedInstanceState.getLong(PERSON_ID_KEY));
+
+    handleIntent();
+  }
+
+  private void handleIntent()
+  {
+    Intent intent = getIntent();
+
+    if (intent == null)
+      return;
+
+    String action = intent.getAction();
+
+    if (action == null || !action.equals(Intent.ACTION_VIEW))
+      return;
+
+    String uri = intent.getDataString();
+
+    if (uri == null)
+      return;
+
+    surface.setInviteUrl(uri);
   }
 
   @Override

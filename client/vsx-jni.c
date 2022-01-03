@@ -33,6 +33,7 @@
 #include "vsx-game-state.h"
 #include "vsx-connection.h"
 #include "vsx-worker.h"
+#include "vsx-id-url.h"
 
 #define TAG "Anagrams"
 
@@ -55,6 +56,9 @@ struct data {
 
         bool has_person_id;
         uint64_t person_id;
+
+        bool has_conversation_id;
+        uint64_t conversation_id;
 
         /* Weak pointer to the surface view so that we can queue redraws */
         jobject surface;
@@ -214,18 +218,29 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
         return (jlong) data;
 }
 
+static void
+configure_connection(struct data *data)
+{
+        vsx_connection_set_player_name(data->connection, "test");
+
+        if (data->has_person_id) {
+                vsx_connection_set_person_id(data->connection,
+                                             data->person_id);
+        }
+
+        if (data->has_conversation_id) {
+                vsx_connection_set_conversation_id(data->connection,
+                                                   data->conversation_id);
+        }
+}
+
 static bool
 ensure_game_state(struct data *data)
 {
         if (data->connection == NULL) {
                 data->connection = vsx_connection_new();
 
-                vsx_connection_set_player_name(data->connection, "test");
-
-                if (data->has_person_id) {
-                        vsx_connection_set_person_id(data->connection,
-                                                     data->person_id);
-                }
+                configure_connection(data);
         }
 
         if (data->worker == NULL) {
@@ -317,6 +332,28 @@ VSX_JNI_RENDERER_PREFIX(setPersonId)(JNIEnv *env,
 
         data->has_person_id = true;
         data->person_id = person_id;
+}
+
+JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setInviteUrl)(JNIEnv *env,
+                                      jobject this,
+                                      jlong native_data,
+                                      jstring url_string)
+{
+        struct data *data = GET_DATA(native_data);
+
+        const char *url =
+                (*env)->GetStringUTFChars(env, url_string, NULL /* isCopy */);
+
+        uint64_t id;
+        bool ret = vsx_id_url_decode(url, &id);
+
+        (*env)->ReleaseStringUTFChars(env, url_string, url);
+
+        if (ret) {
+                data->has_conversation_id = true;
+                data->conversation_id = id;
+        }
 }
 
 JNIEXPORT void JNICALL
