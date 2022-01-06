@@ -87,6 +87,12 @@ struct vsx_qr_data {
         /* Final image with the mask and format bits */
         struct vsx_qr_image masked_image;
 
+        /* The same image but the columns are stored in the bits
+         * instead of the rows. This is just a temporary buffer used
+         * for finding the best mask.
+         */
+        struct vsx_qr_image column_image;
+
         struct vsx_qr_block blocks[N_BLOCKS];
 };
 
@@ -393,14 +399,25 @@ generate_masked_image(struct vsx_qr_data *qr_data,
                           format_bits_for_mask[mask_num]);
 }
 
-static int
-score_adjacent_modules_same(const struct vsx_qr_image *image,
-                            bool vertical)
+static void
+generate_column_image(struct vsx_qr_data *qr_data)
 {
-#define get_pixel(a, b) ((vertical) ?                           \
-                         check_pixel((image), (b), (a)) :       \
-                         check_pixel((image), (a), (b)))
+        for (int i = 0; i < N_MODULES; i++) {
+                uint32_t column_bits = 0;
 
+                for (int y = 0; y < N_MODULES; y++) {
+                        column_bits >>= 1;
+                        if (check_pixel(&qr_data->masked_image, i, y))
+                                column_bits |= 1 << (N_MODULES - 1);
+                }
+
+                qr_data->column_image.bits[i] = column_bits;
+        }
+}
+
+static int
+score_adjacent_modules_same(const struct vsx_qr_image *image)
+{
         int score = 0;
 
         for (int i = 0; i < N_MODULES; i++) {
@@ -409,13 +426,15 @@ score_adjacent_modules_same(const struct vsx_qr_image *image,
                 for (int j = 0;
                      j <= N_MODULES - MIN_ADJACENT_MODULE_LENGTH;
                      j += sequence_length) {
-                        bool value = get_pixel(j, i);
+                        bool value = check_pixel(image, j, i);
 
                         sequence_length = 1;
 
                         while (j + sequence_length < N_MODULES) {
                                 bool other_value =
-                                        get_pixel(j + sequence_length, i);
+                                        check_pixel(image,
+                                                    j + sequence_length,
+                                                    i);
 
                                 if (other_value != value)
                                         break;
@@ -430,8 +449,6 @@ score_adjacent_modules_same(const struct vsx_qr_image *image,
                         }
                 }
         }
-
-#undef get_pixel
 
         return score;
 }
@@ -463,8 +480,8 @@ score_block_same(const struct vsx_qr_image *image)
 }
 
 static int
-score_bad_pattern_horizontal(const struct vsx_qr_image *image,
-                             uint32_t pattern)
+score_bad_pattern(const struct vsx_qr_image *image,
+                  uint32_t pattern)
 {
         int score = 0;
 
@@ -477,33 +494,6 @@ score_bad_pattern_horizontal(const struct vsx_qr_image *image,
                                 score += BAD_PATTERN_PENALTY;
 
                         row_bits >>= 1;
-                }
-        }
-
-        return score;
-}
-
-static int
-score_bad_pattern_vertical(const struct vsx_qr_image *image,
-                           uint32_t pattern)
-{
-        int score = 0;
-
-        for (int x = 0; x < N_MODULES; x++) {
-                uint32_t column_bits = 0;
-
-                for (int y = 0; y < N_MODULES; y++) {
-                        column_bits >>= 1;
-                        if (check_pixel(image, x, y))
-                                column_bits |= 1 << (N_MODULES - 1);
-                }
-
-                for (int y = 0; y <= N_MODULES - BAD_PATTERN_LENGTH; y++) {
-                        if ((column_bits & ((1 << BAD_PATTERN_LENGTH) - 1)) ==
-                            pattern)
-                                score += BAD_PATTERN_PENALTY;
-
-                        column_bits >>= 1;
                 }
         }
 
@@ -531,20 +521,20 @@ score_dark_light_ratio(const struct vsx_qr_image *image)
 }
 
 static int
-evaluate_image(const struct vsx_qr_image *image)
+evaluate_image(const struct vsx_qr_data *qr_data)
 {
         int score = 0;
 
-        score += score_adjacent_modules_same(image, false /* vertical */);
-        score += score_adjacent_modules_same(image, true /* vertical */);
-        score += score_block_same(image);
+        score += score_adjacent_modules_same(&qr_data->masked_image);
+        score += score_adjacent_modules_same(&qr_data->column_image);
+        score += score_block_same(&qr_data->masked_image);
 
-        score += score_bad_pattern_horizontal(image, BAD_PATTERN_BEFORE);
-        score += score_bad_pattern_horizontal(image, BAD_PATTERN_AFTER);
-        score += score_bad_pattern_vertical(image, BAD_PATTERN_BEFORE);
-        score += score_bad_pattern_vertical(image, BAD_PATTERN_AFTER);
+        score += score_bad_pattern(&qr_data->masked_image, BAD_PATTERN_BEFORE);
+        score += score_bad_pattern(&qr_data->masked_image, BAD_PATTERN_AFTER);
+        score += score_bad_pattern(&qr_data->column_image, BAD_PATTERN_BEFORE);
+        score += score_bad_pattern(&qr_data->column_image, BAD_PATTERN_AFTER);
 
-        score += score_dark_light_ratio(image);
+        score += score_dark_light_ratio(&qr_data->masked_image);
 
         return score;
 }
@@ -557,8 +547,9 @@ pick_mask(struct vsx_qr_data *qr_data)
 
         for (int i = 0; i < VSX_N_ELEMENTS(mask_images); i++) {
                 generate_masked_image(qr_data, i);
+                generate_column_image(qr_data);
 
-                int score = evaluate_image(&qr_data->masked_image);
+                int score = evaluate_image(qr_data);
 
                 if (score < best_score) {
                         best_score = score;
