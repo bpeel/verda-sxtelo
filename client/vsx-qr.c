@@ -176,14 +176,6 @@ coeff_div(uint8_t a, uint8_t b)
 }
 
 static void
-poly_mul_by_generator(uint8_t poly2,
-                      uint8_t *coeffs)
-{
-        for (int i = 0; i < VSX_N_ELEMENTS(generator_poly); i++)
-                coeffs[i] = coeff_mul(generator_poly[i], poly2);
-}
-
-static void
 get_error_correction_codewords(const uint8_t *data_codewords,
                                uint8_t *remainder_out)
 {
@@ -201,11 +193,10 @@ get_error_correction_codewords(const uint8_t *data_codewords,
                 uint8_t factor = coeff_div(remainder[i],
                                            generator_poly[0]);
 
-                uint8_t subst[VSX_N_ELEMENTS(generator_poly)];
-                poly_mul_by_generator(factor, subst);
-
-                for (int j = 1; j < VSX_N_ELEMENTS(subst); j++)
-                        remainder[i + j] ^= subst[j];
+                for (int j = 1; j < VSX_N_ELEMENTS(generator_poly); j++) {
+                        uint8_t coeff = coeff_mul(generator_poly[j], factor);
+                        remainder[i + j] ^= coeff;
+                }
         }
 
         memcpy(remainder_out,
