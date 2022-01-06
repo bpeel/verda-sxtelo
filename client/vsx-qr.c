@@ -421,25 +421,24 @@ score_adjacent_modules_same(const struct vsx_qr_image *image)
         int score = 0;
 
         for (int i = 0; i < N_MODULES; i++) {
+                uint32_t row = image->bits[i];
+
                 int sequence_length;
 
                 for (int j = 0;
                      j <= N_MODULES - MIN_ADJACENT_MODULE_LENGTH;
                      j += sequence_length) {
-                        bool value = check_pixel(image, j, i);
+                        bool value = row & 1;
+                        row >>= 1;
 
                         sequence_length = 1;
 
                         while (j + sequence_length < N_MODULES) {
-                                bool other_value =
-                                        check_pixel(image,
-                                                    j + sequence_length,
-                                                    i);
-
-                                if (other_value != value)
+                                if ((row & 1) != value)
                                         break;
 
                                 sequence_length++;
+                                row >>= 1;
                         }
 
                         if (sequence_length >= MIN_ADJACENT_MODULE_LENGTH) {
