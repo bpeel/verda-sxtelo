@@ -136,3 +136,17 @@ test_id_url = executable('test-id-url',
                          test_id_url_src,
                          include_directories: inc_dirs)
 test('id-url', test_id_url)
+
+generate_qr_src = [
+        'vsx-qr.c',
+        'generate-qr.c',
+]
+
+generate_qr = executable('generate-qr',
+                         generate_qr_src,
+                         include_directories: inc_dirs)
+
+test('test-qr',
+     files('test-qr.py'),
+     depends: generate_qr,
+     args: [ generate_qr.full_path() ])
