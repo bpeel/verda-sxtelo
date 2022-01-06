@@ -34,6 +34,7 @@
 #define QUIET_ZONE_SIZE 4
 #define ERROR_CORRECTION_CODEWORDS_PER_BLOCK 18
 #define DATA_CODEWORDS_PER_BLOCK 17
+#define N_BLOCKS 2
 
 _Static_assert(N_MODULES <= sizeof (uint32_t) * 8,
                "N_MODULES needs to fit in a uint32_t for vsx_qr_image");
@@ -47,6 +48,24 @@ struct vsx_qr_image {
          * Array index 0 is topmost.
          */
         uint32_t bits[N_MODULES];
+};
+
+struct vsx_qr_block {
+        uint8_t data[DATA_CODEWORDS_PER_BLOCK];
+        uint8_t ec[ERROR_CORRECTION_CODEWORDS_PER_BLOCK];
+};
+
+struct vsx_qr_data {
+        /* Last module position that we wrote to */
+        int x, y;
+        /* Whether we’re currently moving up the image */
+        bool upwards;
+        /* Whether on the right of the current column */
+        bool right;
+
+        struct vsx_qr_image image;
+
+        struct vsx_qr_block blocks[N_BLOCKS];
 };
 
 #include "vsx-qr-data.h"
@@ -271,34 +290,28 @@ generate_pixel_image(const struct vsx_qr_image *image,
         }
 }
 
-struct bit_writer {
-        int x, y;
-        bool upwards;
-        bool right;
-};
-
 static void
-bit_writer_next_pos(struct bit_writer *writer)
+move_to_next_pos(struct vsx_qr_data *qr_data)
 {
-        bool right = writer->right;
-        writer->right = !right;
+        bool right = qr_data->right;
+        qr_data->right = !right;
 
         /* If we are on the right-hand side of the column then just
          * move to the left.
          */
         if (right) {
-                writer->x--;
+                qr_data->x--;
                 return;
         }
 
         /* Move back to the right */
-        writer->x++;
+        qr_data->x++;
 
-        if (writer->upwards) {
-                if (writer->y <= 0) {
-                        writer->upwards = false;
-                        writer->x -= 2;
-                        if (writer->x == 6) {
+        if (qr_data->upwards) {
+                if (qr_data->y <= 0) {
+                        qr_data->upwards = false;
+                        qr_data->x -= 2;
+                        if (qr_data->x == 6) {
                                 /* If the right-hand side of the
                                  * column is in the vertical timing
                                  * pattern, then move the whole column
@@ -309,51 +322,41 @@ bit_writer_next_pos(struct bit_writer *writer)
                                  * happens but it does seem to match
                                  * the pictures.
                                  */
-                                writer->x--;
+                                qr_data->x--;
                         }
                 } else {
-                        writer->y--;
+                        qr_data->y--;
                 }
         } else {
-                if (writer->y >= N_MODULES - 1) {
-                        writer->upwards = true;
-                        writer->x -= 2;
+                if (qr_data->y >= N_MODULES - 1) {
+                        qr_data->upwards = true;
+                        qr_data->x -= 2;
                 } else {
-                        writer->y++;
+                        qr_data->y++;
                 }
         }
 }
 
 static void
-bit_writer_next_available_pos(struct bit_writer *writer)
+move_to_next_available_pos(struct vsx_qr_data *qr_data)
 {
         do {
-                bit_writer_next_pos(writer);
-        } while (!check_pixel(&data_mask_image, writer->x, writer->y));
+                move_to_next_pos(qr_data);
+        } while (!check_pixel(&data_mask_image, qr_data->x, qr_data->y));
 }
 
 static void
-bit_writer_init(struct bit_writer *writer)
-{
-        /* Writing a bit starts by moving to the next available
-         * position so we’ll start off the edge of the image.
-         */
-        writer->x = N_MODULES - 2;
-        writer->y = N_MODULES;
-        writer->upwards = true;
-        writer->right = false;
-}
-
-static void
-bit_writer_write_codeword(struct bit_writer *writer,
-                          struct vsx_qr_image *image,
-                          uint8_t codeword)
+write_codeword(struct vsx_qr_data *qr_data,
+               uint8_t codeword)
 {
         for (unsigned i = 0; i < 8; i++) {
-                bit_writer_next_available_pos(writer);
+                move_to_next_available_pos(qr_data);
 
-                if ((codeword & 0x80))
-                        set_image_pixel(image, writer->x, writer->y);
+                if ((codeword & 0x80)) {
+                        set_image_pixel(&qr_data->image,
+                                        qr_data->x,
+                                        qr_data->y);
+                }
 
                 codeword <<= 1;
         }
@@ -367,71 +370,98 @@ apply_mask(struct vsx_qr_image *image,
                 image->bits[i] ^= mask->bits[i];
 }
 
-void
-vsx_qr_create(const uint8_t *data,
-              uint8_t *image_out)
+static struct vsx_qr_data *
+create_data(void)
 {
-        struct vsx_qr_image image = base_image;
+        struct vsx_qr_data *qr_data = vsx_alloc(sizeof *qr_data);
 
-        int mask_num = 3;
+        /* Writing a bit starts by moving to the next available
+         * position so we’ll start off the edge of the image.
+         */
+        qr_data->x = N_MODULES - 2;
+        qr_data->y = N_MODULES;
+        qr_data->upwards = true;
+        qr_data->right = false;
 
-        store_format_bits(&image, format_bits_for_mask[mask_num]);
+        qr_data->image = base_image;
 
-        uint8_t block1_data[DATA_CODEWORDS_PER_BLOCK];
+        return qr_data;
+}
+
+static void
+fill_block1(struct vsx_qr_data *qr_data,
+            const uint8_t *data)
+{
+        uint8_t *block_data = qr_data->blocks[0].data;
+
         /* Mode indicator is always 0b0100, ie, byte mode */
-        block1_data[0] = 0x40 | (VSX_QR_DATA_SIZE >> 4);
-        block1_data[1] = ((VSX_QR_DATA_SIZE & 0x0f) << 4) | (data[0] >> 4);
+        block_data[0] = 0x40 | (VSX_QR_DATA_SIZE >> 4);
+        block_data[1] = ((VSX_QR_DATA_SIZE & 0x0f) << 4) | (data[0] >> 4);
 
-        for (int i = 2; i < VSX_N_ELEMENTS(block1_data); i++) {
-                block1_data[i] = (((data[i - 2] & 0x0f) << 4) |
-                                  (data[i - 1] >> 4));
+        for (int i = 2; i < DATA_CODEWORDS_PER_BLOCK; i++) {
+                block_data[i] = (((data[i - 2] & 0x0f) << 4) |
+                                 (data[i - 1] >> 4));
         }
+}
 
-        uint8_t block2_data[DATA_CODEWORDS_PER_BLOCK];
+static void
+fill_block2(struct vsx_qr_data *qr_data,
+            const uint8_t *data)
+{
+        uint8_t *block_data = qr_data->blocks[1].data;
 
         for (int i = 0; i < DATA_CODEWORDS_PER_BLOCK - 1; i++) {
                 /* 1.5 codewords from the first block were used for
                  * something other than the data
                  */
                 int data_index = i + DATA_CODEWORDS_PER_BLOCK - 2;
-                block2_data[i] = (((data[data_index] & 0x0f) << 4) |
-                                  (data[data_index + 1] >> 4));
+                block_data[i] = (((data[data_index] & 0x0f) << 4) |
+                                 (data[data_index + 1] >> 4));
         }
         /* Last codeword contains the last four bits of the data +
          * four zero bits for the terminator.
          */
-        block2_data[DATA_CODEWORDS_PER_BLOCK - 1] =
+        block_data[DATA_CODEWORDS_PER_BLOCK - 1] =
                 (data[VSX_QR_DATA_SIZE - 1] & 0x0f) << 4;
+}
 
-        uint8_t block1_ec[ERROR_CORRECTION_CODEWORDS_PER_BLOCK];
-        get_error_correction_codewords(block1_data, block1_ec);
-
-        uint8_t block2_ec[ERROR_CORRECTION_CODEWORDS_PER_BLOCK];
-        get_error_correction_codewords(block2_data, block2_ec);
-
-        struct bit_writer writer;
-
-        bit_writer_init(&writer);
-
+static void
+write_blocks(struct vsx_qr_data *qr_data)
+{
         for (int i = 0; i < DATA_CODEWORDS_PER_BLOCK; i++) {
-                bit_writer_write_codeword(&writer,
-                                          &image,
-                                          block1_data[i]);
-                bit_writer_write_codeword(&writer,
-                                          &image,
-                                          block2_data[i]);
+                for (int block = 0; block < N_BLOCKS; block++)
+                        write_codeword(qr_data, qr_data->blocks[block].data[i]);
         }
 
         for (int i = 0; i < ERROR_CORRECTION_CODEWORDS_PER_BLOCK; i++) {
-                bit_writer_write_codeword(&writer,
-                                          &image,
-                                          block1_ec[i]);
-                bit_writer_write_codeword(&writer,
-                                          &image,
-                                          block2_ec[i]);
+                for (int block = 0; block < N_BLOCKS; block++)
+                        write_codeword(qr_data, qr_data->blocks[block].ec[i]);
+        }
+}
+
+void
+vsx_qr_create(const uint8_t *data,
+              uint8_t *image_out)
+{
+        struct vsx_qr_data *qr_data = create_data();
+
+        fill_block1(qr_data, data);
+        fill_block2(qr_data, data);
+
+        for (int i = 0; i < N_BLOCKS; i++) {
+                get_error_correction_codewords(qr_data->blocks[i].data,
+                                               qr_data->blocks[i].ec);
         }
 
-        apply_mask(&image, mask_images + mask_num);
+        write_blocks(qr_data);
 
-        generate_pixel_image(&image, image_out);
+        int mask_num = 3;
+
+        store_format_bits(&qr_data->image, format_bits_for_mask[mask_num]);
+
+        apply_mask(&qr_data->image, mask_images + mask_num);
+
+        generate_pixel_image(&qr_data->image, image_out);
+
+        vsx_free(qr_data);
 }

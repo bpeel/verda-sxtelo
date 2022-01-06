@@ -139,6 +139,7 @@ test('id-url', test_id_url)
 
 generate_qr_src = [
         'vsx-qr.c',
+        '../common/vsx-util.c',
         'generate-qr.c',
 ]
 
