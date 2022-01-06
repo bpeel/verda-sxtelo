@@ -48,12 +48,7 @@
 #define BLOCK_SAME_PENALTY 3
 
 #define BAD_PATTERN_PENALTY 40
-#define BAD_PATTERN_LENGTH (1 + 1 + 3 + 1 + 1 + 4)
-#define BAD_PATTERN_BASE 0x5d
-/* The bad pattern with 4 zero bits after it */
-#define BAD_PATTERN_AFTER BAD_PATTERN_BASE
-/* The bad pattern with 4 zero bits before it */
-#define BAD_PATTERN_BEFORE (BAD_PATTERN_BASE << 4)
+#define BAD_PATTERN_BASE_LENGTH (1 + 1 + 3 + 1 + 1)
 
 _Static_assert(N_MODULES <= sizeof (uint32_t) * 8,
                "N_MODULES needs to fit in a uint32_t for vsx_qr_image");
@@ -97,6 +92,17 @@ struct vsx_qr_data {
 };
 
 #include "vsx-qr-data.h"
+
+/* We want to detect sequences that look like the finder pattern or
+ * any scale of the finder pattern.
+ */
+static const uint32_t
+bad_patterns[] = {
+        0x5d, /* base pattern 0b1011101 */
+        0x33f3, /* doubled 0b11001111110011 */
+        0x1c7fc7, /* tripled 0b111000111111111000111 */
+        0xf0fff0f, /* quadrupled 0b1111000011111111111100001111 */
+};
 
 /* We always use Q-level correction. The only other thing left in the
  * format is the mask number. There’s only eight of them so we might
@@ -480,19 +486,29 @@ score_block_same(const struct vsx_qr_image *image)
 
 static int
 score_bad_pattern(const struct vsx_qr_image *image,
-                  uint32_t pattern)
+                  uint32_t pattern,
+                  int pattern_length)
 {
         int score = 0;
 
         for (int y = 0; y < N_MODULES; y++) {
                 uint32_t row_bits = image->bits[y];
+                uint32_t mask = (UINT32_C(1) << pattern_length) - 1;
 
-                for (int x = 0; x <= N_MODULES - BAD_PATTERN_LENGTH; x++) {
-                        if ((row_bits & ((1 << BAD_PATTERN_LENGTH) - 1)) ==
-                            pattern)
+                for (int x = 0; x <= N_MODULES - pattern_length; x++) {
+                        if (((row_bits >> x) & mask) != pattern)
+                                continue;
+
+                        int before_bits = MIN(4, x);
+                        uint32_t before_mask = (UINT32_C(1) << before_bits) - 1;
+
+                        int after_bits = MIN(4, N_MODULES - x - pattern_length);
+                        uint32_t after_mask = (UINT32_C(1) << after_bits) - 1;
+
+                        if ((row_bits & (before_mask << x)) == 0 ||
+                            (row_bits & (after_mask <<
+                                         (x + pattern_length))) == 0)
                                 score += BAD_PATTERN_PENALTY;
-
-                        row_bits >>= 1;
                 }
         }
 
@@ -528,10 +544,15 @@ evaluate_image(const struct vsx_qr_data *qr_data)
         score += score_adjacent_modules_same(&qr_data->column_image);
         score += score_block_same(&qr_data->masked_image);
 
-        score += score_bad_pattern(&qr_data->masked_image, BAD_PATTERN_BEFORE);
-        score += score_bad_pattern(&qr_data->masked_image, BAD_PATTERN_AFTER);
-        score += score_bad_pattern(&qr_data->column_image, BAD_PATTERN_BEFORE);
-        score += score_bad_pattern(&qr_data->column_image, BAD_PATTERN_AFTER);
+        for (int i = 0; i < VSX_N_ELEMENTS(bad_patterns); i++) {
+                int pattern_length = (i + 1) * BAD_PATTERN_BASE_LENGTH;
+                score += score_bad_pattern(&qr_data->masked_image,
+                                           bad_patterns[i],
+                                           pattern_length);
+                score += score_bad_pattern(&qr_data->column_image,
+                                           bad_patterns[i],
+                                           pattern_length);
+        }
 
         score += score_dark_light_ratio(&qr_data->masked_image);
 
