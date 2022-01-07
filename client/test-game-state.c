@@ -1351,6 +1351,65 @@ out:
 }
 
 static bool
+test_conversation_id(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        uint64_t conversation_id;
+
+        if (vsx_game_state_get_conversation_id(harness->game_state,
+                                               &conversation_id)) {
+                fprintf(stderr,
+                        "The game state has a conversation ID before one was "
+                        "sent.\n");
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t conversation_id_message[] =
+                "\x82\x09\x0a\x81\x82\x83\x84\x85\x86\x87\x88";
+
+        if (!write_data(harness,
+                        conversation_id_message,
+                        sizeof conversation_id_message - 1) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!vsx_game_state_get_conversation_id(harness->game_state,
+                                                &conversation_id)) {
+                fprintf(stderr,
+                        "The game state doesn’t have a conversation ID even "
+                        "after one was sent.\n");
+                ret = false;
+                goto out;
+        }
+
+        uint64_t expected_id = UINT64_C(0x8887868584838281);
+
+        if (expected_id != conversation_id) {
+                fprintf(stderr,
+                        "Game state conversation id does not match.\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        conversation_id);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_dangling_events(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1442,6 +1501,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_commands())
+                ret = EXIT_FAILURE;
+
+        if (!test_conversation_id())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

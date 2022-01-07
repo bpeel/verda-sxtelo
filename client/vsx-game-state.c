@@ -58,6 +58,9 @@ struct vsx_game_state {
         enum vsx_game_state_shout_state shout_state;
         int shouting_player;
 
+        bool has_conversation_id;
+        uint64_t conversation_id;
+
         int self;
 
         /* Array of tile pointers indexed by tile number */
@@ -173,6 +176,14 @@ handle_header(struct vsx_game_state *game_state,
 }
 
 static void
+handle_conversation_id(struct vsx_game_state *game_state,
+                       const struct vsx_connection_event *event)
+{
+        game_state->has_conversation_id = true;
+        game_state->conversation_id = event->conversation_id.id;
+}
+
+static void
 handle_player_name_changed(struct vsx_game_state *game_state,
                            const struct vsx_connection_event *event)
 {
@@ -258,6 +269,9 @@ handle_event(struct vsx_game_state *game_state,
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
                 handle_header(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
+                handle_conversation_id(game_state, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
                 handle_player_name_changed(game_state, event);
@@ -416,6 +430,18 @@ enum vsx_game_state_shout_state
 vsx_game_state_get_shout_state(struct vsx_game_state *game_state)
 {
         return game_state->shout_state;
+}
+
+bool
+vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
+                                   uint64_t *id)
+{
+        if (game_state->has_conversation_id) {
+                *id = game_state->conversation_id;
+                return true;
+        } else {
+                return false;
+        }
 }
 
 int

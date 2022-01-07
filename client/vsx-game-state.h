@@ -83,6 +83,10 @@ vsx_game_state_get_self(struct vsx_game_state *game_state);
 enum vsx_game_state_shout_state
 vsx_game_state_get_shout_state(struct vsx_game_state *game_state);
 
+bool
+vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
+                                   uint64_t *id);
+
 void
 vsx_game_state_update(struct vsx_game_state *game_state);
 
