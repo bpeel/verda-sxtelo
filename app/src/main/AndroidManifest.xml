@@ -41,6 +41,7 @@
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="https"
               android:host="gemelo.org"
               android:pathPrefix="/j/" />
@@ -48,6 +49,7 @@
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="http"
               android:host="gemelo.org"
               android:pathPrefix="/j/"/>
