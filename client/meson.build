@@ -153,3 +153,14 @@ test('test-qr',
      files('test-qr.py'),
      depends: generate_qr,
      args: [ generate_qr.full_path() ])
+
+test_instance_state_src = [
+        '../common/vsx-buffer.c',
+        'vsx-instance-state.c',
+        '../common/vsx-util.c',
+        'test-instance-state.c',
+]
+test_instance_state = executable('test-instance-state',
+                                 test_instance_state_src,
+                                 include_directories: inc_dirs)
+test('test-instance-state', test_instance_state)
