@@ -261,8 +261,36 @@ check_started_running_cb(struct harness *harness,
         return true;
 }
 
+static bool
+start_harness(struct harness *harness)
+{
+        vsx_worker_lock(harness->worker);
+        vsx_connection_set_running(harness->connection, true);
+        vsx_worker_unlock(harness->worker);
+
+        harness->server_fd = accept(harness->server_sock,
+                                    NULL, /* addr */
+                                    NULL /* addrlen */);
+
+        if (harness->server_fd == -1) {
+                fprintf(stderr,
+                        "accept failed: %s\n",
+                        strerror(errno));
+                return false;
+        }
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
+                         check_started_running_cb,
+                         (const uint8_t *) "", 0,
+                         NULL /* user_data */))
+            return false;
+
+        return true;
+}
+
 static struct harness *
-create_harness(void)
+create_harness_no_start(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
 
@@ -334,33 +362,27 @@ create_harness(void)
         harness->game_state = vsx_game_state_new(harness->worker,
                                                  harness->connection);
 
-        vsx_worker_lock(harness->worker);
-        vsx_connection_set_running(harness->connection, true);
-        vsx_worker_unlock(harness->worker);
-
-        harness->server_fd = accept(harness->server_sock,
-                                    NULL, /* addr */
-                                    NULL /* addrlen */);
-
-        if (harness->server_fd == -1) {
-                fprintf(stderr,
-                        "accept failed: %s\n",
-                        strerror(errno));
-                goto error;
-        }
-
-        if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
-                         check_started_running_cb,
-                         (const uint8_t *) "", 0,
-                         NULL /* user_data */))
-            goto error;
-
         return harness;
 
 error:
         free_harness(harness);
         return NULL;
+}
+
+static struct harness *
+create_harness(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        if (!start_harness(harness)) {
+                free_harness(harness);
+                return NULL;
+        }
+
+        return harness;
 }
 
 static void
@@ -482,6 +504,24 @@ send_player_id(struct harness *harness)
         return true;
 }
 
+static bool
+negotiate_harness(struct harness *harness)
+{
+        if (!read_ws_request(harness))
+                return false;
+
+        if (!write_data(harness, (const uint8_t *) "\r\n\r\n", 4))
+                return false;
+
+        if (!read_new_player_request(harness))
+                return false;
+
+        if (!send_player_id(harness))
+                return false;
+
+        return true;
+}
+
 static struct harness *
 create_negotiated_harness(void)
 {
@@ -490,23 +530,12 @@ create_negotiated_harness(void)
         if (harness == NULL)
                 return NULL;
 
-        if (!read_ws_request(harness))
-                goto error;
-
-        if (!write_data(harness, (const uint8_t *) "\r\n\r\n", 4))
-                goto error;
-
-        if (!read_new_player_request(harness))
-                goto error;
-
-        if (!send_player_id(harness))
-                goto error;
+        if (!negotiate_harness(harness)) {
+                free_harness(harness);
+                return NULL;
+        }
 
         return harness;
-
-error:
-        free_harness(harness);
-        return NULL;
 }
 
 struct send_tile_closure {
@@ -1480,12 +1509,115 @@ out:
         return ret;
 }
 
+static bool
+test_load_instance_state(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_load_instance_state(harness->game_state,
+                                           "person_id=5");
+
+        if (!start_harness(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_data(harness, (const uint8_t *) "\r\n\r\n", 4)) {
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t reconnect_request[] =
+                "\x82\x0b\x81\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+
+        /* Check that we get a reconnect message with the player ID
+         * that we loaded from the instance state.
+         */
+        if (!expect_data(harness,
+                         reconnect_request,
+                         sizeof reconnect_request - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_load_empty_instance_state(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_load_instance_state(harness->game_state, "");
+
+        /* The string is empty so the connection should start a
+         * regular new player request.
+         */
+        ret = start_harness(harness) && negotiate_harness(harness);
+
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+test_save_instance_state(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        char *str = vsx_game_state_save_instance_state(harness->game_state);
+
+        const char *expected_str = "person_id=6e6d6c6b6a696867";
+
+        if (strcmp(str, expected_str)) {
+                fprintf(stderr,
+                        "String from saved instance state does not match.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        expected_str,
+                        str);
+                ret = false;
+        }
+
+        vsx_free(str);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
         int ret = EXIT_SUCCESS;
 
         if (!test_self())
+                ret = EXIT_FAILURE;
+
+        if (!test_load_instance_state())
+                ret = EXIT_FAILURE;
+
+        if (!test_load_empty_instance_state())
+                ret = EXIT_FAILURE;
+
+        if (!test_save_instance_state())
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())

@@ -27,6 +27,7 @@ client_common_src = [
         'vsx-id-url.c',
         'vsx-image.c',
         'vsx-image-loader.c',
+        'vsx-instance-state.c',
         'vsx-invite-painter.c',
         'vsx-main-thread.c',
         'vsx-map-buffer.c',
@@ -116,6 +117,7 @@ test('worker', test_worker)
 test_game_state_src = [
         'test-game-state.c',
         'vsx-game-state.c',
+        'vsx-instance-state.c',
         'vsx-main-thread.c',
         'vsx-monotonic.c',
         'vsx-thread-linux.c',

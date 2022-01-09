@@ -101,6 +101,17 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y);
 
+/* This can be called from any thread. The caller must free the
+ * returned string.
+ */
+char *
+vsx_game_state_save_instance_state(struct vsx_game_state *game_state);
+
+/* This must be called from the main thread */
+void
+vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
+                                   const char *str);
+
 /* This signal will only ever be emitted from the main thread */
 struct vsx_signal *
 vsx_game_state_get_event_signal(struct vsx_game_state *game_state);

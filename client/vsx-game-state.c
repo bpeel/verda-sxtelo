@@ -32,6 +32,7 @@
 #include "vsx-list.h"
 #include "vsx-slab.h"
 #include "vsx-main-thread.h"
+#include "vsx-instance-state.h"
 
 struct vsx_game_state_player {
         char *name;
@@ -86,6 +87,12 @@ struct vsx_game_state {
         struct vsx_main_thread_token *flush_queue_token;
 
         struct vsx_list freed_events;
+
+        /* The instance state is also protected by the mutex so that
+         * it can be accessed from the android UI main thread (ie, not
+         * the render thread)
+         */
+        struct vsx_instance_state instance_state;
 };
 
 static void
@@ -323,6 +330,21 @@ flush_queue_cb(void *data)
 }
 
 static void
+handle_instance_state_event_locked(struct vsx_instance_state *instance_state,
+                                   const struct vsx_connection_event *event)
+{
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+                instance_state->has_person_id = true;
+                instance_state->person_id = event->header.person_id;
+                break;
+
+        default:
+                break;
+        }
+}
+
+static void
 event_cb(struct vsx_listener *listener,
          void *data)
 {
@@ -361,6 +383,11 @@ event_cb(struct vsx_listener *listener,
                         vsx_main_thread_queue_idle(flush_queue_cb,
                                                    game_state);
         }
+
+        /* Handle instance state events here while the mutex is locked
+         * instead of in the idle callback.
+         */
+        handle_instance_state_event_locked(&game_state->instance_state, event);
 
         pthread_mutex_unlock(&game_state->mutex);
 }
@@ -415,6 +442,8 @@ vsx_game_state_new(struct vsx_worker *worker,
         game_state->worker = worker;
         game_state->connection = connection;
 
+        vsx_instance_state_init(&game_state->instance_state);
+
         vsx_worker_lock(game_state->worker);
 
         game_state->event_listener.notify = event_cb;
@@ -448,6 +477,43 @@ int
 vsx_game_state_get_self(struct vsx_game_state *game_state)
 {
         return game_state->self;
+}
+
+char *
+vsx_game_state_save_instance_state(struct vsx_game_state *game_state)
+{
+        char *str;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        str = vsx_instance_state_save(&game_state->instance_state);
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        return str;
+}
+
+void
+vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
+                                   const char *str)
+{
+        bool has_person_id;
+        uint64_t person_id;
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        vsx_instance_state_load(&game_state->instance_state, str);
+        has_person_id = game_state->instance_state.has_person_id;
+        person_id = game_state->instance_state.person_id;
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        if (has_person_id) {
+                vsx_worker_lock(game_state->worker);
+                vsx_connection_set_person_id(game_state->connection,
+                                             person_id);
+                vsx_worker_unlock(game_state->worker);
+        }
 }
 
 struct vsx_signal *
