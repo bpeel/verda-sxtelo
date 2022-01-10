@@ -63,11 +63,17 @@ typedef bool
                      const struct vsx_connection_event *event,
                      void *user_data);
 
+typedef bool
+(* check_modified_func)(struct harness *harness,
+                        const struct vsx_game_state_modified_event *event,
+                        void *user_data);
+
 struct check_event_listener {
         struct vsx_listener listener;
         enum check_event_result result;
-        enum vsx_connection_event_type expected_type;
-        check_event_func cb;
+        int expected_type;
+        check_event_func event_cb;
+        check_modified_func modified_cb;
         struct harness *harness;
         void *user_data;
 };
@@ -172,49 +178,75 @@ check_event_cb(struct vsx_listener *listener, void *data)
                 vsx_container_of(listener,
                                  struct check_event_listener,
                                  listener);
-        const struct vsx_connection_event *event = data;
 
         if (ce_listener->result != CHECK_EVENT_RESULT_NO_MESSAGE) {
                 fprintf(stderr,
                         "Multiple events received when only one "
                         "was expected\n");
                 ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-        } else if (ce_listener->expected_type != event->type) {
-                fprintf(stderr,
-                        "Expected event type %i but received %i\n",
-                        ce_listener->expected_type,
-                        event->type);
-                ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-        } else if (!ce_listener->cb(ce_listener->harness,
-                                    event,
-                                    ce_listener->user_data)) {
-                ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+        } else if (ce_listener->event_cb) {
+                const struct vsx_connection_event *event = data;
+
+                if (ce_listener->expected_type != event->type) {
+                        fprintf(stderr,
+                                "Expected event type %i but received %i\n",
+                                ce_listener->expected_type,
+                                event->type);
+                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+                } else if (!ce_listener->event_cb(ce_listener->harness,
+                                                  event,
+                                                  ce_listener->user_data)) {
+                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+                } else {
+                        ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
+                }
         } else {
-                ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
+                const struct vsx_game_state_modified_event *event = data;
+
+                if (ce_listener->expected_type != event->type) {
+                        fprintf(stderr,
+                                "Expected modified event type %i "
+                                "but received %i\n",
+                                ce_listener->expected_type,
+                                event->type);
+                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+                } else if (!ce_listener->modified_cb(ce_listener->harness,
+                                                     event,
+                                                     ce_listener->user_data)) {
+                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
+                } else {
+                        ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
+                }
         }
 }
 
 static bool
-check_event(struct harness *harness,
-            enum vsx_connection_event_type expected_type,
-            check_event_func cb,
-            const uint8_t *data,
-            size_t data_len,
-            void *user_data)
+check_event_or_modified(struct harness *harness,
+                        int expected_type,
+                        check_event_func event_cb,
+                        check_modified_func modified_cb,
+                        const uint8_t *data,
+                        size_t data_len,
+                        void *user_data)
 {
         struct check_event_listener listener = {
                 .listener = { .notify = check_event_cb },
                 .result = CHECK_EVENT_RESULT_NO_MESSAGE,
                 .expected_type = expected_type,
-                .cb = cb,
+                .event_cb = event_cb,
+                .modified_cb = modified_cb,
                 .harness = harness,
                 .user_data = user_data,
         };
 
         bool ret = true;
 
-        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
-                       &listener.listener);
+        struct vsx_signal *signal =
+                event_cb ?
+                vsx_game_state_get_event_signal(harness->game_state) :
+                vsx_game_state_get_modified_signal(harness->game_state);
+
+        vsx_signal_add(signal, &listener.listener);
 
         if (!write_data(harness, data, data_len)) {
                 ret = false;
@@ -238,12 +270,46 @@ check_event(struct harness *harness,
                 goto out;
         }
 
-        assert(!"Unexpected check_event result");
+        assert(!"Unexpected check_event_or_modified result");
 
 out:
         vsx_list_remove(&listener.listener.link);
 
         return ret;
+}
+
+static bool
+check_event(struct harness *harness,
+            enum vsx_connection_event_type expected_type,
+            check_event_func event_cb,
+            const uint8_t *data,
+            size_t data_len,
+            void *user_data)
+{
+        return check_event_or_modified(harness,
+                                       expected_type,
+                                       event_cb,
+                                       NULL, /* modified_cb */
+                                       data,
+                                       data_len,
+                                       user_data);
+}
+
+static bool
+check_modified(struct harness *harness,
+               enum vsx_game_state_modified_type expected_type,
+               check_modified_func modified_cb,
+               const uint8_t *data,
+               size_t data_len,
+               void *user_data)
+{
+        return check_event_or_modified(harness,
+                                       expected_type,
+                                       NULL, /* event_cb */
+                                       modified_cb,
+                                       data,
+                                       data_len,
+                                       user_data);
 }
 
 static bool
@@ -1045,7 +1111,9 @@ check_shouting_flags(struct harness *harness,
 struct check_shouting_closure {
         int clear_shouting_player;
         int set_shouting_player;
-        struct vsx_listener listener;
+        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
+        bool got_modified_event;
         bool succeeded;
 };
 
@@ -1056,7 +1124,7 @@ check_shouting_cb(struct vsx_listener *listener,
         struct check_shouting_closure *closure =
                 vsx_container_of(listener,
                                  struct check_shouting_closure,
-                                 listener);
+                                 event_listener);
         const struct vsx_connection_event *event = user_data;
 
         if (event->type != VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED) {
@@ -1113,6 +1181,28 @@ check_shouting_cb(struct vsx_listener *listener,
         }
 }
 
+static void
+check_shouting_modified_cb(struct vsx_listener *listener,
+                           void *user_data)
+{
+        struct check_shouting_closure *closure =
+                vsx_container_of(listener,
+                                 struct check_shouting_closure,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS) {
+                fprintf(stderr,
+                        "Received unexpected modified event %i "
+                        "after setting player shouting.\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
+        closure->got_modified_event = true;
+}
+
 static bool
 check_shouting_events(struct harness *harness,
                       int set_player_num,
@@ -1122,17 +1212,24 @@ check_shouting_events(struct harness *harness,
                 .clear_shouting_player = clear_player_num,
                 .set_shouting_player = set_player_num,
                 .succeeded = true,
-                .listener = {
+                .got_modified_event = false,
+                .event_listener = {
                         .notify = check_shouting_cb,
+                },
+                .modified_listener = {
+                        .notify = check_shouting_modified_cb,
                 },
         };
 
         vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
-                       &closure.listener);
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
 
         bool ret = wait_for_idle_queue(harness);
 
-        vsx_list_remove(&closure.listener.link);
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
 
         if (!ret || !closure.succeeded)
                 return false;
@@ -1144,6 +1241,16 @@ check_shouting_events(struct harness *harness,
 
         if (closure.clear_shouting_player != -1) {
                 fprintf(stderr, "No clear shouting player event received.\n");
+                return false;
+        }
+
+        if (!closure.got_modified_event &&
+            ((set_player_num >= 0 &&
+              set_player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS) ||
+             (clear_player_num >= 0 &&
+              clear_player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS))) {
+                fprintf(stderr,
+                        "No modified event received for shouting change.\n");
                 return false;
         }
 
@@ -1380,6 +1487,14 @@ out:
 }
 
 static bool
+check_conversation_id_modified_cb(struct harness *harness,
+                                  const struct vsx_game_state_modified_event *e,
+                                  void *user_data)
+{
+        return true;
+}
+
+static bool
 test_conversation_id(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1403,10 +1518,12 @@ test_conversation_id(void)
         static const uint8_t conversation_id_message[] =
                 "\x82\x09\x0a\x81\x82\x83\x84\x85\x86\x87\x88";
 
-        if (!write_data(harness,
-                        conversation_id_message,
-                        sizeof conversation_id_message - 1) ||
-            !wait_for_idle_queue(harness)) {
+        if (!check_modified(harness,
+                            VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+                            check_conversation_id_modified_cb,
+                            conversation_id_message,
+                            sizeof conversation_id_message - 1,
+                            NULL /* user_data */)) {
                 ret = false;
                 goto out;
         }
@@ -1603,6 +1720,87 @@ test_save_instance_state(void)
         return ret;
 }
 
+struct check_player_flags_closure {
+        bool succeeded;
+        bool found_connected_player;
+};
+
+static void
+check_player_flags_foreach_player_cb(const char *name,
+                                     enum vsx_game_state_player_flag flags,
+                                     void *user_data)
+{
+        struct check_player_flags_closure *closure = user_data;
+
+        if ((flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) == 0)
+                return;
+
+        if (closure->found_connected_player) {
+                fprintf(stderr,
+                        "Found multiple connected players when only one "
+                        "expected\n");
+                closure->succeeded = false;
+        } else {
+                closure->found_connected_player = true;
+
+                if (flags != 3) {
+                        fprintf(stderr,
+                                "Player flags expected to be 3, got %i\n",
+                                (int) flags);
+                        closure->succeeded = false;
+                }
+        }
+}
+
+static bool
+check_player_flags_modified_cb(struct harness *harness,
+                               const struct vsx_game_state_modified_event *e,
+                               void *user_data)
+{
+        struct check_player_flags_closure closure = {
+                .succeeded = true,
+        };
+
+        vsx_game_state_foreach_player(harness->game_state,
+                                      check_player_flags_foreach_player_cb,
+                                      &closure);
+
+        if (!closure.succeeded)
+                return false;
+
+        if (!closure.found_connected_player) {
+                fprintf(stderr, "No connected player found\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_typing_modified(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Set the typing flag for the player and make sure that we
+         * get a player flags modified event.
+         */
+        if (!check_modified(harness,
+                            VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+                            check_player_flags_modified_cb,
+                            (const uint8_t *) "\x82\x03\x05\x00\x03", 5,
+                            NULL /* user_data */))
+                ret = false;
+
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1618,6 +1816,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_save_instance_state())
+                ret = EXIT_FAILURE;
+
+        if (!test_typing_modified())
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())

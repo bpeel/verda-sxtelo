@@ -51,6 +51,15 @@ enum vsx_game_state_shout_state {
         VSX_GAME_STATE_SHOUT_STATE_OTHER,
 };
 
+enum vsx_game_state_modified_type {
+        VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+        VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+};
+
+struct vsx_game_state_modified_event {
+        enum vsx_game_state_modified_type type;
+};
+
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
@@ -112,9 +121,12 @@ void
 vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                                    const char *str);
 
-/* This signal will only ever be emitted from the main thread */
+/* These signals will only ever be emitted from the main thread */
 struct vsx_signal *
 vsx_game_state_get_event_signal(struct vsx_game_state *game_state);
+
+struct vsx_signal *
+vsx_game_state_get_modified_signal(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_free(struct vsx_game_state *game_state);

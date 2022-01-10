@@ -76,6 +76,7 @@ struct vsx_game_state {
         struct vsx_listener event_listener;
 
         struct vsx_signal event_signal;
+        struct vsx_signal modified_signal;
 
         pthread_mutex_t mutex;
 
@@ -188,6 +189,12 @@ handle_conversation_id(struct vsx_game_state *game_state,
 {
         game_state->has_conversation_id = true;
         game_state->conversation_id = event->conversation_id.id;
+
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
 }
 
 static void
@@ -221,6 +228,12 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
         /* Leave the shouting flag as it was */
         player->flags = ((player->flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING) |
                          event->player_flags_changed.flags);
+
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
 }
 
 static void
@@ -249,6 +262,14 @@ handle_player_shouting_changed(struct vsx_game_state *game_state,
                         game_state->shout_state =
                                 VSX_GAME_STATE_SHOUT_STATE_NOONE;
                 }
+        }
+
+        if (player) {
+                struct vsx_game_state_modified_event m_event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &m_event);
         }
 }
 
@@ -429,6 +450,7 @@ vsx_game_state_new(struct vsx_worker *worker,
         pthread_mutex_init(&game_state->mutex, NULL /* attr */);
 
         vsx_signal_init(&game_state->event_signal);
+        vsx_signal_init(&game_state->modified_signal);
 
         vsx_list_init(&game_state->event_queue);
         vsx_list_init(&game_state->freed_events);
@@ -520,6 +542,12 @@ struct vsx_signal *
 vsx_game_state_get_event_signal(struct vsx_game_state *game_state)
 {
         return &game_state->event_signal;
+}
+
+struct vsx_signal *
+vsx_game_state_get_modified_signal(struct vsx_game_state *game_state)
+{
+        return &game_state->modified_signal;
 }
 
 static void
