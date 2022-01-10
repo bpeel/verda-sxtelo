@@ -52,13 +52,16 @@ struct data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
-        struct vsx_listener event_listener;
-
-        bool has_person_id;
-        uint64_t person_id;
 
         bool has_conversation_id;
         uint64_t conversation_id;
+
+        /* Instance state that is queued to be set on the
+         * vsx_game_state when it is created. It will be freed after
+         * being used. This shouldn’t be used for reading the game
+         * state, only setting it.
+         */
+        char *instance_state;
 
         /* Weak pointer to the surface view so that we can queue redraws */
         jobject surface;
@@ -67,7 +70,6 @@ struct data {
         bool redraw_queued;
 
         jmethodID queue_flush_idle_method_id;
-        jmethodID queue_set_person_id_method_id;
 
         /* Graphics data that needs to be recreated when the context changes */
         void *gl_lib;
@@ -159,23 +161,6 @@ wakeup_cb(void *user_data)
         call_void_surface_method(data, data->queue_flush_idle_method_id);
 }
 
-static void
-event_cb(struct vsx_listener *listener,
-         void *signal_data)
-{
-        struct data *data = vsx_container_of(listener,
-                                             struct data,
-                                             event_listener);
-        struct vsx_connection_event *event = signal_data;
-
-        if (event->type != VSX_CONNECTION_EVENT_TYPE_HEADER)
-                return;
-
-        call_void_surface_method(data,
-                                 data->queue_set_person_id_method_id,
-                                 event->header.person_id);
-}
-
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -201,12 +186,6 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "queueFlushIdleEvents",
                                     "()V");
 
-        data->queue_set_person_id_method_id =
-                (*env)->GetMethodID(env,
-                                    data->surface_class,
-                                    "queueSetPersonId",
-                                    "(J)V");
-
         vsx_thread_set_jvm(data->jvm);
 
         data->asset_manager = vsx_asset_manager_new(env, asset_manager_jni);
@@ -223,15 +202,29 @@ configure_connection(struct data *data)
 {
         vsx_connection_set_player_name(data->connection, "test");
 
-        if (data->has_person_id) {
-                vsx_connection_set_person_id(data->connection,
-                                             data->person_id);
-        }
-
         if (data->has_conversation_id) {
                 vsx_connection_set_conversation_id(data->connection,
                                                    data->conversation_id);
         }
+}
+
+static void
+free_instance_state(struct data *data)
+{
+        vsx_free(data->instance_state);
+        data->instance_state = NULL;
+}
+
+static void
+load_instance_state(struct data *data)
+{
+        if (data->instance_state == NULL)
+                return;
+
+        vsx_game_state_load_instance_state(data->game_state,
+                                           data->instance_state);
+
+        free_instance_state(data);
 }
 
 static bool
@@ -263,10 +256,7 @@ ensure_game_state(struct data *data)
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
 
-                data->event_listener.notify = event_cb;
-                struct vsx_signal *event_signal =
-                        vsx_game_state_get_event_signal(data->game_state);
-                vsx_signal_add(event_signal, &data->event_listener);
+                load_instance_state(data);
 
                 vsx_worker_lock(data->worker);
 
@@ -323,15 +313,42 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
 }
 
 JNIEXPORT void JNICALL
-VSX_JNI_RENDERER_PREFIX(setPersonId)(JNIEnv *env,
-                                     jobject this,
-                                     jlong native_data,
-                                     jlong person_id)
+VSX_JNI_RENDERER_PREFIX(setInstanceState)(JNIEnv *env,
+                                          jobject this,
+                                          jlong native_data,
+                                          jstring state_string)
 {
         struct data *data = GET_DATA(native_data);
 
-        data->has_person_id = true;
-        data->person_id = person_id;
+        free_instance_state(data);
+
+        const char *state =
+                (*env)->GetStringUTFChars(env,
+                                          state_string,
+                                          NULL /* isCopy */);
+
+        data->instance_state = vsx_strdup(state);
+
+        (*env)->ReleaseStringUTFChars(env, state_string, state);
+}
+
+JNIEXPORT jstring JNICALL
+VSX_JNI_RENDERER_PREFIX(getInstanceState)(JNIEnv *env,
+                                          jobject this,
+                                          jlong native_data)
+{
+        struct data *data = GET_DATA(native_data);
+
+        if (data->game_state == NULL)
+                return NULL;
+
+        char *str = vsx_game_state_save_instance_state(data->game_state);
+
+        jstring state_string = (*env)->NewStringUTF(env, str);
+
+        vsx_free(str);
+
+        return state_string;
 }
 
 JNIEXPORT void JNICALL
@@ -460,6 +477,8 @@ VSX_JNI_RENDERER_PREFIX(freeNativeData)(JNIEnv *env,
         struct data *data = GET_DATA(native_data);
 
         destroy_graphics(data);
+
+        free_instance_state(data);
 
         if (data->game_state)
                 vsx_game_state_free(data->game_state);

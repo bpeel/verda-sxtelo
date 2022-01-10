@@ -35,8 +35,6 @@ public class GameView extends GLSurfaceView
   private long nativeData;
   private int dpi;
   private Context context;
-  private boolean hasPersonId = false;
-  private long personId;
 
   static {
     System.loadLibrary("anagrams");
@@ -145,15 +143,18 @@ public class GameView extends GLSurfaceView
       });
   }
 
-  public void setPersonId(long personId)
+  public void setInstanceState(String instanceState)
   {
-    this.hasPersonId = true;
-    this.personId = personId;
     queueEvent(new Runnable() {
         public void run() {
-          renderer.setPersonId(nativeData, personId);
+          renderer.setInstanceState(nativeData, instanceState);
         }
       });
+  }
+
+  public String getInstanceState()
+  {
+    return renderer.getInstanceState(nativeData);
   }
 
   public void setInviteUrl(String url)
@@ -161,27 +162,6 @@ public class GameView extends GLSurfaceView
     queueEvent(new Runnable() {
         public void run() {
           renderer.setInviteUrl(nativeData, url);
-        }
-      });
-  }
-
-  public Long getPersonId()
-  {
-    if (hasPersonId)
-      return new Long(personId);
-    else
-      return null;
-  }
-
-  public void queueSetPersonId(long personId)
-  {
-    Handler mainHandler = new Handler(context.getMainLooper());
-
-    mainHandler.post(new Runnable() {
-        @Override
-        public void run()
-        {
-          setPersonId(personId);
         }
       });
   }
@@ -270,7 +250,8 @@ public class GameView extends GLSurfaceView
     private native long createNativeData(GLSurfaceView surface,
                                          AssetManager assetManager,
                                          int dpi);
-    private native void setPersonId(long nativeData, long personId);
+    private native void setInstanceState(long nativeData, String instanceState);
+    private native String getInstanceState(long nativeData);
     private native void setInviteUrl(long nativeData, String inviteUrl);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,

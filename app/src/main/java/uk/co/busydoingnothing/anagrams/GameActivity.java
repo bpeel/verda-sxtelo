@@ -30,7 +30,7 @@ import android.view.View;
 public class GameActivity extends AppCompatActivity
 {
   private static String TAG = "GameActivity";
-  private static String PERSON_ID_KEY = "VsxPersonId";
+  private static String INSTANCE_STATE_KEY = "VsxState";
 
   private GameView surface;
 
@@ -43,9 +43,11 @@ public class GameActivity extends AppCompatActivity
 
     surface = (GameView) findViewById(R.id.gl_view);
 
-    if (savedInstanceState != null &&
-        savedInstanceState.containsKey(PERSON_ID_KEY))
-      surface.setPersonId(savedInstanceState.getLong(PERSON_ID_KEY));
+    if (savedInstanceState != null) {
+      String instanceState = savedInstanceState.getString(INSTANCE_STATE_KEY);
+      if (instanceState != null)
+        surface.setInstanceState(instanceState);
+    }
 
     handleIntent();
   }
@@ -91,9 +93,9 @@ public class GameActivity extends AppCompatActivity
   {
     super.onSaveInstanceState(outState);
 
-    Long personId = surface.getPersonId();
+    String instanceState = surface.getInstanceState();
 
-    if (personId != null)
-      outState.putLong(PERSON_ID_KEY, personId);
+    if (instanceState != null)
+      outState.putString(INSTANCE_STATE_KEY, instanceState);
   }
 }
