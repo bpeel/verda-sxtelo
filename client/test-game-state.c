@@ -1765,7 +1765,8 @@ test_save_instance_state(void)
 
         char *str = vsx_game_state_save_instance_state(harness->game_state);
 
-        const char *expected_str = "person_id=6e6d6c6b6a696867";
+        const char *expected_str =
+                "person_id=6e6d6c6b6a696867,invite_visible=y";
 
         if (strcmp(str, expected_str)) {
                 fprintf(stderr,

@@ -31,6 +31,8 @@
 struct vsx_instance_state {
         bool has_person_id;
         uint64_t person_id;
+
+        bool invite_visible;
 };
 
 void

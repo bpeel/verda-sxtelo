@@ -89,6 +89,27 @@ load_person_id_cb(struct vsx_instance_state *state,
         state->person_id = id;
 }
 
+static void
+save_invite_visible_cb(const struct vsx_instance_state *state,
+                       struct vsx_buffer *buf)
+{
+        vsx_buffer_append_c(buf, state->invite_visible ? 'y' : 'n');
+}
+
+static void
+load_invite_visible_cb(struct vsx_instance_state *state,
+                       const char *value,
+                       size_t value_length)
+{
+        if (value_length != 1)
+                return;
+
+        if (*value == 'y')
+                state->invite_visible = true;
+        else if (*value == 'n')
+                state->invite_visible = false;
+}
+
 static const struct vsx_instance_state_property
 properties[] = {
         {
@@ -97,12 +118,18 @@ properties[] = {
                 .save = save_person_id_cb,
                 .load = load_person_id_cb,
         },
+        {
+                .name = "invite_visible",
+                .save = save_invite_visible_cb,
+                .load = load_invite_visible_cb,
+        },
 };
 
 void
 vsx_instance_state_init(struct vsx_instance_state *state)
 {
         state->has_person_id = false;
+        state->invite_visible = true;
 }
 
 char *

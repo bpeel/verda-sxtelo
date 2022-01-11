@@ -248,6 +248,70 @@ test_save_empty(void)
         return true;
 }
 
+static bool
+test_invite_visible(bool value_to_set)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        bool ret = true;
+
+        if (!state.invite_visible) {
+                fprintf(stderr,
+                        "invite_visible did not start off as true\n");
+                ret = false;
+        }
+
+        state.invite_visible = value_to_set;
+
+        char *str = vsx_instance_state_save(&state);
+
+        struct vsx_instance_state loaded_state;
+
+        memset(&loaded_state, 0, sizeof loaded_state);
+
+        vsx_instance_state_load(&loaded_state, str);
+
+        vsx_free(str);
+
+        if (loaded_state.invite_visible != value_to_set) {
+                fprintf(stderr,
+                        "invite_visible has wrong value after load.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        value_to_set ? "true" : "false",
+                        loaded_state.invite_visible ? "true" : "false");
+                ret = false;
+        }
+
+        return ret;
+}
+
+static bool
+test_invite_visible_invalid_value(const char *value)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        bool old_value = state.invite_visible;
+
+        char *str = vsx_strconcat("invite_visible=", value, NULL);
+        vsx_instance_state_load(&state, str);
+        vsx_free(str);
+
+        if (state.invite_visible != old_value) {
+                fprintf(stderr,
+                        "invite_visible changed after setting "
+                        "the invalid value “%s”\n",
+                        value);
+                return false;
+        }
+
+        return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -287,6 +351,24 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_save_empty())
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible(true))
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible(false))
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible_invalid_value("yy"))
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible_invalid_value("nn"))
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible_invalid_value("t"))
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible_invalid_value("f"))
                 ret = EXIT_FAILURE;
 
         return ret;
