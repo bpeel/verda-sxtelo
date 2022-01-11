@@ -62,6 +62,8 @@ struct vsx_game_state {
         bool has_conversation_id;
         uint64_t conversation_id;
 
+        bool invite_visible;
+
         int self;
 
         /* Array of tile pointers indexed by tile number */
@@ -471,6 +473,8 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
 
+        game_state->invite_visible = true;
+
         game_state->worker = worker;
         game_state->connection = connection;
 
@@ -503,6 +507,28 @@ vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
         } else {
                 return false;
         }
+}
+
+bool
+vsx_game_state_get_invite_visible(struct vsx_game_state *game_state)
+{
+        return game_state->invite_visible;
+}
+
+void
+vsx_game_state_set_invite_visible(struct vsx_game_state *game_state,
+                                  bool visibility)
+{
+        if (game_state->invite_visible == visibility)
+                return;
+
+        game_state->invite_visible = visibility;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
 int

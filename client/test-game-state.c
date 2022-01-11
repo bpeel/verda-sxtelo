@@ -1880,6 +1880,129 @@ out:
         return ret;
 }
 
+struct test_invite_visible_closure {
+        struct harness *harness;
+        bool succeeded;
+        bool expected_value;
+        bool had_event;
+        struct vsx_listener listener;
+};
+
+static void
+test_invite_visible_cb(struct vsx_listener *listener,
+                       void *user_data)
+{
+        struct test_invite_visible_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_invite_visible_closure,
+                                 listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE) {
+                fprintf(stderr,
+                        "Received unexpected modified event %i while setting "
+                        "invite visible.\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
+        if (closure->had_event) {
+                fprintf(stderr,
+                        "Received multiple invite visible modified events.\n");
+                closure->succeeded = false;
+                return;
+        }
+
+        bool real_value =
+                vsx_game_state_get_invite_visible(closure->harness->game_state);
+
+        if (closure->expected_value != real_value) {
+                fprintf(stderr,
+                        "invite visible has wrong value\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        closure->expected_value ? "true" : "false",
+                        real_value ? "true" : "false");
+                closure->succeeded = false;
+                return;
+        }
+
+        closure->had_event = true;
+}
+
+static bool
+test_invite_visible(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (!harness)
+                return false;
+
+        bool ret = true;
+
+        struct test_invite_visible_closure closure = {
+                .harness = harness,
+                .succeeded = true,
+                .expected_value = false,
+                .had_event = false,
+                .listener = {
+                        .notify = test_invite_visible_cb,
+                },
+        };
+
+        struct vsx_signal *signal =
+                vsx_game_state_get_modified_signal(harness->game_state);
+        vsx_signal_add(signal, &closure.listener);
+
+        if (!vsx_game_state_get_invite_visible(harness->game_state)) {
+                fprintf(stderr,
+                        "invite_visible didn’t start off as true\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_invite_visible(harness->game_state, false);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_event) {
+                fprintf(stderr,
+                        "No modified event received after setting invite "
+                        "visible.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* Set the same value again and ensure no event was triggered */
+
+        closure.had_event = false;
+
+        vsx_game_state_set_invite_visible(harness->game_state, false);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_event) {
+                fprintf(stderr,
+                        "A modified event was received after setting invite "
+                        "visible to same value.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1916,6 +2039,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_conversation_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_invite_visible())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

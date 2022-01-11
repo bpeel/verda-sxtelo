@@ -54,6 +54,7 @@ enum vsx_game_state_shout_state {
 enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+        VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE,
 };
 
 struct vsx_game_state_modified_event {
@@ -95,6 +96,13 @@ vsx_game_state_get_shout_state(struct vsx_game_state *game_state);
 bool
 vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
                                    uint64_t *id);
+
+bool
+vsx_game_state_get_invite_visible(struct vsx_game_state *game_state);
+
+void
+vsx_game_state_set_invite_visible(struct vsx_game_state *game_state,
+                                  bool visibilty);
 
 void
 vsx_game_state_update(struct vsx_game_state *game_state);
