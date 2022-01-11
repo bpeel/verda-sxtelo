@@ -524,6 +524,10 @@ vsx_game_state_set_invite_visible(struct vsx_game_state *game_state,
 
         game_state->invite_visible = visibility;
 
+        pthread_mutex_lock(&game_state->mutex);
+        game_state->instance_state.invite_visible = visibility;
+        pthread_mutex_unlock(&game_state->mutex);
+
         struct vsx_game_state_modified_event event = {
                 .type = VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE,
         };
@@ -557,12 +561,14 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
 {
         bool has_person_id;
         uint64_t person_id;
+        bool invite_visible;
 
         pthread_mutex_lock(&game_state->mutex);
 
         vsx_instance_state_load(&game_state->instance_state, str);
         has_person_id = game_state->instance_state.has_person_id;
         person_id = game_state->instance_state.person_id;
+        invite_visible = game_state->instance_state.invite_visible;
 
         pthread_mutex_unlock(&game_state->mutex);
 
@@ -572,6 +578,8 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                                              person_id);
                 vsx_worker_unlock(game_state->worker);
         }
+
+        vsx_game_state_set_invite_visible(game_state, invite_visible);
 }
 
 struct vsx_signal *
