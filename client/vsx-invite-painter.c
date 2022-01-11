@@ -41,8 +41,6 @@ struct vsx_invite_painter {
 
         struct vsx_painter_toolbox *toolbox;
 
-        bool invite_visible;
-
         GLuint program;
         GLint matrix_uniform;
         GLint translation_uniform;
@@ -79,8 +77,11 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID:
-                if (painter->invite_visible)
+                if (vsx_game_state_get_invite_visible(painter->game_state))
                         vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+        case VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE:
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
         default:
                 break;
@@ -279,8 +280,6 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        painter->invite_visible = true;
-
         init_program(painter, &toolbox->shader_data);
 
         create_buffer(painter);
@@ -326,7 +325,7 @@ paint_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        if (!painter->invite_visible)
+        if (!vsx_game_state_get_invite_visible(painter->game_state))
                 return;
 
         uint64_t conversation_id;
@@ -371,9 +370,9 @@ input_event_cb(void *painter_data,
                 return false;
 
         case VSX_INPUT_EVENT_TYPE_CLICK:
-                if (painter->invite_visible) {
-                        painter->invite_visible = false;
-                        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                if (vsx_game_state_get_invite_visible(painter->game_state)) {
+                        vsx_game_state_set_invite_visible(painter->game_state,
+                                                          false);
                         return true;
                 }
                 return false;
