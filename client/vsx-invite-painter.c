@@ -37,7 +37,7 @@ _Static_assert(VSX_QR_IMAGE_SIZE <= TEXTURE_SIZE,
 
 struct vsx_invite_painter {
         struct vsx_game_state *game_state;
-        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
 
         struct vsx_painter_toolbox *toolbox;
 
@@ -68,20 +68,18 @@ struct vertex {
 #define N_VERTICES (N_QUADS * 4)
 
 static void
-event_cb(struct vsx_listener *listener,
-         void *user_data)
+modified_cb(struct vsx_listener *listener,
+            void *user_data)
 {
         struct vsx_invite_painter *painter =
                 vsx_container_of(listener,
                                  struct vsx_invite_painter,
-                                 event_listener);
-        const struct vsx_connection_event *event = user_data;
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
-        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
-                if (painter->invite_visible &&
-                    (painter->tex == 0 ||
-                     painter->id_in_texture != event->conversation_id.id))
+        case VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID:
+                if (painter->invite_visible)
                         vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
         default:
@@ -287,9 +285,9 @@ create_cb(struct vsx_game_state *game_state,
 
         create_buffer(painter);
 
-        painter->event_listener.notify = event_cb;
-        vsx_signal_add(vsx_game_state_get_event_signal(game_state),
-                       &painter->event_listener);
+        painter->modified_listener.notify = modified_cb;
+        vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
+                       &painter->modified_listener);
 
         return painter;
 }
@@ -397,7 +395,7 @@ free_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        vsx_list_remove(&painter->event_listener.link);
+        vsx_list_remove(&painter->modified_listener.link);
 
         if (painter->vao)
                 vsx_array_object_free(painter->vao);
