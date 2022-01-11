@@ -187,6 +187,10 @@ static void
 handle_conversation_id(struct vsx_game_state *game_state,
                        const struct vsx_connection_event *event)
 {
+        if (game_state->has_conversation_id &&
+            game_state->conversation_id == event->conversation_id.id)
+                return;
+
         game_state->has_conversation_id = true;
         game_state->conversation_id = event->conversation_id.id;
 
@@ -226,8 +230,14 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
                 game_state->players + player_num;
 
         /* Leave the shouting flag as it was */
-        player->flags = ((player->flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING) |
-                         event->player_flags_changed.flags);
+        enum vsx_game_state_player_flag new_flags =
+                ((player->flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING) |
+                 event->player_flags_changed.flags);
+
+        if (new_flags == player->flags)
+                return;
+
+        player->flags = new_flags;
 
         struct vsx_game_state_modified_event m_event = {
                 .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,

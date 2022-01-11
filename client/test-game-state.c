@@ -312,6 +312,59 @@ check_modified(struct harness *harness,
                                        user_data);
 }
 
+struct check_no_modification_closure {
+        bool succeeded;
+        struct vsx_listener listener;
+};
+
+static void
+check_no_modification_cb(struct vsx_listener *listener,
+                         void *user_data)
+{
+        struct check_no_modification_closure *closure =
+                vsx_container_of(listener,
+                                 struct check_no_modification_closure,
+                                 listener);
+        struct vsx_game_state_modified_event *event = user_data;
+
+        fprintf(stderr,
+                "Received modification event %i when none was expected.\n",
+                event->type);
+
+        closure->succeeded = false;
+}
+
+static bool
+check_no_modification(struct harness *harness,
+                      const uint8_t *data,
+                      size_t data_len)
+{
+        struct check_no_modification_closure closure = {
+                .succeeded = true,
+                .listener = {
+                        .notify = check_no_modification_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.listener);
+
+        if (!write_data(harness, data, data_len)) {
+                closure.succeeded = false;
+                goto out;
+        }
+
+        if (!wait_for_idle_queue(harness)) {
+                closure.succeeded = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
+
+        return closure.succeeded;
+}
+
 static bool
 check_started_running_cb(struct harness *harness,
                          const struct vsx_connection_event *event,
@@ -1550,6 +1603,16 @@ test_conversation_id(void)
                 goto out;
         }
 
+        /* Send the same message again and verify that it doesn’t emit
+         * a modification event.
+         */
+        if (!check_no_modification(harness,
+                                   conversation_id_message,
+                                   sizeof conversation_id_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
 out:
         free_harness(harness);
         return ret;
@@ -1786,16 +1849,32 @@ test_typing_modified(void)
 
         bool ret = true;
 
+        static const uint8_t typing_message[] = "\x82\x03\x05\x00\x03";
+
         /* Set the typing flag for the player and make sure that we
          * get a player flags modified event.
          */
         if (!check_modified(harness,
                             VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
                             check_player_flags_modified_cb,
-                            (const uint8_t *) "\x82\x03\x05\x00\x03", 5,
-                            NULL /* user_data */))
+                            typing_message,
+                            sizeof typing_message - 1,
+                            NULL /* user_data */)) {
                 ret = false;
+                goto out;
+        }
 
+        /* Send the same event again and make sure that it doesn’t
+         * send another modification event.
+         */
+        if (!check_no_modification(harness,
+                                   typing_message,
+                                   sizeof typing_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
         free_harness(harness);
 
         return ret;
