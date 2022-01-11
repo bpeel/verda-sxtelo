@@ -55,10 +55,12 @@ struct vertex {
         float s, t;
 };
 
-#define N_BUTTONS 2
+#define N_BUTTONS 3
 #define N_GAPS (N_BUTTONS + 1)
 #define N_QUADS (N_BUTTONS + N_GAPS)
 #define N_VERTICES (N_QUADS * 4)
+
+#define N_BUTTONS_IN_IMAGE 4
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -207,10 +209,14 @@ handle_click(struct vsx_button_painter *painter,
             y >= paint_state->button_area_height)
                 return false;
 
-        if (y >= paint_state->button_area_height / 2)
-                vsx_game_state_shout(painter->game_state);
-        else
+        switch (y * N_BUTTONS / paint_state->button_area_height) {
+        case 0:
                 vsx_game_state_turn(painter->game_state);
+                break;
+        case 2:
+                vsx_game_state_shout(painter->game_state);
+                break;
+        }
 
         return false;
 }
@@ -305,9 +311,9 @@ generate_vertices(struct vsx_button_painter *painter,
                            0, y,
                            area_width, button_size,
                            -tex_coord_side_extra,
-                           i / (float) N_BUTTONS,
+                           i / (float) N_BUTTONS_IN_IMAGE,
                            1.0f + tex_coord_side_extra,
-                           (i + 1.0f) / N_BUTTONS);
+                           (i + 1.0f) / N_BUTTONS_IN_IMAGE);
                 y += button_size;
                 v += 4;
         }
