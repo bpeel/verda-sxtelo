@@ -1525,6 +1525,16 @@ test_send_commands(void)
                 goto out;
         }
 
+        vsx_game_state_set_n_tiles(harness->game_state, 10);
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x02\x8b\x0a",
+                         4)) {
+                ret = false;
+                goto out;
+        }
+
 out:
         free_harness(harness);
         return ret;

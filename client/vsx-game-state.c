@@ -466,6 +466,15 @@ vsx_game_state_turn(struct vsx_game_state *game_state)
 }
 
 void
+vsx_game_state_set_n_tiles(struct vsx_game_state *game_state,
+                           int n_tiles)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_set_n_tiles(game_state->connection, n_tiles);
+        vsx_worker_unlock(game_state->worker);
+}
+
+void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y)

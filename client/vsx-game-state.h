@@ -120,6 +120,10 @@ void
 vsx_game_state_turn(struct vsx_game_state *game_state);
 
 void
+vsx_game_state_set_n_tiles(struct vsx_game_state *game_state,
+                           int n_tiles);
+
+void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y);
