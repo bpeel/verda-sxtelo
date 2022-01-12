@@ -32,6 +32,7 @@ client_common_src = [
         'vsx-invite-painter.c',
         'vsx-main-thread.c',
         'vsx-map-buffer.c',
+        'vsx-menu-painter.c',
         'vsx-mipmap.c',
         'vsx-monotonic.c',
         'vsx-paint-state.c',
