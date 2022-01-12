@@ -56,6 +56,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
+        VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
 };
 
 struct vsx_game_state_modified_event {
@@ -65,6 +66,13 @@ struct vsx_game_state_modified_event {
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
                    struct vsx_connection *connection);
+
+/* Gets the number of tiles in the game, as reported by the server.
+ * This includes the tiles that are still in the bag so it is just
+ * used to determine the length of the game.
+ */
+int
+vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
 
 typedef void
 (* vsx_game_state_foreach_tile_cb)(const struct vsx_connection_event *tile,

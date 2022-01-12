@@ -73,6 +73,12 @@ struct vsx_game_state {
         /* Slab allocator for the tiles */
         struct vsx_slab_allocator tile_allocator;
 
+        /* The number of tiles in the game, as reported by the server.
+         * This includes the tiles that are still in the bag so it is
+         * just used to determine the length of the game.
+         */
+        int n_tiles;
+
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -145,6 +151,12 @@ get_tile_by_index(struct vsx_game_state *game_state,
         }
 
         return tile;
+}
+
+int
+vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
+{
+        return game_state->n_tiles;
 }
 
 void
@@ -296,6 +308,22 @@ handle_tile_changed(struct vsx_game_state *game_state,
 }
 
 static void
+handle_n_tiles_changed(struct vsx_game_state *game_state,
+                       const struct vsx_connection_event *event)
+{
+        if (game_state->n_tiles == event->n_tiles_changed.n_tiles)
+                return;
+
+        game_state->n_tiles = event->n_tiles_changed.n_tiles;
+
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
+}
+
+static void
 handle_event(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
@@ -317,6 +345,9 @@ handle_event(struct vsx_game_state *game_state,
                 break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+                handle_n_tiles_changed(game_state, event);
                 break;
         default:
                 break;

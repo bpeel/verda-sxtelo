@@ -1610,6 +1610,61 @@ out:
 }
 
 static bool
+check_n_tiles_modified_cb(struct harness *harness,
+                          const struct vsx_game_state_modified_event *event,
+                          void *user_data)
+{
+        int n_tiles = vsx_game_state_get_n_tiles(harness->game_state);
+
+        if (n_tiles != 5) {
+                fprintf(stderr,
+                        "Expected n_tiles to be 5 but got %i\n",
+                        n_tiles);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_n_tiles(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        static const uint8_t n_tiles_message[] =
+                "\x82\x02\x02\x05";
+
+        if (!check_modified(harness,
+                            VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
+                            check_n_tiles_modified_cb,
+                            n_tiles_message,
+                            sizeof n_tiles_message - 1,
+                            NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send the same message again and verify that it doesn’t emit
+         * a modification event.
+         */
+        if (!check_no_modification(harness,
+                                   n_tiles_message,
+                                   sizeof n_tiles_message - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_dangling_events(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2053,6 +2108,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_dialog())
+                ret = EXIT_FAILURE;
+
+        if (!test_n_tiles())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())
