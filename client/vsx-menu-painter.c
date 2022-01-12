@@ -308,6 +308,15 @@ fb_size_changed_cb(void *painter_data)
         painter->layout_dirty = true;
 }
 
+static void
+handle_toggle_length(struct vsx_menu_painter *painter)
+{
+        int n_tiles = (is_long_game(painter) ?
+                       SHORT_GAME_N_TILES :
+                       LONG_GAME_N_TILES);
+        vsx_game_state_set_n_tiles(painter->game_state, n_tiles);
+}
+
 static bool
 handle_click(struct vsx_menu_painter *painter,
              const struct vsx_input_event *event)
@@ -352,6 +361,7 @@ handle_click(struct vsx_menu_painter *painter,
                                           VSX_DIALOG_INVITE_LINK);
                 break;
         case MENU_BUTTON_LENGTH:
+                handle_toggle_length(painter);
                 break;
         }
 
