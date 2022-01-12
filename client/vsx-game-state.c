@@ -62,7 +62,7 @@ struct vsx_game_state {
         bool has_conversation_id;
         uint64_t conversation_id;
 
-        bool invite_visible;
+        enum vsx_dialog dialog;
 
         int self;
 
@@ -473,14 +473,14 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
 
-        game_state->invite_visible = true;
+        game_state->dialog = VSX_DIALOG_INVITE_LINK;
 
         game_state->worker = worker;
         game_state->connection = connection;
 
         vsx_instance_state_init(&game_state->instance_state);
 
-        game_state->instance_state.dialog = VSX_DIALOG_INVITE_LINK;
+        game_state->instance_state.dialog = game_state->dialog;
 
         vsx_worker_lock(game_state->worker);
 
@@ -511,28 +511,27 @@ vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
         }
 }
 
-bool
-vsx_game_state_get_invite_visible(struct vsx_game_state *game_state)
+enum vsx_dialog
+vsx_game_state_get_dialog(struct vsx_game_state *game_state)
 {
-        return game_state->invite_visible;
+        return game_state->dialog;
 }
 
 void
-vsx_game_state_set_invite_visible(struct vsx_game_state *game_state,
-                                  bool visibility)
+vsx_game_state_set_dialog(struct vsx_game_state *game_state,
+                          enum vsx_dialog dialog)
 {
-        if (game_state->invite_visible == visibility)
+        if (game_state->dialog == dialog)
                 return;
 
-        game_state->invite_visible = visibility;
+        game_state->dialog = dialog;
 
         pthread_mutex_lock(&game_state->mutex);
-        game_state->instance_state.dialog =
-                visibility ? VSX_DIALOG_INVITE_LINK : VSX_DIALOG_NONE;
+        game_state->instance_state.dialog = dialog;
         pthread_mutex_unlock(&game_state->mutex);
 
         struct vsx_game_state_modified_event event = {
-                .type = VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE,
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
         };
 
         vsx_signal_emit(&game_state->modified_signal, &event);
@@ -564,15 +563,14 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
 {
         bool has_person_id;
         uint64_t person_id;
-        bool invite_visible;
+        enum vsx_dialog dialog;
 
         pthread_mutex_lock(&game_state->mutex);
 
         vsx_instance_state_load(&game_state->instance_state, str);
         has_person_id = game_state->instance_state.has_person_id;
         person_id = game_state->instance_state.person_id;
-        invite_visible =
-                game_state->instance_state.dialog == VSX_DIALOG_INVITE_LINK;
+        dialog = game_state->instance_state.dialog;
 
         pthread_mutex_unlock(&game_state->mutex);
 
@@ -583,7 +581,7 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                 vsx_worker_unlock(game_state->worker);
         }
 
-        vsx_game_state_set_invite_visible(game_state, invite_visible);
+        vsx_game_state_set_dialog(game_state, dialog);
 }
 
 struct vsx_signal *

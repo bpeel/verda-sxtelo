@@ -24,6 +24,7 @@
 #include "vsx-connection.h"
 #include "vsx-worker.h"
 #include "vsx-signal.h"
+#include "vsx-dialog.h"
 
 /* This maintains a copy of the game state reported by the
  * vsx_connection so that it can be painted. The state is only
@@ -54,7 +55,7 @@ enum vsx_game_state_shout_state {
 enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
-        VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE,
+        VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
 };
 
 struct vsx_game_state_modified_event {
@@ -97,12 +98,12 @@ bool
 vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
                                    uint64_t *id);
 
-bool
-vsx_game_state_get_invite_visible(struct vsx_game_state *game_state);
+enum vsx_dialog
+vsx_game_state_get_dialog(struct vsx_game_state *game_state);
 
 void
-vsx_game_state_set_invite_visible(struct vsx_game_state *game_state,
-                                  bool visibilty);
+vsx_game_state_set_dialog(struct vsx_game_state *game_state,
+                          enum vsx_dialog dialog);
 
 void
 vsx_game_state_update(struct vsx_game_state *game_state);

@@ -214,7 +214,8 @@ handle_click(struct vsx_button_painter *painter,
                 vsx_game_state_turn(painter->game_state);
                 break;
         case 1:
-                vsx_game_state_set_invite_visible(painter->game_state, true);
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_INVITE_LINK);
                 break;
         case 2:
                 vsx_game_state_shout(painter->game_state);

@@ -1702,10 +1702,17 @@ test_load_instance_state(void)
         vsx_game_state_load_instance_state(harness->game_state,
                                            "person_id=5,dialog=none");
 
-        if (vsx_game_state_get_invite_visible(harness->game_state)) {
+        enum vsx_dialog dialog = vsx_game_state_get_dialog(harness->game_state);
+
+        if (dialog != VSX_DIALOG_NONE) {
                 fprintf(stderr,
-                        "Invite is visible after loading a state with it set "
-                        "to invisible.\n");
+                        "Dialog not as expected after loading a state.\n"
+                        " Expected: %i (%s)\n"
+                        " Got: %i (%s)\n",
+                        VSX_DIALOG_NONE,
+                        vsx_dialog_to_name(VSX_DIALOG_NONE),
+                        dialog,
+                        vsx_dialog_to_name(dialog));
                 ret = false;
                 goto out;
         }
@@ -1771,7 +1778,7 @@ test_save_instance_state(void)
 
         bool ret = true;
 
-        vsx_game_state_set_invite_visible(harness->game_state, false);
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_NONE);
 
         char *str = vsx_game_state_save_instance_state(harness->game_state);
 
@@ -1891,28 +1898,28 @@ out:
         return ret;
 }
 
-struct test_invite_visible_closure {
+struct test_dialog_closure {
         struct harness *harness;
         bool succeeded;
-        bool expected_value;
+        enum vsx_dialog expected_value;
         bool had_event;
         struct vsx_listener listener;
 };
 
 static void
-test_invite_visible_cb(struct vsx_listener *listener,
-                       void *user_data)
+test_dialog_cb(struct vsx_listener *listener,
+               void *user_data)
 {
-        struct test_invite_visible_closure *closure =
+        struct test_dialog_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_invite_visible_closure,
+                                 struct test_dialog_closure,
                                  listener);
         const struct vsx_game_state_modified_event *event = user_data;
 
-        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_INVITE_VISIBLE) {
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_DIALOG) {
                 fprintf(stderr,
                         "Received unexpected modified event %i while setting "
-                        "invite visible.\n",
+                        "dialog.\n",
                         event->type);
                 closure->succeeded = false;
                 return;
@@ -1920,21 +1927,23 @@ test_invite_visible_cb(struct vsx_listener *listener,
 
         if (closure->had_event) {
                 fprintf(stderr,
-                        "Received multiple invite visible modified events.\n");
+                        "Received multiple dialog modified events.\n");
                 closure->succeeded = false;
                 return;
         }
 
-        bool real_value =
-                vsx_game_state_get_invite_visible(closure->harness->game_state);
+        enum vsx_dialog real_value =
+                vsx_game_state_get_dialog(closure->harness->game_state);
 
         if (closure->expected_value != real_value) {
                 fprintf(stderr,
-                        "invite visible has wrong value\n"
-                        " Expected: %s\n"
-                        " Received: %s\n",
-                        closure->expected_value ? "true" : "false",
-                        real_value ? "true" : "false");
+                        "dialog has wrong value\n"
+                        " Expected: %i (%s)\n"
+                        " Received: %i (%s)\n",
+                        closure->expected_value,
+                        vsx_dialog_to_name(closure->expected_value),
+                        real_value,
+                        vsx_dialog_to_name(real_value));
                 closure->succeeded = false;
                 return;
         }
@@ -1943,7 +1952,7 @@ test_invite_visible_cb(struct vsx_listener *listener,
 }
 
 static bool
-test_invite_visible(void)
+test_dialog(void)
 {
         struct harness *harness = create_harness_no_start();
 
@@ -1952,13 +1961,13 @@ test_invite_visible(void)
 
         bool ret = true;
 
-        struct test_invite_visible_closure closure = {
+        struct test_dialog_closure closure = {
                 .harness = harness,
                 .succeeded = true,
-                .expected_value = false,
+                .expected_value = VSX_DIALOG_NONE,
                 .had_event = false,
                 .listener = {
-                        .notify = test_invite_visible_cb,
+                        .notify = test_dialog_cb,
                 },
         };
 
@@ -1966,14 +1975,15 @@ test_invite_visible(void)
                 vsx_game_state_get_modified_signal(harness->game_state);
         vsx_signal_add(signal, &closure.listener);
 
-        if (!vsx_game_state_get_invite_visible(harness->game_state)) {
+        if (vsx_game_state_get_dialog(harness->game_state) !=
+            VSX_DIALOG_INVITE_LINK) {
                 fprintf(stderr,
-                        "invite_visible didn’t start off as true\n");
+                        "dialog didn’t start off as invite_link\n");
                 ret = false;
                 goto out;
         }
 
-        vsx_game_state_set_invite_visible(harness->game_state, false);
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_NONE);
 
         if (!closure.succeeded) {
                 ret = false;
@@ -1982,8 +1992,7 @@ test_invite_visible(void)
 
         if (!closure.had_event) {
                 fprintf(stderr,
-                        "No modified event received after setting invite "
-                        "visible.\n");
+                        "No modified event received after setting dialog.\n");
                 ret = false;
                 goto out;
         }
@@ -1992,7 +2001,7 @@ test_invite_visible(void)
 
         closure.had_event = false;
 
-        vsx_game_state_set_invite_visible(harness->game_state, false);
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_NONE);
 
         if (!closure.succeeded) {
                 ret = false;
@@ -2001,8 +2010,8 @@ test_invite_visible(void)
 
         if (closure.had_event) {
                 fprintf(stderr,
-                        "A modified event was received after setting invite "
-                        "visible to same value.\n");
+                        "A modified event was received after setting dialog "
+                        "to same value.\n");
                 ret = false;
                 goto out;
         }
@@ -2052,7 +2061,7 @@ main(int argc, char **argv)
         if (!test_conversation_id())
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible())
+        if (!test_dialog())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())
