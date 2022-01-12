@@ -164,7 +164,8 @@ vsx_game_painter_new(struct vsx_game_state *game_state,
 
         painter->game_state = game_state;
 
-        vsx_paint_state_set_fb_size(&painter->toolbox.paint_state, 1, 1);
+        painter->toolbox.paint_state.width = 1;
+        painter->toolbox.paint_state.height = 1;
         painter->toolbox.paint_state.dpi = dpi;
         painter->viewport_dirty = true;
 
@@ -190,6 +191,15 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
         vsx_paint_state_set_fb_size(&painter->toolbox.paint_state,
                                     width, height);
         painter->viewport_dirty = true;
+
+        for (int i = 0; i < N_PAINTERS; i++) {
+                const struct vsx_painter *callbacks = painters[i];
+
+                if (callbacks->fb_size_changed_cb == NULL)
+                        continue;
+
+                callbacks->fb_size_changed_cb(painter->painters[i].data);
+        }
 }
 
 static bool

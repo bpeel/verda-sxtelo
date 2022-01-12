@@ -40,6 +40,9 @@ struct vsx_painter {
                       struct vsx_painter_toolbox *toolbox);
 
         void
+        (* fb_size_changed_cb)(void *painter);
+
+        void
         (* paint_cb)(void *painter);
 
         bool
