@@ -16,35 +16,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_INSTANCE_STATE_H
-#define VSX_INSTANCE_STATE_H
-
-#include <stdbool.h>
-#include <stdint.h>
+#include "config.h"
 
 #include "vsx-dialog.h"
 
-/* This represents the state that needs to be preserved in the android
- * application when stopping the process in order to bring the game
- * back up to its previous state when it is restarted. It can be
- * serialised into a string.
- */
+#include <string.h>
 
-struct vsx_instance_state {
-        bool has_person_id;
-        uint64_t person_id;
+#include "vsx-util.h"
 
-        enum vsx_dialog dialog;
+static const char * const
+names[] = {
+        [VSX_DIALOG_NONE] = "none",
+        [VSX_DIALOG_INVITE_LINK] = "invite",
 };
 
-void
-vsx_instance_state_init(struct vsx_instance_state *state);
+enum vsx_dialog
+vsx_dialog_from_name(const char *name, size_t name_length)
+{
+        for (int i = 0; i < VSX_N_ELEMENTS(names); i++) {
+                if (strlen(names[i]) == name_length &&
+                    !memcmp(names[i], name, name_length))
+                        return i;
+        }
 
-char *
-vsx_instance_state_save(const struct vsx_instance_state *state);
+        return VSX_DIALOG_NONE;
+}
 
-void
-vsx_instance_state_load(struct vsx_instance_state *state,
-                        const char *save_data);
-
-#endif /* VSX_INSTANCE_STATE_H */
+const char *
+vsx_dialog_to_name(enum vsx_dialog dialog)
+{
+        return names[dialog];
+}

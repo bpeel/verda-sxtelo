@@ -21,6 +21,7 @@ client_common_src = [
         'vsx-array-object.c',
         'vsx-board-painter.c',
         'vsx-button-painter.c',
+        'vsx-dialog.c',
         'vsx-game-painter.c',
         'vsx-game-state.c',
         'vsx-gl.c',
@@ -116,6 +117,7 @@ test('worker', test_worker)
 
 test_game_state_src = [
         'test-game-state.c',
+        'vsx-dialog.c',
         'vsx-game-state.c',
         'vsx-instance-state.c',
         'vsx-main-thread.c',
@@ -158,6 +160,7 @@ test('test-qr',
 
 test_instance_state_src = [
         '../common/vsx-buffer.c',
+        'vsx-dialog.c',
         'vsx-instance-state.c',
         '../common/vsx-util.c',
         'test-instance-state.c',

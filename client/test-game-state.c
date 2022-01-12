@@ -1700,7 +1700,7 @@ test_load_instance_state(void)
         bool ret = true;
 
         vsx_game_state_load_instance_state(harness->game_state,
-                                           "person_id=5,invite_visible=n");
+                                           "person_id=5,dialog=none");
 
         if (vsx_game_state_get_invite_visible(harness->game_state)) {
                 fprintf(stderr,
@@ -1776,7 +1776,7 @@ test_save_instance_state(void)
         char *str = vsx_game_state_save_instance_state(harness->game_state);
 
         const char *expected_str =
-                "person_id=6e6d6c6b6a696867,invite_visible=n";
+                "person_id=6e6d6c6b6a696867,dialog=none";
 
         if (strcmp(str, expected_str)) {
                 fprintf(stderr,

@@ -90,24 +90,18 @@ load_person_id_cb(struct vsx_instance_state *state,
 }
 
 static void
-save_invite_visible_cb(const struct vsx_instance_state *state,
+save_dialog_cb(const struct vsx_instance_state *state,
                        struct vsx_buffer *buf)
 {
-        vsx_buffer_append_c(buf, state->invite_visible ? 'y' : 'n');
+        vsx_buffer_append_string(buf, vsx_dialog_to_name(state->dialog));
 }
 
 static void
-load_invite_visible_cb(struct vsx_instance_state *state,
+load_dialog_cb(struct vsx_instance_state *state,
                        const char *value,
                        size_t value_length)
 {
-        if (value_length != 1)
-                return;
-
-        if (*value == 'y')
-                state->invite_visible = true;
-        else if (*value == 'n')
-                state->invite_visible = false;
+        state->dialog = vsx_dialog_from_name(value, value_length);
 }
 
 static const struct vsx_instance_state_property
@@ -119,9 +113,9 @@ properties[] = {
                 .load = load_person_id_cb,
         },
         {
-                .name = "invite_visible",
-                .save = save_invite_visible_cb,
-                .load = load_invite_visible_cb,
+                .name = "dialog",
+                .save = save_dialog_cb,
+                .load = load_dialog_cb,
         },
 };
 
@@ -129,7 +123,7 @@ void
 vsx_instance_state_init(struct vsx_instance_state *state)
 {
         state->has_person_id = false;
-        state->invite_visible = true;
+        state->dialog = VSX_DIALOG_NONE;
 }
 
 char *

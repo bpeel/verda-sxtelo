@@ -249,7 +249,7 @@ test_save_empty(void)
 }
 
 static bool
-test_invite_visible(bool value_to_set)
+test_dialog(enum vsx_dialog value_to_set)
 {
         struct vsx_instance_state state;
 
@@ -257,13 +257,13 @@ test_invite_visible(bool value_to_set)
 
         bool ret = true;
 
-        if (!state.invite_visible) {
+        if (state.dialog != VSX_DIALOG_NONE) {
                 fprintf(stderr,
-                        "invite_visible did not start off as true\n");
+                        "dialog did not start off as NONE\n");
                 ret = false;
         }
 
-        state.invite_visible = value_to_set;
+        state.dialog = value_to_set;
 
         char *str = vsx_instance_state_save(&state);
 
@@ -275,13 +275,15 @@ test_invite_visible(bool value_to_set)
 
         vsx_free(str);
 
-        if (loaded_state.invite_visible != value_to_set) {
+        if (loaded_state.dialog != value_to_set) {
                 fprintf(stderr,
-                        "invite_visible has wrong value after load.\n"
-                        " Expected: %s\n"
-                        " Received: %s\n",
-                        value_to_set ? "true" : "false",
-                        loaded_state.invite_visible ? "true" : "false");
+                        "dialog has wrong value after load.\n"
+                        " Expected: %i (%s)\n"
+                        " Received: %i (%s)\n",
+                        value_to_set,
+                        vsx_dialog_to_name(value_to_set),
+                        loaded_state.dialog,
+                        vsx_dialog_to_name(loaded_state.dialog));
                 ret = false;
         }
 
@@ -289,21 +291,21 @@ test_invite_visible(bool value_to_set)
 }
 
 static bool
-test_invite_visible_invalid_value(const char *value)
+test_dialog_invalid_value(const char *value)
 {
         struct vsx_instance_state state;
 
         vsx_instance_state_init(&state);
 
-        bool old_value = state.invite_visible;
+        enum vsx_dialog old_value = state.dialog;
 
-        char *str = vsx_strconcat("invite_visible=", value, NULL);
+        char *str = vsx_strconcat("dialog=", value, NULL);
         vsx_instance_state_load(&state, str);
         vsx_free(str);
 
-        if (state.invite_visible != old_value) {
+        if (state.dialog != old_value) {
                 fprintf(stderr,
-                        "invite_visible changed after setting "
+                        "dialog changed after setting "
                         "the invalid value “%s”\n",
                         value);
                 return false;
@@ -353,22 +355,22 @@ main(int argc, char **argv)
         if (!test_save_empty())
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible(true))
+        if (!test_dialog(VSX_DIALOG_NONE))
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible(false))
+        if (!test_dialog(VSX_DIALOG_INVITE_LINK))
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible_invalid_value("yy"))
+        if (!test_dialog_invalid_value(""))
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible_invalid_value("nn"))
+        if (!test_dialog_invalid_value("really_long_value"))
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible_invalid_value("t"))
+        if (!test_dialog_invalid_value("invitey"))
                 ret = EXIT_FAILURE;
 
-        if (!test_invite_visible_invalid_value("f"))
+        if (!test_dialog_invalid_value("InVite"))
                 ret = EXIT_FAILURE;
 
         return ret;
