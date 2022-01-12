@@ -147,13 +147,6 @@ get_tile_by_index(struct vsx_game_state *game_state,
         return tile;
 }
 
-size_t
-vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
-{
-        return (game_state->tiles_by_index.length /
-                sizeof (struct vsx_game_state_tile *));
-}
-
 void
 vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
                             vsx_game_state_foreach_tile_cb cb,
