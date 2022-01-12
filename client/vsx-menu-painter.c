@@ -69,6 +69,13 @@ enum menu_button {
         MENU_BUTTON_LENGTH,
 };
 
+enum menu_image {
+        MENU_IMAGE_LANGUAGE,
+        MENU_IMAGE_SHARE,
+        MENU_IMAGE_SHORT_GAME,
+        MENU_IMAGE_LONG_GAME,
+};
+
 #define N_BUTTONS 3
 #define N_VERTICES (N_BUTTONS * 4)
 
@@ -77,11 +84,25 @@ enum menu_button {
 /* Size in mm of a button */
 #define BUTTON_SIZE 15
 
+#define SHORT_GAME_N_TILES 50
+#define LONG_GAME_N_TILES 122
+/* If the number of tiles is at least this then we’ll assume it’s a
+ * long game.
+ */
+#define LONG_GAME_THRESHOLD ((SHORT_GAME_N_TILES + LONG_GAME_N_TILES) / 2)
+
 static bool
 menu_visible(struct vsx_menu_painter *painter)
 {
         return vsx_game_state_get_dialog(painter->game_state)
                 == VSX_DIALOG_MENU;
+}
+
+static bool
+is_long_game(struct vsx_menu_painter *painter)
+{
+        return (vsx_game_state_get_n_tiles(painter->game_state) >=
+                LONG_GAME_THRESHOLD);
 }
 
 static void
@@ -97,6 +118,13 @@ modified_cb(struct vsx_listener *listener,
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+        case VSX_GAME_STATE_MODIFIED_TYPE_N_TILES:
+                painter->vertices_dirty = true;
+
+                if (menu_visible(painter))
+                        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+
                 break;
         default:
                 break;
@@ -395,12 +423,28 @@ ensure_vertices(struct vsx_menu_painter *painter)
         struct vertex *v = vertices;
 
         for (int i = 0; i < N_BUTTONS; i++) {
+                enum menu_image image = 0;
+
+                switch ((enum menu_button) i) {
+                case MENU_BUTTON_LANGUAGE:
+                        image = MENU_IMAGE_LANGUAGE;
+                        break;
+                case MENU_BUTTON_SHARE:
+                        image = MENU_IMAGE_SHARE;
+                        break;
+                case MENU_BUTTON_LENGTH:
+                        image = (is_long_game(painter) ?
+                                 MENU_IMAGE_LONG_GAME :
+                                 MENU_IMAGE_SHORT_GAME);
+                        break;
+                }
+
                 /* Button image */
                 store_quad(v,
                            i, 0, 1, 1,
-                           i / (float) N_IMAGES,
+                           image / (float) N_IMAGES,
                            0.0f,
-                           (i + 1.0f) / N_IMAGES,
+                           (image + 1.0f) / N_IMAGES,
                            1.0f);
                 v += 4;
         }
