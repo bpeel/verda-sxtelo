@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "vsx-util.h"
+#include "vsx-monotonic.h"
 
 struct harness {
         bool idle_queued;
@@ -210,6 +211,41 @@ test_no_wakeup_func(void)
 }
 
 static bool
+test_no_wakeup_func_timeout(void)
+{
+        int invocation_count = 0;
+
+        vsx_main_thread_queue_timeout(0, /* microseconds */
+                                      count_invocations_cb,
+                                      &invocation_count);
+
+        /* Sleep 100ms */
+        struct timespec sleep_time = {
+                .tv_sec = 0,
+                .tv_nsec = 100 * 1000 * 1000L,
+        };
+        nanosleep(&sleep_time, NULL /* rem */);
+
+        vsx_main_thread_flush_idle_events();
+
+        bool ret = true;
+
+        if (invocation_count > 1) {
+                fprintf(stderr,
+                        "idle callback invoked multiple times.\n");
+                ret = false;
+        } else if (invocation_count != 1) {
+                fprintf(stderr,
+                        "callback not invoked in test with no wakeup func.\n");
+                ret = false;
+        }
+
+        vsx_main_thread_clean_up();
+
+        return ret;
+}
+
+static bool
 test_simple_queue_and_flush(struct harness *harness)
 {
         int invocation_count = 0;
@@ -309,11 +345,123 @@ test_dangling_tokens(void)
         for (int i = 0; i < VSX_N_ELEMENTS(tokens) / 2; i++)
                 vsx_main_thread_cancel_idle(tokens[i]);
 
+        /* Check the timeout queue as well */
+
+        vsx_main_thread_queue_timeout(10 * 1000 * 1000,
+                                      count_invocations_cb,
+                                      NULL /* user_data */);
+
         /* Clean up without flushing the queue */
+
+        int64_t cleanup_start = vsx_monotonic_get();
 
         vsx_main_thread_clean_up();
 
+        int64_t cleanup_time = vsx_monotonic_get() - cleanup_start;
+
+        if (cleanup_time > 500 * 1000) {
+                fprintf(stderr,
+                        "Clean up with a dangling timeout took %f seconds\n",
+                        cleanup_time / 1000.0f / 1000.0f);
+                return false;
+        }
+
         return true;
+}
+
+static bool
+test_timeout(void)
+{
+        struct harness *harness = create_harness();
+
+        bool ret = true;
+
+        int invocation_counts[4];
+
+        memset(invocation_counts, 0, sizeof invocation_counts);
+
+        /* Create 4 timeout at 4 seconds, 2 seconds, 8 seconds and
+         * 6 seconds. The funky order is to check that the timeout
+         * list gets maintained in sorted order.
+         */
+
+        for (int i = 0; i < VSX_N_ELEMENTS(invocation_counts); i++) {
+                int timeout_num = i ^ 1;
+                int timeout_microseconds = (timeout_num + 1) * 2 * 1000 * 1000;
+
+                vsx_main_thread_queue_timeout(timeout_microseconds,
+                                              count_invocations_cb,
+                                              invocation_counts + timeout_num);
+        }
+
+        for (int i = 0; i < VSX_N_ELEMENTS(invocation_counts); i++) {
+                struct timespec sleep_time = {
+                        .tv_sec = 1,
+                        .tv_nsec = 500 * 1000 * 1000l,
+                };
+
+                harness->idle_queued = false;
+
+                /* sleep for 1.5 seconds. This shouldn’t be enough to
+                 * trigger the timeout.
+                 */
+
+                nanosleep(&sleep_time, NULL /* rem */);
+
+                if (harness->idle_queued) {
+                        fprintf(stderr,
+                                "Idle queued before timeout should be "
+                                "ready.\n");
+                        ret = false;
+                }
+
+                /* sleep for 600 ms to push it over the limit */
+                sleep_time.tv_sec = 0;
+                sleep_time.tv_nsec += 100 * 1000 * 1000l;
+
+                nanosleep(&sleep_time, NULL /* rem */);
+
+                if (!harness->idle_queued) {
+                        fprintf(stderr,
+                                "Idle not queued even though enough time has "
+                                "elapsed\n");
+                        ret = false;
+                }
+
+                vsx_main_thread_flush_idle_events();
+
+                if (invocation_counts[i] == 0) {
+                        fprintf(stderr,
+                                "Timeout not invoked after waiting the "
+                                "time.\n");
+                        ret = false;
+                }
+
+                for (int j = i + 1;
+                     j < VSX_N_ELEMENTS(invocation_counts);
+                     j++) {
+                        if (invocation_counts[j] != 0) {
+                                fprintf(stderr,
+                                        "Timeout %i invoked early.\n",
+                                        j);
+                                ret = false;
+                        }
+                }
+        }
+
+        for (int i = 0; i < VSX_N_ELEMENTS(invocation_counts); i++) {
+                if (invocation_counts[i] != 1) {
+                        fprintf(stderr,
+                                "Timeout %i invoked %i times.\n",
+                                i,
+                                invocation_counts[i]);
+                        ret = false;
+                }
+        }
+
+        free_harness(harness);
+
+        return ret;
 }
 
 int
@@ -327,6 +475,9 @@ main(int argc, char **argv)
         if (!test_no_wakeup_func())
                 ret = EXIT_FAILURE;
 
+        if (!test_no_wakeup_func_timeout())
+                ret = EXIT_FAILURE;
+
         if (!test_threaded_queue_event())
                 ret = EXIT_FAILURE;
 
@@ -334,6 +485,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_cancel())
+                ret = EXIT_FAILURE;
+
+        if (!test_timeout())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_tokens())

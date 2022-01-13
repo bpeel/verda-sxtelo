@@ -65,6 +65,7 @@ if get_option('client')
                 'vsx-image-loader.c',
                 'vsx-asset-linux.c',
                 'vsx-main-thread.c',
+                'vsx-monotonic.c',
                 'vsx-thread-linux.c',
                 '../common/vsx-util.c',
                 'vsx-image.c',
@@ -173,6 +174,8 @@ test('test-instance-state', test_instance_state)
 
 test_main_thread_src = [
         'vsx-main-thread.c',
+        'vsx-monotonic.c',
+        'vsx-thread-linux.c',
         '../common/vsx-util.c',
         'test-main-thread.c',
 ]

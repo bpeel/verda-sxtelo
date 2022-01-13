@@ -19,6 +19,8 @@
 #ifndef VSX_MAIN_THREAD_H
 #define VSX_MAIN_THREAD_H
 
+#include <stdint.h>
+
 struct vsx_main_thread_token;
 
 typedef void
@@ -26,6 +28,11 @@ typedef void
 
 typedef void
 (* vsx_main_thread_wakeup_func)(void *data);
+
+struct vsx_main_thread_token *
+vsx_main_thread_queue_timeout(uint32_t microseconds,
+                              vsx_main_thread_idle_func func,
+                              void *user_data);
 
 struct vsx_main_thread_token *
 vsx_main_thread_queue_idle(vsx_main_thread_idle_func func,
