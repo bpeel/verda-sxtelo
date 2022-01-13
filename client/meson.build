@@ -170,3 +170,14 @@ test_instance_state = executable('test-instance-state',
                                  test_instance_state_src,
                                  include_directories: inc_dirs)
 test('test-instance-state', test_instance_state)
+
+test_main_thread_src = [
+        'vsx-main-thread.c',
+        '../common/vsx-util.c',
+        'test-main-thread.c',
+]
+test_main_thread = executable('test-main-thread',
+                              test_main_thread_src,
+                              dependencies: [thread_dep],
+                              include_directories: inc_dirs)
+test('main-thread', test_main_thread)
