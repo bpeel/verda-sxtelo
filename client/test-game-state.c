@@ -1194,6 +1194,15 @@ check_shouting_events(struct harness *harness,
                 return false;
         }
 
+        if (closure.got_modified_event &&
+            set_player_num == -1 &&
+            clear_player_num == -1) {
+                fprintf(stderr,
+                        "Got a shouting player modified event when nothing "
+                        "should have changed.\n");
+                return false;
+        }
+
         if (!closure.got_modified_event &&
             (set_player_num >= 0 || clear_player_num >= 0)) {
                 fprintf(stderr,
@@ -1252,6 +1261,20 @@ test_shouting(void)
         if (!send_shout(harness,
                         1, /* player_num */
                         -1 /* clear_player_num */)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send the same shout again, this shouln’t trigger a modified event */
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x02\x06\x01",
+                        4)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Check that no modification event was triggered */
+        if (!check_shouting_events(harness, -1, -1)) {
                 ret = false;
                 goto out;
         }
