@@ -87,11 +87,6 @@ update_poll(struct vsx_connection *connection);
  */
 #define VSX_CONNECTION_STABLE_TIME (15 * 1000 * 1000)
 
-/* When a shout event is received, the shout flag will remain on the
- * player until this number of microseconds passes.
- */
-#define VSX_CONNECTION_SHOUT_TIME (10 * 1000 * 1000)
-
 enum vsx_connection_running_state {
         VSX_CONNECTION_RUNNING_STATE_DISCONNECTED,
         /* connect has been called and we are waiting for it to
@@ -153,13 +148,6 @@ struct vsx_connection {
          * for a while.
          */
         int64_t player_id_received_timestamp;
-
-        /* The next time we need to clear the shouting player, or
-         * INT64_MAX if no-one is shouting.
-         */
-        int64_t reset_shout_timestamp;
-        /* The currently shouting player or -1 if no-one is shouting */
-        int shouting_player;
 
         struct vsx_signal event_signal;
 
@@ -496,35 +484,6 @@ handle_tile(struct vsx_connection *connection,
         return true;
 }
 
-static void
-emit_shouting_changed(struct vsx_connection *connection,
-                      int player_num,
-                      bool shouting)
-{
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
-                .player_shouting_changed = {
-                        .player_num = player_num,
-                        .shouting = shouting,
-                },
-        };
-
-        emit_event(connection, &event);
-}
-
-static void
-remove_shout(struct vsx_connection *connection)
-{
-        int shouting_player = connection->shouting_player;
-
-        if (shouting_player == -1)
-                return;
-
-        connection->shouting_player = -1;
-
-        emit_shouting_changed(connection, shouting_player, false);
-}
-
 static bool
 handle_player_name(struct vsx_connection *connection,
                    const uint8_t *payload,
@@ -623,16 +582,14 @@ handle_player_shouted(struct vsx_connection *connection,
                 return false;
         }
 
-        connection->reset_shout_timestamp =
-                vsx_monotonic_get() + VSX_CONNECTION_SHOUT_TIME;
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
+                .player_shouted = {
+                        .player_num = player_num,
+                },
+        };
 
-        if (player_num != connection->shouting_player) {
-                remove_shout(connection);
-
-                connection->shouting_player = player_num;
-
-                emit_shouting_changed(connection, player_num, true);
-        }
+        vsx_signal_emit(&connection->event_signal, &event);
 
         return true;
 }
@@ -1464,11 +1421,6 @@ vsx_connection_wake_up(struct vsx_connection *connection,
                 connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE;
         }
 
-        if (now >= connection->reset_shout_timestamp) {
-                connection->reset_shout_timestamp = INT64_MAX;
-                remove_shout(connection);
-        }
-
         if ((poll_events & (POLLIN | POLLERR | POLLHUP)))
                 handle_read(connection);
         else if ((poll_events & POLLOUT))
@@ -1539,9 +1491,6 @@ calculate_wakeup_timestamp(struct vsx_connection *connection)
 
         if (connection->keep_alive_timestamp < wakeup_timestamp)
                 wakeup_timestamp = connection->keep_alive_timestamp;
-
-        if (connection->reset_shout_timestamp < wakeup_timestamp)
-                wakeup_timestamp = connection->reset_shout_timestamp;
 
         return wakeup_timestamp;
 }
@@ -1679,9 +1628,6 @@ vsx_connection_new(void)
 
         connection->keep_alive_timestamp = INT64_MAX;
         connection->reconnect_timestamp = INT64_MAX;
-        connection->reset_shout_timestamp = INT64_MAX;
-
-        connection->shouting_player = -1;
 
         connection->poll_changed_event.type =
                 VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
@@ -1892,7 +1838,7 @@ vsx_connection_copy_event(struct vsx_connection_event *dest,
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
         case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
@@ -1918,7 +1864,7 @@ vsx_connection_destroy_event(struct vsx_connection_event *event)
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
         case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
         case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:

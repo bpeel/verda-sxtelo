@@ -58,6 +58,7 @@ struct vsx_game_state {
 
         enum vsx_game_state_shout_state shout_state;
         int shouting_player;
+        struct vsx_main_thread_token *remove_shout_timeout;
 
         bool has_conversation_id;
         uint64_t conversation_id;
@@ -104,15 +105,10 @@ struct vsx_game_state {
         struct vsx_instance_state instance_state;
 };
 
-static void
-set_shout_state_for_player(struct vsx_game_state *game_state,
-                           int player_num)
-{
-        game_state->shout_state =
-                player_num == game_state->self ?
-                VSX_GAME_STATE_SHOUT_STATE_SELF :
-                VSX_GAME_STATE_SHOUT_STATE_OTHER;
-}
+/* When a shout event is received, the shout flag will remain on the
+ * player until this number of microseconds passes.
+ */
+#define VSX_GAME_STATE_SHOUT_TIME (10 * 1000 * 1000)
 
 static void
 ensure_n_tiles(struct vsx_game_state *game_state,
@@ -184,6 +180,45 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
 }
 
 static void
+clear_remove_shout_timeout(struct vsx_game_state *game_state)
+{
+        if (game_state->remove_shout_timeout == NULL)
+                return;
+
+        vsx_main_thread_cancel_idle(game_state->remove_shout_timeout);
+
+        game_state->remove_shout_timeout = NULL;
+}
+
+static void
+remove_shout_cb(void *data)
+{
+        struct vsx_game_state *game_state = data;
+
+        game_state->remove_shout_timeout = NULL;
+
+        if (game_state->shouting_player == -1)
+                return;
+
+        if (game_state->shouting_player < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
+                struct vsx_game_state_player *player =
+                        game_state->players +
+                        game_state->shouting_player;
+
+                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+
+                struct vsx_game_state_modified_event m_event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &m_event);
+        }
+
+        game_state->shouting_player = -1;
+        game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
+}
+
+static void
 handle_header(struct vsx_game_state *game_state,
               const struct vsx_connection_event *event)
 {
@@ -228,7 +263,7 @@ static void
 handle_player_flags_changed(struct vsx_game_state *game_state,
                             const struct vsx_connection_event *event)
 {
-        int player_num = event->player_shouting_changed.player_num;
+        int player_num = event->player_flags_changed.player_num;
 
         if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
                 return;
@@ -254,34 +289,48 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
 }
 
 static void
-handle_player_shouting_changed(struct vsx_game_state *game_state,
-                               const struct vsx_connection_event *event)
+handle_player_shouted(struct vsx_game_state *game_state,
+                      const struct vsx_connection_event *event)
 {
-        int player_num = event->player_shouting_changed.player_num;
+        int player_num = event->player_shouted.player_num;
 
-        struct vsx_game_state_player *player =
-                player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS ?
-                game_state->players + player_num :
-                NULL;
+        clear_remove_shout_timeout(game_state);
+        game_state->remove_shout_timeout =
+                vsx_main_thread_queue_timeout(VSX_GAME_STATE_SHOUT_TIME,
+                                              remove_shout_cb,
+                                              game_state);
 
-        if (event->player_shouting_changed.shouting) {
-                if (player)
-                        player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+        if (player_num == game_state->shouting_player)
+                return;
 
-                game_state->shouting_player = player_num;
-                set_shout_state_for_player(game_state, player_num);
-        } else {
-                if (player)
-                        player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+        bool flags_modified = false;
 
-                if (player_num == game_state->shouting_player) {
-                        game_state->shouting_player = -1;
-                        game_state->shout_state =
-                                VSX_GAME_STATE_SHOUT_STATE_NOONE;
-                }
+        if (game_state->shouting_player != -1 &&
+            game_state->shouting_player < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
+                struct vsx_game_state_player *player =
+                        game_state->players + game_state->shouting_player;
+
+                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+
+                flags_modified = true;
         }
 
-        if (player) {
+        game_state->shouting_player = player_num;
+        game_state->shout_state =
+                player_num == game_state->self ?
+                VSX_GAME_STATE_SHOUT_STATE_SELF :
+                VSX_GAME_STATE_SHOUT_STATE_OTHER;
+
+        if (player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
+                struct vsx_game_state_player *player =
+                        game_state->players + player_num;
+
+                player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
+
+                flags_modified = true;
+        }
+
+        if (flags_modified) {
                 struct vsx_game_state_modified_event m_event = {
                         .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
                 };
@@ -340,8 +389,8 @@ handle_event(struct vsx_game_state *game_state,
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
                 handle_player_flags_changed(game_state, event);
                 break;
-        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED:
-                handle_player_shouting_changed(game_state, event);
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
+                handle_player_shouted(game_state, event);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
                 handle_tile_changed(game_state, event);
@@ -668,6 +717,8 @@ vsx_game_state_free(struct vsx_game_state *game_state)
 
         if (game_state->flush_queue_token)
                 vsx_main_thread_cancel_idle(game_state->flush_queue_token);
+
+        clear_remove_shout_timeout(game_state);
 
         free_event_queue(game_state);
         free_freed_events(game_state);

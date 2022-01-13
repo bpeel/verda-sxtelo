@@ -45,7 +45,7 @@ enum vsx_connection_event_type {
          */
         VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
-        VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
         VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
@@ -96,8 +96,7 @@ struct vsx_connection_event {
 
                 struct {
                         uint8_t player_num;
-                        bool shouting;
-                } player_shouting_changed;
+                } player_shouted;
 
                 struct {
                         uint8_t num;

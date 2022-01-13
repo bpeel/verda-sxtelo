@@ -1154,10 +1154,10 @@ check_shouting_flags(struct harness *harness,
 
 struct check_shouting_closure {
         int clear_shouting_player;
-        int set_shouting_player;
         struct vsx_listener event_listener;
         struct vsx_listener modified_listener;
         bool got_modified_event;
+        bool got_player_shouted_event;
         bool succeeded;
 };
 
@@ -1171,7 +1171,7 @@ check_shouting_cb(struct vsx_listener *listener,
                                  event_listener);
         const struct vsx_connection_event *event = user_data;
 
-        if (event->type != VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED) {
+        if (event->type != VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED) {
                 fprintf(stderr,
                         "Received unexpected event %i after setting player "
                         "shouting.\n",
@@ -1180,49 +1180,14 @@ check_shouting_cb(struct vsx_listener *listener,
                 return;
         }
 
-        int player_num = event->player_shouting_changed.player_num;
-
-        if (event->player_shouting_changed.shouting) {
-                if (closure->set_shouting_player == -1) {
-                        fprintf(stderr,
-                                "Received set shout event for %i when none "
-                                "expected\n",
-                                player_num);
+        if (closure->got_player_shouted_event) {
+                fprintf(stderr,
+                        "Received multiple PLAYER_SHOUTED events\n");
                         closure->succeeded = false;
                         return;
-                }
-                if (closure->set_shouting_player != player_num) {
-                        fprintf(stderr,
-                                "Received set shout event for %i but "
-                                "expected %i\n",
-                                player_num,
-                                closure->set_shouting_player);
-                        closure->succeeded = false;
-                        return;
-                }
-
-                closure->set_shouting_player = -1;
-        } else {
-                if (closure->clear_shouting_player == -1) {
-                        fprintf(stderr,
-                                "Received clear shout event for %i when none "
-                                "expected\n",
-                                player_num);
-                        closure->succeeded = false;
-                        return;
-                }
-                if (closure->clear_shouting_player != player_num) {
-                        fprintf(stderr,
-                                "Received clear shout event for %i but "
-                                "expected %i\n",
-                                player_num,
-                                closure->clear_shouting_player);
-                        closure->succeeded = false;
-                        return;
-                }
-
-                closure->clear_shouting_player = -1;
         }
+
+        closure->got_player_shouted_event = true;
 }
 
 static void
@@ -1253,9 +1218,8 @@ check_shouting_events(struct harness *harness,
                       int clear_player_num)
 {
         struct check_shouting_closure closure = {
-                .clear_shouting_player = clear_player_num,
-                .set_shouting_player = set_player_num,
                 .succeeded = true,
+                .got_player_shouted_event = false,
                 .got_modified_event = false,
                 .event_listener = {
                         .notify = check_shouting_cb,
@@ -1278,13 +1242,9 @@ check_shouting_events(struct harness *harness,
         if (!ret || !closure.succeeded)
                 return false;
 
-        if (closure.set_shouting_player != -1) {
-                fprintf(stderr, "No set shouting player event received.\n");
-                return false;
-        }
-
-        if (closure.clear_shouting_player != -1) {
-                fprintf(stderr, "No clear shouting player event received.\n");
+        if (set_player_num >= 0 &&
+            !closure.got_player_shouted_event) {
+                fprintf(stderr, "No player shouted event received.\n");
                 return false;
         }
 

@@ -1324,17 +1324,11 @@ static bool
 check_shouter_num(int expected_shouter,
                   const struct vsx_connection_event *event)
 {
-        if (expected_shouter != event->player_shouting_changed.player_num) {
+        if (expected_shouter != event->player_shouted.player_num) {
                 fprintf(stderr,
                         "Expected shouter to be %i but got %i\n",
                         expected_shouter,
-                        event->player_shouting_changed.player_num);
-                return false;
-        }
-
-        if (!event->player_shouting_changed.shouting) {
-                fprintf(stderr,
-                        "Received shout event but player is not shouting\n");
+                        event->player_shouted.player_num);
                 return false;
         }
 
@@ -1357,86 +1351,6 @@ check_other_shouted_cb(struct harness *harness,
         return check_shouter_num(1, event);
 }
 
-struct check_reset_shouting_player_closure {
-        int expected_shouter;
-};
-
-static bool
-check_reset_shouting_player_cb(struct harness *harness,
-                               const struct vsx_connection_event *event,
-                               void *user_data)
-{
-        struct check_reset_shouting_player_closure *closure = user_data;
-        int expected_shouter = closure->expected_shouter;
-
-        if (expected_shouter != event->player_shouting_changed.player_num) {
-                fprintf(stderr,
-                        "Expected shouter reset to be %i but got %i\n",
-                        expected_shouter,
-                        event->player_shouting_changed.player_num);
-                return false;
-        }
-
-        if (event->player_shouting_changed.shouting) {
-                fprintf(stderr,
-                        "Received shout reset event but player is shouting\n");
-                return false;
-        }
-
-        return true;
-}
-
-static bool
-check_reset_shouting_player(struct harness *harness,
-                            int player_num)
-{
-        if (llabs(harness->wakeup_time -
-                  (replacement_monotonic_time + 10 * 1000000)) >
-            1000000) {
-                fprintf(stderr,
-                        "Expected the connection to request a wakeup "
-                        "10 seconds after shouting, but it requested "
-                        "%f seconds\n",
-                        (harness->wakeup_time - replacement_monotonic_time) /
-                        1000000.0);
-                return false;
-        }
-
-        /* Advance time to nearly enough */
-        replacement_monotonic_time += 10 * 1000000 - 500000;
-
-        harness->events_triggered = 0;
-
-        if (!wake_up_connection(harness))
-                return false;
-
-        /* Check that no event was fired */
-        if (harness->events_triggered != 0) {
-                fprintf(stderr,
-                        "The vsx_connection triggered an event before the "
-                        "shout reset delay.\n");
-                return false;
-        }
-
-        /* Now advance actually enough time */
-        replacement_monotonic_time += 500001;
-
-        enum vsx_connection_event_type event_type =
-                VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED;
-
-        struct check_reset_shouting_player_closure closure = {
-                .expected_shouter = player_num,
-        };
-
-        return check_event_with_ignore(harness,
-                                       event_type,
-                                       VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
-                                       check_reset_shouting_player_cb,
-                                       (const uint8_t *) "", /* data */
-                                       0, /* data_len */
-                                       &closure);
-}
-
 static bool
 test_receive_shout(void)
 {
@@ -1453,21 +1367,13 @@ test_receive_shout(void)
         replacement_monotonic_time = vsx_monotonic_get();
         replace_monotonic_time = true;
 
-        enum vsx_connection_event_type event_type =
-                VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTING_CHANGED;
-
         if (!check_event_with_ignore(harness,
-                                     event_type,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
                                      VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                      check_self_shouted_cb,
                                      self_shout_message,
                                      sizeof self_shout_message - 1,
                                      NULL /* user_data */)) {
-                ret = false;
-                goto out;
-        }
-
-        if (!check_reset_shouting_player(harness, 0)) {
                 ret = false;
                 goto out;
         }
@@ -1481,17 +1387,12 @@ test_receive_shout(void)
                 "\x82\x02\x06\x01";
 
         if (!check_event_with_ignore(harness,
-                                     event_type,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
                                      VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
                                      check_other_shouted_cb,
                                      other_shout_message,
                                      sizeof other_shout_message - 1,
                                      NULL /* user_data */)) {
-                ret = false;
-                goto out;
-        }
-
-        if (!check_reset_shouting_player(harness, 1)) {
                 ret = false;
                 goto out;
         }
