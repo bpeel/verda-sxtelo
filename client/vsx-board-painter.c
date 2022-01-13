@@ -390,6 +390,7 @@ modified_cb(struct vsx_listener *listener,
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER:
         case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS:
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
@@ -606,6 +607,7 @@ create_cb(struct vsx_game_state *game_state,
 struct paint_box_closure {
         struct vsx_board_painter *painter;
         int player_num;
+        int shouting_player;
 };
 
 static void
@@ -622,7 +624,7 @@ paint_box_cb(const char *name,
                 closure->painter->box_draw_commands + player_num;
         const struct box_style_draw_command *style;
 
-        if ((flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING))
+        if (player_num == closure->shouting_player)
                 style = box->styles + 2;
         else if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
                 style = box->styles + 1;
@@ -674,6 +676,8 @@ paint_cb(void *painter_data)
         struct paint_box_closure closure = {
                 .player_num = 0,
                 .painter = painter,
+                .shouting_player =
+                vsx_game_state_get_shouting_player(painter->game_state),
         };
 
         vsx_game_state_foreach_player(painter->game_state,

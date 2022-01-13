@@ -56,7 +56,6 @@ struct vsx_game_state {
 
         struct vsx_game_state_player players[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
 
-        enum vsx_game_state_shout_state shout_state;
         int shouting_player;
         struct vsx_main_thread_token *remove_shout_timeout;
 
@@ -105,8 +104,8 @@ struct vsx_game_state {
         struct vsx_instance_state instance_state;
 };
 
-/* When a shout event is received, the shout flag will remain on the
- * player until this number of microseconds passes.
+/* When a shout event is received, the player will remain shouting
+ * until this number of microseconds passes.
  */
 #define VSX_GAME_STATE_SHOUT_TIME (10 * 1000 * 1000)
 
@@ -200,22 +199,13 @@ remove_shout_cb(void *data)
         if (game_state->shouting_player == -1)
                 return;
 
-        if (game_state->shouting_player < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
-                struct vsx_game_state_player *player =
-                        game_state->players +
-                        game_state->shouting_player;
-
-                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
-
-                struct vsx_game_state_modified_event m_event = {
-                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
-                };
-
-                vsx_signal_emit(&game_state->modified_signal, &m_event);
-        }
-
         game_state->shouting_player = -1;
-        game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
 static void
@@ -273,8 +263,7 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
 
         /* Leave the shouting flag as it was */
         enum vsx_game_state_player_flag new_flags =
-                ((player->flags & VSX_GAME_STATE_PLAYER_FLAG_SHOUTING) |
-                 event->player_flags_changed.flags);
+                event->player_flags_changed.flags;
 
         if (new_flags == player->flags)
                 return;
@@ -303,40 +292,13 @@ handle_player_shouted(struct vsx_game_state *game_state,
         if (player_num == game_state->shouting_player)
                 return;
 
-        bool flags_modified = false;
-
-        if (game_state->shouting_player != -1 &&
-            game_state->shouting_player < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
-                struct vsx_game_state_player *player =
-                        game_state->players + game_state->shouting_player;
-
-                player->flags &= ~VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
-
-                flags_modified = true;
-        }
-
         game_state->shouting_player = player_num;
-        game_state->shout_state =
-                player_num == game_state->self ?
-                VSX_GAME_STATE_SHOUT_STATE_SELF :
-                VSX_GAME_STATE_SHOUT_STATE_OTHER;
 
-        if (player_num < VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
-                struct vsx_game_state_player *player =
-                        game_state->players + player_num;
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
+        };
 
-                player->flags |= VSX_GAME_STATE_PLAYER_FLAG_SHOUTING;
-
-                flags_modified = true;
-        }
-
-        if (flags_modified) {
-                struct vsx_game_state_modified_event m_event = {
-                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
-                };
-
-                vsx_signal_emit(&game_state->modified_signal, &m_event);
-        }
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
 }
 
 static void
@@ -553,7 +515,7 @@ vsx_game_state_new(struct vsx_worker *worker,
         vsx_slab_init(&game_state->tile_allocator);
         vsx_list_init(&game_state->tile_list);
 
-        game_state->shout_state = VSX_GAME_STATE_SHOUT_STATE_NOONE;
+        game_state->shouting_player = -1;
 
         game_state->dialog = VSX_DIALOG_INVITE_LINK;
 
@@ -575,10 +537,10 @@ vsx_game_state_new(struct vsx_worker *worker,
         return game_state;
 }
 
-enum vsx_game_state_shout_state
-vsx_game_state_get_shout_state(struct vsx_game_state *game_state)
+int
+vsx_game_state_get_shouting_player(struct vsx_game_state *game_state)
 {
-        return game_state->shout_state;
+        return game_state->shouting_player;
 }
 
 bool

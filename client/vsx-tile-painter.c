@@ -469,6 +469,18 @@ find_tile_at_pos(struct vsx_tile_painter *painter,
 }
 
 static bool
+is_other_shouting(struct vsx_tile_painter *painter)
+{
+        int shouting_player =
+                vsx_game_state_get_shouting_player(painter->game_state);
+
+        if (shouting_player == -1)
+                return false;
+
+        return shouting_player != vsx_game_state_get_self(painter->game_state);
+}
+
+static bool
 handle_click(struct vsx_tile_painter *painter,
              const struct vsx_input_event *event)
 {
@@ -513,8 +525,7 @@ static bool
 handle_drag_start(struct vsx_tile_painter *painter,
                   const struct vsx_input_event *event)
 {
-        if (vsx_game_state_get_shout_state(painter->game_state) ==
-            VSX_GAME_STATE_SHOUT_STATE_OTHER)
+        if (is_other_shouting(painter))
                 return false;
 
         int board_x, board_y;
@@ -803,8 +814,7 @@ paint_cb(void *painter_data)
          * tile will snap back to where the server last reported it to
          * be.
          */
-        if (vsx_game_state_get_shout_state(painter->game_state) ==
-            VSX_GAME_STATE_SHOUT_STATE_OTHER)
+        if (is_other_shouting(painter))
                 cancel_drag(painter);
 
         bool any_tiles_animating = update_tile_animations(painter);

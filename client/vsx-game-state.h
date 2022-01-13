@@ -40,20 +40,11 @@ enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_CONNECTED = (1 << 0),
         VSX_GAME_STATE_PLAYER_FLAG_TYPING = (1 << 1),
         VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN = (1 << 2),
-        VSX_GAME_STATE_PLAYER_FLAG_SHOUTING = (1 << 3),
-};
-
-enum vsx_game_state_shout_state {
-        /* No-one is shouting */
-        VSX_GAME_STATE_SHOUT_STATE_NOONE,
-        /* The player themself is shouting */
-        VSX_GAME_STATE_SHOUT_STATE_SELF,
-        /* Someone else is shouting */
-        VSX_GAME_STATE_SHOUT_STATE_OTHER,
 };
 
 enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+        VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
         VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
@@ -96,8 +87,8 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
 int
 vsx_game_state_get_self(struct vsx_game_state *game_state);
 
-enum vsx_game_state_shout_state
-vsx_game_state_get_shout_state(struct vsx_game_state *game_state);
+int
+vsx_game_state_get_shouting_player(struct vsx_game_state *game_state);
 
 bool
 vsx_game_state_get_conversation_id(struct vsx_game_state *game_state,
