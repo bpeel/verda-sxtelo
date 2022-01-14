@@ -174,7 +174,7 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
         for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
                 struct vsx_game_state_player *player = game_state->players + i;
 
-                cb(player->name, player->flags, user_data);
+                cb(i, player->name, player->flags, user_data);
         }
 }
 

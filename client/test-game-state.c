@@ -896,12 +896,25 @@ struct check_players_closure {
 };
 
 static void
-check_players_cb(const char *name,
+check_players_cb(int player_num,
+                 const char *name,
                  enum vsx_game_state_player_flag flags,
                  void *user_data)
 {
         struct check_players_closure *closure = user_data;
-        int player_num = closure->next_player_num++;
+
+
+        if (player_num != closure->next_player_num) {
+                fprintf(stderr,
+                        "Wrong player_num received.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        player_num,
+                        closure->next_player_num);
+                closure->succeeded = false;
+        }
+
+        closure->next_player_num++;
 
         struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
@@ -1834,7 +1847,8 @@ struct check_player_flags_closure {
 };
 
 static void
-check_player_flags_foreach_player_cb(const char *name,
+check_player_flags_foreach_player_cb(int player_num,
+                                     const char *name,
                                      enum vsx_game_state_player_flag flags,
                                      void *user_data)
 {

@@ -83,7 +83,8 @@ vsx_game_state_foreach_tile(struct vsx_game_state *game_state,
                             void *user_data);
 
 typedef void
-(* vsx_game_state_foreach_player_cb)(const char *name,
+(* vsx_game_state_foreach_player_cb)(int player_num,
+                                     const char *name,
                                      enum vsx_game_state_player_flag flags,
                                      void *user_data);
 

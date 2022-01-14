@@ -604,27 +604,24 @@ create_cb(struct vsx_game_state *game_state,
         return painter;
 }
 
-struct paint_box_closure {
-        struct vsx_board_painter *painter;
-        int player_num;
-        int shouting_player;
-};
-
 static void
-paint_box_cb(const char *name,
+paint_box_cb(int player_num,
+             const char *name,
              enum vsx_game_state_player_flag flags,
              void *user_data)
 {
-        struct paint_box_closure *closure = user_data;
+        struct vsx_board_painter *painter = user_data;
 
-        assert(closure->player_num <= VSX_GAME_STATE_N_VISIBLE_PLAYERS);
+        assert(player_num <= VSX_GAME_STATE_N_VISIBLE_PLAYERS);
 
-        int player_num = closure->player_num;
         const struct box_draw_command *box =
-                closure->painter->box_draw_commands + player_num;
+                painter->box_draw_commands + player_num;
         const struct box_style_draw_command *style;
 
-        if (player_num == closure->shouting_player)
+        int shouting_player =
+                vsx_game_state_get_shouting_player(painter->game_state);
+
+        if (player_num == shouting_player)
                 style = box->styles + 2;
         else if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
                 style = box->styles + 1;
@@ -638,8 +635,6 @@ paint_box_cb(const char *name,
                                    GL_UNSIGNED_SHORT,
                                    (GLvoid *) (intptr_t)
                                    style->offset);
-
-        closure->player_num++;
 }
 
 static void
@@ -673,18 +668,9 @@ paint_cb(void *painter_data)
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
-        struct paint_box_closure closure = {
-                .player_num = 0,
-                .painter = painter,
-                .shouting_player =
-                vsx_game_state_get_shouting_player(painter->game_state),
-        };
-
         vsx_game_state_foreach_player(painter->game_state,
                                       paint_box_cb,
-                                      &closure);
-
-        assert(closure.player_num == VSX_GAME_STATE_N_VISIBLE_PLAYERS);
+                                      painter);
 }
 
 static struct vsx_signal *
