@@ -44,6 +44,7 @@ enum vsx_game_state_player_flag {
 
 enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+        VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME,
         VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
@@ -52,6 +53,13 @@ enum vsx_game_state_modified_type {
 
 struct vsx_game_state_modified_event {
         enum vsx_game_state_modified_type type;
+
+        union {
+                struct {
+                        int player_num;
+                        const char *name;
+                } player_name;
+        };
 };
 
 struct vsx_game_state *

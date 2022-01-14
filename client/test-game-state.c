@@ -958,17 +958,52 @@ check_player_added_cb(struct harness *harness,
 }
 
 static bool
+check_player_name_changed_cb(struct harness *harness,
+                             const struct vsx_game_state_modified_event *event,
+                             void *user_data)
+{
+        if (event->player_name.player_num != 1) {
+                fprintf(stderr,
+                        "Wrong player changed.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        1,
+                        event->player_name.player_num);
+                return false;
+        }
+
+        if (strcmp(event->player_name.name, "George")) {
+                fprintf(stderr,
+                        "Wrong player name.\n"
+                        " Expected: George\n"
+                        " Received: %s\n",
+                        event->player_name.name);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
 add_player(struct harness *harness)
 {
+        const struct check_event_setup setup = {
+                .event_cb = check_player_added_cb,
+                .expected_event_type =
+                VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                .modified_cb = check_player_name_changed_cb,
+                .expected_modified_type =
+                VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME,
+        };
+
         static const uint8_t add_player_message[] =
                 "\x82\x09\x04\x01George\x00";
 
-        return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
-                           check_player_added_cb,
-                           add_player_message,
-                           sizeof add_player_message - 1,
-                           NULL /* user_data */);
+        return check_event_or_modified(harness,
+                                       &setup,
+                                       add_player_message,
+                                       sizeof add_player_message - 1,
+                                       NULL /* user_data */);
 }
 
 struct check_player_added_closure {

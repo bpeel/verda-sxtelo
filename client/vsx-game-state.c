@@ -247,6 +247,16 @@ handle_player_name_changed(struct vsx_game_state *game_state,
 
         vsx_free(player->name);
         player->name = vsx_strdup(event->player_name_changed.name);
+
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME,
+                .player_name = {
+                        .player_num = player_num,
+                        .name = player->name,
+                },
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
 }
 
 static void
