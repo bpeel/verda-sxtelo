@@ -52,12 +52,6 @@ struct harness {
         bool idle_queued;
 };
 
-enum check_event_result {
-        CHECK_EVENT_RESULT_NO_MESSAGE,
-        CHECK_EVENT_RESULT_FAILED,
-        CHECK_EVENT_RESULT_SUCCEEDED,
-};
-
 typedef bool
 (* check_event_func)(struct harness *harness,
                      const struct vsx_connection_event *event,
@@ -68,12 +62,20 @@ typedef bool
                         const struct vsx_game_state_modified_event *event,
                         void *user_data);
 
-struct check_event_listener {
-        struct vsx_listener listener;
-        enum check_event_result result;
-        int expected_type;
+struct check_event_setup {
+        enum vsx_connection_event_type expected_event_type;
         check_event_func event_cb;
+        enum vsx_game_state_modified_type expected_modified_type;
         check_modified_func modified_cb;
+};
+
+struct check_event_listener {
+        struct check_event_setup setup;
+        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
+
+        bool succeeded;
+
         struct harness *harness;
         void *user_data;
 };
@@ -177,76 +179,87 @@ check_event_cb(struct vsx_listener *listener, void *data)
         struct check_event_listener *ce_listener =
                 vsx_container_of(listener,
                                  struct check_event_listener,
-                                 listener);
+                                 event_listener);
+        const struct vsx_connection_event *event = data;
 
-        if (ce_listener->result != CHECK_EVENT_RESULT_NO_MESSAGE) {
+        if (ce_listener->setup.event_cb == NULL) {
                 fprintf(stderr,
-                        "Multiple events received when only one "
+                        "Connection event received when none "
                         "was expected\n");
-                ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-        } else if (ce_listener->event_cb) {
-                const struct vsx_connection_event *event = data;
-
-                if (ce_listener->expected_type != event->type) {
-                        fprintf(stderr,
-                                "Expected event type %i but received %i\n",
-                                ce_listener->expected_type,
-                                event->type);
-                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-                } else if (!ce_listener->event_cb(ce_listener->harness,
-                                                  event,
-                                                  ce_listener->user_data)) {
-                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-                } else {
-                        ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
-                }
+                ce_listener->succeeded = false;
+        } else if (ce_listener->setup.expected_event_type != event->type) {
+                fprintf(stderr,
+                        "Expected event type %i but received %i\n",
+                        ce_listener->setup.expected_event_type,
+                        event->type);
+                ce_listener->succeeded = false;
+        } else if (!ce_listener->setup.event_cb(ce_listener->harness,
+                                                event,
+                                                ce_listener->user_data)) {
+                ce_listener->succeeded = false;
         } else {
-                const struct vsx_game_state_modified_event *event = data;
+                ce_listener->setup.event_cb = NULL;
+        }
+}
 
-                if (ce_listener->expected_type != event->type) {
-                        fprintf(stderr,
-                                "Expected modified event type %i "
-                                "but received %i\n",
-                                ce_listener->expected_type,
-                                event->type);
-                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-                } else if (!ce_listener->modified_cb(ce_listener->harness,
-                                                     event,
-                                                     ce_listener->user_data)) {
-                        ce_listener->result = CHECK_EVENT_RESULT_FAILED;
-                } else {
-                        ce_listener->result = CHECK_EVENT_RESULT_SUCCEEDED;
-                }
+static void
+check_modified_cb(struct vsx_listener *listener, void *data)
+{
+        struct check_event_listener *ce_listener =
+                vsx_container_of(listener,
+                                 struct check_event_listener,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = data;
+
+        if (ce_listener->setup.modified_cb == NULL) {
+                fprintf(stderr,
+                        "Modified event received when none "
+                        "was expected\n");
+                ce_listener->succeeded = false;
+        } else if (ce_listener->setup.expected_modified_type != event->type) {
+                fprintf(stderr,
+                        "Expected modified event type %i but received %i\n",
+                        ce_listener->setup.expected_modified_type,
+                        event->type);
+                ce_listener->succeeded = false;
+        } else if (!ce_listener->setup.modified_cb(ce_listener->harness,
+                                                   event,
+                                                   ce_listener->user_data)) {
+                ce_listener->succeeded = false;
+        } else {
+                ce_listener->setup.modified_cb = NULL;
         }
 }
 
 static bool
 check_event_or_modified(struct harness *harness,
-                        int expected_type,
-                        check_event_func event_cb,
-                        check_modified_func modified_cb,
+                        const struct check_event_setup *setup,
                         const uint8_t *data,
                         size_t data_len,
                         void *user_data)
 {
         struct check_event_listener listener = {
-                .listener = { .notify = check_event_cb },
-                .result = CHECK_EVENT_RESULT_NO_MESSAGE,
-                .expected_type = expected_type,
-                .event_cb = event_cb,
-                .modified_cb = modified_cb,
+                .setup = *setup,
+                .event_listener = { .notify = check_event_cb },
+                .modified_listener = { .notify = check_modified_cb },
+                .succeeded = true,
                 .harness = harness,
                 .user_data = user_data,
         };
 
         bool ret = true;
 
-        struct vsx_signal *signal =
-                event_cb ?
-                vsx_game_state_get_event_signal(harness->game_state) :
-                vsx_game_state_get_modified_signal(harness->game_state);
+        if (setup->event_cb) {
+                struct vsx_signal *signal =
+                        vsx_game_state_get_event_signal(harness->game_state);
+                vsx_signal_add(signal, &listener.event_listener);
+        }
 
-        vsx_signal_add(signal, &listener.listener);
+        if (setup->modified_cb) {
+                struct vsx_signal *signal =
+                        vsx_game_state_get_modified_signal(harness->game_state);
+                vsx_signal_add(signal, &listener.modified_listener);
+        }
 
         if (!write_data(harness, data, data_len)) {
                 ret = false;
@@ -258,22 +271,32 @@ check_event_or_modified(struct harness *harness,
                 goto out;
         }
 
-        switch (listener.result) {
-        case CHECK_EVENT_RESULT_NO_MESSAGE:
-                fprintf(stderr, "No event received when one was expected\n");
+        if (!listener.succeeded) {
                 ret = false;
-                goto out;
-        case CHECK_EVENT_RESULT_FAILED:
-                ret = false;
-                goto out;
-        case CHECK_EVENT_RESULT_SUCCEEDED:
                 goto out;
         }
 
-        assert(!"Unexpected check_event_or_modified result");
+        if (setup->event_cb && listener.setup.event_cb) {
+                fprintf(stderr,
+                        "No vsx_connection event received when one was "
+                        "expected\n");
+                ret = false;
+                goto out;
+        }
+
+        if (setup->modified_cb && listener.setup.modified_cb) {
+                fprintf(stderr,
+                        "No modified event received when one was "
+                        "expected\n");
+                ret = false;
+                goto out;
+        }
 
 out:
-        vsx_list_remove(&listener.listener.link);
+        if (setup->event_cb)
+                vsx_list_remove(&listener.event_listener.link);
+        if (setup->modified_cb)
+                vsx_list_remove(&listener.modified_listener.link);
 
         return ret;
 }
@@ -286,10 +309,13 @@ check_event(struct harness *harness,
             size_t data_len,
             void *user_data)
 {
+        struct check_event_setup setup = {
+                .event_cb = event_cb,
+                .expected_event_type = expected_type,
+        };
+
         return check_event_or_modified(harness,
-                                       expected_type,
-                                       event_cb,
-                                       NULL, /* modified_cb */
+                                       &setup,
                                        data,
                                        data_len,
                                        user_data);
@@ -303,10 +329,13 @@ check_modified(struct harness *harness,
                size_t data_len,
                void *user_data)
 {
+        struct check_event_setup setup = {
+                .modified_cb = modified_cb,
+                .expected_modified_type = expected_type,
+        };
+
         return check_event_or_modified(harness,
-                                       expected_type,
-                                       NULL, /* event_cb */
-                                       modified_cb,
+                                       &setup,
                                        data,
                                        data_len,
                                        user_data);
