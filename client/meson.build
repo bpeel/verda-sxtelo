@@ -1,6 +1,7 @@
 inc_dirs = [ configinc, '../common' ]
 
 m_dep = cc.find_library('m', required : false)
+freetype = dependency('freetype2')
 
 connection_src = [
         '../common/vsx-bitmask.c',
@@ -20,11 +21,15 @@ connection_src = [
 client_common_src = [
         'vsx-array-object.c',
         'vsx-board-painter.c',
+        'vsx-bsp.c',
         'vsx-button-painter.c',
         'vsx-dialog.c',
+        'vsx-font.c',
         'vsx-game-painter.c',
         'vsx-game-state.c',
         'vsx-gl.c',
+        'vsx-glyph-hash.c',
+        '../common/vsx-hash-table.c',
         'vsx-id-url.c',
         'vsx-image.c',
         'vsx-image-loader.c',
@@ -47,7 +52,7 @@ client_common_src = [
 if get_option('client')
         sdl_dep = dependency('sdl2')
 
-        client_deps = [ thread_dep, sdl_dep, m_dep ]
+        client_deps = [ thread_dep, sdl_dep, m_dep, freetype ]
 
         client_src = [
                 'vsx-asset-linux.c',
@@ -90,7 +95,7 @@ if get_option('jni')
         log_dep = cc.find_library('log', required : true)
 
         jni_lib = library('anagrams', jni_src,
-                          dependencies: [android_dep, log_dep, m_dep],
+                          dependencies: [android_dep, log_dep, m_dep, freetype],
                           include_directories: inc_dirs,
                           install: true)
 endif
