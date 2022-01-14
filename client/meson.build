@@ -196,3 +196,13 @@ test_glyph_hash_src = [
 test_glyph_hash = executable('test-glyph-hash', test_glyph_hash_src,
                              include_directories: inc_dirs)
 test('glyph-hash', test_glyph_hash)
+
+test_bsp_src = [
+        'test-bsp.c',
+        'vsx-bsp.c',
+        '../common/vsx-buffer.c',
+        '../common/vsx-util.c',
+]
+test_bsp = executable('test-bsp', test_bsp_src,
+                      include_directories: inc_dirs)
+test('bsp', test_bsp)
