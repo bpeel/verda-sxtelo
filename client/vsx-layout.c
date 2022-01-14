@@ -193,7 +193,7 @@ add_glyph_quads_for_line(struct vsx_layout *layout,
                 if (right > layout->logical_extents.right)
                         layout->logical_extents.right = right;
 
-                int bottom = y / 64.0f + metrics->descender;
+                int bottom = y / 64.0f - metrics->descender;
 
                 if (bottom > layout->logical_extents.bottom)
                         layout->logical_extents.bottom = bottom;
