@@ -20,58 +20,25 @@
 
 #include "vsx-glyph-hash.h"
 
+#include <stdalign.h>
+
 #include "vsx-util.h"
+#include "vsx-slab.h"
+#include "vsx-list.h"
 
 struct vsx_glyph_hash {
-        int n_entries;
-        int size;
-        /* All entries in an array */
-        struct vsx_glyph_hash_entry *entries;
-        /* Lookup of indices into entries array by hash index */
-        unsigned *lookup;
+        struct vsx_hash_table table;
+
+        struct vsx_slab_allocator entry_allocator;
 };
-
-static unsigned
-get_hash_index(struct vsx_glyph_hash *hash,
-               unsigned code)
-{
-        return code % hash->size;
-}
-
-static void
-link_entry(struct vsx_glyph_hash *hash,
-           int hash_index,
-           int entry_index)
-{
-        struct vsx_glyph_hash_entry *entry = hash->entries + entry_index;
-        entry->next = hash->lookup[hash_index];
-        hash->lookup[hash_index] = entry_index + 1;
-}
-
-static void
-grow_hash(struct vsx_glyph_hash *hash)
-{
-        hash->size *= 2;
-        hash->entries = vsx_realloc(hash->entries,
-                                    hash->size * sizeof hash->entries[0]);
-        vsx_free(hash->lookup);
-        hash->lookup = vsx_calloc(hash->size * sizeof hash->lookup[0]);
-
-        for (int i = 0; i < hash->n_entries; i++) {
-                struct vsx_glyph_hash_entry *entry = hash->entries + i;
-                link_entry(hash, get_hash_index(hash, entry->code), i);
-        }
-}
 
 struct vsx_glyph_hash *
 vsx_glyph_hash_new(void)
 {
         struct vsx_glyph_hash *hash = vsx_alloc(sizeof *hash);
 
-        hash->n_entries = 0;
-        hash->size = 1;
-        hash->entries = vsx_alloc(hash->size * sizeof hash->entries[0]);
-        hash->lookup = vsx_calloc(hash->size * sizeof hash->lookup[0]);
+        vsx_hash_table_init(&hash->table);
+        vsx_slab_init(&hash->entry_allocator);
 
         return hash;
 }
@@ -81,31 +48,24 @@ vsx_glyph_hash_get(struct vsx_glyph_hash *hash,
                    unsigned code,
                    bool *added)
 {
-        unsigned hash_index = get_hash_index(hash, code);
-        struct vsx_glyph_hash_entry *entry;
+        struct vsx_hash_table_entry *hash_entry =
+                vsx_hash_table_get(&hash->table, code);
 
-        for (int entry_num = hash->lookup[hash_index];
-             entry_num;
-             entry_num = entry->next) {
-                entry = hash->entries + entry_num - 1;
-
-                if (entry->code == code) {
-                        *added = false;
-                        return entry;
-                }
+        if (hash_entry) {
+                *added = false;
+                return vsx_container_of(hash_entry,
+                                        struct vsx_glyph_hash_entry,
+                                        hash_entry);
         }
 
-        if (hash->n_entries > hash->size * 3 / 4) {
-                grow_hash(hash);
-                hash_index = get_hash_index(hash, code);
-        }
+        struct vsx_glyph_hash_entry *entry =
+                vsx_slab_allocate(&hash->entry_allocator,
+                                  sizeof (struct vsx_glyph_hash_entry),
+                                  alignof (struct vsx_glyph_hash_entry));
 
-        int entry_index = hash->n_entries++;
-        entry = hash->entries + entry_index;
+        entry->hash_entry.id = code;
 
-        entry->code = code;
-
-        link_entry(hash, hash_index, entry_index);
+        vsx_hash_table_add(&hash->table, &entry->hash_entry);
 
         *added = true;
 
@@ -115,7 +75,7 @@ vsx_glyph_hash_get(struct vsx_glyph_hash *hash,
 void
 vsx_glyph_hash_free(struct vsx_glyph_hash *hash)
 {
-        vsx_free(hash->entries);
-        vsx_free(hash->lookup);
+        vsx_hash_table_destroy(&hash->table);
+        vsx_slab_destroy(&hash->entry_allocator);
         vsx_free(hash);
 }

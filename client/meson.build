@@ -189,6 +189,8 @@ test_glyph_hash_src = [
         'test-glyph-hash.c',
         'vsx-glyph-hash.c',
         '../common/vsx-buffer.c',
+        '../common/vsx-hash-table.c',
+        '../common/vsx-slab.c',
         '../common/vsx-util.c',
 ]
 test_glyph_hash = executable('test-glyph-hash', test_glyph_hash_src,

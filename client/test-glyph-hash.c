@@ -21,7 +21,7 @@ main(int argc, char **argv)
                 struct vsx_glyph_hash_entry *entry =
                         vsx_glyph_hash_get(hash, i, &added);
 
-                assert(entry->code == i);
+                assert(entry->hash_entry.id == i);
                 assert(added);
 
                 /* Fill in some test values so that we can recognise
@@ -42,7 +42,7 @@ main(int argc, char **argv)
                         entry = vsx_glyph_hash_get(hash, j, &added);
 
                         assert(!added);
-                        assert(entry->code == j);
+                        assert(entry->hash_entry.id == j);
                         assert(entry->x_advance == j);
                         assert(entry->tex_num == j + 1);
                         assert(entry->s1 == j + 2);

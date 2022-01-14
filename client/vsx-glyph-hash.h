@@ -22,11 +22,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "vsx-hash-table.h"
+
 struct vsx_glyph_hash;
 
 struct vsx_glyph_hash_entry {
-        unsigned code;
-        unsigned next;
+        struct vsx_hash_table_entry hash_entry;
 
         int left, top;
         long x_advance;
