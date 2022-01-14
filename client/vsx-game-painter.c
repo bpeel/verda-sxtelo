@@ -412,6 +412,17 @@ vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter)
 void
 vsx_game_painter_paint(struct vsx_game_painter *painter)
 {
+        /* Preparation */
+
+        for (unsigned i = 0; i < N_PAINTERS; i++) {
+                if (painters[i]->prepare_cb == NULL)
+                        continue;
+
+                painters[i]->prepare_cb(painter->painters[i].data);
+        }
+
+        /* Painting */
+
         if (painter->viewport_dirty) {
                 vsx_gl.glViewport(0, 0,
                                   painter->toolbox.paint_state.width,
