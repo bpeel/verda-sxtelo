@@ -184,3 +184,13 @@ test_main_thread = executable('test-main-thread',
                               dependencies: [thread_dep],
                               include_directories: inc_dirs)
 test('main-thread', test_main_thread)
+
+test_glyph_hash_src = [
+        'test-glyph-hash.c',
+        'vsx-glyph-hash.c',
+        '../common/vsx-buffer.c',
+        '../common/vsx-util.c',
+]
+test_glyph_hash = executable('test-glyph-hash', test_glyph_hash_src,
+                             include_directories: inc_dirs)
+test('glyph-hash', test_glyph_hash)
