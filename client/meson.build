@@ -35,6 +35,7 @@ client_common_src = [
         'vsx-image-loader.c',
         'vsx-instance-state.c',
         'vsx-invite-painter.c',
+        'vsx-layout.c',
         'vsx-main-thread.c',
         'vsx-map-buffer.c',
         'vsx-menu-painter.c',
