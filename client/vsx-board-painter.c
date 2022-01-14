@@ -31,6 +31,7 @@
 #include "vsx-array-object.h"
 #include "vsx-quad-buffer.h"
 #include "vsx-board.h"
+#include "vsx-layout.h"
 
 #define N_BOX_STYLES 3
 
@@ -41,6 +42,11 @@ struct box_style_draw_command {
 
 struct box_draw_command {
         struct box_style_draw_command styles[N_BOX_STYLES];
+};
+
+struct name_label {
+        int x, y;
+        struct vsx_layout *layout;
 };
 
 struct vsx_board_painter {
@@ -55,6 +61,9 @@ struct vsx_board_painter {
 
         struct box_draw_command box_draw_commands
         [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+
+        struct name_label name_labels[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+        bool name_label_positions_dirty;
 
         struct vsx_array_object *vao;
         GLuint vbo;
@@ -342,6 +351,7 @@ player_5_quads[] = {
 struct player_box {
         int n_quads;
         const struct board_quad *quads;
+        int center_x, center_y;
 };
 
 static const struct player_box
@@ -349,26 +359,40 @@ player_boxes[] = {
         {
                 .n_quads = VSX_N_ELEMENTS(player_0_quads),
                 .quads = player_0_quads,
+                .center_x = (PLAYER_SPACE_MIDDLE_X +
+                             PLAYER_SPACE_MIDDLE_WIDTH / 2),
+                .center_y = PLAYER_SPACE_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_1_quads),
                 .quads = player_1_quads,
+                .center_x = (PLAYER_SPACE_MIDDLE_X +
+                             PLAYER_SPACE_MIDDLE_WIDTH / 2),
+                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_2_quads),
                 .quads = player_2_quads,
+                .center_x = PLAYER_SPACE_SIDE_WIDTH / 2,
+                .center_y = PLAYER_SPACE_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_3_quads),
                 .quads = player_3_quads,
+                .center_x = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH / 2,
+                .center_y = PLAYER_SPACE_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_4_quads),
                 .quads = player_4_quads,
+                .center_x = PLAYER_SPACE_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_5_quads),
                 .quads = player_5_quads,
+                .center_x = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT / 2,
         },
 };
 
@@ -378,6 +402,16 @@ _Static_assert(VSX_N_ELEMENTS(player_boxes) == VSX_GAME_STATE_N_VISIBLE_PLAYERS,
 
 #define N_BOARD_QUADS VSX_N_ELEMENTS(board_quads)
 #define N_BOARD_VERTICES (N_BOARD_QUADS * 4)
+
+static void
+update_player_name(struct vsx_board_painter *painter,
+                   int player_num,
+                   const char *name)
+{
+        struct vsx_layout *layout = painter->name_labels[player_num].layout;
+
+        vsx_layout_set_text(layout, name);
+}
 
 static void
 modified_cb(struct vsx_listener *listener,
@@ -390,6 +424,13 @@ modified_cb(struct vsx_listener *listener,
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME:
+                update_player_name(painter,
+                                   event->player_name.player_num,
+                                   event->player_name.name);
+                painter->name_label_positions_dirty = true;
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
         case VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER:
         case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS:
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
@@ -577,6 +618,18 @@ init_program(struct vsx_board_painter *painter,
                                             "translation");
 }
 
+static void
+load_name_cb(int player_num,
+             const char *name,
+             enum vsx_game_state_player_flag flags,
+             void *user_data)
+{
+        struct vsx_board_painter *painter = user_data;
+
+        if (name != NULL)
+                update_player_name(painter, player_num, name);
+}
+
 static void *
 create_cb(struct vsx_game_state *game_state,
           struct vsx_painter_toolbox *toolbox)
@@ -587,6 +640,12 @@ create_cb(struct vsx_game_state *game_state,
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
+
+        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+                painter->name_labels[i].layout =
+                        vsx_layout_new(toolbox->font_library,
+                                       &toolbox->shader_data);
+        }
 
         init_program(painter, &toolbox->shader_data);
 
@@ -600,6 +659,10 @@ create_cb(struct vsx_game_state *game_state,
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
+
+        vsx_game_state_foreach_player(game_state, load_name_cb, painter);
+
+        painter->name_label_positions_dirty = true;
 
         return painter;
 }
@@ -638,6 +701,92 @@ paint_box_cb(int player_num,
 }
 
 static void
+update_name_label_position(struct vsx_board_painter *painter,
+                           int player_num)
+{
+        struct vsx_layout *layout = painter->name_labels[player_num].layout;
+
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        int board_top, board_left, board_width, board_height;
+
+        if (paint_state->board_rotated) {
+                board_left = (paint_state->height -
+                              paint_state->board_scissor_y -
+                              paint_state->board_scissor_height);
+                board_top = (paint_state->width -
+                             paint_state->board_scissor_x -
+                             paint_state->board_scissor_width);
+
+                board_width = paint_state->board_scissor_height;
+                board_height = paint_state->board_scissor_width;
+        } else {
+                board_left = paint_state->board_scissor_x;
+                board_top = (paint_state->height -
+                              paint_state->board_scissor_y -
+                              paint_state->board_scissor_height);
+
+                board_width = paint_state->board_scissor_width;
+                board_height = paint_state->board_scissor_height;
+        }
+
+        const struct player_box *box = player_boxes + player_num;
+
+        int center_x = box->center_x * board_width / VSX_BOARD_WIDTH;
+        int center_y = box->center_y * board_width / VSX_BOARD_WIDTH;
+
+        const struct vsx_layout_extents *extents =
+                vsx_layout_get_logical_extents(layout);
+
+        int layout_x = center_x - (extents->right + extents->left) / 2;
+
+        if (layout_x - extents->left < 0)
+                layout_x = extents->left;
+        else if (layout_x + extents->right > board_width)
+                layout_x = board_width - extents->right;
+
+        int layout_y = (center_y +
+                        (extents->bottom + extents->top) / 2 -
+                        extents->bottom);
+
+        if (layout_y - extents->top < 0)
+                layout_y = extents->top;
+        else if (layout_y + extents->bottom > board_height)
+                layout_y = board_height - extents->bottom;
+
+        struct name_label *label = painter->name_labels + player_num;
+
+        label->x = layout_x + board_left;
+        label->y = layout_y + board_top;
+}
+
+static void
+fb_size_changed_cb(void *painter_data)
+{
+        struct vsx_board_painter *painter = painter_data;
+
+        painter->name_label_positions_dirty = true;
+}
+
+static void
+prepare_cb(void *painter_data)
+{
+        struct vsx_board_painter *painter = painter_data;
+
+        if (painter->name_label_positions_dirty) {
+                vsx_paint_state_ensure_layout(&painter->toolbox->paint_state);
+
+                for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+                        vsx_layout_prepare(painter->name_labels[i].layout);
+                        update_name_label_position(painter, i);
+                }
+
+                painter->name_label_positions_dirty = false;
+        }
+}
+
+static void
 paint_cb(void *painter_data)
 {
         struct vsx_board_painter *painter = painter_data;
@@ -671,6 +820,16 @@ paint_cb(void *painter_data)
         vsx_game_state_foreach_player(painter->game_state,
                                       paint_box_cb,
                                       painter);
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->name_labels); i++) {
+                const struct name_label *name_label = painter->name_labels + i;
+
+                vsx_layout_paint(name_label->layout,
+                                 paint_state,
+                                 name_label->x,
+                                 name_label->y,
+                                 0.0f, 0.0f, 0.0f);
+        }
 }
 
 static struct vsx_signal *
@@ -687,6 +846,11 @@ free_cb(void *painter_data)
         struct vsx_board_painter *painter = painter_data;
 
         vsx_list_remove(&painter->modified_listener.link);
+
+        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+                if (painter->name_labels[i].layout)
+                        vsx_layout_free(painter->name_labels[i].layout);
+        }
 
         if (painter->vao)
                 vsx_array_object_free(painter->vao);
@@ -706,6 +870,8 @@ free_cb(void *painter_data)
 const struct vsx_painter
 vsx_board_painter = {
         .create_cb = create_cb,
+        .fb_size_changed_cb = fb_size_changed_cb,
+        .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
