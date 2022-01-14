@@ -23,6 +23,7 @@
 
 #include "vsx-shader-data.h"
 #include "vsx-image-loader.h"
+#include "vsx-font.h"
 #include "vsx-game-state.h"
 #include "vsx-paint-state.h"
 #include "vsx-signal.h"
@@ -31,6 +32,7 @@
 struct vsx_painter_toolbox {
         struct vsx_shader_data shader_data;
         struct vsx_image_loader *image_loader;
+        struct vsx_font_library *font_library;
         struct vsx_paint_state paint_state;
 };
 

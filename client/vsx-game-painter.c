@@ -128,6 +128,7 @@ init_painters(struct vsx_game_painter *painter)
 static bool
 init_toolbox(struct vsx_game_painter *painter,
              struct vsx_asset_manager *asset_manager,
+             int dpi,
              struct vsx_error **error)
 {
         struct vsx_painter_toolbox *toolbox = &painter->toolbox;
@@ -141,6 +142,11 @@ init_toolbox(struct vsx_game_painter *painter,
 
         toolbox->image_loader = vsx_image_loader_new(asset_manager);
 
+        toolbox->font_library = vsx_font_library_new(asset_manager, dpi, error);
+
+        if (toolbox->font_library == NULL)
+                return false;
+
         return true;
 }
 
@@ -148,6 +154,9 @@ static void
 destroy_toolbox(struct vsx_game_painter *painter)
 {
         struct vsx_painter_toolbox *toolbox = &painter->toolbox;
+
+        if (toolbox->font_library)
+                vsx_font_library_free(toolbox->font_library);
 
         if (toolbox->image_loader)
                 vsx_image_loader_free(toolbox->image_loader);
@@ -173,7 +182,7 @@ vsx_game_painter_new(struct vsx_game_state *game_state,
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
-        if (!init_toolbox(painter, asset_manager, error))
+        if (!init_toolbox(painter, asset_manager, dpi, error))
                 goto error;
 
         init_painters(painter);
