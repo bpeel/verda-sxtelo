@@ -64,6 +64,9 @@ typedef struct
   int total_n_tiles;
   VsxTile tiles[VSX_TILE_DATA_N_TILES];
 
+  /* The chosen tile data, ie which language is chosen for the game */
+  const VsxTileData *tile_data;
+
   int64_t last_shout_time;
 
   int log_id;
@@ -79,6 +82,7 @@ typedef enum
 {
   VSX_CONVERSATION_STATE_CHANGED,
   VSX_CONVERSATION_N_TILES_CHANGED,
+  VSX_CONVERSATION_TILE_DATA_CHANGED,
   VSX_CONVERSATION_MESSAGE_ADDED,
   VSX_CONVERSATION_PLAYER_CHANGED,
   VSX_CONVERSATION_TILE_CHANGED,
@@ -113,6 +117,11 @@ void
 vsx_conversation_set_n_tiles (VsxConversation *conversation,
                               unsigned int player_num,
                               int n_tiles);
+
+void
+vsx_conversation_set_tile_data (VsxConversation *conversation,
+                                unsigned int player_num,
+                                const VsxTileData *tile_data);
 
 void
 vsx_conversation_start (VsxConversation *conversation);

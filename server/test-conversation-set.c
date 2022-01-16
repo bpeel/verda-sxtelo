@@ -27,6 +27,7 @@
 
 #include "vsx-conversation-set.h"
 #include "vsx-util.h"
+#include "vsx-main-context.h"
 
 static bool
 test_get_from_empty_set(VsxConversationSet *set)
@@ -46,10 +47,8 @@ test_get_from_empty_set(VsxConversationSet *set)
 static bool
 using_esperanto_tiles(VsxConversation *conversation)
 {
-        for (int i = 0; i < VSX_TILE_DATA_N_TILES; i++) {
-                if (!strcmp(conversation->tiles[i].letter, "Ĉ"))
-                        return true;
-        }
+        if (strstr(conversation->tile_data->letters, "Ĉ"))
+                return true;
 
         fprintf(stderr,
                 "The conversation doesn’t seem to be using the "
@@ -61,14 +60,38 @@ using_esperanto_tiles(VsxConversation *conversation)
 static bool
 using_english_tiles(VsxConversation *conversation)
 {
-        for (int i = 0; i < VSX_TILE_DATA_N_TILES; i++) {
-                if (!strcmp(conversation->tiles[i].letter, "W"))
-                        return true;
-        }
+        if (strstr(conversation->tile_data->letters, "W"))
+                return true;
 
         fprintf(stderr,
                 "The conversation doesn’t seem to be using the "
                 "English tile set.\n");
+
+        return false;
+}
+
+static bool
+turned_tiles_contain_letter(VsxConversation *conversation,
+                            const char *letter)
+{
+        /* Turn a tile to ensure the game has started */
+        vsx_conversation_turn(conversation, 0);
+
+        if (conversation->state != VSX_CONVERSATION_IN_PROGRESS) {
+                fprintf(stderr,
+                        "The conversation hasn’t started after turning "
+                        "a tile.\n");
+                return false;
+        }
+
+        for (int i = 0; i < VSX_N_ELEMENTS(conversation->tiles); i++) {
+                if (!strcmp(conversation->tiles[i].letter, letter))
+                        return true;
+        }
+
+        fprintf(stderr,
+                "The tile data doesn’t contain the letter %s\n",
+                letter);
 
         return false;
 }
@@ -197,6 +220,13 @@ test_generate_english_conversation(VsxConversationSet *set,
                 goto out;
         }
 
+        vsx_conversation_add_player(conversation, "Zamenhof");
+
+        if (!turned_tiles_contain_letter(conversation, "W")) {
+                ret = false;
+                goto out;
+        }
+
 out:
         vsx_object_unref(conversation);
         return ret;
@@ -214,6 +244,13 @@ test_no_language_code(VsxConversationSet *set,
         bool ret = true;
 
         if (!using_esperanto_tiles(conversation)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_conversation_add_player(conversation, "Zamenhof");
+
+        if (!turned_tiles_contain_letter(conversation, "Ĉ")) {
                 ret = false;
                 goto out;
         }
@@ -297,6 +334,169 @@ test_free_game(VsxConversationSet *set,
         return ret;
 }
 
+struct check_tile_data_closure {
+        const char *expected_language_code;
+        bool received_changed_event;
+        bool succeeded;
+        struct vsx_listener listener;
+};
+
+static void
+check_tile_data_cb(struct vsx_listener *listener,
+                   void *user_data)
+{
+        struct check_tile_data_closure *closure =
+                vsx_container_of(listener,
+                                 struct check_tile_data_closure,
+                                 listener);
+        VsxConversationChangedData *data = user_data;
+
+        if (data->type != VSX_CONVERSATION_TILE_DATA_CHANGED)
+                return;
+
+        if (closure->received_changed_event) {
+                fprintf(stderr,
+                        "Multiple tile_data_changed events received.\n");
+                closure->succeeded = false;
+                return;
+        }
+
+        closure->received_changed_event = true;
+
+        if (strcmp(data->conversation->tile_data->language_code,
+                   closure->expected_language_code)) {
+                fprintf(stderr,
+                        "Wrong language code in conversation tile data.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        closure->expected_language_code,
+                        data->conversation->tile_data->language_code);
+                closure->succeeded = false;
+                return;
+        }
+}
+
+static void
+set_tile_data_by_language_code(VsxConversation *conversation,
+                               const char *language_code)
+{
+        for (int i = 0; i < VSX_TILE_DATA_N_ROOMS; i++) {
+                if (!strcmp(vsx_tile_data[i].language_code, language_code)) {
+                        vsx_conversation_set_tile_data(conversation,
+                                                       0,
+                                                       vsx_tile_data + i);
+                        return;
+                }
+        }
+
+        assert(!"Couldn’t find language code for tile data");
+}
+
+static bool
+set_tile_data_no_event(VsxConversation *conversation,
+                       const char *language_code,
+                       struct check_tile_data_closure *closure)
+{
+        closure->expected_language_code = language_code;
+        closure->received_changed_event = false;
+
+        set_tile_data_by_language_code(conversation, language_code);
+
+        if (!closure->succeeded)
+                return false;
+
+        if (closure->received_changed_event) {
+                fprintf(stderr,
+                        "Tile data changed event received when none "
+                        "expected.\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+set_tile_data_and_check_event(VsxConversation *conversation,
+                              const char *language_code,
+                              struct check_tile_data_closure *closure)
+{
+        closure->expected_language_code = language_code;
+        closure->received_changed_event = false;
+
+        set_tile_data_by_language_code(conversation, language_code);
+
+        if (!closure->succeeded)
+                return false;
+
+        if (!closure->received_changed_event) {
+                fprintf(stderr,
+                        "No tile data changed event received when one was "
+                        "expected.\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_set_tile_data(VsxConversationSet *set,
+                   const struct vsx_netaddress *addr)
+{
+        VsxConversation *conversation =
+                vsx_conversation_set_generate_conversation(set,
+                                                           "en",
+                                                           addr);
+
+        vsx_conversation_add_player(conversation, "Zamenhof");
+
+        struct check_tile_data_closure closure = {
+                .succeeded = true,
+                .listener = {
+                        .notify = check_tile_data_cb,
+                },
+        };
+
+        vsx_signal_add(&conversation->changed_signal,
+                       &closure.listener);
+
+        bool ret = true;
+
+        if (!using_english_tiles(conversation)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Nothing should happen if we set the same language again */
+        if (!set_tile_data_no_event(conversation, "en", &closure)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!set_tile_data_and_check_event(conversation, "eo", &closure)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!turned_tiles_contain_letter(conversation, "Ĉ")) {
+                ret = false;
+                goto out;
+        }
+
+        /* Setting the tile data after the conversation has started
+         * shouldn’t do anything.
+         */
+        if (!set_tile_data_no_event(conversation, "en", &closure)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
+        vsx_object_unref(conversation);
+
+        return ret;
+}
+
 static bool
 run_tests(VsxConversationSet *set)
 {
@@ -371,6 +571,11 @@ run_tests(VsxConversationSet *set)
                 goto out;
         }
 
+        if (!test_set_tile_data(set, &addr)) {
+                ret = false;
+                goto out;
+        }
+
 out:
         vsx_object_unref(conversation);
         return ret;
@@ -387,6 +592,8 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         vsx_object_unref(set);
+
+        vsx_main_context_free(vsx_main_context_get_default(NULL /* error */));
 
         return ret;
 }

@@ -309,31 +309,13 @@ shuffle_tiles (VsxConversation *self)
     }
 }
 
-VsxConversation *
-vsx_conversation_new (VsxConversationId id,
-                      const VsxTileData *tile_data)
+static void
+init_tile_data (VsxConversation *self)
 {
-  VsxConversation *self = vsx_calloc (sizeof *self);
-  const char *t;
-  int i;
-
-  vsx_object_init (self, &vsx_conversation_class);
-
-  self->hash_entry.id = id;
-
-  self->log_id = next_log_id++;
-  self->n_tiles_in_play = 0;
-  self->total_n_tiles = VSX_TILE_DATA_N_TILES;
-
-  vsx_signal_init (&self->changed_signal);
-
-  vsx_buffer_init (&self->messages);
-
-  self->state = VSX_CONVERSATION_AWAITING_START;
-
   /* Initialise the tile data with the letters */
-  t = tile_data->letters;
-  for (i = 0; i < VSX_TILE_DATA_N_TILES; i++)
+  const char *t = self->tile_data->letters;
+
+  for (int i = 0; i < VSX_TILE_DATA_N_TILES; i++)
     {
       const char *t_next = vsx_utf8_next (t);
 
@@ -352,6 +334,28 @@ vsx_conversation_new (VsxConversationId id,
 
   /* Shuffle the tiles */
   shuffle_tiles (self);
+}
+
+VsxConversation *
+vsx_conversation_new (VsxConversationId id,
+                      const VsxTileData *tile_data)
+{
+  VsxConversation *self = vsx_calloc (sizeof *self);
+
+  vsx_object_init (self, &vsx_conversation_class);
+
+  self->hash_entry.id = id;
+
+  self->log_id = next_log_id++;
+  self->n_tiles_in_play = 0;
+  self->total_n_tiles = VSX_TILE_DATA_N_TILES;
+  self->tile_data = tile_data;
+
+  vsx_signal_init (&self->changed_signal);
+
+  vsx_buffer_init (&self->messages);
+
+  self->state = VSX_CONVERSATION_AWAITING_START;
 
   return self;
 }
@@ -380,6 +384,29 @@ vsx_conversation_set_n_tiles (VsxConversation *conversation,
       vsx_conversation_changed (conversation,
                                 VSX_CONVERSATION_N_TILES_CHANGED);
     }
+}
+
+void
+vsx_conversation_set_tile_data (VsxConversation *conversation,
+                                unsigned int player_num,
+                                const VsxTileData *tile_data)
+{
+  VsxPlayer *player = conversation->players[player_num];
+
+  /* Ignore attempts from players that have left */
+  if (!vsx_player_is_connected (player))
+    return;
+
+  /* Don't let the tile data change once the game has started */
+  if (conversation->state != VSX_CONVERSATION_AWAITING_START)
+    return;
+
+  if (conversation->tile_data == tile_data)
+    return;
+
+  conversation->tile_data = tile_data;
+
+  vsx_conversation_changed (conversation, VSX_CONVERSATION_TILE_DATA_CHANGED);
 }
 
 static bool
@@ -467,6 +494,12 @@ vsx_conversation_turn (VsxConversation *conversation,
   /* Ignore turns if all of the tiles are already in */
   if (conversation->n_tiles_in_play >= conversation->total_n_tiles)
     return;
+
+  /* The bag is filled with tiles just before the first turn so that
+   * the tile data can be changed up until the game starts.
+   */
+  if (is_first_turn)
+    init_tile_data (conversation);
 
   tile = conversation->tiles + conversation->n_tiles_in_play;
 
