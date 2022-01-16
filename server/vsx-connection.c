@@ -32,13 +32,6 @@
 #include "vsx-base64.h"
 #include "vsx-util.h"
 
-/* VsxConnection specifically handles connections using the WebSocket
- * protocol. Connections via the HTTP protocol use an HTTP parser
- * instead. The weird name is because eventually the HTTP part is
- * expected to be removed and VsxConnection will be the only type of
- * connection.
- */
-
 typedef enum
 {
   VSX_CONNECTION_STATE_READING_WS_HEADERS,
