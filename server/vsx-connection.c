@@ -46,9 +46,10 @@ typedef enum
   VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID = (1 << 2),
   VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID = (1 << 3),
   VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 4),
-  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 5),
-  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 6),
-  VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR = (1 << 7),
+  VSX_CONNECTION_DIRTY_FLAG_LANGUAGE = (1 << 5),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT = (1 << 6),
+  VSX_CONNECTION_DIRTY_FLAG_SYNC = (1 << 7),
+  VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR = (1 << 8),
 } VsxConnectionDirtyFlag;
 
 struct _VsxConnection
@@ -146,6 +147,10 @@ conversation_changed_cb (struct vsx_listener *listener,
       conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
       break;
 
+    case VSX_CONVERSATION_TILE_DATA_CHANGED:
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LANGUAGE;
+      break;
+
     case VSX_CONVERSATION_PLAYER_CHANGED:
       vsx_bitmask_set (conn->dirty_players, data->num, true);
       break;
@@ -173,6 +178,7 @@ start_following_person (VsxConnection *conn)
   conn->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID
                         | VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID
                         | VSX_CONNECTION_DIRTY_FLAG_N_TILES
+                        | VSX_CONNECTION_DIRTY_FLAG_LANGUAGE
                         | VSX_CONNECTION_DIRTY_FLAG_SYNC);
 
   vsx_bitmask_set_range (conn->dirty_tiles,
@@ -1158,6 +1164,25 @@ write_n_tiles (VsxConnection *conn,
 }
 
 static int
+write_language (VsxConnection *conn,
+                uint8_t *buffer,
+                size_t buffer_size)
+{
+  const char *language_code =
+    conn->person->conversation->tile_data->language_code;
+
+  return vsx_proto_write_command (buffer,
+                                  buffer_size,
+
+                                  VSX_PROTO_LANGUAGE,
+
+                                  VSX_PROTO_TYPE_STRING,
+                                  language_code,
+
+                                  VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_pending_shout (VsxConnection *conn,
                      uint8_t *buffer,
                      size_t buffer_size)
@@ -1242,6 +1267,7 @@ vsx_connection_fill_output_buffer (VsxConnection *conn,
       { VSX_CONNECTION_DIRTY_FLAG_PLAYER_ID, write_player_id },
       { VSX_CONNECTION_DIRTY_FLAG_CONVERSATION_ID, write_conversation_id },
       { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
+      { VSX_CONNECTION_DIRTY_FLAG_LANGUAGE, write_language },
       { .func = write_player_name },
       { .func = write_player },
       { VSX_CONNECTION_DIRTY_FLAG_PENDING_SHOUT, write_pending_shout },

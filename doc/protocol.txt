@@ -209,6 +209,15 @@ before the game starts it will also be resent. Note that it is not
 sent while the game is in progress. The argument is a single integer
 specifying the number of tiles.
 
+LANGUAGE (0x0c)
+---------------
+
+• string language_code
+
+This will be sent after N_TILES to specify the language of the tile
+set used in the game. If any player sends SET_LANGUAGE before the game
+starts it will also be resent.
+
 TILE (0x03)
 -----------
 

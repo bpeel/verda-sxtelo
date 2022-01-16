@@ -72,6 +72,7 @@
 #define VSX_PROTO_BAD_PLAYER_ID 0x09
 #define VSX_PROTO_CONVERSATION_ID 0x0a
 #define VSX_PROTO_BAD_CONVERSATION_ID 0x0b
+#define VSX_PROTO_LANGUAGE 0x0c
 
 enum vsx_proto_type {
         VSX_PROTO_TYPE_UINT8,

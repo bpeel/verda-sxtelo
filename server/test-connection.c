@@ -510,6 +510,66 @@ read_n_tiles (VsxConnection *conn,
 }
 
 static bool
+read_language_code (VsxConnection *conn,
+                    const char *expected_language_code)
+{
+  size_t code_length = strlen (expected_language_code);
+  size_t buf_length = 1 + 1 + 1 + code_length + 1;
+  uint8_t *buf = alloca (buf_length);
+
+  size_t got = vsx_connection_fill_output_buffer (conn, buf, buf_length);
+
+  if (got != buf_length)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read language_code\n",
+               got,
+               buf_length);
+      return false;
+    }
+
+  if (buf[2] != VSX_PROTO_LANGUAGE)
+    {
+      fprintf (stderr,
+               "Expected LANGUAGE command but received 0x%02x\n",
+               buf[2]);
+      return false;
+    }
+
+  if (buf[1] != buf_length - 2)
+    {
+      fprintf (stderr,
+               "Expected language command of length %zu but got %i\n",
+               buf_length - 2,
+               buf[1]);
+      return false;
+    }
+
+  if (buf[buf_length - 1] != '\0')
+    {
+      fprintf (stderr,
+               "String in language event is not null terminated.\n");
+      return false;
+    }
+
+  const char *actual_language_code = (const char *) buf + 3;
+
+  if (strcmp (actual_language_code, expected_language_code))
+    {
+      fprintf (stderr,
+               "Language code in language message is wrong.\n"
+               " Expected: %s\n"
+               " Received: %s\n",
+               expected_language_code,
+               actual_language_code);
+      return false;
+    }
+
+  return true;
+}
+
+static bool
 read_conversation_id (VsxConnection *conn,
                       uint64_t *conversation_id_out)
 {
@@ -670,6 +730,9 @@ read_connect_header (VsxConnection *conn,
     return false;
 
   if (!read_n_tiles (conn, NULL /* n_tiles_out */))
+    return false;
+
+  if (!read_language_code (conn, "eo"))
     return false;
 
   if (!read_player_name (conn,
@@ -2279,6 +2342,7 @@ join_conversation_by_id (Harness *harness,
                        NULL /* player_num_out */)
       || !read_conversation_id (other_conn, &new_conversation_id)
       || !read_n_tiles (other_conn, NULL /* n_tiles_out */)
+      || !read_language_code (other_conn, "eo")
       || !read_player_name (other_conn,
                             0, /* expected_player_num */
                             "Zamenhof")
