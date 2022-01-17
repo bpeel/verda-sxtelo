@@ -719,6 +719,47 @@ read_player (VsxConnection *conn,
 }
 
 static bool
+read_sync (VsxConnection *conn)
+{
+  uint8_t buf[3];
+  uint8_t *large_buf = vsx_alloc(1024);
+
+  size_t got = vsx_connection_fill_output_buffer (conn,
+                                                  buf,
+                                                  sizeof buf);
+
+  bool ret = true;
+
+  if (got != sizeof buf)
+    {
+      fprintf (stderr,
+               "Only got %zu bytes out of %zu "
+               "when trying to read the sync\n",
+               got,
+               sizeof buf);
+      ret = false;
+    }
+  else if (buf[2] != VSX_PROTO_SYNC)
+    {
+      fprintf (stderr,
+               "Expected sync command but received 0x%02x\n",
+               buf[2]);
+      ret = false;
+    }
+  else if (vsx_connection_fill_output_buffer (conn,
+                                              large_buf,
+                                              1024) != 0)
+    {
+      fprintf (stderr, "Unexpected data after sync command\n");
+      ret = false;
+    }
+
+  vsx_free (large_buf);
+
+  return ret;
+}
+
+static bool
 read_connect_header (VsxConnection *conn,
                      uint64_t *person_id_out,
                      uint8_t *player_num_out)
@@ -1972,38 +2013,8 @@ test_sync (void)
     }
   else
     {
-      uint8_t buf[3];
-      uint8_t *large_buf = vsx_alloc(1024);
-
-      size_t got = vsx_connection_fill_output_buffer (harness->conn,
-                                                      buf,
-                                                      sizeof buf);
-
-      if (got != sizeof buf)
-        {
-          fprintf (stderr,
-                   "Only got %zu bytes out of %zu "
-                   "when trying to read the sync\n",
-                   got,
-                   sizeof buf);
-          ret = false;
-        }
-      else if (buf[2] != VSX_PROTO_SYNC)
-        {
-          fprintf (stderr,
-                   "Expected sync command but received 0x%02x\n",
-                   buf[2]);
-          ret = false;
-        }
-      else if (vsx_connection_fill_output_buffer (harness->conn,
-                                                  large_buf,
-                                                  1024) != 0)
-        {
-          fprintf (stderr, "Unexpected data after sync command\n");
-          ret = false;
-        }
-
-      vsx_free (large_buf);
+      if (!read_sync (harness->conn))
+        ret = false;
 
       vsx_object_unref (person);
     }
