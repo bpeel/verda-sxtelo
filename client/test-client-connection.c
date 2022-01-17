@@ -1785,6 +1785,43 @@ out:
 }
 
 static bool
+test_set_language(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_connection_set_language(harness->connection, "en");
+        vsx_connection_set_language(harness->connection,
+                                    "really_excessively_long_language_code");
+        vsx_connection_set_language(harness->connection, "fr");
+
+        const uint8_t expected_data[] =
+                "\x82\x04\x8e" "fr\x0";
+
+        if (!expect_data(harness, expected_data, sizeof expected_data - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        if (fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection sent more data after set_language "
+                        "command\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_send_all_tiles(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2687,6 +2724,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_set_n_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_set_language())
                 ret = EXIT_FAILURE;
 
         if (!test_send_all_tiles())

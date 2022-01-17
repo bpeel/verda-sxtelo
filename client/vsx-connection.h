@@ -197,6 +197,10 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
                            int n_tiles);
 
 void
+vsx_connection_set_language(struct vsx_connection *connection,
+                            const char *language);
+
+void
 vsx_connection_send_message(struct vsx_connection *connection,
                             const char *message);
 

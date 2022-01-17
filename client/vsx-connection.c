@@ -54,6 +54,7 @@ enum vsx_connection_dirty_flag {
         VSX_CONNECTION_DIRTY_FLAG_SHOUT = (1 << 4),
         VSX_CONNECTION_DIRTY_FLAG_TURN = (1 << 5),
         VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 6),
+        VSX_CONNECTION_DIRTY_FLAG_LANGUAGE = (1 << 7),
 };
 
 typedef int
@@ -156,6 +157,8 @@ struct vsx_connection {
         struct vsx_list messages_to_send;
         /* The n_tiles value that is queued to send to the server */
         int n_tiles_to_send;
+        /* The language code that is queued to send to the server */
+        char language_to_send[8];
 
         int sock;
 
@@ -275,6 +278,19 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
 {
         connection->n_tiles_to_send = n_tiles;
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
+
+        update_poll(connection);
+}
+
+void
+vsx_connection_set_language(struct vsx_connection *connection,
+                            const char *language_code)
+{
+        size_t max_len = VSX_N_ELEMENTS(connection->language_to_send) - 1;
+
+        strncpy(connection->language_to_send, language_code, max_len);
+        connection->language_to_send[max_len] = '\0';
+        connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LANGUAGE;
 
         update_poll(connection);
 }
@@ -1113,6 +1129,21 @@ write_n_tiles(struct vsx_connection *connection,
 }
 
 static int
+write_language(struct vsx_connection *connection,
+               uint8_t *buffer, size_t buffer_size)
+{
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_SET_LANGUAGE,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->language_to_send,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_leave(struct vsx_connection *connection,
             uint8_t *buffer, size_t buffer_size)
 {
@@ -1252,6 +1283,7 @@ write_one_item(struct vsx_connection *connection)
                 { VSX_CONNECTION_DIRTY_FLAG_HEADER, write_header },
                 { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
                 { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
+                { VSX_CONNECTION_DIRTY_FLAG_LANGUAGE, write_language },
                 { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
                 { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
                 { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
