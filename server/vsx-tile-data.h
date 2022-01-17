@@ -21,7 +21,7 @@
 
 #include "vsx-tile.h"
 
-#define VSX_TILE_DATA_N_ROOMS 2
+#define VSX_TILE_DATA_N_ROOMS 3
 #define VSX_TILE_DATA_N_TILES 122
 
 typedef struct

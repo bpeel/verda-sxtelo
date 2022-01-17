@@ -60,7 +60,8 @@ using_esperanto_tiles(VsxConversation *conversation)
 static bool
 using_english_tiles(VsxConversation *conversation)
 {
-        if (strstr(conversation->tile_data->letters, "W"))
+        if (strstr(conversation->tile_data->letters, "W")
+            && !strcmp(conversation->tile_data->language_code, "en"))
                 return true;
 
         fprintf(stderr,
@@ -71,8 +72,23 @@ using_english_tiles(VsxConversation *conversation)
 }
 
 static bool
-turned_tiles_contain_letter(VsxConversation *conversation,
-                            const char *letter)
+using_french_tiles(VsxConversation *conversation)
+{
+        if (strstr(conversation->tile_data->letters, "C")
+            && !strcmp(conversation->tile_data->language_code, "fr"))
+                return true;
+
+        fprintf(stderr,
+                "The conversation doesn’t seem to be using the "
+                "French tile set.\n");
+
+        return false;
+}
+
+static int
+check_letter_count_in_turned_tiles(VsxConversation *conversation,
+                                   const char *letter,
+                                   int expected_count)
 {
         /* Turn a tile to ensure the game has started */
         vsx_conversation_turn(conversation, 0);
@@ -84,16 +100,26 @@ turned_tiles_contain_letter(VsxConversation *conversation,
                 return false;
         }
 
+        int count = 0;
+
         for (int i = 0; i < VSX_N_ELEMENTS(conversation->tiles); i++) {
                 if (!strcmp(conversation->tiles[i].letter, letter))
-                        return true;
+                        count++;
         }
 
-        fprintf(stderr,
-                "The tile data doesn’t contain the letter %s\n",
-                letter);
+        if (count != expected_count) {
+                fprintf(stderr,
+                        "The tile data contains the wrong number of tiles with "
+                        "the letter %s\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        letter,
+                        expected_count,
+                        count);
+                return false;
+        }
 
-        return false;
+        return true;
 }
 
 static bool
@@ -222,7 +248,38 @@ test_generate_english_conversation(VsxConversationSet *set,
 
         vsx_conversation_add_player(conversation, "Zamenhof");
 
-        if (!turned_tiles_contain_letter(conversation, "W")) {
+        if (!check_letter_count_in_turned_tiles(conversation, "W", 2)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_object_unref(conversation);
+        return ret;
+}
+
+static bool
+test_generate_french_conversation(VsxConversationSet *set,
+                                  const struct vsx_netaddress *addr)
+{
+        VsxConversation *conversation =
+                vsx_conversation_set_generate_conversation(set, "fr", addr);
+
+        bool ret = true;
+
+        if (!using_french_tiles(conversation)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!test_get_by_id(set, conversation)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_conversation_add_player(conversation, "Zamenhof");
+
+        if (!check_letter_count_in_turned_tiles(conversation, "W", 1)) {
                 ret = false;
                 goto out;
         }
@@ -250,7 +307,7 @@ test_no_language_code(VsxConversationSet *set,
 
         vsx_conversation_add_player(conversation, "Zamenhof");
 
-        if (!turned_tiles_contain_letter(conversation, "Ĉ")) {
+        if (!check_letter_count_in_turned_tiles(conversation, "Ĥ", 1)) {
                 ret = false;
                 goto out;
         }
@@ -477,7 +534,7 @@ test_set_tile_data(VsxConversationSet *set,
                 goto out;
         }
 
-        if (!turned_tiles_contain_letter(conversation, "Ĉ")) {
+        if (!check_letter_count_in_turned_tiles(conversation, "Ĥ", 1)) {
                 ret = false;
                 goto out;
         }
@@ -552,6 +609,11 @@ run_tests(VsxConversationSet *set)
         }
 
         if (!test_generate_english_conversation(set, &addr)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!test_generate_french_conversation(set, &addr)) {
                 ret = false;
                 goto out;
         }
