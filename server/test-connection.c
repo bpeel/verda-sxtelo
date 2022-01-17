@@ -170,6 +170,10 @@ frame_error_tests[] =
       "Invalid set_n_tiles command received",
     },
     {
+      BIN_STR("\x82\x1\x8e"),
+      "Invalid set_language command received",
+    },
+    {
       BIN_STR("\x82\x13\x80gefault\0Zamenhof\x1b\0"),
       "Client sent an invalid player name",
     },
@@ -1995,6 +1999,116 @@ test_set_n_tiles (void)
 }
 
 static bool
+test_set_language (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  VsxPerson *person;
+  bool ret = true;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = false;
+    }
+  else
+    {
+      struct vsx_error *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (uint8_t *) "\x82\x4\x8e" "en\x0",
+                                      6,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_set_language: Unexpected error: %s\n",
+                   error->message);
+          vsx_error_free (error);
+          ret = false;
+        }
+      else if (strcmp(person->conversation->tile_data->language_code, "en"))
+        {
+          fprintf (stderr,
+                   "test_set_language: failed to set tile_data "
+                   "(%s != en)\n",
+                   person->conversation->tile_data->language_code);
+          ret = false;
+        }
+      else if (!read_language_code (harness->conn, "en"))
+        {
+          ret = false;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
+static bool
+test_set_unknown_language (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  VsxPerson *person;
+  bool ret = true;
+
+  if (!create_player (harness,
+                      "default:eo", "Zamenhof",
+                      &person))
+    {
+      ret = false;
+    }
+  else
+    {
+      struct vsx_error *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (uint8_t *) "\x82\x4\x8e" "zh\x0",
+                                      6,
+                                      &error))
+        {
+          fprintf (stderr,
+                   "test_set_unknown_language: Unexpected error: %s\n",
+                   error->message);
+          vsx_error_free (error);
+          ret = false;
+        }
+      else if (strcmp(person->conversation->tile_data->language_code, "eo"))
+        {
+          fprintf (stderr,
+                   "test_set_unknown_language: language changed "
+                   "(%s != eo)\n",
+                   person->conversation->tile_data->language_code);
+          ret = false;
+        }
+      else
+        {
+          /* Nothing should have changed so no LANGUAGE message should
+           * be send. Instead we should get the SYNC message.
+           */
+          if (!read_sync (harness->conn))
+            ret = false;
+        }
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
+static bool
 test_sync (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -2544,6 +2658,12 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_set_n_tiles ())
+    ret = EXIT_FAILURE;
+
+  if (!test_set_language ())
+    ret = EXIT_FAILURE;
+
+  if (!test_set_unknown_language ())
     ret = EXIT_FAILURE;
 
   if (!test_sync ())

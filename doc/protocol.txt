@@ -164,6 +164,17 @@ only have any effect if it is called before the game starts. It will
 cause a “n_tiles” message to be sent to every player. The value will
 be clamped to the range 0 to 122.
 
+SET_LANGUAGE (0x8E)
+-------------------
+
+• string language_code
+
+Sets the language of the tile set that will be used for this game.
+This will only have any effect if it is called before the game starts.
+It will cause a “language” message to be sent to every player. If the
+language code isn’t known to the server then the message will be
+silently ignored.
+
 Messages to the client
 ======================
 

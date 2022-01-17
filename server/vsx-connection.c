@@ -746,6 +746,46 @@ handle_set_n_tiles (VsxConnection *conn,
 }
 
 static bool
+handle_set_language (VsxConnection *conn,
+                     struct vsx_error **error)
+{
+  const char *language_code;
+
+  if (!vsx_proto_read_payload (conn->message_data + 1,
+                               conn->message_data_length - 1,
+
+                               VSX_PROTO_TYPE_STRING,
+                               &language_code,
+
+                               VSX_PROTO_TYPE_NONE))
+    {
+      vsx_set_error (error,
+                     &vsx_connection_error,
+                     VSX_CONNECTION_ERROR_INVALID_PROTOCOL,
+                     "Invalid set_language command received");
+      return false;
+    }
+
+  if (!activate_person (conn, error))
+    return false;
+
+  const VsxTileData *tile_data =
+    vsx_tile_data_get_for_language_code (language_code);
+
+  if (tile_data == NULL)
+    {
+      /* Silently ignore requests for a language that we don’t recognise */
+      return true;
+    }
+
+  vsx_conversation_set_tile_data (conn->person->conversation,
+                                  conn->person->player->num,
+                                  tile_data);
+
+  return true;
+}
+
+static bool
 process_message (VsxConnection *conn,
                  struct vsx_error **error)
 {
@@ -788,6 +828,8 @@ process_message (VsxConnection *conn,
       return handle_shout (conn, error);
     case VSX_PROTO_SET_N_TILES:
       return handle_set_n_tiles (conn, error);
+    case VSX_PROTO_SET_LANGUAGE:
+      return handle_set_language (conn, error);
     }
 
   vsx_set_error (error,
