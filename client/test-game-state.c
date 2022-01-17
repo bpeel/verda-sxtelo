@@ -1519,6 +1519,16 @@ test_send_commands(void)
                 goto out;
         }
 
+        vsx_game_state_set_language(harness->game_state, "fr");
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x04\x8e" "fr\x0",
+                         6)) {
+                ret = false;
+                goto out;
+        }
+
 out:
         free_harness(harness);
         return ret;

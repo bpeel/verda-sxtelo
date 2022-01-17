@@ -496,6 +496,15 @@ vsx_game_state_set_n_tiles(struct vsx_game_state *game_state,
 }
 
 void
+vsx_game_state_set_language(struct vsx_game_state *game_state,
+                            const char *language_code)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_set_language(game_state->connection, language_code);
+        vsx_worker_unlock(game_state->worker);
+}
+
+void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y)
