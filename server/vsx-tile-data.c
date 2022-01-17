@@ -20,6 +20,8 @@
 
 #include "vsx-tile-data.h"
 
+#include <string.h>
+
 const VsxTileData
 vsx_tile_data[VSX_TILE_DATA_N_ROOMS] =
   {
@@ -34,3 +36,15 @@ vsx_tile_data[VSX_TILE_DATA_N_ROOMS] =
       "OOOOOOPPQRRRRRRSSSSTTTTTTUUUUVVWWXYYZNILRUIATCNUENOIEBYOEVASS"
     },
   };
+
+const VsxTileData *
+vsx_tile_data_get_for_language_code (const char *language_code)
+{
+  for (int i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+    {
+      if (!strcmp (vsx_tile_data[i].language_code, language_code))
+        return vsx_tile_data + i;
+    }
+
+  return NULL;
+}

@@ -33,4 +33,7 @@ typedef struct
 extern const VsxTileData
 vsx_tile_data[VSX_TILE_DATA_N_ROOMS];
 
+const VsxTileData *
+vsx_tile_data_get_for_language_code (const char *language_code);
+
 #endif /* VSX_TILE_DATA_H */

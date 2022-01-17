@@ -185,15 +185,16 @@ get_tile_data_for_room_name (const char *room_name)
 static const VsxTileData *
 get_tile_data_for_language_code (const char *language_code)
 {
-  /* Look for some tile data for the corresponding language code */
-  for (int i = 0; i < VSX_TILE_DATA_N_ROOMS; i++)
+  const VsxTileData *tile_data =
+    vsx_tile_data_get_for_language_code (language_code);
+
+  if (tile_data == NULL)
     {
-      if (!strcmp (vsx_tile_data[i].language_code, language_code))
-        return vsx_tile_data + i;
+      /* No language found, just use the first one */
+      return vsx_tile_data;
     }
 
-  /* No language found, just use the first one */
-  return vsx_tile_data;
+  return tile_data;
 }
 
 VsxConversationSet *
