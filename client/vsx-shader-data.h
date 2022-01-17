@@ -30,6 +30,7 @@ vsx_shader_data_error;
 
 enum vsx_shader_data_program {
         VSX_SHADER_DATA_PROGRAM_TEXTURE,
+        VSX_SHADER_DATA_PROGRAM_SOLID,
         VSX_SHADER_DATA_PROGRAM_LAYOUT,
         VSX_SHADER_DATA_N_PROGRAMS
 };

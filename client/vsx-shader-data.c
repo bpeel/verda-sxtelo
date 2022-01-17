@@ -60,6 +60,16 @@ vsx_shader_data_shaders[] = {
                 (const char *[]) { "vsx-layout-fragment.glsl", NULL },
                 { VSX_SHADER_DATA_PROGRAM_LAYOUT, PROGRAMS_END }
         },
+        {
+                GL_FRAGMENT_SHADER,
+                (const char *[]) { "vsx-solid-fragment.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_SOLID, PROGRAMS_END }
+        },
+        {
+                GL_VERTEX_SHADER,
+                (const char *[]) { "vsx-solid-vertex.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_SOLID, PROGRAMS_END }
+        },
 };
 
 static GLuint
