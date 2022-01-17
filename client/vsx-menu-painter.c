@@ -92,13 +92,6 @@ enum menu_image {
 #define LONG_GAME_THRESHOLD ((SHORT_GAME_N_TILES + LONG_GAME_N_TILES) / 2)
 
 static bool
-menu_visible(struct vsx_menu_painter *painter)
-{
-        return vsx_game_state_get_dialog(painter->game_state)
-                == VSX_DIALOG_MENU;
-}
-
-static bool
 is_long_game(struct vsx_menu_painter *painter)
 {
         return (vsx_game_state_get_n_tiles(painter->game_state) >=
@@ -116,15 +109,10 @@ modified_cb(struct vsx_listener *listener,
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
-        case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-                break;
         case VSX_GAME_STATE_MODIFIED_TYPE_N_TILES:
                 painter->vertices_dirty = true;
 
-                if (menu_visible(painter))
-                        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
         default:
                 break;
@@ -217,8 +205,7 @@ texture_load_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, painter->tex);
 
-        if (menu_visible(painter))
-            vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static void
@@ -297,6 +284,14 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
 
+        struct vsx_image_loader *image_loader =
+                painter->toolbox->image_loader;
+
+        painter->image_token = vsx_image_loader_load(image_loader,
+                                                     "menu.mpng",
+                                                     texture_load_cb,
+                                                     painter);
+
         return painter;
 }
 
@@ -321,9 +316,6 @@ static bool
 handle_click(struct vsx_menu_painter *painter,
              const struct vsx_input_event *event)
 {
-        if (!menu_visible(painter))
-                return false;
-
         ensure_layout(painter);
 
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
@@ -467,32 +459,12 @@ ensure_vertices(struct vsx_menu_painter *painter)
 }
 
 static void
-start_image_load(struct vsx_menu_painter *painter)
-{
-        if (painter->tex || painter->image_token)
-                return;
-
-        struct vsx_image_loader *image_loader =
-                painter->toolbox->image_loader;
-
-        painter->image_token = vsx_image_loader_load(image_loader,
-                                                     "menu.mpng",
-                                                     texture_load_cb,
-                                                     painter);
-}
-
-static void
 paint_cb(void *painter_data)
 {
         struct vsx_menu_painter *painter = painter_data;
 
-        if (!menu_visible(painter))
+        if (painter->tex == 0)
                 return;
-
-        if (painter->tex == 0) {
-                start_image_load(painter);
-                return;
-        }
 
         ensure_layout(painter);
 

@@ -65,13 +65,6 @@ struct vertex {
 #define N_QUADS 1
 #define N_VERTICES (N_QUADS * 4)
 
-static bool
-invite_visible(struct vsx_invite_painter *painter)
-{
-        return vsx_game_state_get_dialog(painter->game_state)
-                == VSX_DIALOG_INVITE_LINK;
-}
-
 static void
 modified_cb(struct vsx_listener *listener,
             void *user_data)
@@ -84,10 +77,6 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID:
-                if (invite_visible(painter))
-                        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-                break;
-        case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
         default:
@@ -332,9 +321,6 @@ paint_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        if (!invite_visible(painter))
-                return;
-
         uint64_t conversation_id;
 
         if (vsx_game_state_get_conversation_id(painter->game_state,
@@ -377,12 +363,9 @@ input_event_cb(void *painter_data,
                 return false;
 
         case VSX_INPUT_EVENT_TYPE_CLICK:
-                if (invite_visible(painter)) {
-                        vsx_game_state_set_dialog(painter->game_state,
-                                                  VSX_DIALOG_NONE);
-                        return true;
-                }
-                return false;
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_NONE);
+                return true;
         }
 
         return false;
