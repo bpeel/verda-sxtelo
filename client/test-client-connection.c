@@ -116,6 +116,10 @@ frame_error_tests[] = {
                 "The server sent an invalid n_tiles command"
         },
         {
+                BIN_STR("\x82\x04\x0cĉĉ"),
+                "The server sent an invalid language command"
+        },
+        {
                 BIN_STR("\x82\x09\x01\x00ghijklm"),
                 "The server sent an invalid message command"
         },
@@ -1273,6 +1277,48 @@ test_send_n_tiles(void)
                          VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
                          check_n_tiles_changed_cb,
                          (const uint8_t *) "\x82\x02\x02\x42", 4,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+check_language_changed_cb(struct harness *harness,
+                          const struct vsx_connection_event *event,
+                          void *user_data)
+{
+        if (strcmp(event->language_changed.code, "fr")) {
+                fprintf(stderr,
+                        "language in event has unexpected value\n"
+                        " Expected: fr\n"
+                        " Received: %s\n",
+                        event->language_changed.code);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_send_language(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED,
+                         check_language_changed_cb,
+                         (const uint8_t *) "\x82\x04\x0C" "fr\x00", 6,
                          NULL /* user_data */)) {
                 ret = false;
                 goto out;
@@ -2700,6 +2746,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_send_n_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_language())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())

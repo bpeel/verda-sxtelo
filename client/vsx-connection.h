@@ -48,6 +48,7 @@ enum vsx_connection_event_type {
         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
         VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
+        VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
         VSX_CONNECTION_EVENT_TYPE_END,
         VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
@@ -108,6 +109,10 @@ struct vsx_connection_event {
                 struct {
                         int n_tiles;
                 } n_tiles_changed;
+
+                struct {
+                        const char *code;
+                } language_changed;
 
                 struct {
                         bool running;

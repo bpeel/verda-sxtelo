@@ -406,6 +406,40 @@ handle_n_tiles(struct vsx_connection *connection,
 }
 
 static bool
+handle_language(struct vsx_connection *connection,
+                const uint8_t *payload,
+                size_t payload_length,
+                struct vsx_error **error)
+{
+        const char *language_code;
+
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_STRING,
+                                    &language_code,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid language command");
+                return false;
+        }
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED,
+                .language_changed = {
+                        .code = language_code,
+                },
+        };
+
+        emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
 handle_message(struct vsx_connection *connection,
                const uint8_t *payload,
                size_t payload_length,
@@ -723,6 +757,10 @@ process_message(struct vsx_connection *connection,
                 return handle_n_tiles(connection,
                                       payload, payload_length,
                                       error);
+        case VSX_PROTO_LANGUAGE:
+                return handle_language(connection,
+                                       payload, payload_length,
+                                       error);
         case VSX_PROTO_MESSAGE:
                 return handle_message(connection,
                                       payload, payload_length,
@@ -1867,6 +1905,10 @@ vsx_connection_copy_event(struct vsx_connection_event *dest,
                 dest->player_name_changed.name =
                         vsx_strdup(src->player_name_changed.name);
                 break;
+        case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
+                dest->language_changed.code =
+                        vsx_strdup(src->language_changed.code);
+                break;
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
         case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
@@ -1892,6 +1934,9 @@ vsx_connection_destroy_event(struct vsx_connection_event *event)
                 break;
         case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
                 vsx_free((char *) event->player_name_changed.name);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
+                vsx_free((char *) event->language_changed.code);
                 break;
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
         case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
