@@ -47,6 +47,7 @@ client_common_src = [
         'vsx-qr.c',
         'vsx-quad-buffer.c',
         'vsx-shader-data.c',
+        'vsx-text.c',
         'vsx-tile-painter.c',
         'vsx-tile-texture.c',
         'vsx-worker.c',
