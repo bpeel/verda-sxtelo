@@ -1053,7 +1053,7 @@ write_create_private_game_header(struct vsx_connection *connection,
                                        VSX_PROTO_NEW_PRIVATE_GAME,
 
                                        VSX_PROTO_TYPE_STRING,
-                                       "eo", /* language code */
+                                       connection->language_to_send,
 
                                        VSX_PROTO_TYPE_STRING,
                                        connection->player_name,

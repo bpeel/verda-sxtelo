@@ -2623,8 +2623,8 @@ test_new_private_game(void)
         }
 
         if (!expect_data(harness,
-                         (const uint8_t *) "\x82\x10\x8c" "eo\0test_player\0",
-                         18)) {
+                         (const uint8_t *) "\x82\x0e\x8c\0test_player\0",
+                         16)) {
                 ret = false;
                 goto out;
         }
