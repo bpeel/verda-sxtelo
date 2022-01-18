@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2014, 2021  Neil Roberts
+ * Copyright (C) 2014, 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -245,6 +245,28 @@ get_program_name(enum vsx_shader_data_program program_num)
         return (char *) buffer.data;
 }
 
+static void
+get_uniforms(struct vsx_shader_data_program_data *program)
+{
+        program->tex_uniform =
+                vsx_gl.glGetUniformLocation(program->program, "tex");
+
+        if (program->tex_uniform != -1) {
+                vsx_gl.glUseProgram(program->program);
+                vsx_gl.glUniform1i(program->tex_uniform, 0);
+        }
+
+        program->matrix_uniform =
+                vsx_gl.glGetUniformLocation(program->program,
+                                            "transform_matrix");
+        program->translation_uniform =
+                vsx_gl.glGetUniformLocation(program->program,
+                                            "translation");
+        program->color_uniform =
+                vsx_gl.glGetUniformLocation(program->program,
+                                            "color");
+}
+
 static bool
 link_program(struct vsx_shader_data *data,
              enum vsx_shader_data_program program_num,
@@ -256,7 +278,7 @@ link_program(struct vsx_shader_data *data,
         GLuint program;
         char *program_name;
 
-        program = data->programs[program_num];
+        program = data->programs[program_num].program;
 
         vsx_gl.glBindAttribLocation(program,
                                     VSX_SHADER_DATA_ATTRIB_POSITION,
@@ -303,6 +325,8 @@ link_program(struct vsx_shader_data *data,
                 return false;
         }
 
+        get_uniforms(data->programs + program_num);
+
         return true;
 }
 
@@ -346,19 +370,19 @@ vsx_shader_data_init(struct vsx_shader_data *data,
         }
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                data->programs[i] = vsx_gl.glCreateProgram();
+                data->programs[i].program = vsx_gl.glCreateProgram();
 
         for (i = 0; i < VSX_N_ELEMENTS(shaders); i++) {
                 shader = vsx_shader_data_shaders + i;
                 for (j = 0; shader->programs[j] != PROGRAMS_END; j++) {
-                        program = data->programs[shader->programs[j]];
+                        program = data->programs[shader->programs[j]].program;
                         vsx_gl.glAttachShader(program, shaders[i]);
                 }
         }
 
         if (!link_programs(data, error)) {
                 for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                        vsx_gl.glDeleteProgram(data->programs[i]);
+                        vsx_gl.glDeleteProgram(data->programs[i].program);
                 result = false;
         }
 
@@ -375,5 +399,5 @@ vsx_shader_data_destroy(struct vsx_shader_data *data)
         int i;
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                vsx_gl.glDeleteProgram(data->programs[i]);
+                vsx_gl.glDeleteProgram(data->programs[i].program);
 }

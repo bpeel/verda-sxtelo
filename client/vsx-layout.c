@@ -37,9 +37,8 @@ struct vsx_layout {
         struct vsx_font_library *library;
         struct vsx_font *font;
         struct vsx_array_object *vao;
+        const struct vsx_shader_data_program_data *program;
         GLuint vbo, element_buffer;
-        GLuint program;
-        GLuint matrix_uniform, translation_uniform, color_uniform;
         char *text;
         bool dirty;
         size_t buffer_size;
@@ -68,28 +67,6 @@ struct draw_call {
 
 #define VSX_LAYOUT_MINIMUM_BUFFER_SIZE 1024
 
-static void
-init_program(struct vsx_layout *layout,
-             struct vsx_shader_data *shader_data)
-{
-        layout->program =
-                shader_data->programs[VSX_SHADER_DATA_PROGRAM_LAYOUT];
-
-        GLuint tex_uniform =
-                vsx_gl.glGetUniformLocation(layout->program, "tex");
-        vsx_gl.glUseProgram(layout->program);
-        vsx_gl.glUniform1i(tex_uniform, 0);
-
-        layout->matrix_uniform =
-                vsx_gl.glGetUniformLocation(layout->program,
-                                            "transform_matrix");
-        layout->translation_uniform =
-                vsx_gl.glGetUniformLocation(layout->program,
-                                            "translation");
-        layout->color_uniform =
-                vsx_gl.glGetUniformLocation(layout->program, "color");
-}
-
 struct vsx_layout *
 vsx_layout_new(struct vsx_font_library *library,
                struct vsx_shader_data *shader_data)
@@ -101,7 +78,8 @@ vsx_layout_new(struct vsx_font_library *library,
         vsx_buffer_init(&layout->draw_calls);
         layout->width = UINT_MAX;
 
-        init_program(layout, shader_data);
+        layout->program =
+                shader_data->programs + VSX_SHADER_DATA_PROGRAM_LAYOUT;
 
         return layout;
 }
@@ -554,13 +532,13 @@ set_uniforms(struct vsx_layout *layout,
                 ty = 1.0f - y * 2.0f / paint_state->height;
         }
 
-        vsx_gl.glUniformMatrix2fv(layout->matrix_uniform,
+        vsx_gl.glUniformMatrix2fv(layout->program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
                                   matrix);
-        vsx_gl.glUniform2f(layout->translation_uniform, tx, ty);
+        vsx_gl.glUniform2f(layout->program->translation_uniform, tx, ty);
 
-        vsx_gl.glUniform3f(layout->color_uniform, r, g, b);
+        vsx_gl.glUniform3f(layout->program->color_uniform, r, g, b);
 }
 
 void
@@ -580,7 +558,7 @@ vsx_layout_paint(struct vsx_layout *layout,
         vsx_gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         vsx_gl.glEnable(GL_BLEND);
 
-        vsx_gl.glUseProgram(layout->program);
+        vsx_gl.glUseProgram(layout->program->program);
 
         set_uniforms(layout, paint_state, x, y, r, g, b);
 

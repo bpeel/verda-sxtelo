@@ -57,10 +57,6 @@ struct vsx_tile_painter {
 
         struct vsx_painter_toolbox *toolbox;
 
-        GLuint program;
-        GLint matrix_uniform;
-        GLint translation_uniform;
-
         struct vsx_array_object *vao;
         GLuint vbo;
         GLuint element_buffer;
@@ -356,26 +352,6 @@ init_tiles_cb(const struct vsx_connection_event *event,
         handle_tile_event(painter, event);
 }
 
-static void
-init_program(struct vsx_tile_painter *painter,
-             struct vsx_shader_data *shader_data)
-{
-        painter->program =
-                shader_data->programs[VSX_SHADER_DATA_PROGRAM_TEXTURE];
-
-        GLuint tex_uniform =
-                vsx_gl.glGetUniformLocation(painter->program, "tex");
-        vsx_gl.glUseProgram(painter->program);
-        vsx_gl.glUniform1i(tex_uniform, 0);
-
-        painter->matrix_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "transform_matrix");
-        painter->translation_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "translation");
-}
-
 static void *
 create_cb(struct vsx_game_state *game_state,
           struct vsx_painter_toolbox *toolbox)
@@ -390,8 +366,6 @@ create_cb(struct vsx_game_state *game_state,
         vsx_list_init(&painter->tile_list);
 
         vsx_signal_init(&painter->redraw_needed_signal);
-
-        init_program(painter, &toolbox->shader_data);
 
         painter->image_token = vsx_image_loader_load(toolbox->image_loader,
                                                      "tiles.mpng",
@@ -846,14 +820,19 @@ paint_cb(void *painter_data)
         if (n_vertices <= 0)
                 return;
 
-        vsx_gl.glUseProgram(painter->program);
+        const struct vsx_shader_data *shader_data =
+                &painter->toolbox->shader_data;
+        const struct vsx_shader_data_program_data *program =
+                shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+
+        vsx_gl.glUseProgram(program->program);
         vsx_array_object_bind(painter->vao);
 
-        vsx_gl.glUniformMatrix2fv(painter->matrix_uniform,
+        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
                                   paint_state->board_matrix);
-        vsx_gl.glUniform2f(painter->translation_uniform,
+        vsx_gl.glUniform2f(program->translation_uniform,
                            paint_state->board_translation[0],
                            paint_state->board_translation[1]);
 

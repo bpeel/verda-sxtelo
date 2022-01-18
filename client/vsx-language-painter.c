@@ -54,11 +54,6 @@ struct vsx_language_painter {
         struct vsx_game_state *game_state;
         struct vsx_painter_toolbox *toolbox;
 
-        GLuint program;
-        GLint matrix_uniform;
-        GLint translation_uniform;
-        GLint color_uniform;
-
         struct language_button buttons[N_LANGUAGES];
 
         int layout_y;
@@ -156,25 +151,6 @@ create_buffer(struct vsx_language_painter *painter)
                                        offsetof(struct vertex, x));
 }
 
-static void
-init_program(struct vsx_language_painter *painter,
-             struct vsx_shader_data *shader_data)
-{
-        painter->program =
-                shader_data->programs[VSX_SHADER_DATA_PROGRAM_SOLID];
-
-        painter->matrix_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "transform_matrix");
-        painter->translation_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "translation");
-
-        painter->color_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "color");
-}
-
 static void *
 create_cb(struct vsx_game_state *game_state,
           struct vsx_painter_toolbox *toolbox)
@@ -183,8 +159,6 @@ create_cb(struct vsx_game_state *game_state,
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
-
-        init_program(painter, &toolbox->shader_data);
 
         create_buttons(painter);
         create_buffer(painter);
@@ -260,7 +234,8 @@ input_event_cb(void *painter_data,
 }
 
 static void
-update_uniforms(struct vsx_language_painter *painter)
+update_uniforms(struct vsx_language_painter *painter,
+                const struct vsx_shader_data_program_data *program)
 {
         const struct vsx_paint_state *paint_state =
                 &painter->toolbox->paint_state;
@@ -286,13 +261,13 @@ update_uniforms(struct vsx_language_painter *painter)
                 ty = painter->total_height / (float) paint_state->height;
         }
 
-        vsx_gl.glUniformMatrix2fv(painter->matrix_uniform,
+        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
                                   matrix);
-        vsx_gl.glUniform2f(painter->translation_uniform, tx, ty);
+        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
 
-        vsx_gl.glUniform3f(painter->color_uniform, 1.0f, 1.0f, 1.0f);
+        vsx_gl.glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
 }
 
 static void
@@ -300,9 +275,14 @@ paint_cb(void *painter_data)
 {
         struct vsx_language_painter *painter = painter_data;
 
-        vsx_gl.glUseProgram(painter->program);
+        const struct vsx_shader_data *shader_data =
+                &painter->toolbox->shader_data;
+        const struct vsx_shader_data_program_data *program =
+                shader_data->programs + VSX_SHADER_DATA_PROGRAM_SOLID;
 
-        update_uniforms(painter);
+        vsx_gl.glUseProgram(program->program);
+
+        update_uniforms(painter, program);
 
         vsx_array_object_bind(painter->vao);
 

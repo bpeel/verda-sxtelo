@@ -48,8 +48,17 @@ enum vsx_shader_data_error {
         VSX_SHADER_DATA_ERROR_FILE,
 };
 
+struct vsx_shader_data_program_data {
+        GLuint program;
+        GLint matrix_uniform;
+        GLint translation_uniform;
+        GLint tex_uniform;
+        GLint color_uniform;
+};
+
 struct vsx_shader_data {
-        GLuint programs[VSX_SHADER_DATA_N_PROGRAMS];
+        struct vsx_shader_data_program_data
+        programs[VSX_SHADER_DATA_N_PROGRAMS];
 };
 
 bool

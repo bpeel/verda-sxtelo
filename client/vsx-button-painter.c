@@ -36,10 +36,6 @@ struct vsx_button_painter {
         struct vsx_game_state *game_state;
         struct vsx_painter_toolbox *toolbox;
 
-        GLuint program;
-        GLint matrix_uniform;
-        GLint translation_uniform;
-
         struct vsx_array_object *vao;
         GLuint vbo;
         GLuint element_buffer;
@@ -134,26 +130,6 @@ create_buffer(struct vsx_button_painter *painter)
                 vsx_quad_buffer_generate(painter->vao, N_QUADS);
 }
 
-static void
-init_program(struct vsx_button_painter *painter,
-             struct vsx_shader_data *shader_data)
-{
-        painter->program =
-                shader_data->programs[VSX_SHADER_DATA_PROGRAM_TEXTURE];
-
-        GLuint tex_uniform =
-                vsx_gl.glGetUniformLocation(painter->program, "tex");
-        vsx_gl.glUseProgram(painter->program);
-        vsx_gl.glUniform1i(tex_uniform, 0);
-
-        painter->matrix_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "transform_matrix");
-        painter->translation_uniform =
-                vsx_gl.glGetUniformLocation(painter->program,
-                                            "translation");
-}
-
 static void *
 create_cb(struct vsx_game_state *game_state,
           struct vsx_painter_toolbox *toolbox)
@@ -164,8 +140,6 @@ create_cb(struct vsx_game_state *game_state,
         painter->toolbox = toolbox;
 
         vsx_signal_init(&painter->redraw_needed_signal);
-
-        init_program(painter, &toolbox->shader_data);
 
         create_buffer(painter);
 
@@ -356,14 +330,19 @@ paint_cb(void *painter_data)
 
         vsx_map_buffer_unmap();
 
-        vsx_gl.glUseProgram(painter->program);
+        const struct vsx_shader_data *shader_data =
+                &painter->toolbox->shader_data;
+        const struct vsx_shader_data_program_data *program =
+                shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+
+        vsx_gl.glUseProgram(program->program);
         vsx_array_object_bind(painter->vao);
 
-        vsx_gl.glUniformMatrix2fv(painter->matrix_uniform,
+        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
                                   paint_state->button_area_matrix);
-        vsx_gl.glUniform2f(painter->translation_uniform,
+        vsx_gl.glUniform2f(program->translation_uniform,
                            paint_state->button_area_translation[0],
                            paint_state->button_area_translation[1]);
 
