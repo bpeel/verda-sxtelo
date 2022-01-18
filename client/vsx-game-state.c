@@ -79,6 +79,9 @@ struct vsx_game_state {
          */
         int n_tiles;
 
+        /* The language reported by the server */
+        enum vsx_text_language language;
+
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -152,6 +155,12 @@ int
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
 {
         return game_state->n_tiles;
+}
+
+enum vsx_text_language
+vsx_game_state_get_language(struct vsx_game_state *game_state)
+{
+        return game_state->language;
 }
 
 void
@@ -345,6 +354,32 @@ handle_n_tiles_changed(struct vsx_game_state *game_state,
 }
 
 static void
+handle_language_changed(struct vsx_game_state *game_state,
+                        const struct vsx_connection_event *event)
+{
+        enum vsx_text_language language = VSX_TEXT_LANGUAGE_ENGLISH;
+
+        for (int i = 0; i < VSX_TEXT_N_LANGUAGES; i++) {
+                if (!strcmp(event->language_changed.code,
+                            vsx_text_get(i, VSX_TEXT_LANGUAGE_CODE))) {
+                        language = i;
+                        break;
+                }
+        }
+
+        if (language == game_state->language)
+                return;
+
+        game_state->language = language;
+
+        struct vsx_game_state_modified_event m_event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
+}
+
+static void
 handle_event(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
@@ -369,6 +404,9 @@ handle_event(struct vsx_game_state *game_state,
                 break;
         case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
                 handle_n_tiles_changed(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
+                handle_language_changed(game_state, event);
                 break;
         default:
                 break;

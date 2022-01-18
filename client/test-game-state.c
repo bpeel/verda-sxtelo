@@ -1669,6 +1669,100 @@ out:
 }
 
 static bool
+check_language(struct harness *harness,
+               enum vsx_text_language expected_language)
+{
+
+        enum vsx_text_language actual_language =
+                vsx_game_state_get_language(harness->game_state);
+
+        if (actual_language != expected_language) {
+                fprintf(stderr,
+                        "Language does not match expected.\n"
+                        " Expected: %i (%s)\n"
+                        " Received: %i (%s)\n",
+                        expected_language,
+                        vsx_text_get(expected_language,
+                                     VSX_TEXT_LANGUAGE_CODE),
+                        actual_language,
+                        vsx_text_get(actual_language,
+                                     VSX_TEXT_LANGUAGE_CODE));
+                return false;
+        }
+
+        return true;
+}
+
+struct check_language_modified_closure {
+        enum vsx_text_language expected_language;
+};
+
+static bool
+check_language_modified_cb(struct harness *harness,
+                           const struct vsx_game_state_modified_event *event,
+                           void *user_data)
+{
+        const struct check_language_modified_closure *closure = user_data;
+
+        return check_language(harness, closure->expected_language);
+}
+
+static bool
+test_language(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        static const struct {
+                const char *test_message;
+                enum vsx_text_language expected_language;
+        } tests[] = {
+                { "\x82\x04\x0c" "eo", VSX_TEXT_LANGUAGE_ESPERANTO },
+                /* Unknown language should resort to English */
+                { "\x82\x04\x0c" "??", VSX_TEXT_LANGUAGE_ENGLISH },
+                { "\x82\x04\x0c" "fr", VSX_TEXT_LANGUAGE_FRENCH },
+                { "\x82\x04\x0c" "en", VSX_TEXT_LANGUAGE_ENGLISH },
+        };
+
+        for (int i = 0; i < VSX_N_ELEMENTS(tests); i++) {
+                struct check_language_modified_closure closure = {
+                        .expected_language = tests[i].expected_language,
+                };
+
+                if (!check_modified(harness,
+                                    VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
+                                    check_language_modified_cb,
+                                    (const uint8_t *) tests[i].test_message,
+                                    strlen(tests[i].test_message) + 1,
+                                    &closure)) {
+                        ret = false;
+                        goto out;
+                }
+        }
+
+        const char *last_message =
+                tests[VSX_N_ELEMENTS(tests) - 1].test_message;
+
+        /* Send the last message again and verify that it doesn’t emit
+         * a modification event.
+         */
+        if (!check_no_modification(harness,
+                                   (const uint8_t *) last_message,
+                                   strlen(last_message) + 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_dangling_events(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2116,6 +2210,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_n_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_language())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

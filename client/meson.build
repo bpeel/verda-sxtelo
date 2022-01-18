@@ -133,6 +133,7 @@ test_game_state_src = [
         'vsx-instance-state.c',
         'vsx-main-thread.c',
         'vsx-monotonic.c',
+        'vsx-text.c',
         'vsx-thread-linux.c',
         'vsx-worker.c',
 ] + connection_src

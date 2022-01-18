@@ -25,6 +25,7 @@
 #include "vsx-worker.h"
 #include "vsx-signal.h"
 #include "vsx-dialog.h"
+#include "vsx-text.h"
 
 /* This maintains a copy of the game state reported by the
  * vsx_connection so that it can be painted. The state is only
@@ -49,6 +50,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
         VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
+        VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
 };
 
 struct vsx_game_state_modified_event {
@@ -72,6 +74,9 @@ vsx_game_state_new(struct vsx_worker *worker,
  */
 int
 vsx_game_state_get_n_tiles(struct vsx_game_state *game_state);
+
+enum vsx_text_language
+vsx_game_state_get_language(struct vsx_game_state *game_state);
 
 typedef void
 (* vsx_game_state_foreach_tile_cb)(const struct vsx_connection_event *tile,
