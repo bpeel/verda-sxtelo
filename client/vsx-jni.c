@@ -56,6 +56,8 @@ struct data {
         bool has_conversation_id;
         uint64_t conversation_id;
 
+        char game_language_code[8];
+
         /* Instance state that is queued to be set on the
          * vsx_game_state when it is created. It will be freed after
          * being used. This shouldn’t be used for reading the game
@@ -205,6 +207,9 @@ configure_connection(struct data *data)
         if (data->has_conversation_id) {
                 vsx_connection_set_conversation_id(data->connection,
                                                    data->conversation_id);
+        } else if (data->game_language_code[0]) {
+                vsx_connection_set_language(data->connection,
+                                            data->game_language_code);
         }
 }
 
@@ -371,6 +376,29 @@ VSX_JNI_RENDERER_PREFIX(setInviteUrl)(JNIEnv *env,
                 data->has_conversation_id = true;
                 data->conversation_id = id;
         }
+}
+
+JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setGameLanguageCode)(JNIEnv *env,
+                                             jobject this,
+                                             jlong native_data,
+                                             jstring language_code_str)
+{
+        struct data *data = GET_DATA(native_data);
+
+        const char *language_code =
+                (*env)->GetStringUTFChars(env,
+                                          language_code_str,
+                                          NULL /* isCopy */);
+
+        strncpy(data->game_language_code,
+                language_code,
+                VSX_N_ELEMENTS(data->game_language_code));
+
+        data->game_language_code[VSX_N_ELEMENTS(data->game_language_code) - 1] =
+                '\0';
+
+        (*env)->ReleaseStringUTFChars(env, language_code_str, language_code);
 }
 
 JNIEXPORT void JNICALL

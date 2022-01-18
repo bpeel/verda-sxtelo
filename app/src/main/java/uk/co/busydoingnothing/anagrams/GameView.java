@@ -20,6 +20,7 @@ package uk.co.busydoingnothing.anagrams;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
@@ -221,6 +222,11 @@ public class GameView extends GLSurfaceView
       nativeData = createNativeData(GameView.this,
                                     getContext().getAssets(),
                                     dpi);
+
+      Resources resources = getResources();
+
+      setGameLanguageCode(nativeData,
+                          resources.getString(R.string.game_language_code));
     }
 
     @Override
@@ -253,6 +259,8 @@ public class GameView extends GLSurfaceView
     private native void setInstanceState(long nativeData, String instanceState);
     private native String getInstanceState(long nativeData);
     private native void setInviteUrl(long nativeData, String inviteUrl);
+    private native void setGameLanguageCode(long nativeData,
+                                            String languageCode);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,
                                int width, int height);
