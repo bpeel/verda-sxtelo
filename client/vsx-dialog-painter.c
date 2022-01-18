@@ -24,6 +24,7 @@
 
 #include "vsx-menu-painter.h"
 #include "vsx-invite-painter.h"
+#include "vsx-language-painter.h"
 
 struct vsx_dialog_painter {
         struct vsx_game_state *game_state;
@@ -42,6 +43,7 @@ child_painters[] = {
         [VSX_DIALOG_NONE] = NULL,
         [VSX_DIALOG_MENU] = &vsx_menu_painter,
         [VSX_DIALOG_INVITE_LINK] = &vsx_invite_painter,
+        [VSX_DIALOG_LANGUAGE] = &vsx_language_painter,
 };
 
 static void
