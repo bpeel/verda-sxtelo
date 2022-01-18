@@ -347,6 +347,8 @@ handle_click(struct vsx_menu_painter *painter,
 
         switch (x / painter->button_size) {
         case MENU_BUTTON_LANGUAGE:
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_LANGUAGE);
                 break;
         case MENU_BUTTON_SHARE:
                 vsx_game_state_set_dialog(painter->game_state,
