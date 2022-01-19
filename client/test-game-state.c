@@ -691,6 +691,7 @@ struct send_tile_closure {
         int x;
         int y;
         char letter;
+        int remaining_tiles;
 };
 
 static bool
@@ -723,12 +724,36 @@ check_tile_changed_cb(struct harness *harness,
 }
 
 static bool
+check_remaining_tiles_cb(struct harness *harness,
+                         const struct vsx_game_state_modified_event *event,
+                         void *user_data)
+{
+        struct send_tile_closure *closure = user_data;
+
+        int actual_remaining =
+                vsx_game_state_get_remaining_tiles(harness->game_state);
+
+        if (actual_remaining != closure->remaining_tiles) {
+                fprintf(stderr,
+                        "Remaining tiles does not match.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        closure->remaining_tiles,
+                        actual_remaining);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
 send_tile(struct harness *harness,
           int num,
           int x,
           int y,
           char letter,
-          uint8_t player)
+          uint8_t player,
+          int remaining_tiles)
 {
         uint8_t add_tile_message[] =
                 "\x82\x09\x03\x00\x01\x00\x02\x00g\x00\x00";
@@ -746,14 +771,25 @@ send_tile(struct harness *harness,
                 .x = x,
                 .y = y,
                 .letter = letter,
+                .remaining_tiles = remaining_tiles,
         };
 
-        return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
-                           check_tile_changed_cb,
-                           add_tile_message,
-                           sizeof add_tile_message - 1,
-                           &closure);
+        struct check_event_setup setup = {
+                .event_cb = check_tile_changed_cb,
+                .expected_event_type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
+        };
+
+        if (remaining_tiles != INT_MAX) {
+                setup.modified_cb = check_remaining_tiles_cb;
+                setup.expected_modified_type =
+                        VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES;
+        }
+
+        return check_event_or_modified(harness,
+                                       &setup,
+                                       add_tile_message,
+                                       sizeof add_tile_message - 1,
+                                       &closure);
 }
 
 struct check_tiles_closure {
@@ -823,12 +859,26 @@ test_send_all_tiles(void)
 
         bool ret = true;
 
+        /* Tell the game state how many tiles there are so that it can
+         * calculate the remaining tiles.
+         */
+        if (!write_data(harness, (const uint8_t *) "\x82\x02\x02\xff", 4) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        int max_tile = 0;
+
         /* Add all of the possible tiles */
         for (int i = 0; i < 256; i++) {
                 /* Send them in a strange order */
                 int tile_num = ((i & 0xfc) |
                                 ((i & 2) >> 1) |
                                 ((i & 1) << 1));
+
+                if (tile_num > max_tile)
+                        max_tile = tile_num;
 
                 int x = tile_num * 257;
                 if ((x & 0x8000))
@@ -839,7 +889,10 @@ test_send_all_tiles(void)
                                x,
                                (tile_num & 1) ? -tile_num : tile_num,
                                tile_num % 26 + 'A',
-                               tile_num / 2)) {
+                               tile_num / 2,
+                               tile_num == max_tile ?
+                               255 - max_tile - 1 :
+                               INT_MAX)) {
                         ret = false;
                         goto out;
                 }
@@ -851,7 +904,8 @@ test_send_all_tiles(void)
                        257,
                        -1,
                        'B',
-                       0)) {
+                       0,
+                       INT_MAX)) {
                 ret = false;
                 goto out;
         }
@@ -1613,21 +1667,69 @@ out:
         return ret;
 }
 
-static bool
-check_n_tiles_modified_cb(struct harness *harness,
-                          const struct vsx_game_state_modified_event *event,
+struct check_n_tiles_modified_closure {
+        struct vsx_listener listener;
+        struct harness *harness;
+        bool succeeded;
+        bool had_n_tiles;
+        bool had_remaining_tiles;
+};
+
+static void
+check_n_tiles_modified_cb(struct vsx_listener *listener,
                           void *user_data)
 {
+        struct check_n_tiles_modified_closure *closure =
+                vsx_container_of(listener,
+                                 struct check_n_tiles_modified_closure,
+                                 listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+        struct harness *harness = closure->harness;
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_N_TILES:
+                if (closure->had_n_tiles) {
+                        fprintf(stderr,
+                                "Received multiple n_tiles modified events\n");
+                        closure->succeeded = false;
+                }
+                closure->had_n_tiles = true;
+                break;
+        case VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES:
+                if (closure->had_remaining_tiles) {
+                        fprintf(stderr,
+                                "Received multiple remaining_tiles modified "
+                                "events\n");
+                        closure->succeeded = false;
+                }
+                closure->had_remaining_tiles = true;
+                break;
+        default:
+                fprintf(stderr,
+                        "Received unexpected modified event %i\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
         int n_tiles = vsx_game_state_get_n_tiles(harness->game_state);
 
         if (n_tiles != 5) {
                 fprintf(stderr,
                         "Expected n_tiles to be 5 but got %i\n",
                         n_tiles);
-                return false;
+                closure->succeeded = false;
         }
 
-        return true;
+        int remaining_tiles =
+                vsx_game_state_get_remaining_tiles(harness->game_state);
+
+        if (remaining_tiles != 5) {
+                fprintf(stderr,
+                        "Expected remaining_tiles to be 5 but got %i\n",
+                        remaining_tiles);
+                closure->succeeded = false;
+        }
 }
 
 static bool
@@ -1643,12 +1745,38 @@ test_n_tiles(void)
         static const uint8_t n_tiles_message[] =
                 "\x82\x02\x02\x05";
 
-        if (!check_modified(harness,
-                            VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
-                            check_n_tiles_modified_cb,
-                            n_tiles_message,
-                            sizeof n_tiles_message - 1,
-                            NULL /* user_data */)) {
+        struct check_n_tiles_modified_closure closure = {
+                .harness = harness,
+                .listener = {
+                        .notify = check_n_tiles_modified_cb,
+                },
+                .succeeded = true,
+                .had_n_tiles = false,
+                .had_remaining_tiles = false,
+        };
+
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.listener);
+
+        if (!write_data(harness, n_tiles_message, sizeof n_tiles_message - 1) ||
+            !wait_for_idle_queue(harness))
+                closure.succeeded = false;
+
+        vsx_list_remove(&closure.listener.link);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_n_tiles) {
+                fprintf(stderr, "No n_tiles modified event received\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_remaining_tiles) {
+                fprintf(stderr, "No remaining_tiles modified event received\n");
                 ret = false;
                 goto out;
         }

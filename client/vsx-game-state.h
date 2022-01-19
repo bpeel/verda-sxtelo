@@ -51,6 +51,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
         VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
         VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
+        VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
 };
 
 struct vsx_game_state_modified_event {
@@ -127,6 +128,9 @@ vsx_game_state_turn(struct vsx_game_state *game_state);
 void
 vsx_game_state_set_n_tiles(struct vsx_game_state *game_state,
                            int n_tiles);
+
+int
+vsx_game_state_get_remaining_tiles(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_set_language(struct vsx_game_state *game_state,

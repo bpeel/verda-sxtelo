@@ -157,6 +157,14 @@ vsx_game_state_get_n_tiles(struct vsx_game_state *game_state)
         return game_state->n_tiles;
 }
 
+int
+vsx_game_state_get_remaining_tiles(struct vsx_game_state *game_state)
+{
+        return (game_state->n_tiles -
+                game_state->tiles_by_index.length /
+                sizeof (struct vsx_game_state_tile *));
+}
+
 enum vsx_text_language
 vsx_game_state_get_language(struct vsx_game_state *game_state)
 {
@@ -324,6 +332,8 @@ static void
 handle_tile_changed(struct vsx_game_state *game_state,
                     const struct vsx_connection_event *event)
 {
+        size_t old_length = game_state->tiles_by_index.length;
+
         struct vsx_game_state_tile *tile =
                 get_tile_by_index(game_state, event->tile_changed.num);
 
@@ -335,6 +345,17 @@ handle_tile_changed(struct vsx_game_state *game_state,
          */
         vsx_list_remove(&tile->link);
         vsx_list_insert(game_state->tile_list.prev, &tile->link);
+
+        /* If this is a new tile then the number of tiles remaining
+         * will have changed.
+         */
+        if (old_length < game_state->tiles_by_index.length) {
+                struct vsx_game_state_modified_event m_event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &m_event);
+        }
 }
 
 static void
@@ -349,6 +370,10 @@ handle_n_tiles_changed(struct vsx_game_state *game_state,
         struct vsx_game_state_modified_event m_event = {
                 .type = VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
         };
+
+        vsx_signal_emit(&game_state->modified_signal, &m_event);
+
+        m_event.type = VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES;
 
         vsx_signal_emit(&game_state->modified_signal, &m_event);
 }
