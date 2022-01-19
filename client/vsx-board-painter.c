@@ -44,11 +44,6 @@ struct box_draw_command {
         struct box_style_draw_command styles[N_BOX_STYLES];
 };
 
-struct name_label {
-        int x, y;
-        struct vsx_layout *layout;
-};
-
 struct vsx_board_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
@@ -58,7 +53,8 @@ struct vsx_board_painter {
         struct box_draw_command box_draw_commands
         [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
 
-        struct name_label name_labels[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+        struct vsx_layout_paint_position name_labels
+        [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
         bool name_label_positions_dirty;
 
         struct vsx_array_object *vao;
@@ -729,7 +725,8 @@ update_name_label_position(struct vsx_board_painter *painter,
         else if (layout_y + extents->bottom > board_height)
                 layout_y = board_height - extents->bottom;
 
-        struct name_label *label = painter->name_labels + player_num;
+        struct vsx_layout_paint_position *label =
+                painter->name_labels + player_num;
 
         label->x = layout_x + board_left;
         label->y = layout_y + board_top;
@@ -800,15 +797,10 @@ paint_cb(void *painter_data)
                                       paint_box_cb,
                                       painter);
 
-        for (int i = 0; i < VSX_N_ELEMENTS(painter->name_labels); i++) {
-                const struct name_label *name_label = painter->name_labels + i;
-
-                vsx_layout_paint(name_label->layout,
-                                 paint_state,
-                                 name_label->x,
-                                 name_label->y,
-                                 0.0f, 0.0f, 0.0f);
-        }
+        vsx_layout_paint_multiple(painter->name_labels,
+                                  VSX_N_ELEMENTS(painter->name_labels),
+                                  paint_state,
+                                  0.0f, 0.0f, 0.0f);
 }
 
 static struct vsx_signal *
