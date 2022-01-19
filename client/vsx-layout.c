@@ -506,64 +506,50 @@ vsx_layout_get_logical_extents(struct vsx_layout *layout)
 }
 
 static void
-set_uniforms(struct vsx_layout *layout,
-             const struct vsx_paint_state *paint_state,
-             int x, int y,
-             float r, float g, float b)
+set_matrix_uniform(const struct vsx_shader_data_program_data *program,
+                   const struct vsx_paint_state *paint_state)
 {
         GLfloat matrix[4];
-        float tx, ty;
 
         if (paint_state->board_rotated) {
                 matrix[0] = 0.0f;
                 matrix[1] = -2.0f / paint_state->height;
                 matrix[2] = -2.0f / paint_state->width;
                 matrix[3] = 0.0f;
-
-                tx = 1.0f - y * 2.0f / paint_state->width;
-                ty = 1.0f - x * 2.0f / paint_state->height;
         } else {
                 matrix[0] = 2.0f / paint_state->width;
                 matrix[1] = 0.0f;
                 matrix[2] = 0.0f;
                 matrix[3] = -2.0f / paint_state->height;
+        }
 
+        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
+                                  1, /* count */
+                                  GL_FALSE, /* transpose */
+                                  matrix);
+}
+
+static void
+set_translation_uniform(const struct vsx_shader_data_program_data *program,
+                        const struct vsx_paint_state *paint_state,
+                        int x, int y)
+{
+        float tx, ty;
+
+        if (paint_state->board_rotated) {
+                tx = 1.0f - y * 2.0f / paint_state->width;
+                ty = 1.0f - x * 2.0f / paint_state->height;
+        } else {
                 tx = x * 2.0f / paint_state->width - 1.0f;
                 ty = 1.0f - y * 2.0f / paint_state->height;
         }
 
-        vsx_gl.glUniformMatrix2fv(layout->program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  matrix);
-        vsx_gl.glUniform2f(layout->program->translation_uniform, tx, ty);
-
-        vsx_gl.glUniform3f(layout->program->color_uniform, r, g, b);
+        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
 }
 
-void
-vsx_layout_paint(struct vsx_layout *layout,
-                 const struct vsx_paint_state *paint_state,
-                 int x, int y,
-                 float r, float g, float b)
+static void
+submit_layout(struct vsx_layout *layout)
 {
-        /* All the layouts of the scene should be prepared before any
-         * of them are painted.
-         */
-        assert(!layout->dirty);
-
-        if (layout->draw_calls.length <= 0)
-                return;
-
-        vsx_gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        vsx_gl.glEnable(GL_BLEND);
-
-        vsx_gl.glUseProgram(layout->program->program);
-
-        set_uniforms(layout, paint_state, x, y, r, g, b);
-
-        vsx_array_object_bind(layout->vao);
-
         const struct draw_call *draw_calls =
                 (const struct draw_call *) layout->draw_calls.data;
         size_t n_draw_calls = layout->draw_calls.length / sizeof draw_calls[0];
@@ -584,8 +570,68 @@ vsx_layout_paint(struct vsx_layout *layout,
 
                 start_index += n_verts;
         }
+}
+
+void
+vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
+                          size_t n_layouts,
+                          const struct vsx_paint_state *paint_state,
+                          float r, float g, float b)
+{
+        if (n_layouts <= 0)
+                return;
+
+        const struct vsx_shader_data_program_data *program =
+                layouts[0].layout->program;
+
+        vsx_gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        vsx_gl.glEnable(GL_BLEND);
+
+        vsx_gl.glUseProgram(program->program);
+
+        set_matrix_uniform(program, paint_state);
+
+        vsx_gl.glUniform3f(program->color_uniform, r, g, b);
+
+        for (unsigned i = 0; i < n_layouts; i++) {
+                const struct vsx_layout_paint_position *pos = layouts + i;
+
+                /* All the layouts of the scene should be prepared before any
+                 * of them are painted.
+                 */
+                assert(!pos->layout->dirty);
+
+                if (pos->layout->draw_calls.length <= 0)
+                        continue;
+
+                vsx_array_object_bind(pos->layout->vao);
+
+                set_translation_uniform(program,
+                                        paint_state,
+                                        pos->x, pos->y);
+
+                submit_layout(pos->layout);
+        }
 
         vsx_gl.glDisable(GL_BLEND);
+}
+
+void
+vsx_layout_paint(struct vsx_layout *layout,
+                 const struct vsx_paint_state *paint_state,
+                 int x, int y,
+                 float r, float g, float b)
+{
+        if (layout->draw_calls.length <= 0)
+                return;
+
+        struct vsx_layout_paint_position pos = {
+                .layout = layout,
+                .x = x,
+                .y = y,
+        };
+
+        vsx_layout_paint_multiple(&pos, 1, paint_state, r, g, b);
 }
 
 void
