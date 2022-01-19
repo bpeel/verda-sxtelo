@@ -301,15 +301,17 @@ paint_cb(void *painter_data)
                 y_off = paint_state->height / 2 - painter->total_height / 2;
         }
 
-        for (int i = 0; i < N_LANGUAGES; i++) {
-                struct language_button *button = painter->buttons + i;
+        struct vsx_layout_paint_position pos[N_LANGUAGES];
 
-                vsx_layout_paint(button->layout,
-                                 &painter->toolbox->paint_state,
-                                 x_off + button->x,
-                                 y_off + painter->layout_y,
-                                 0.0f, 0.0f, 0.0f);
+        for (int i = 0; i < N_LANGUAGES; i++) {
+                pos[i].layout = painter->buttons[i].layout;
+                pos[i].x = painter->buttons[i].x + x_off;
+                pos[i].y = painter->layout_y + y_off;
         }
+
+        vsx_layout_paint_multiple(pos, N_LANGUAGES,
+                                  &painter->toolbox->paint_state,
+                                  0.0f, 0.0f, 0.0f);
 }
 
 static void
