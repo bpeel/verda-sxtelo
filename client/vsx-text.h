@@ -27,6 +27,10 @@ enum vsx_text_language {
 
 enum vsx_text {
         VSX_TEXT_LANGUAGE_CODE,
+        VSX_TEXT_LANGUAGE_BUTTON,
+        VSX_TEXT_SHARE_BUTTON,
+        VSX_TEXT_SHORT_GAME,
+        VSX_TEXT_LONG_GAME,
 };
 
 #define VSX_TEXT_N_LANGUAGES 3

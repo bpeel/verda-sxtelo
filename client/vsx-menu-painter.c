@@ -31,6 +31,9 @@
 #include "vsx-gl.h"
 #include "vsx-array-object.h"
 #include "vsx-quad-buffer.h"
+#include "vsx-layout.h"
+
+#define N_BUTTONS 3
 
 struct vsx_menu_painter {
         struct vsx_game_state *game_state;
@@ -41,6 +44,10 @@ struct vsx_menu_painter {
         GLfloat matrix[4];
         GLfloat translation[2];
         int button_size;
+        int dialog_x, dialog_y;
+        int dialog_height;
+
+        struct vsx_layout_paint_position labels[N_BUTTONS];
 
         bool vertices_dirty;
 
@@ -72,7 +79,6 @@ enum menu_image {
         MENU_IMAGE_LONG_GAME,
 };
 
-#define N_BUTTONS 3
 #define N_VERTICES (N_BUTTONS * 4)
 
 #define N_IMAGES 4
@@ -105,14 +111,83 @@ modified_cb(struct vsx_listener *listener,
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
         case VSX_GAME_STATE_MODIFIED_TYPE_N_TILES:
-                painter->vertices_dirty = true;
-
+                painter->layout_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
+
         default:
                 break;
         }
+}
+
+static void
+update_label_text(struct vsx_menu_painter *painter)
+{
+        enum vsx_text_language language =
+                vsx_game_state_get_language(painter->game_state);
+
+        int bottom_most = 0;
+
+        for (int i = 0; i < N_BUTTONS; i++) {
+                struct vsx_layout *layout = painter->labels[i].layout;
+
+                vsx_layout_set_width(layout, painter->button_size);
+
+                enum vsx_text text = 0;
+
+                switch ((enum menu_button) i) {
+                case MENU_BUTTON_LANGUAGE:
+                        text = VSX_TEXT_LANGUAGE_BUTTON;
+                        break;
+                case MENU_BUTTON_SHARE:
+                        text = VSX_TEXT_SHARE_BUTTON;
+                        break;
+                case MENU_BUTTON_LENGTH:
+                        text = (is_long_game(painter) ?
+                                VSX_TEXT_LONG_GAME :
+                                VSX_TEXT_SHORT_GAME);
+                        break;
+                }
+
+                vsx_layout_set_text(layout, vsx_text_get(language, text));
+
+                vsx_layout_prepare(layout);
+
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(layout);
+
+                int bottom = extents->top + extents->bottom;
+
+                if (bottom > bottom_most)
+                        bottom_most = bottom;
+        }
+
+        painter->dialog_height = painter->button_size + bottom_most;
+}
+
+static void
+update_label_positions(struct vsx_menu_painter *painter)
+{
+        for (int i = 0; i < N_BUTTONS; i++) {
+                struct vsx_layout *layout = painter->labels[i].layout;
+
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(layout);
+
+                painter->labels[i].x =
+                        painter->dialog_x +
+                        i * painter->button_size +
+                        painter->button_size / 2 -
+                        extents->right / 2;
+                painter->labels[i].y =
+                        painter->dialog_y +
+                        painter->button_size +
+                        extents->top;
+        }
+
+        painter->vertices_dirty = true;
 }
 
 static void
@@ -128,19 +203,24 @@ ensure_layout(struct vsx_menu_painter *painter)
         /* Convert the button size from mm to pixels */
         painter->button_size = BUTTON_SIZE * paint_state->dpi * 10 / 254;
 
+        update_label_text(painter);
+
         if (paint_state->board_rotated) {
                 if (painter->button_size * N_BUTTONS > paint_state->height)
                         painter->button_size = paint_state->height / N_BUTTONS;
 
                 painter->matrix[0] = 0.0f;
-                painter->matrix[1] = (-painter->button_size * 2.0f /
-                                      paint_state->height);
-                painter->matrix[2] = (-painter->button_size * 2.0f /
-                                      paint_state->width);
+                painter->matrix[1] = -2.0f / paint_state->height;
+                painter->matrix[2] = -2.0f / paint_state->width;
                 painter->matrix[3] = 0.0f;
 
+                painter->dialog_x = (paint_state->height / 2 -
+                                     painter->button_size * N_BUTTONS / 2);
+                painter->dialog_y = (paint_state->width / 2 -
+                                     painter->dialog_height / 2);
+
                 painter->translation[0] =
-                        painter->button_size / (float) paint_state->width;
+                        painter->dialog_height / (float) paint_state->width;
                 painter->translation[1] =
                         N_BUTTONS *
                         painter->button_size /
@@ -149,21 +229,27 @@ ensure_layout(struct vsx_menu_painter *painter)
                 if (painter->button_size * N_BUTTONS > paint_state->width)
                         painter->button_size = paint_state->width / N_BUTTONS;
 
-                painter->matrix[0] = (painter->button_size * 2.0f /
-                                      paint_state->width);
+                painter->matrix[0] = 2.0f / paint_state->width;
                 painter->matrix[1] = 0.0f;
                 painter->matrix[2] = 0.0f;
-                painter->matrix[3] = (-painter->button_size * 2.0f /
-                                      paint_state->height);
+                painter->matrix[3] = -2.0f / paint_state->height;
+
+                painter->dialog_x = (paint_state->width / 2 -
+                                     painter->button_size * N_BUTTONS / 2);
+                painter->dialog_y = (paint_state->height / 2 -
+                                     painter->dialog_height / 2);
 
                 painter->translation[0] =
                         -N_BUTTONS *
                         painter->button_size /
                         (float) paint_state->width;
                 painter->translation[1] =
-                        painter->button_size / (float) paint_state->height;
+                        painter->dialog_height / (float) paint_state->height;
         }
 
+        update_label_positions(painter);
+
+        painter->vertices_dirty = true;
         painter->layout_dirty = false;
 }
 
@@ -258,6 +344,12 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
 
+        for (int i = 0; i < N_BUTTONS; i++) {
+                painter->labels[i].layout =
+                        vsx_layout_new(toolbox->font_library,
+                                       &toolbox->shader_data);
+        }
+
         struct vsx_image_loader *image_loader =
                 painter->toolbox->image_loader;
 
@@ -297,23 +389,15 @@ handle_click(struct vsx_menu_painter *painter,
         int x, y;
 
         if (paint_state->board_rotated) {
-                int top_x = (paint_state->height / 2 -
-                             N_BUTTONS * painter->button_size / 2);
-                int top_y = (paint_state->width / 2 +
-                             painter->button_size / 2);
-                x = event->click.y - top_x;
-                y = top_y - event->click.x;
+                x = event->click.y - painter->dialog_x;
+                y = paint_state->width - painter->dialog_y - event->click.x;
         } else {
-                int top_x = (paint_state->width / 2 -
-                             N_BUTTONS * painter->button_size / 2);
-                int top_y = (paint_state->height / 2 -
-                             painter->button_size / 2);
-                x = event->click.x - top_x;
-                y = event->click.y - top_y;
+                x = event->click.x - painter->dialog_x;
+                y = event->click.y - painter->dialog_y;
         }
 
         if (x < 0 || x >= painter->button_size * N_BUTTONS ||
-            y < 0 || y >= painter->button_size) {
+            y < 0 || y >= painter->dialog_height) {
                 vsx_game_state_set_dialog(painter->game_state,
                                           VSX_DIALOG_NONE);
                 return true;
@@ -419,11 +503,15 @@ ensure_vertices(struct vsx_menu_painter *painter)
 
                 /* Button image */
                 store_quad(v,
-                           i, 0, 1, 1,
+                           i * painter->button_size,
+                           0, /* y */
+                           painter->button_size,
+                           painter->dialog_height,
                            image / (float) N_IMAGES,
                            0.0f,
                            (image + 1.0f) / N_IMAGES,
-                           1.0f);
+                           painter->dialog_height /
+                           (float) painter->button_size);
                 v += 4;
         }
 
@@ -435,7 +523,7 @@ ensure_vertices(struct vsx_menu_painter *painter)
 }
 
 static void
-paint_cb(void *painter_data)
+prepare_cb(void *painter_data)
 {
         struct vsx_menu_painter *painter = painter_data;
 
@@ -443,6 +531,15 @@ paint_cb(void *painter_data)
                 return;
 
         ensure_layout(painter);
+}
+
+static void
+paint_cb(void *painter_data)
+{
+        struct vsx_menu_painter *painter = painter_data;
+
+        if (painter->tex == 0)
+                return;
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
@@ -472,6 +569,11 @@ paint_cb(void *painter_data)
                                    N_BUTTONS * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
+
+        vsx_layout_paint_multiple(painter->labels,
+                                  N_BUTTONS,
+                                  &painter->toolbox->paint_state,
+                                  0.0f, 0.0f, 0.0f);
 }
 
 static struct vsx_signal *
@@ -488,6 +590,9 @@ free_cb(void *painter_data)
         struct vsx_menu_painter *painter = painter_data;
 
         vsx_list_remove(&painter->modified_listener.link);
+
+        for (int i = 0; i < N_BUTTONS; i++)
+                vsx_layout_free(painter->labels[i].layout);
 
         if (painter->vao)
                 vsx_array_object_free(painter->vao);
@@ -508,6 +613,7 @@ const struct vsx_painter
 vsx_menu_painter = {
         .create_cb = create_cb,
         .fb_size_changed_cb = fb_size_changed_cb,
+        .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,

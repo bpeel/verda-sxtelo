@@ -27,16 +27,28 @@
 static const char *const
 english[] = {
         [VSX_TEXT_LANGUAGE_CODE] = "en",
+        [VSX_TEXT_LANGUAGE_BUTTON] = "Game in English",
+        [VSX_TEXT_SHARE_BUTTON] = "Invite friends",
+        [VSX_TEXT_LONG_GAME] = "Long game",
+        [VSX_TEXT_SHORT_GAME] = "Short game",
 };
 
 static const char *const
 french[] = {
         [VSX_TEXT_LANGUAGE_CODE] = "fr",
+        [VSX_TEXT_LANGUAGE_BUTTON] = "Jeu en français",
+        [VSX_TEXT_SHARE_BUTTON] = "Inviter des ami·es",
+        [VSX_TEXT_LONG_GAME] = "Jeu long",
+        [VSX_TEXT_SHORT_GAME] = "Jeu court",
 };
 
 static const char *const
 esperanto[] = {
         [VSX_TEXT_LANGUAGE_CODE] = "eo",
+        [VSX_TEXT_LANGUAGE_BUTTON] = "Ludo en Esperanto",
+        [VSX_TEXT_SHARE_BUTTON] = "Inviti amikojn",
+        [VSX_TEXT_LONG_GAME] = "Longa ludo",
+        [VSX_TEXT_SHORT_GAME] = "Mallonga ludo",
 };
 
 static const char *const * const
