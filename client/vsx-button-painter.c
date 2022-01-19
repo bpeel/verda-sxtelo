@@ -41,6 +41,8 @@ struct vsx_button_painter {
         GLuint vbo;
         GLuint element_buffer;
 
+        bool vertices_dirty;
+
         GLuint tex;
         struct vsx_image_loader_token *image_token;
 
@@ -102,6 +104,7 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES:
+                painter->vertices_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
 
@@ -191,6 +194,8 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
+        painter->vertices_dirty = true;
+
         vsx_signal_init(&painter->redraw_needed_signal);
 
         create_buffer(painter);
@@ -273,6 +278,14 @@ input_event_cb(void *painter_data,
         }
 
         return false;
+}
+
+static void
+fb_size_changed_cb(void *painter_data)
+{
+        struct vsx_button_painter *painter = painter_data;
+
+        painter->vertices_dirty = true;
 }
 
 static void
@@ -431,6 +444,27 @@ generate_n_tiles_vertices(struct vsx_button_painter *painter,
 }
 
 static void
+ensure_vertices(struct vsx_button_painter *painter)
+{
+        if (!painter->vertices_dirty)
+                return;
+
+
+        struct vertex *vertices =
+                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                                   TOTAL_N_VERTICES * sizeof (struct vertex),
+                                   false, /* flush explicit */
+                                   GL_DYNAMIC_DRAW);
+
+        generate_button_vertices(painter, vertices);
+        generate_n_tiles_vertices(painter, vertices + N_BUTTON_VERTICES);
+
+        vsx_map_buffer_unmap();
+
+        painter->vertices_dirty = false;
+}
+
+static void
 paint_cb(void *painter_data)
 {
         struct vsx_button_painter *painter = painter_data;
@@ -444,16 +478,7 @@ paint_cb(void *painter_data)
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
-        struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
-                                   TOTAL_N_VERTICES * sizeof (struct vertex),
-                                   false, /* flush explicit */
-                                   GL_DYNAMIC_DRAW);
-
-        generate_button_vertices(painter, vertices);
-        generate_n_tiles_vertices(painter, vertices + N_BUTTON_VERTICES);
-
-        vsx_map_buffer_unmap();
+        ensure_vertices(painter);
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
@@ -513,6 +538,7 @@ free_cb(void *painter_data)
 const struct vsx_painter
 vsx_button_painter = {
         .create_cb = create_cb,
+        .fb_size_changed_cb = fb_size_changed_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
