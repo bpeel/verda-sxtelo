@@ -34,6 +34,7 @@
 
 struct vsx_button_painter {
         struct vsx_game_state *game_state;
+        struct vsx_listener modified_listener;
         struct vsx_painter_toolbox *toolbox;
 
         struct vsx_array_object *vao;
@@ -53,10 +54,61 @@ struct vertex {
 
 #define N_BUTTONS 3
 #define N_GAPS (N_BUTTONS + 1)
-#define N_QUADS (N_BUTTONS + N_GAPS)
-#define N_VERTICES (N_QUADS * 4)
+#define N_BUTTON_QUADS (N_BUTTONS + N_GAPS)
+#define N_BUTTON_VERTICES (N_BUTTON_QUADS * 4)
 
 #define N_BUTTONS_IN_IMAGE 4
+
+/* The digit images occupy the space of the 4th button image. They are
+ * positioned at the bottom-left of the image.
+ */
+
+/* Width of a digit in texture coordinates */
+#define DIGIT_WIDTH (13.0f / 128.0f)
+/* Distance between the left of one digit image to the next in texture
+ * coordinates.
+ */
+#define DIGIT_DISTANCE_X (36.0f / 128.0f)
+/* Height of a digit in texture coordinates */
+#define DIGIT_HEIGHT (17.0f / (128.0f * N_BUTTONS_IN_IMAGE))
+/* Distance between the bottom of one digit image to the next in
+ * texture coordinates.
+ */
+#define DIGIT_DISTANCE_Y (42.0f / (128.0f * N_BUTTONS_IN_IMAGE))
+
+/* Center of the number for the remaining tiles as a fraction of the
+ * button size.
+ */
+#define REMAINING_TILES_CENTER_X (72.0f / 128.0f)
+/* Bottom of the number measured as a fraction of the button size */
+#define REMAINING_TILES_BOTTOM (105.0f / 128.0f)
+
+#define DIGITS_PER_ROW 4
+
+#define MAX_DIGITS 3
+
+#define TOTAL_N_QUADS (N_BUTTON_QUADS + MAX_DIGITS)
+#define TOTAL_N_VERTICES (TOTAL_N_QUADS * 4)
+
+static void
+modified_cb(struct vsx_listener *listener,
+            void *user_data)
+{
+        struct vsx_button_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_button_painter,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES:
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+
+        default:
+                break;
+        }
+}
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -101,7 +153,7 @@ create_buffer(struct vsx_button_painter *painter)
         vsx_gl.glGenBuffers(1, &painter->vbo);
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
         vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            N_VERTICES * sizeof (struct vertex),
+                            TOTAL_N_VERTICES * sizeof (struct vertex),
                             NULL, /* data */
                             GL_DYNAMIC_DRAW);
 
@@ -127,7 +179,7 @@ create_buffer(struct vsx_button_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, N_QUADS);
+                vsx_quad_buffer_generate(painter->vao, TOTAL_N_QUADS);
 }
 
 static void *
@@ -142,6 +194,10 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_init(&painter->redraw_needed_signal);
 
         create_buffer(painter);
+
+        painter->modified_listener.notify = modified_cb;
+        vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
+                       &painter->modified_listener);
 
         painter->image_token = vsx_image_loader_load(toolbox->image_loader,
                                                      "buttons.mpng",
@@ -250,8 +306,8 @@ store_quad(struct vertex *vertices,
 }
 
 static void
-generate_vertices(struct vsx_button_painter *painter,
-                  struct vertex *vertices)
+generate_button_vertices(struct vsx_button_painter *painter,
+                         struct vertex *vertices)
 {
         struct vertex *v = vertices;
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
@@ -261,7 +317,7 @@ generate_vertices(struct vsx_button_painter *painter,
 
         if (button_size <= 0) {
                 /* This shouldn’t happen */
-                memset(vertices, 0, N_VERTICES * sizeof *vertices);
+                memset(vertices, 0, TOTAL_N_VERTICES * sizeof *vertices);
                 return;
         }
 
@@ -303,7 +359,75 @@ generate_vertices(struct vsx_button_painter *painter,
                    0.0f, 0.0f, 0.0f, 0.0f);
         v += 4;
 
-        assert(v - vertices == N_VERTICES);
+        assert(v - vertices == N_BUTTON_VERTICES);
+}
+
+static int
+get_n_digits(int num)
+{
+        int n_digits;
+
+        for (n_digits = 1; n_digits < MAX_DIGITS; n_digits++) {
+                if (num < 10)
+                        break;
+                num /= 10;
+        }
+
+        return n_digits;
+}
+
+static void
+generate_n_tiles_vertices(struct vsx_button_painter *painter,
+                          struct vertex *vertices)
+{
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        int button_size = MIN(paint_state->button_area_width,
+                              paint_state->button_area_height / N_BUTTONS);
+
+        int n_tiles = vsx_game_state_get_remaining_tiles(painter->game_state);
+        int n_digits = get_n_digits(n_tiles);
+
+        if (button_size <= 0) {
+                /* This shouldn’t happen */
+                return;
+        }
+
+        int area_width = paint_state->button_area_width;
+        int area_height = paint_state->button_area_height;
+
+        int button_x = area_width / 2 - button_size / 2;
+        int button_y = area_height / N_BUTTONS / 2 - button_size / 2;
+        float num_left = (button_x +
+                          REMAINING_TILES_CENTER_X * button_size -
+                          n_digits * DIGIT_WIDTH * button_size / 2.0f);
+        float num_bottom = button_y + REMAINING_TILES_BOTTOM * button_size;
+        /* Digit height in pixels */
+        float digit_height = DIGIT_HEIGHT * button_size * N_BUTTONS_IN_IMAGE;
+
+        for (int i = 0; i < n_digits; i++) {
+                int digit = n_tiles % 10;
+
+                float tx = digit % DIGITS_PER_ROW * DIGIT_DISTANCE_X;
+                float ty = 1.0f - digit / DIGITS_PER_ROW * DIGIT_DISTANCE_Y;
+
+                store_quad(vertices + i * 4,
+                           num_left +
+                           (n_digits - i - 1) *
+                           DIGIT_WIDTH * button_size,
+                           num_bottom - digit_height,
+                           DIGIT_WIDTH * button_size,
+                           digit_height,
+                           tx,
+                           ty - DIGIT_HEIGHT,
+                           tx + DIGIT_WIDTH,
+                           ty);
+
+                n_tiles /= 10;
+        }
+
+        memset(vertices + n_digits * 4,
+               0,
+               (MAX_DIGITS - n_digits) * 4 * sizeof (struct vertex));
 }
 
 static void
@@ -322,11 +446,12 @@ paint_cb(void *painter_data)
 
         struct vertex *vertices =
                 vsx_map_buffer_map(GL_ARRAY_BUFFER,
-                                   N_VERTICES * sizeof (struct vertex),
+                                   TOTAL_N_VERTICES * sizeof (struct vertex),
                                    false, /* flush explicit */
                                    GL_DYNAMIC_DRAW);
 
-        generate_vertices(painter, vertices);
+        generate_button_vertices(painter, vertices);
+        generate_n_tiles_vertices(painter, vertices + N_BUTTON_VERTICES);
 
         vsx_map_buffer_unmap();
 
@@ -349,8 +474,8 @@ paint_cb(void *painter_data)
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
-                                   0, N_VERTICES - 1,
-                                   N_QUADS * 6,
+                                   0, TOTAL_N_VERTICES - 1,
+                                   TOTAL_N_QUADS * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 }
@@ -367,6 +492,8 @@ static void
 free_cb(void *painter_data)
 {
         struct vsx_button_painter *painter = painter_data;
+
+        vsx_list_remove(&painter->modified_listener.link);
 
         if (painter->vao)
                 vsx_array_object_free(painter->vao);
