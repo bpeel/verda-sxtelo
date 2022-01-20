@@ -124,6 +124,33 @@ calculate_board_transform(struct vsx_paint_state *paint_state)
 }
 
 static void
+calculate_pixel_transform(struct vsx_paint_state *paint_state)
+{
+        float *matrix = paint_state->pixel_matrix;
+        float *translation = paint_state->pixel_translation;
+
+        if (paint_state->board_rotated) {
+                matrix[0] = 0.0f;
+                matrix[1] = -2.0f / paint_state->height;
+                matrix[2] = -2.0f / paint_state->width;
+                matrix[3] = 0.0f;
+                translation[0] = 1.0f;
+                translation[1] = 1.0f;
+                paint_state->pixel_width = paint_state->height;
+                paint_state->pixel_height = paint_state->width;
+        } else {
+                matrix[0] = 2.0f / paint_state->width;
+                matrix[1] = 0.0f;
+                matrix[2] = 0.0f;
+                matrix[3] = -2.0f / paint_state->height;
+                translation[0] = -1.0f;
+                translation[1] = 1.0f;
+                paint_state->pixel_width = paint_state->width;
+                paint_state->pixel_height = paint_state->height;
+        }
+}
+
+static void
 calculate_button_area_transform(struct vsx_paint_state *paint_state)
 {
         float *matrix = paint_state->button_area_matrix;
@@ -185,6 +212,7 @@ vsx_paint_state_ensure_layout(struct vsx_paint_state *paint_state)
         paint_state->layout_dirty = false;
 
         calculate_board_transform(paint_state);
+        calculate_pixel_transform(paint_state);
         calculate_button_area_transform(paint_state);
         calculate_button_area_size(paint_state);
 }
