@@ -38,8 +38,6 @@ struct vsx_note_painter {
         struct vsx_array_object *vao;
         GLuint vbo;
 
-        GLfloat matrix[4];
-        GLfloat translation[2];
         int layout_x, layout_y;
 
         struct vsx_layout *layout;
@@ -190,37 +188,6 @@ fb_size_changed_cb(void *painter_data)
 }
 
 static void
-calculate_transform(struct vsx_note_painter *painter,
-                    const struct vsx_paint_state *paint_state,
-                    int *screen_width,
-                    int *screen_height)
-{
-        if (paint_state->board_rotated) {
-                painter->matrix[0] = 0.0f;
-                painter->matrix[1] = -2.0f / paint_state->height;
-                painter->matrix[2] = -2.0f / paint_state->width;
-                painter->matrix[3] = 0.0f;
-
-                painter->translation[0] = 1.0f;
-                painter->translation[1] = 1.0f;
-
-                *screen_width = paint_state->height;
-                *screen_height = paint_state->width;
-        } else {
-                painter->matrix[0] = 2.0f / paint_state->width;
-                painter->matrix[1] = 0.0f;
-                painter->matrix[2] = 0.0f;
-                painter->matrix[3] = -2.0f / paint_state->height;
-
-                painter->translation[0] = -1.0f;
-                painter->translation[1] = 1.0f;
-
-                *screen_width = paint_state->width;
-                *screen_height = paint_state->height;
-        }
-}
-
-static void
 prepare_cb(void *painter_data)
 {
         struct vsx_note_painter *painter = painter_data;
@@ -232,19 +199,13 @@ prepare_cb(void *painter_data)
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        int screen_width, screen_height;
-
-        calculate_transform(painter,
-                            paint_state,
-                            &screen_width, &screen_height);
-
         /* Convert the measurements from mm to pixels */
         int bottom_gap = BOTTOM_GAP * paint_state->dpi * 10 / 254;
         int border = BORDER * paint_state->dpi * 10 / 254;
         int text_width = TEXT_WIDTH * paint_state->dpi * 10 / 254;
 
-        if (text_width > screen_width - border * 2)
-                text_width = screen_width - border * 2;
+        if (text_width > paint_state->pixel_width - border * 2)
+                text_width = paint_state->pixel_width - border * 2;
 
         vsx_layout_set_width(painter->layout, text_width);
 
@@ -255,8 +216,10 @@ prepare_cb(void *painter_data)
         const struct vsx_layout_extents *extents =
                 vsx_layout_get_logical_extents(painter->layout);
 
-        painter->layout_x = screen_width / 2 - extents->right / 2;
-        painter->layout_y = screen_height - bottom_gap - extents->bottom;
+        painter->layout_x = paint_state->pixel_width / 2 - extents->right / 2;
+        painter->layout_y = (paint_state->pixel_height -
+                             bottom_gap -
+                             extents->bottom);
 
         int box_x1 = painter->layout_x - extents->left - border;
         int box_x2 = painter->layout_x + extents->right + border;
@@ -295,13 +258,15 @@ paint_cb(void *painter_data)
         vsx_gl.glUseProgram(program->program);
         vsx_array_object_bind(painter->vao);
 
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  painter->matrix);
+                                  paint_state->pixel_matrix);
         vsx_gl.glUniform2f(program->translation_uniform,
-                           painter->translation[0],
-                           painter->translation[1]);
+                           paint_state->pixel_translation[0],
+                           paint_state->pixel_translation[1]);
         vsx_gl.glUniform3f(program->color_uniform,
                            0.0f, 0.0f, 0.0f);
 
