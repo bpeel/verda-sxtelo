@@ -75,4 +75,9 @@ vsx_paint_state_set_fb_size(struct vsx_paint_state *paint_state,
 void
 vsx_paint_state_ensure_layout(struct vsx_paint_state *paint_state);
 
+void
+vsx_paint_state_offset_pixel_translation(struct vsx_paint_state *paint_state,
+                                         float x, float y,
+                                         float *translation);
+
 #endif /* VSX_PAINT_STATE_H */

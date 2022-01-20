@@ -216,3 +216,19 @@ vsx_paint_state_ensure_layout(struct vsx_paint_state *paint_state)
         calculate_button_area_transform(paint_state);
         calculate_button_area_size(paint_state);
 }
+
+void
+vsx_paint_state_offset_pixel_translation(struct vsx_paint_state *paint_state,
+                                         float x, float y,
+                                         float *translation)
+{
+        vsx_paint_state_ensure_layout(paint_state);
+
+        if (paint_state->board_rotated) {
+                translation[0] = 1.0f - y * 2.0f / paint_state->width;
+                translation[1] = 1.0f - x * 2.0f / paint_state->height;
+        } else {
+                translation[0] = x * 2.0f / paint_state->width - 1.0f;
+                translation[1] = 1.0f - y * 2.0f / paint_state->height;
+        }
+}
