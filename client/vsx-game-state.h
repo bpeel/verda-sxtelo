@@ -20,6 +20,7 @@
 #define VSX_GAME_STATE_H
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "vsx-connection.h"
 #include "vsx-worker.h"
@@ -144,6 +145,9 @@ vsx_game_state_set_language(struct vsx_game_state *game_state,
 void
 vsx_game_state_set_note(struct vsx_game_state *game_state,
                         const char *text);
+
+bool
+vsx_game_state_get_started(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,

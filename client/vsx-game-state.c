@@ -582,6 +582,12 @@ vsx_game_state_set_note(struct vsx_game_state *game_state,
         vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
+bool
+vsx_game_state_get_started(struct vsx_game_state *game_state)
+{
+        return game_state->tiles_by_index.length > 0;
+}
+
 void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,

@@ -2385,6 +2385,45 @@ out:
         return ret;
 }
 
+static bool
+test_started(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (vsx_game_state_get_started(harness->game_state)) {
+                fprintf(stderr,
+                        "Game is marked as started before turning a tile.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!send_tile(harness,
+                       0, /* num */
+                       10, 15, /* x/y */
+                       'W', /* letter */
+                       0, /* player */
+                       INT_MAX /* remaining_tiles (don’t check event) */)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!vsx_game_state_get_started(harness->game_state)) {
+                fprintf(stderr,
+                        "The game is not started after turning a tile.\n");
+                ret = false;
+                goto out;
+        }
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2433,6 +2472,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_note())
+                ret = EXIT_FAILURE;
+
+        if (!test_started())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())
