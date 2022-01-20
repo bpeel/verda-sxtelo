@@ -388,10 +388,19 @@ handle_language_button(struct vsx_menu_painter *painter)
 static void
 handle_toggle_length(struct vsx_menu_painter *painter)
 {
-        int n_tiles = (is_long_game(painter) ?
-                       SHORT_GAME_N_TILES :
-                       LONG_GAME_N_TILES);
-        vsx_game_state_set_n_tiles(painter->game_state, n_tiles);
+        if (vsx_game_state_get_started(painter->game_state)) {
+                enum vsx_text_language language =
+                        vsx_game_state_get_language(painter->game_state);
+                const char *note =
+                        vsx_text_get(language,
+                                     VSX_TEXT_CANT_CHANGE_LENGTH_STARTED);
+                vsx_game_state_set_note(painter->game_state, note);
+        } else {
+                int n_tiles = (is_long_game(painter) ?
+                               SHORT_GAME_N_TILES :
+                               LONG_GAME_N_TILES);
+                vsx_game_state_set_n_tiles(painter->game_state, n_tiles);
+        }
 }
 
 static bool
