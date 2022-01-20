@@ -47,7 +47,8 @@ french[] = {
         [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
         "La langue ne peut pas être changée après que le jeu ait commencé",
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
-        "La durée de jeu ne peut pas être changé après que le jeu ait commencé",
+        "La durée de jeu ne peut pas être changée après que le jeu ait "
+        "commencé",
 };
 
 static const char *const
