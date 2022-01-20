@@ -48,11 +48,6 @@ struct vsx_paint_state {
         /* Board translation */
         float board_translation[2];
 
-        /* Transformation matrix for the button area */
-        float button_area_matrix[4];
-        /* Button area translation */
-        float button_area_translation[2];
-
         /* Transformation matrix to use pixel coordinates. This also
          * takes into account the rotation.
          */
@@ -61,11 +56,6 @@ struct vsx_paint_state {
         float pixel_translation[2];
         /* Size of the screen, taking into account the rotation */
         int pixel_width, pixel_height;
-
-        /* Size in pixels of the button area, taking into account the
-         * rotation.
-         */
-        int button_area_width, button_area_height;
 };
 
 void
