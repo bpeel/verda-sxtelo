@@ -41,7 +41,13 @@ struct vsx_button_painter {
         GLuint vbo;
         GLuint element_buffer;
 
+        bool layout_dirty;
         bool vertices_dirty;
+
+        float translation[2];
+        int area_x, area_y;
+        int area_width, area_height;
+        int button_size;
 
         GLuint tex;
         struct vsx_image_loader_token *image_token;
@@ -195,6 +201,7 @@ create_cb(struct vsx_game_state *game_state,
         painter->toolbox = toolbox;
 
         painter->vertices_dirty = true;
+        painter->layout_dirty = true;
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
@@ -212,39 +219,69 @@ create_cb(struct vsx_game_state *game_state,
         return painter;
 }
 
+static void
+ensure_layout(struct vsx_button_painter *painter)
+{
+        if (!painter->layout_dirty)
+                return;
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        vsx_paint_state_ensure_layout(paint_state);
+
+        if (paint_state->board_rotated) {
+                painter->area_width =
+                        (paint_state->height -
+                         paint_state->board_scissor_height);
+                painter->area_height = paint_state->width;
+        } else {
+                painter->area_width =
+                        (paint_state->width -
+                         paint_state->board_scissor_width);
+                painter->area_height = paint_state->height;
+        }
+
+        painter->area_x = paint_state->pixel_width - painter->area_width;
+        painter->area_y = 0;
+
+        painter->button_size = MIN(painter->area_width,
+                                   painter->area_height / N_BUTTONS);
+
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 painter->area_x,
+                                                 painter->area_y,
+                                                 painter->translation);
+
+        painter->layout_dirty = false;
+        painter->vertices_dirty = true;
+}
+
 static bool
 handle_click(struct vsx_button_painter *painter,
              const struct vsx_input_event *event)
 {
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
-        vsx_paint_state_ensure_layout(paint_state);
+        ensure_layout(painter);
 
         int x, y;
 
         if (paint_state->board_rotated) {
-                /* This takes into account the inverted y-origin of
-                 * the board scissor
-                 */
-                x = (event->click.y -
-                     (paint_state->height -
-                      paint_state->board_scissor_y));
-                y = paint_state->width - 1 - event->click.x;
+                x = event->click.y - painter->area_x;
+                y = painter->area_y + painter->area_height - 1 - event->click.x;
         } else {
-                x = (event->click.x -
-                     paint_state->board_scissor_x -
-                     paint_state->board_scissor_width);
-                y = event->click.y;
+                x = event->click.x - painter->area_x;
+                y = event->click.y - painter->area_y;
         }
 
         if (x < 0 || y < 0)
                 return false;
 
-        if (x >= paint_state->button_area_width ||
-            y >= paint_state->button_area_height)
+        if (x >= painter->area_width ||
+            y >= painter->area_height)
                 return false;
 
-        switch (y * N_BUTTONS / paint_state->button_area_height) {
+        switch (y * N_BUTTONS / painter->area_height) {
         case 0:
                 vsx_game_state_turn(painter->game_state);
                 break;
@@ -285,7 +322,7 @@ fb_size_changed_cb(void *painter_data)
 {
         struct vsx_button_painter *painter = painter_data;
 
-        painter->vertices_dirty = true;
+        painter->layout_dirty = true;
 }
 
 static void
@@ -323,10 +360,8 @@ generate_button_vertices(struct vsx_button_painter *painter,
                          struct vertex *vertices)
 {
         struct vertex *v = vertices;
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-        int button_size = MIN(paint_state->button_area_width,
-                              paint_state->button_area_height / N_BUTTONS);
         int y = 0;
+        int button_size = painter->button_size;
 
         if (button_size <= 0) {
                 /* This shouldn’t happen */
@@ -334,8 +369,8 @@ generate_button_vertices(struct vsx_button_painter *painter,
                 return;
         }
 
-        int area_width = paint_state->button_area_width;
-        int area_height = paint_state->button_area_height;
+        int area_width = painter->area_width;
+        int area_height = painter->area_height;
 
         for (int i = 0; i < N_BUTTONS; i++) {
                 int button_start = (i * area_height / N_BUTTONS +
@@ -393,20 +428,18 @@ static void
 generate_n_tiles_vertices(struct vsx_button_painter *painter,
                           struct vertex *vertices)
 {
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-        int button_size = MIN(paint_state->button_area_width,
-                              paint_state->button_area_height / N_BUTTONS);
-
         int n_tiles = vsx_game_state_get_remaining_tiles(painter->game_state);
         int n_digits = get_n_digits(n_tiles);
 
-        if (button_size <= 0) {
+        int button_size = painter->button_size;
+
+        if (painter->button_size <= 0) {
                 /* This shouldn’t happen */
                 return;
         }
 
-        int area_width = paint_state->button_area_width;
-        int area_height = paint_state->button_area_height;
+        int area_width = painter->area_width;
+        int area_height = painter->area_height;
 
         int button_x = area_width / 2 - button_size / 2;
         int button_y = area_height / N_BUTTONS / 2 - button_size / 2;
@@ -472,9 +505,7 @@ paint_cb(void *painter_data)
         if (painter->tex == 0)
                 return;
 
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-
-        vsx_paint_state_ensure_layout(paint_state);
+        ensure_layout(painter);
 
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
@@ -491,10 +522,10 @@ paint_cb(void *painter_data)
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  paint_state->button_area_matrix);
+                                  painter->toolbox->paint_state.pixel_matrix);
         vsx_gl.glUniform2f(program->translation_uniform,
-                           paint_state->button_area_translation[0],
-                           paint_state->button_area_translation[1]);
+                           painter->translation[0],
+                           painter->translation[1]);
 
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
 
