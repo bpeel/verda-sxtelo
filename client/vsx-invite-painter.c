@@ -30,11 +30,6 @@
 #include "vsx-qr.h"
 #include "vsx-id-url.h"
 
-#define TEXTURE_SIZE 64
-
-_Static_assert(VSX_QR_IMAGE_SIZE <= TEXTURE_SIZE,
-               "The texture needs to be big enough to hold the QR image");
-
 struct vsx_invite_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
@@ -55,7 +50,7 @@ struct vsx_invite_painter {
 
 struct vertex {
         int16_t x, y;
-        uint16_t s, t;
+        uint8_t s, t;
 };
 
 #define N_QUADS 1
@@ -123,44 +118,23 @@ create_texture(struct vsx_invite_painter *painter,
         vsx_gl.glTexImage2D(GL_TEXTURE_2D,
                             0, /* level */
                             GL_LUMINANCE,
-                            TEXTURE_SIZE,
-                            TEXTURE_SIZE,
+                            VSX_QR_IMAGE_SIZE,
+                            VSX_QR_IMAGE_SIZE,
                             0, /* border */
                             GL_LUMINANCE,
                             GL_UNSIGNED_BYTE,
                             NULL /* data */);
 
-        uint8_t row[TEXTURE_SIZE];
-
-        memset(row + VSX_QR_IMAGE_SIZE,
-               0xff,
-               TEXTURE_SIZE - VSX_QR_IMAGE_SIZE);
-
         for (int y = 0; y < VSX_QR_IMAGE_SIZE; y++) {
-                memcpy(row, image + y * VSX_QR_IMAGE_SIZE, VSX_QR_IMAGE_SIZE);
                 vsx_gl.glTexSubImage2D(GL_TEXTURE_2D,
                                        0, /* level */
                                        0, /* x_offset */
                                        y,
-                                       TEXTURE_SIZE,
-                                       1, /* height */
-                                     GL_LUMINANCE,
-                                       GL_UNSIGNED_BYTE,
-                                       row);
-        }
-
-        memset(row, 0xff, VSX_QR_IMAGE_SIZE);
-
-        for (int y = VSX_QR_IMAGE_SIZE; y < TEXTURE_SIZE; y++) {
-                vsx_gl.glTexSubImage2D(GL_TEXTURE_2D,
-                                       0, /* level */
-                                       0, /* x_offset */
-                                       y,
-                                       TEXTURE_SIZE,
+                                       VSX_QR_IMAGE_SIZE,
                                        1, /* height */
                                        GL_LUMINANCE,
                                        GL_UNSIGNED_BYTE,
-                                       row);
+                                       image + y * VSX_QR_IMAGE_SIZE);
         }
 }
 
@@ -169,8 +143,6 @@ generate_vertices(struct vertex *vertices)
 {
         struct vertex *v = vertices;
 
-        uint16_t tex_max = VSX_QR_IMAGE_SIZE * 65535 / TEXTURE_SIZE;
-
         v->x = -1;
         v->y = 1;
         v->s = 0;
@@ -180,19 +152,19 @@ generate_vertices(struct vertex *vertices)
         v->x = -1;
         v->y = -1;
         v->s = 0;
-        v->t = tex_max;
+        v->t = 255;
         v++;
 
         v->x = 1;
         v->y = 1;
-        v->s = tex_max;
+        v->s = 255;
         v->t = 0;
         v++;
 
         v->x = 1;
         v->y = -1;
-        v->s = tex_max;
-        v->t = tex_max;
+        v->s = 255;
+        v->t = 255;
         v++;
 }
 
@@ -220,7 +192,7 @@ create_buffer(struct vsx_invite_painter *painter)
         vsx_array_object_set_attribute(painter->vao,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_UNSIGNED_SHORT,
+                                       GL_UNSIGNED_BYTE,
                                        true, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
