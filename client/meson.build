@@ -43,6 +43,7 @@ client_common_src = [
         'vsx-menu-painter.c',
         'vsx-mipmap.c',
         'vsx-monotonic.c',
+        'vsx-note-painter.c',
         'vsx-paint-state.c',
         'vsx-qr.c',
         'vsx-quad-buffer.c',
