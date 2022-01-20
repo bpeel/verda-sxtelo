@@ -75,16 +75,22 @@ cancel_timeout(struct vsx_note_painter *painter)
 }
 
 static void
+remove_note(struct vsx_note_painter *painter)
+{
+        vsx_free(painter->text);
+        painter->text = NULL;
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
 remove_note_cb(void *user_data)
 {
         struct vsx_note_painter *painter = user_data;
 
         painter->remove_note_timeout = NULL;
 
-        vsx_free(painter->text);
-        painter->text = NULL;
-
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        remove_note(painter);
 }
 
 static void
@@ -308,6 +314,27 @@ paint_cb(void *painter_data)
                          1.0f, 1.0f, 1.0f);
 }
 
+static bool
+input_event_cb(void *painter_data,
+               const struct vsx_input_event *event)
+{
+        struct vsx_note_painter *painter = painter_data;
+
+        switch (event->type) {
+        case VSX_INPUT_EVENT_TYPE_DRAG:
+        case VSX_INPUT_EVENT_TYPE_ZOOM:
+                break;
+
+        case VSX_INPUT_EVENT_TYPE_ZOOM_START:
+        case VSX_INPUT_EVENT_TYPE_DRAG_START:
+        case VSX_INPUT_EVENT_TYPE_CLICK:
+                remove_note(painter);
+                break;
+        }
+
+        return false;
+}
+
 static struct vsx_signal *
 get_redraw_needed_signal_cb(void *painter_data)
 {
@@ -343,6 +370,7 @@ vsx_note_painter = {
         .fb_size_changed_cb = fb_size_changed_cb,
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
+        .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };
