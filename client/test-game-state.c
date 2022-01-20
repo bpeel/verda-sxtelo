@@ -2296,6 +2296,95 @@ out:
         return ret;
 }
 
+struct test_note_closure {
+        bool succeeded;
+        bool had_event;
+        const char *expected_text;
+        struct vsx_listener listener;
+};
+
+static void
+test_note_cb(struct vsx_listener *listener,
+             void *user_data)
+{
+        struct test_note_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_note_closure,
+                                 listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_NOTE) {
+                fprintf(stderr,
+                        "Received unexpected modified event %i\n",
+                        event->type);
+                closure->succeeded = false;
+        }
+
+        if (closure->had_event) {
+                fprintf(stderr,
+                        "Received multiple note modified events\n");
+                closure->succeeded = false;
+        }
+
+        if (strcmp(closure->expected_text, event->note.text)) {
+                fprintf(stderr,
+                        "Note text does not match.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        closure->expected_text,
+                        event->note.text);
+                closure->succeeded = false;
+        }
+
+        closure->had_event = true;
+}
+
+static bool
+test_note(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        struct test_note_closure closure = {
+                .listener = {
+                        .notify = test_note_cb,
+                },
+
+                .had_event = false,
+                .succeeded = true,
+                .expected_text = "Ne eblas manĝi kokuson kun la ŝelo",
+        };
+
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.listener);
+
+        vsx_game_state_set_note(harness->game_state, closure.expected_text);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_event) {
+                fprintf(stderr,
+                        "No note modified event received after setting "
+                        "note.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
+
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2341,6 +2430,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_language())
+                ret = EXIT_FAILURE;
+
+        if (!test_note())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

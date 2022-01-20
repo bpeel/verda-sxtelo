@@ -568,6 +568,21 @@ vsx_game_state_set_language(struct vsx_game_state *game_state,
 }
 
 void
+vsx_game_state_set_note(struct vsx_game_state *game_state,
+                        const char *text)
+{
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_NOTE,
+
+                .note = {
+                        .text = text,
+                },
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y)

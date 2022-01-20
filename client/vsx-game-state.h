@@ -52,6 +52,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
         VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
         VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
+        VSX_GAME_STATE_MODIFIED_TYPE_NOTE,
 };
 
 struct vsx_game_state_modified_event {
@@ -62,6 +63,10 @@ struct vsx_game_state_modified_event {
                         int player_num;
                         const char *name;
                 } player_name;
+
+                struct {
+                        const char *text;
+                } note;
         };
 };
 
@@ -135,6 +140,10 @@ vsx_game_state_get_remaining_tiles(struct vsx_game_state *game_state);
 void
 vsx_game_state_set_language(struct vsx_game_state *game_state,
                             const char *language_code);
+
+void
+vsx_game_state_set_note(struct vsx_game_state *game_state,
+                        const char *text);
 
 void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
