@@ -507,44 +507,30 @@ vsx_layout_get_logical_extents(struct vsx_layout *layout)
 
 static void
 set_matrix_uniform(const struct vsx_shader_data_program_data *program,
-                   const struct vsx_paint_state *paint_state)
+                   struct vsx_paint_state *paint_state)
 {
-        GLfloat matrix[4];
-
-        if (paint_state->board_rotated) {
-                matrix[0] = 0.0f;
-                matrix[1] = -2.0f / paint_state->height;
-                matrix[2] = -2.0f / paint_state->width;
-                matrix[3] = 0.0f;
-        } else {
-                matrix[0] = 2.0f / paint_state->width;
-                matrix[1] = 0.0f;
-                matrix[2] = 0.0f;
-                matrix[3] = -2.0f / paint_state->height;
-        }
+        vsx_paint_state_ensure_layout(paint_state);
 
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  matrix);
+                                  paint_state->pixel_matrix);
 }
 
 static void
 set_translation_uniform(const struct vsx_shader_data_program_data *program,
-                        const struct vsx_paint_state *paint_state,
+                        struct vsx_paint_state *paint_state,
                         int x, int y)
 {
-        float tx, ty;
+        float translation[2];
 
-        if (paint_state->board_rotated) {
-                tx = 1.0f - y * 2.0f / paint_state->width;
-                ty = 1.0f - x * 2.0f / paint_state->height;
-        } else {
-                tx = x * 2.0f / paint_state->width - 1.0f;
-                ty = 1.0f - y * 2.0f / paint_state->height;
-        }
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 x, y,
+                                                 translation);
 
-        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
+        vsx_gl.glUniform2f(program->translation_uniform,
+                           translation[0],
+                           translation[1]);
 }
 
 static void
@@ -575,7 +561,7 @@ submit_layout(struct vsx_layout *layout)
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                           size_t n_layouts,
-                          const struct vsx_paint_state *paint_state,
+                          struct vsx_paint_state *paint_state,
                           float r, float g, float b)
 {
         if (n_layouts <= 0)
@@ -618,7 +604,7 @@ vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
 
 void
 vsx_layout_paint(struct vsx_layout *layout,
-                 const struct vsx_paint_state *paint_state,
+                 struct vsx_paint_state *paint_state,
                  int x, int y,
                  float r, float g, float b)
 {

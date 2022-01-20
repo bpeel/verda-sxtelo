@@ -48,12 +48,12 @@ vsx_layout_get_logical_extents(struct vsx_layout *layout);
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                           size_t n_layouts,
-                          const struct vsx_paint_state *paint_state,
+                          struct vsx_paint_state *paint_state,
                           float r, float g, float b);
 
 void
 vsx_layout_paint(struct vsx_layout *layout,
-                 const struct vsx_paint_state *paint_state,
+                 struct vsx_paint_state *paint_state,
                  int x, int y,
                  float r, float g, float b);
 
