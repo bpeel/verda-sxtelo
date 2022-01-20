@@ -185,8 +185,6 @@ update_label_positions(struct vsx_menu_painter *painter)
                         painter->button_size +
                         extents->top;
         }
-
-        painter->vertices_dirty = true;
 }
 
 static void
