@@ -370,6 +370,22 @@ fb_size_changed_cb(void *painter_data)
 }
 
 static void
+handle_language_button(struct vsx_menu_painter *painter)
+{
+        if (vsx_game_state_get_started(painter->game_state)) {
+                enum vsx_text_language language =
+                        vsx_game_state_get_language(painter->game_state);
+                const char *note =
+                        vsx_text_get(language,
+                                     VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED);
+                vsx_game_state_set_note(painter->game_state, note);
+        } else {
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_LANGUAGE);
+        }
+}
+
+static void
 handle_toggle_length(struct vsx_menu_painter *painter)
 {
         int n_tiles = (is_long_game(painter) ?
@@ -405,8 +421,7 @@ handle_click(struct vsx_menu_painter *painter,
 
         switch (x / painter->button_size) {
         case MENU_BUTTON_LANGUAGE:
-                vsx_game_state_set_dialog(painter->game_state,
-                                          VSX_DIALOG_LANGUAGE);
+                handle_language_button(painter);
                 break;
         case MENU_BUTTON_SHARE:
                 vsx_game_state_set_dialog(painter->game_state,
