@@ -166,28 +166,37 @@ create_cb(struct vsx_game_state *game_state,
         return painter;
 }
 
+static void
+get_origin(struct vsx_language_painter *painter,
+           int *origin_x,
+           int *origin_y)
+{
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        vsx_paint_state_ensure_layout(paint_state);
+
+        *origin_x = paint_state->pixel_width / 2 - painter->total_width / 2;
+        *origin_y = paint_state->pixel_height / 2 - painter->total_height / 2;
+}
+
 static bool
 handle_click(struct vsx_language_painter *painter,
              const struct vsx_input_event *event)
 {
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        int origin_x, origin_y;
+
+        get_origin(painter, &origin_x, &origin_y);
 
         int x, y;
 
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
         if (paint_state->board_rotated) {
-                int top_x = (paint_state->height / 2 -
-                             painter->total_width / 2);
-                int top_y = (paint_state->width / 2 +
-                             painter->total_height / 2);
-                x = event->click.y - top_x;
-                y = top_y - event->click.x;
+                x = event->click.y - origin_x;
+                y = origin_y + painter->total_height - 1 - event->click.x;
         } else {
-                int top_x = (paint_state->width / 2 -
-                             painter->total_width / 2);
-                int top_y = (paint_state->height / 2 -
-                             painter->total_height / 2);
-                x = event->click.x - top_x;
-                y = event->click.y - top_y;
+                x = event->click.x - origin_x;
+                y = event->click.y - origin_y;
         }
 
         if (x < 0 || x >= painter->total_width ||
@@ -237,35 +246,27 @@ static void
 update_uniforms(struct vsx_language_painter *painter,
                 const struct vsx_shader_data_program_data *program)
 {
-        const struct vsx_paint_state *paint_state =
+        struct vsx_paint_state *paint_state =
                 &painter->toolbox->paint_state;
 
-        GLfloat matrix[4];
-        GLfloat tx, ty;
+        float translation[2];
 
-        if (paint_state->board_rotated) {
-                matrix[0] = 0.0f;
-                matrix[1] = -2.0f / paint_state->height;
-                matrix[2] = -2.0f / paint_state->width;
-                matrix[3] = 0.0f;
+        int origin_x = (paint_state->pixel_width / 2 -
+                        painter->total_width / 2);
+        int origin_y = (paint_state->pixel_height / 2 -
+                        painter->total_height / 2);
 
-                tx = painter->total_height / (float) paint_state->width;
-                ty = painter->total_width / (float) paint_state->height;
-        } else {
-                matrix[0] = 2.0f / paint_state->width;
-                matrix[1] = 0.0f;
-                matrix[2] = 0.0f;
-                matrix[3] = -2.0f / paint_state->height;
-
-                tx = -painter->total_width / (float) paint_state->width;
-                ty = painter->total_height / (float) paint_state->height;
-        }
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 origin_x, origin_y,
+                                                 translation);
 
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  matrix);
-        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
+                                  paint_state->pixel_matrix);
+        vsx_gl.glUniform2f(program->translation_uniform,
+                           translation[0],
+                           translation[1]);
 
         vsx_gl.glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
 }
