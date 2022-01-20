@@ -41,7 +41,6 @@ struct vsx_menu_painter {
         struct vsx_painter_toolbox *toolbox;
 
         bool layout_dirty;
-        GLfloat matrix[4];
         GLfloat translation[2];
         int button_size;
         int dialog_x, dialog_y;
@@ -203,49 +202,20 @@ ensure_layout(struct vsx_menu_painter *painter)
         /* Convert the button size from mm to pixels */
         painter->button_size = BUTTON_SIZE * paint_state->dpi * 10 / 254;
 
+        if (painter->button_size * N_BUTTONS > paint_state->pixel_width)
+                painter->button_size = paint_state->pixel_width / N_BUTTONS;
+
         update_label_text(painter);
 
-        if (paint_state->board_rotated) {
-                if (painter->button_size * N_BUTTONS > paint_state->height)
-                        painter->button_size = paint_state->height / N_BUTTONS;
+        painter->dialog_x = (paint_state->pixel_width / 2 -
+                             painter->button_size * N_BUTTONS / 2);
+        painter->dialog_y = (paint_state->pixel_height / 2 -
+                             painter->dialog_height / 2);
 
-                painter->matrix[0] = 0.0f;
-                painter->matrix[1] = -2.0f / paint_state->height;
-                painter->matrix[2] = -2.0f / paint_state->width;
-                painter->matrix[3] = 0.0f;
-
-                painter->dialog_x = (paint_state->height / 2 -
-                                     painter->button_size * N_BUTTONS / 2);
-                painter->dialog_y = (paint_state->width / 2 -
-                                     painter->dialog_height / 2);
-
-                painter->translation[0] =
-                        painter->dialog_height / (float) paint_state->width;
-                painter->translation[1] =
-                        N_BUTTONS *
-                        painter->button_size /
-                        (float) paint_state->height;
-        } else {
-                if (painter->button_size * N_BUTTONS > paint_state->width)
-                        painter->button_size = paint_state->width / N_BUTTONS;
-
-                painter->matrix[0] = 2.0f / paint_state->width;
-                painter->matrix[1] = 0.0f;
-                painter->matrix[2] = 0.0f;
-                painter->matrix[3] = -2.0f / paint_state->height;
-
-                painter->dialog_x = (paint_state->width / 2 -
-                                     painter->button_size * N_BUTTONS / 2);
-                painter->dialog_y = (paint_state->height / 2 -
-                                     painter->dialog_height / 2);
-
-                painter->translation[0] =
-                        -N_BUTTONS *
-                        painter->button_size /
-                        (float) paint_state->width;
-                painter->translation[1] =
-                        painter->dialog_height / (float) paint_state->height;
-        }
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 painter->dialog_x,
+                                                 painter->dialog_y,
+                                                 painter->translation);
 
         update_label_positions(painter);
 
@@ -579,7 +549,7 @@ paint_cb(void *painter_data)
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  painter->matrix);
+                                  painter->toolbox->paint_state.pixel_matrix);
         vsx_gl.glUniform2f(program->translation_uniform,
                            painter->translation[0],
                            painter->translation[1]);
