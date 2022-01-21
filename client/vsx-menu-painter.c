@@ -381,13 +381,13 @@ handle_click(struct vsx_menu_painter *painter,
 
         int x, y;
 
-        if (paint_state->board_rotated) {
-                x = event->click.y - painter->dialog_x;
-                y = paint_state->width - painter->dialog_y - event->click.x;
-        } else {
-                x = event->click.x - painter->dialog_x;
-                y = event->click.y - painter->dialog_y;
-        }
+        vsx_paint_state_screen_to_pixel(paint_state,
+                                        event->click.x,
+                                        event->click.y,
+                                        &x, &y);
+
+        x -= painter->dialog_x;
+        y -= painter->dialog_y;
 
         if (x < 0 || x >= painter->button_size * N_BUTTONS ||
             y < 0 || y >= painter->dialog_height) {
