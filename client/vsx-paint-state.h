@@ -70,4 +70,12 @@ vsx_paint_state_offset_pixel_translation(struct vsx_paint_state *paint_state,
                                          float x, float y,
                                          float *translation);
 
+/* Converts a screen position to the coordinate space used by the
+ * “pixel” matrix. Ie, it takes into account the board rotation.
+ */
+void
+vsx_paint_state_screen_to_pixel(struct vsx_paint_state *paint_state,
+                                int x_in, int y_in,
+                                int *x_out, int *y_out);
+
 #endif /* VSX_PAINT_STATE_H */
