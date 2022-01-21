@@ -73,7 +73,6 @@ struct vsx_main_data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
-        struct vsx_listener event_listener;
 
         bool button_pressed;
         int mouse_x, mouse_y;
@@ -200,7 +199,6 @@ finish_restartable_data(struct vsx_main_data *main_data)
         finish_sdl_window(main_data);
 
         if (main_data->game_state) {
-                vsx_list_remove(&main_data->event_listener.link);
                 vsx_game_state_free(main_data->game_state);
                 main_data->game_state = NULL;
         }
@@ -312,34 +310,6 @@ init_sdl_window(struct vsx_main_data *main_data)
 }
 
 static void
-event_cb(struct vsx_listener *listener,
-         void *user_data)
-{
-        const struct vsx_connection_event *event = user_data;
-
-        if (event->type == VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID) {
-                char buf[VSX_ID_URL_ENCODED_SIZE + 1];
-
-                vsx_id_url_encode(event->conversation_id.id, buf);
-
-                printf("%s\n", buf);
-        }
-}
-
-static void
-init_game_state(struct vsx_main_data *main_data)
-{
-        main_data->game_state = vsx_game_state_new(main_data->worker,
-                                                   main_data->connection);
-
-        main_data->event_listener.notify = event_cb;
-
-        struct vsx_signal *signal =
-                vsx_game_state_get_event_signal(main_data->game_state);
-        vsx_signal_add(signal, &main_data->event_listener);
-}
-
-static void
 redraw_needed_cb(struct vsx_listener *listener,
                  void *signal_data)
 {
@@ -441,7 +411,8 @@ init_restartable_data(struct vsx_main_data *main_data)
         if (main_data->worker == NULL)
                 return false;
 
-        init_game_state(main_data);
+        main_data->game_state = vsx_game_state_new(main_data->worker,
+                                                   main_data->connection);
 
         if (!init_painter(main_data))
                 return false;
