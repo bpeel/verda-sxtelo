@@ -31,6 +31,7 @@
 #include "vsx-qr.h"
 #include "vsx-id-url.h"
 #include "vsx-layout.h"
+#include "vsx-share-link.h"
 
 struct paragraph {
         struct vsx_layout *layout;
@@ -49,6 +50,8 @@ struct vsx_invite_painter {
         GLuint element_buffer;
 
         bool layout_dirty;
+        int dialog_x, dialog_y;
+        int dialog_width, dialog_height;
 
         struct paragraph paragraphs[2];
 
@@ -373,10 +376,8 @@ get_paragraphs_size(struct vsx_invite_painter *painter,
 }
 
 static void
-prepare_cb(void *painter_data)
+ensure_layout(struct vsx_invite_painter *painter)
 {
-        struct vsx_invite_painter *painter = painter_data;
-
         uint64_t conversation_id;
 
         if (vsx_game_state_get_conversation_id(painter->game_state,
@@ -411,17 +412,29 @@ prepare_cb(void *painter_data)
 
         update_vertices(painter, qr_code_size, total_width, total_height);
 
+        painter->dialog_x = paint_state->pixel_width / 2 - total_width / 2;
+        painter->dialog_y = paint_state->pixel_height / 2 - total_height / 2;
+        painter->dialog_width = total_width;
+        painter->dialog_height = total_height;
+
         for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
                 struct paragraph *paragraph = painter->paragraphs + i;
 
-                paragraph->x += (paint_state->pixel_width / 2 -
-                                 total_width / 2 +
-                                 qr_code_size);
-                paragraph->y += (paint_state->pixel_height / 2 -
+                paragraph->x += painter->dialog_x + qr_code_size;
+                paragraph->y += (painter->dialog_y +
+                                 painter->dialog_height / 2 -
                                  paragraphs_height / 2);
         }
 
         painter->layout_dirty = false;
+}
+
+static void
+prepare_cb(void *painter_data)
+{
+        struct vsx_invite_painter *painter = painter_data;
+
+        ensure_layout(painter);
 }
 
 static void
@@ -481,6 +494,51 @@ paint_cb(void *painter_data)
 }
 
 static bool
+handle_click(struct vsx_invite_painter *painter,
+             const struct vsx_input_event *event)
+{
+        ensure_layout(painter);
+
+        if (painter->tex == 0)
+                return false;
+
+        int x, y;
+
+        vsx_paint_state_screen_to_pixel(&painter->toolbox->paint_state,
+                                        event->click.x, event->click.y,
+                                        &x, &y);
+
+        if (x < painter->dialog_x ||
+            x >= painter->dialog_x + painter->dialog_width ||
+            y < painter->dialog_y ||
+            y >= painter->dialog_y + painter->dialog_height) {
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_NONE);
+                return true;
+        }
+
+        const struct paragraph *link =
+                painter->paragraphs + VSX_N_ELEMENTS(painter->paragraphs) - 1;
+
+        const struct vsx_layout_extents *extents =
+                vsx_layout_get_logical_extents(link->layout);
+
+        if (x >= link->x - extents->left &&
+            x < link->x + extents->right &&
+            y >= link->y - extents->top &&
+            y < link->y + extents->bottom) {
+                char url[VSX_ID_URL_ENCODED_SIZE + 1];
+
+                vsx_id_url_encode(painter->id_in_texture, url);
+                vsx_share_link(painter->game_state, url);
+
+                return true;
+        }
+
+        return true;
+}
+
+static bool
 input_event_cb(void *painter_data,
                const struct vsx_input_event *event)
 {
@@ -494,9 +552,7 @@ input_event_cb(void *painter_data,
                 return false;
 
         case VSX_INPUT_EVENT_TYPE_CLICK:
-                vsx_game_state_set_dialog(painter->game_state,
-                                          VSX_DIALOG_NONE);
-                return true;
+                return handle_click(painter, event);
         }
 
         return false;
