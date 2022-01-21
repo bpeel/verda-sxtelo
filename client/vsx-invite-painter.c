@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-gl.h"
@@ -29,6 +30,13 @@
 #include "vsx-quad-buffer.h"
 #include "vsx-qr.h"
 #include "vsx-id-url.h"
+#include "vsx-layout.h"
+
+struct paragraph {
+        struct vsx_layout *layout;
+        int x, y;
+        float r, g, b;
+};
 
 struct vsx_invite_painter {
         struct vsx_game_state *game_state;
@@ -42,6 +50,8 @@ struct vsx_invite_painter {
 
         bool layout_dirty;
 
+        struct paragraph paragraphs[2];
+
         GLuint tex;
 
         /* The ID that we last used to generate the texture */
@@ -52,7 +62,7 @@ struct vsx_invite_painter {
 
 struct vertex {
         int16_t x, y;
-        uint8_t s, t;
+        float s, t;
 };
 
 #define N_QUADS 1
@@ -60,6 +70,15 @@ struct vertex {
 
 /* Size of the QR image in mm */
 #define QR_CODE_SIZE 30
+
+/* Max width of the explanation text in mm */
+#define PARAGRAPH_WIDTH 40
+/* Border size around the paragraphs in mm. This is chosen to be the
+ * same size as the quiet zone around the qr code.
+ */
+#define BORDER (4 * QR_CODE_SIZE / VSX_QR_IMAGE_SIZE)
+
+#define PARAGRAPHS_FONT VSX_FONT_TYPE_LABEL
 
 static void
 modified_cb(struct vsx_listener *listener,
@@ -72,6 +91,10 @@ modified_cb(struct vsx_listener *listener,
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
+                painter->layout_dirty = true;
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
         case VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID:
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
@@ -144,41 +167,59 @@ create_texture(struct vsx_invite_painter *painter,
 }
 
 static void
-generate_vertices(const struct vsx_paint_state *paint_state,
-                  struct vertex *vertices)
+update_vertices(struct vsx_invite_painter *painter,
+                int qr_code_size,
+                int total_width,
+                int total_height)
 {
-        /* Convert the measurements from mm to pixels */
-        int qr_code_size = QR_CODE_SIZE * paint_state->dpi * 10 / 254;
-        int x1 = paint_state->pixel_width / 2 - qr_code_size / 2;
-        int y1 = paint_state->pixel_height / 2 - qr_code_size / 2;
-        int x2 = x1 + qr_code_size;
-        int y2 = y1 + qr_code_size;
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
 
-        struct vertex *v = vertices;
+        int x1 = paint_state->pixel_width / 2 - total_width / 2;
+        int y1 = paint_state->pixel_height / 2 - total_height / 2;
+        int x2 = x1 + total_width;
+        int y2 = y1 + total_height;
+
+        float s1 = 0.0f;
+        float s2 = total_width / (float) qr_code_size;
+
+        float height_in_tex_coords = total_height / (float) qr_code_size;
+        float t1 = -height_in_tex_coords / 2.0f + 0.5f;
+        float t2 = t1 + height_in_tex_coords;
+
+        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+
+        struct vertex *v =
+                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                                   N_VERTICES * sizeof (struct vertex),
+                                   false, /* flush explicit */
+                                   GL_DYNAMIC_DRAW);
 
         v->x = x1;
         v->y = y1;
-        v->s = 0;
-        v->t = 0;
+        v->s = s1;
+        v->t = t1;
         v++;
 
         v->x = x1;
         v->y = y2;
-        v->s = 0;
-        v->t = 255;
+        v->s = s1;
+        v->t = t2;
         v++;
 
         v->x = x2;
         v->y = y1;
-        v->s = 255;
-        v->t = 0;
+        v->s = s2;
+        v->t = t1;
         v++;
 
         v->x = x2;
         v->y = y2;
-        v->s = 255;
-        v->t = 255;
+        v->s = s2;
+        v->t = t2;
         v++;
+
+        vsx_map_buffer_unmap();
 }
 
 static void
@@ -205,8 +246,8 @@ create_buffer(struct vsx_invite_painter *painter)
         vsx_array_object_set_attribute(painter->vao,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_UNSIGNED_BYTE,
-                                       true, /* normalized */
+                                       GL_FLOAT,
+                                       false, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
                                        painter->vbo,
@@ -214,6 +255,24 @@ create_buffer(struct vsx_invite_painter *painter)
 
         painter->element_buffer =
                 vsx_quad_buffer_generate(painter->vao, N_QUADS);
+}
+
+static void
+create_layouts(struct vsx_invite_painter *painter)
+{
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
+                struct vsx_layout *layout =
+                        vsx_layout_new(painter->toolbox->font_library,
+                                       &painter->toolbox->shader_data);
+
+                vsx_layout_set_font(layout, PARAGRAPHS_FONT);
+
+                painter->paragraphs[i].layout = layout;
+        }
+
+        painter->paragraphs[1].r = 0.106f;
+        painter->paragraphs[1].g = 0.561f;
+        painter->paragraphs[1].b = 0.871f;
 }
 
 static void *
@@ -235,6 +294,8 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
 
+        create_layouts(painter);
+
         return painter;
 }
 
@@ -247,28 +308,118 @@ fb_size_changed_cb(void *painter_data)
 }
 
 static void
+update_layouts(struct vsx_invite_painter *painter,
+               uint64_t conversation_id)
+{
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        int paragraph_width = PARAGRAPH_WIDTH * paint_state->dpi * 10 / 254;
+
+        vsx_layout_set_width(painter->paragraphs[0].layout, paragraph_width);
+
+        enum vsx_text_language language =
+                vsx_game_state_get_language(painter->game_state);
+        vsx_layout_set_text(painter->paragraphs[0].layout,
+                            vsx_text_get(language,
+                                         VSX_TEXT_INVITE_EXPLANATION));
+
+        char id_url[VSX_ID_URL_ENCODED_SIZE + 1];
+        vsx_id_url_encode(conversation_id, id_url);
+        vsx_layout_set_text(painter->paragraphs[1].layout, id_url);
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++)
+                vsx_layout_prepare(painter->paragraphs[i].layout);
+}
+
+static void
+get_paragraphs_size(struct vsx_invite_painter *painter,
+                    int *width_out,
+                    int *height_out)
+{
+        struct vsx_font_library *font_library = painter->toolbox->font_library;
+        struct vsx_font *font = vsx_font_library_get_font(font_library,
+                                                          PARAGRAPHS_FONT);
+        struct vsx_font_metrics font_metrics;
+
+        vsx_font_get_metrics(font, &font_metrics);
+
+        int y_advance = roundf(font_metrics.height);
+
+        int max_right = 0;
+        int first_top = 0;
+        int y = 0;
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
+                struct paragraph *paragraph = painter->paragraphs + i;
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(paragraph->layout);
+
+                paragraph->x = 0;
+                paragraph->y = y + extents->top;
+
+                if (i == 0)
+                        first_top = extents->top;
+
+                if (i >= VSX_N_ELEMENTS(painter->paragraphs) - 1)
+                        y += extents->bottom;
+                else
+                        y += (extents->n_lines + 1) * y_advance;
+
+                if (extents->right > max_right)
+                        max_right = extents->right;
+        }
+
+        *width_out = max_right;
+        *height_out = first_top + y;
+}
+
+static void
 prepare_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        if (!painter->layout_dirty)
+        uint64_t conversation_id;
+
+        if (vsx_game_state_get_conversation_id(painter->game_state,
+                                               &conversation_id)) {
+                if (painter->tex == 0 ||
+                    painter->id_in_texture != conversation_id) {
+                        create_texture(painter, conversation_id);
+                        painter->id_in_texture = conversation_id;
+                } else if (!painter->layout_dirty) {
+                        return;
+                }
+        } else {
+                free_texture(painter);
                 return;
+        }
 
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        update_layouts(painter, conversation_id);
 
-        struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
-                                   N_VERTICES * sizeof (struct vertex),
-                                   false, /* flush explicit */
-                                   GL_DYNAMIC_DRAW);
+        /* Convert the measurements from mm to pixels */
+        int border = BORDER * paint_state->dpi * 10 / 254;
+        int qr_code_size = QR_CODE_SIZE * paint_state->dpi * 10 / 254;
 
-        generate_vertices(paint_state, vertices);
+        int paragraphs_width, paragraphs_height;
+        get_paragraphs_size(painter, &paragraphs_width, &paragraphs_height);
 
-        vsx_map_buffer_unmap();
+        int total_width = qr_code_size + paragraphs_width + border;
+        int total_height = MAX(paragraphs_height + border * 2, qr_code_size);
+
+        update_vertices(painter, qr_code_size, total_width, total_height);
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
+                struct paragraph *paragraph = painter->paragraphs + i;
+
+                paragraph->x += (paint_state->pixel_width / 2 -
+                                 total_width / 2 +
+                                 qr_code_size);
+                paragraph->y += (paint_state->pixel_height / 2 -
+                                 paragraphs_height / 2);
+        }
 
         painter->layout_dirty = false;
 }
@@ -294,18 +445,8 @@ paint_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        uint64_t conversation_id;
-
-        if (vsx_game_state_get_conversation_id(painter->game_state,
-                                               &conversation_id)) {
-                if (painter->tex == 0 ||
-                    painter->id_in_texture != conversation_id) {
-                        create_texture(painter, conversation_id);
-                        painter->id_in_texture = conversation_id;
-                }
-        } else {
+        if (painter->tex == 0)
                 return;
-        }
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
@@ -325,6 +466,18 @@ paint_cb(void *painter_data)
                                    N_QUADS * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
+                const struct paragraph *paragraph = painter->paragraphs + i;
+
+                vsx_layout_paint(paragraph->layout,
+                                 &painter->toolbox->paint_state,
+                                 paragraph->x,
+                                 paragraph->y,
+                                 paragraph->r,
+                                 paragraph->g,
+                                 paragraph->b);
+        }
 }
 
 static bool
@@ -370,6 +523,11 @@ free_cb(void *painter_data)
                 vsx_gl.glDeleteBuffers(1, &painter->vbo);
         if (painter->element_buffer)
                 vsx_gl.glDeleteBuffers(1, &painter->element_buffer);
+
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
+                if (painter->paragraphs[i].layout)
+                        vsx_layout_free(painter->paragraphs[i].layout);
+        }
 
         free_texture(painter);
 

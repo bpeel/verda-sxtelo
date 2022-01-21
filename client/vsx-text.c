@@ -35,6 +35,8 @@ english[] = {
         "The language can’t be changed after the game has started",
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
         "The game length can’t be changed after the game has started",
+        [VSX_TEXT_INVITE_EXPLANATION] =
+        "Send the link below or scan the code to invite friends.",
 };
 
 static const char *const
@@ -49,6 +51,9 @@ french[] = {
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
         "La durée de jeu ne peut pas être changée après que le jeu ait "
         "commencé",
+        [VSX_TEXT_INVITE_EXPLANATION] =
+        "Envoyez le lien ci-dessous ou flashez le code pour inviter "
+        "des ami·es.",
 };
 
 static const char *const
@@ -62,6 +67,8 @@ esperanto[] = {
         "Ne eblas ŝanĝi la lingvon post kiam la ludo komenciĝis",
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
         "Ne eblas ŝanĝi la longecon de la ludo post kiam la ludo komenciĝis",
+        [VSX_TEXT_INVITE_EXPLANATION] =
+        "Sendu la jenan ligilon aŭ skanu la kodon por inviti amikojn.",
 };
 
 static const char *const * const
