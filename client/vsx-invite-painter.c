@@ -40,6 +40,8 @@ struct vsx_invite_painter {
         GLuint vbo;
         GLuint element_buffer;
 
+        bool layout_dirty;
+
         GLuint tex;
 
         /* The ID that we last used to generate the texture */
@@ -55,6 +57,9 @@ struct vertex {
 
 #define N_QUADS 1
 #define N_VERTICES (N_QUADS * 4)
+
+/* Size of the QR image in mm */
+#define QR_CODE_SIZE 30
 
 static void
 modified_cb(struct vsx_listener *listener,
@@ -139,30 +144,38 @@ create_texture(struct vsx_invite_painter *painter,
 }
 
 static void
-generate_vertices(struct vertex *vertices)
+generate_vertices(const struct vsx_paint_state *paint_state,
+                  struct vertex *vertices)
 {
+        /* Convert the measurements from mm to pixels */
+        int qr_code_size = QR_CODE_SIZE * paint_state->dpi * 10 / 254;
+        int x1 = paint_state->pixel_width / 2 - qr_code_size / 2;
+        int y1 = paint_state->pixel_height / 2 - qr_code_size / 2;
+        int x2 = x1 + qr_code_size;
+        int y2 = y1 + qr_code_size;
+
         struct vertex *v = vertices;
 
-        v->x = -1;
-        v->y = 1;
+        v->x = x1;
+        v->y = y1;
         v->s = 0;
         v->t = 0;
         v++;
 
-        v->x = -1;
-        v->y = -1;
+        v->x = x1;
+        v->y = y2;
         v->s = 0;
         v->t = 255;
         v++;
 
-        v->x = 1;
-        v->y = 1;
+        v->x = x2;
+        v->y = y1;
         v->s = 255;
         v->t = 0;
         v++;
 
-        v->x = 1;
-        v->y = -1;
+        v->x = x2;
+        v->y = y2;
         v->s = 255;
         v->t = 255;
         v++;
@@ -176,7 +189,7 @@ create_buffer(struct vsx_invite_painter *painter)
         vsx_gl.glBufferData(GL_ARRAY_BUFFER,
                             N_VERTICES * sizeof (struct vertex),
                             NULL, /* data */
-                            GL_STATIC_DRAW);
+                            GL_DYNAMIC_DRAW);
 
         painter->vao = vsx_array_object_new();
 
@@ -199,16 +212,6 @@ create_buffer(struct vsx_invite_painter *painter)
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 
-        struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
-                                   N_VERTICES * sizeof (struct vertex),
-                                   false, /* flush explicit */
-                                   GL_STATIC_DRAW);
-
-        generate_vertices(vertices);
-
-        vsx_map_buffer_unmap();
-
         painter->element_buffer =
                 vsx_quad_buffer_generate(painter->vao, N_QUADS);
 }
@@ -224,6 +227,8 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
+        painter->layout_dirty = true;
+
         create_buffer(painter);
 
         painter->modified_listener.notify = modified_cb;
@@ -234,32 +239,53 @@ create_cb(struct vsx_game_state *game_state,
 }
 
 static void
+fb_size_changed_cb(void *painter_data)
+{
+        struct vsx_invite_painter *painter = painter_data;
+
+        painter->layout_dirty = true;
+}
+
+static void
+prepare_cb(void *painter_data)
+{
+        struct vsx_invite_painter *painter = painter_data;
+
+        if (!painter->layout_dirty)
+                return;
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        vsx_paint_state_ensure_layout(paint_state);
+
+        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+
+        struct vertex *vertices =
+                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                                   N_VERTICES * sizeof (struct vertex),
+                                   false, /* flush explicit */
+                                   GL_DYNAMIC_DRAW);
+
+        generate_vertices(paint_state, vertices);
+
+        vsx_map_buffer_unmap();
+
+        painter->layout_dirty = false;
+}
+
+static void
 set_uniforms(struct vsx_invite_painter *painter,
              const struct vsx_shader_data_program_data *program)
 {
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
-        vsx_paint_state_ensure_layout(paint_state);
-
-        GLfloat matrix[4];
-
-        if (paint_state->board_rotated) {
-                matrix[0] = 0.0f;
-                matrix[1] = -0.5f * paint_state->width / paint_state->height;
-                matrix[2] = 0.5f;
-                matrix[3] = 0.0f;
-        } else {
-                matrix[0] = 0.5f * paint_state->height / paint_state->width;
-                matrix[1] = 0.0f;
-                matrix[2] = 0.0f;
-                matrix[3] = 0.5f;
-        }
-
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */
                                   GL_FALSE, /* transpose */
-                                  matrix);
-        vsx_gl.glUniform2f(program->translation_uniform, 0.0f, 0.0f);
+                                  paint_state->pixel_matrix);
+        vsx_gl.glUniform2f(program->translation_uniform,
+                           paint_state->pixel_translation[0],
+                           paint_state->pixel_translation[1]);
 
 }
 
@@ -353,6 +379,8 @@ free_cb(void *painter_data)
 const struct vsx_painter
 vsx_invite_painter = {
         .create_cb = create_cb,
+        .fb_size_changed_cb = fb_size_changed_cb,
+        .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
         .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
