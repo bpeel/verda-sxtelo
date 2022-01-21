@@ -195,7 +195,7 @@ split_lines(struct vsx_layout *layout,
         int space_advance = get_character_advance(layout, ' ');
         const char *line_start = layout->text, *p = layout->text;
         int line_length = 0;
-        int y = 0;
+        int line_num = 0;
 
         int y_advance = metrics->height * 64 + 0.5f;
 
@@ -233,19 +233,19 @@ split_lines(struct vsx_layout *layout,
                                                          buf,
                                                          word_start,
                                                          p,
-                                                         y);
+                                                         line_num * y_advance);
                         } else {
                                 add_glyph_quads_for_line(layout,
                                                          metrics,
                                                          buf,
                                                          line_start,
                                                          word_start,
-                                                         y);
+                                                         line_num * y_advance);
                                 /* Try adding the word again on a new line */
                                 p = word_start;
                         }
 
-                        y += y_advance;
+                        line_num++;
                         line_length = 0;
                         line_start = p;
                 } else {
@@ -258,15 +258,24 @@ split_lines(struct vsx_layout *layout,
                                                  buf,
                                                  line_start,
                                                  p,
-                                                 y);
-                        y += y_advance;
+                                                 line_num * y_advance);
+                        line_num++;
                         line_length = 0;
                         line_start = ++p;
                 }
         }
 
         /* Add the last line. It should fit. */
-        add_glyph_quads_for_line(layout, metrics, buf, line_start, p, y);
+        if (p > line_start) {
+                add_glyph_quads_for_line(layout,
+                                         metrics,
+                                         buf,
+                                         line_start, p,
+                                         line_num * y_advance);
+                line_num++;
+        }
+
+        layout->logical_extents.n_lines = line_num;
 }
 
 static void
@@ -294,6 +303,7 @@ get_glyph_quads(struct vsx_layout *layout,
                                          layout->text,
                                          layout->text + strlen(layout->text),
                                          0 /* y */);
+                layout->logical_extents.n_lines = 1;
         } else {
                 split_lines(layout, &metrics, &buf);
         }

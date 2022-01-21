@@ -16,6 +16,8 @@ struct vsx_layout_extents {
         /* Extents around the origin when painted */
         float left, right;
         float top, bottom;
+
+        int n_lines;
 };
 
 struct vsx_layout_paint_position {
