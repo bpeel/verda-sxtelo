@@ -183,21 +183,21 @@ static bool
 handle_click(struct vsx_language_painter *painter,
              const struct vsx_input_event *event)
 {
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        int x, y;
+
+        vsx_paint_state_screen_to_pixel(paint_state,
+                                        event->click.x,
+                                        event->click.y,
+                                        &x, &y);
+
         int origin_x, origin_y;
 
         get_origin(painter, &origin_x, &origin_y);
 
-        int x, y;
-
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-
-        if (paint_state->board_rotated) {
-                x = event->click.y - origin_x;
-                y = origin_y + painter->total_height - 1 - event->click.x;
-        } else {
-                x = event->click.x - origin_x;
-                y = event->click.y - origin_y;
-        }
+        x -= origin_x;
+        y -= origin_y;
 
         if (x < 0 || x >= painter->total_width ||
             y < 0 || y >= painter->total_height) {
