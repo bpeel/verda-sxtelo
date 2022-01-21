@@ -266,13 +266,13 @@ handle_click(struct vsx_button_painter *painter,
 
         int x, y;
 
-        if (paint_state->board_rotated) {
-                x = event->click.y - painter->area_x;
-                y = painter->area_y + painter->area_height - 1 - event->click.x;
-        } else {
-                x = event->click.x - painter->area_x;
-                y = event->click.y - painter->area_y;
-        }
+        vsx_paint_state_screen_to_pixel(paint_state,
+                                        event->click.x,
+                                        event->click.y,
+                                        &x, &y);
+
+        x -= painter->area_x;
+        y -= painter->area_y;
 
         if (x < 0 || y < 0)
                 return false;
