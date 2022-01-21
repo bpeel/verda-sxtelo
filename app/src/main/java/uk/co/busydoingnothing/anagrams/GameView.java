@@ -19,6 +19,7 @@
 package uk.co.busydoingnothing.anagrams;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.opengl.GLES20;
@@ -140,6 +141,25 @@ public class GameView extends GLSurfaceView
     queueEvent(new Runnable() {
         public void run() {
           renderer.flushIdleEvents(nativeData);
+        }
+      });
+  }
+
+  public void shareLink(String link)
+  {
+    Handler mainHandler = new Handler(context.getMainLooper());
+
+    mainHandler.post(new Runnable() {
+        @Override
+        public void run()
+        {
+          Intent sendIntent = new Intent();
+          sendIntent.setAction(Intent.ACTION_SEND);
+          sendIntent.putExtra(Intent.EXTRA_TEXT, link);
+          sendIntent.setType("text/plain");
+
+          Intent shareIntent = Intent.createChooser(sendIntent, null);
+          context.startActivity(shareIntent);
         }
       });
   }

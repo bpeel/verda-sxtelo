@@ -16,31 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_TEXT_H
-#define VSX_TEXT_H
+#ifndef VSX_SHARE_LINK_CALLBACK_H
+#define VSX_SHARE_LINK_CALLBACK_H
 
-enum vsx_text_language {
-        VSX_TEXT_LANGUAGE_ENGLISH,
-        VSX_TEXT_LANGUAGE_FRENCH,
-        VSX_TEXT_LANGUAGE_ESPERANTO,
-};
+#include "vsx-share-link.h"
 
-enum vsx_text {
-        VSX_TEXT_LANGUAGE_CODE,
-        VSX_TEXT_LANGUAGE_BUTTON,
-        VSX_TEXT_SHARE_BUTTON,
-        VSX_TEXT_SHORT_GAME,
-        VSX_TEXT_LONG_GAME,
-        VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED,
-        VSX_TEXT_CANT_CHANGE_LENGTH_STARTED,
-        VSX_TEXT_INVITE_EXPLANATION,
-        VSX_TEXT_LINK_COPIED,
-};
+typedef void
+(* vsx_share_link_callback)(const char *link,
+                            void *user_data);
 
-#define VSX_TEXT_N_LANGUAGES 3
+void
+vsx_share_link_set_callback(vsx_share_link_callback callback,
+                            void *user_data);
 
-const char *
-vsx_text_get(enum vsx_text_language language,
-             enum vsx_text text);
-
-#endif /* VSX_TEXT_H */
+#endif /* VSX_SHARE_LINK_CALLBACK_H */

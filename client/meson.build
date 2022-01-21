@@ -62,6 +62,7 @@ if get_option('client')
         client_src = [
                 'vsx-asset-linux.c',
                 'vsx-main.c',
+                'vsx-share-link-linux.c',
                 'vsx-thread-linux.c',
         ] + client_common_src
 
@@ -93,6 +94,7 @@ if get_option('jni')
         jni_src = [
                 'vsx-jni.c',
                 'vsx-asset-android.c',
+                'vsx-share-link-callback.c',
                 'vsx-thread-jni.c',
         ] + client_common_src
 

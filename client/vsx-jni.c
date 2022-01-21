@@ -34,6 +34,7 @@
 #include "vsx-connection.h"
 #include "vsx-worker.h"
 #include "vsx-id-url.h"
+#include "vsx-share-link-callback.h"
 
 #define TAG "Anagrams"
 
@@ -72,6 +73,8 @@ struct data {
         bool redraw_queued;
 
         jmethodID queue_flush_idle_method_id;
+
+        jmethodID share_link_method_id;
 
         /* Graphics data that needs to be recreated when the context changes */
         void *gl_lib;
@@ -163,6 +166,23 @@ wakeup_cb(void *user_data)
         call_void_surface_method(data, data->queue_flush_idle_method_id);
 }
 
+static void
+share_link_cb(const char *link,
+              void *user_data)
+{
+        struct data *data = user_data;
+
+        JNIEnv *env;
+
+        (*data->jvm)->GetEnv(data->jvm, (void **) &env, JNI_VERSION_1_6);
+
+        jstring link_string = (*env)->NewStringUTF(env, link);
+
+        call_void_surface_method(data,
+                                 data->share_link_method_id,
+                                 link_string);
+}
+
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -187,6 +207,11 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     data->surface_class,
                                     "queueFlushIdleEvents",
                                     "()V");
+        data->share_link_method_id =
+                (*env)->GetMethodID(env,
+                                    data->surface_class,
+                                    "shareLink",
+                                    "(Ljava/lang/String;)V");
 
         vsx_thread_set_jvm(data->jvm);
 
@@ -195,6 +220,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
         data->dpi = dpi;
 
         vsx_main_thread_set_wakeup_func(wakeup_cb, data);
+        vsx_share_link_set_callback(share_link_cb, data);
 
         return (jlong) data;
 }
