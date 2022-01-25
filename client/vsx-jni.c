@@ -541,7 +541,7 @@ VSX_JNI_RENDERER_PREFIX(freeNativeData)(JNIEnv *env,
         if (data->connection)
                 vsx_connection_free(data->connection);
 
-        vsx_asset_manager_free(data->asset_manager);
+        vsx_asset_manager_free(env, data->asset_manager);
 
         (*env)->DeleteWeakGlobalRef(env, data->surface);
 

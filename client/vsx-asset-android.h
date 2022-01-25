@@ -27,6 +27,6 @@ struct vsx_asset_manager *
 vsx_asset_manager_new(JNIEnv *env, jobject manager);
 
 void
-vsx_asset_manager_free(struct vsx_asset_manager *manager);
+vsx_asset_manager_free(JNIEnv *env, struct vsx_asset_manager *manager);
 
 #endif /* VSX_ASSET_ANDROID_H */

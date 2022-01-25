@@ -26,7 +26,6 @@
 #include "vsx-util.h"
 
 struct vsx_asset_manager {
-        JNIEnv *env;
         jobject manager_jni;
         struct AAssetManager *manager;
 };
@@ -46,7 +45,6 @@ vsx_asset_manager_new(JNIEnv *env, jobject manager)
                 vsx_calloc(sizeof *asset_manager);
 
         asset_manager->manager_jni = (*env)->NewGlobalRef(env, manager);
-        asset_manager->env = env;
         asset_manager->manager =
                 AAssetManager_fromJava(env, asset_manager->manager_jni);
 
@@ -128,8 +126,8 @@ vsx_asset_close(struct vsx_asset *asset)
 }
 
 void
-vsx_asset_manager_free(struct vsx_asset_manager *manager)
+vsx_asset_manager_free(JNIEnv *env, struct vsx_asset_manager *manager)
 {
-        (*manager->env)->DeleteGlobalRef(manager->env, manager->manager_jni);
+        (*env)->DeleteGlobalRef(env, manager->manager_jni);
         vsx_free(manager);
 }
