@@ -516,31 +516,18 @@ vsx_layout_get_logical_extents(struct vsx_layout *layout)
 }
 
 static void
-set_matrix_uniform(const struct vsx_shader_data_program_data *program,
-                   struct vsx_paint_state *paint_state)
-{
-        vsx_paint_state_ensure_layout(paint_state);
-
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  paint_state->pixel_matrix);
-}
-
-static void
 set_translation_uniform(const struct vsx_shader_data_program_data *program,
-                        struct vsx_paint_state *paint_state,
+                        const struct vsx_layout_paint_params *params,
                         int x, int y)
 {
-        float translation[2];
+        float tx = (params->matrix[0] * x +
+                    params->matrix[2] * y +
+                    params->translation_x);
+        float ty = (params->matrix[1] * x +
+                    params->matrix[3] * y +
+                    params->translation_y);
 
-        vsx_paint_state_offset_pixel_translation(paint_state,
-                                                 x, y,
-                                                 translation);
-
-        vsx_gl.glUniform2f(program->translation_uniform,
-                           translation[0],
-                           translation[1]);
+        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
 }
 
 static void
@@ -569,28 +556,32 @@ submit_layout(struct vsx_layout *layout)
 }
 
 void
-vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
-                          size_t n_layouts,
-                          struct vsx_paint_state *paint_state,
-                          float r, float g, float b)
+vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
 {
-        if (n_layouts <= 0)
+        if (params->n_layouts <= 0)
                 return;
 
         const struct vsx_shader_data_program_data *program =
-                layouts[0].layout->program;
+                params->layouts[0].layout->program;
 
         vsx_gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         vsx_gl.glEnable(GL_BLEND);
 
         vsx_gl.glUseProgram(program->program);
 
-        set_matrix_uniform(program, paint_state);
+        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
+                                  1, /* count */
+                                  GL_FALSE, /* transpose */
+                                  params->matrix);
 
-        vsx_gl.glUniform3f(program->color_uniform, r, g, b);
+        vsx_gl.glUniform3f(program->color_uniform,
+                           params->r,
+                           params->g,
+                           params->b);
 
-        for (unsigned i = 0; i < n_layouts; i++) {
-                const struct vsx_layout_paint_position *pos = layouts + i;
+        for (unsigned i = 0; i < params->n_layouts; i++) {
+                const struct vsx_layout_paint_position *pos =
+                        params->layouts + i;
 
                 /* All the layouts of the scene should be prepared before any
                  * of them are painted.
@@ -603,13 +594,35 @@ vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                 vsx_array_object_bind(pos->layout->vao);
 
                 set_translation_uniform(program,
-                                        paint_state,
+                                        params,
                                         pos->x, pos->y);
 
                 submit_layout(pos->layout);
         }
 
         vsx_gl.glDisable(GL_BLEND);
+}
+
+void
+vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
+                          size_t n_layouts,
+                          struct vsx_paint_state *paint_state,
+                          float r, float g, float b)
+{
+        vsx_paint_state_ensure_layout(paint_state);
+
+        struct vsx_layout_paint_params params = {
+                .layouts = layouts,
+                .n_layouts = n_layouts,
+                .matrix = paint_state->pixel_matrix,
+                .translation_x = paint_state->pixel_translation[0],
+                .translation_y = paint_state->pixel_translation[1],
+                .r = r,
+                .g = g,
+                .b = b,
+        };
+
+        vsx_layout_paint_params(&params);
 }
 
 void
@@ -621,13 +634,26 @@ vsx_layout_paint(struct vsx_layout *layout,
         if (layout->draw_calls.length <= 0)
                 return;
 
+        vsx_paint_state_ensure_layout(paint_state);
+
         struct vsx_layout_paint_position pos = {
                 .layout = layout,
                 .x = x,
                 .y = y,
         };
 
-        vsx_layout_paint_multiple(&pos, 1, paint_state, r, g, b);
+        struct vsx_layout_paint_params params = {
+                .layouts = &pos,
+                .n_layouts = 1,
+                .matrix = paint_state->pixel_matrix,
+                .translation_x = paint_state->pixel_translation[0],
+                .translation_y = paint_state->pixel_translation[1],
+                .r = r,
+                .g = g,
+                .b = b,
+        };
+
+        vsx_layout_paint_params(&params);
 }
 
 void

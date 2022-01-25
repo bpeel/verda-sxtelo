@@ -25,6 +25,14 @@ struct vsx_layout_paint_position {
         int x, y;
 };
 
+struct vsx_layout_paint_params {
+        const struct vsx_layout_paint_position *layouts;
+        size_t n_layouts;
+        const float *matrix;
+        float translation_x, translation_y;
+        float r, g, b;
+};
+
 struct vsx_layout *
 vsx_layout_new(struct vsx_font_library *library,
                struct vsx_shader_data *shader_data);
@@ -46,6 +54,9 @@ vsx_layout_prepare(struct vsx_layout *layout);
 
 const struct vsx_layout_extents *
 vsx_layout_get_logical_extents(struct vsx_layout *layout);
+
+void
+vsx_layout_paint_params(const struct vsx_layout_paint_params *params);
 
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
