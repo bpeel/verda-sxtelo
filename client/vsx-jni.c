@@ -328,6 +328,12 @@ ensure_game_state(struct data *data)
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
 
+                if (data->has_conversation_id) {
+                        enum vsx_text note =
+                                VSX_TEXT_ENTER_NAME_JOIN_GAME;
+                        vsx_game_state_set_name_note(data->game_state, note);
+                }
+
                 struct vsx_signal *signal =
                         vsx_game_state_get_modified_signal(data->game_state);
                 data->modified_listener.notify = modified_cb;
