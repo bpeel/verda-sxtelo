@@ -56,6 +56,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_NOTE,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
+        VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE,
 };
 
 struct vsx_game_state_modified_event {
@@ -168,6 +169,13 @@ vsx_game_state_set_name_height(struct vsx_game_state *game_state,
 
 int
 vsx_game_state_get_name_height(struct vsx_game_state *game_state);
+
+void
+vsx_game_state_set_name_note(struct vsx_game_state *game_state,
+                             enum vsx_text note);
+
+enum vsx_text
+vsx_game_state_get_name_note(struct vsx_game_state *game_state);
 
 bool
 vsx_game_state_get_started(struct vsx_game_state *game_state);

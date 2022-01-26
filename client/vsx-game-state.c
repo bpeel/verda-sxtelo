@@ -85,6 +85,8 @@ struct vsx_game_state {
         int name_y_pos;
         int name_width, name_height;
 
+        enum vsx_text name_note;
+
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -645,6 +647,28 @@ vsx_game_state_get_name_height(struct vsx_game_state *game_state)
         return game_state->name_height;
 }
 
+void
+vsx_game_state_set_name_note(struct vsx_game_state *game_state,
+                             enum vsx_text note)
+{
+        if (game_state->name_note == note)
+                return;
+
+        game_state->name_note = note;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+enum vsx_text
+vsx_game_state_get_name_note(struct vsx_game_state *game_state)
+{
+        return game_state->name_note;
+}
+
 bool
 vsx_game_state_get_started(struct vsx_game_state *game_state)
 {
@@ -693,6 +717,7 @@ vsx_game_state_new(struct vsx_worker *worker,
         game_state->instance_state.dialog = game_state->dialog;
 
         game_state->name_height = 30;
+        game_state->name_note = VSX_TEXT_ENTER_NAME_NEW_GAME;
 
         vsx_worker_lock(game_state->worker);
 
