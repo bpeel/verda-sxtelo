@@ -226,9 +226,19 @@ public class GameView extends GLSurfaceView
       });
   }
 
+  private boolean stringContainsNonWhitespace(CharSequence str)
+  {
+    for (int i = 0; i < str.length(); i++) {
+      if (!Character.isWhitespace(str.charAt(i)))
+        return true;
+    }
+
+    return false;
+  }
+
   public void setPlayerName(CharSequence name)
   {
-    if (name.length() <= 0)
+    if (!stringContainsNonWhitespace(name))
       return;
 
     queueEvent(new Runnable() {
