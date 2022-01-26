@@ -145,6 +145,10 @@ vsx_game_state_set_language(struct vsx_game_state *game_state,
                             const char *language_code);
 
 void
+vsx_game_state_set_player_name(struct vsx_game_state *game_state,
+                               const char *player_name);
+
+void
 vsx_game_state_set_note(struct vsx_game_state *game_state,
                         const char *text);
 

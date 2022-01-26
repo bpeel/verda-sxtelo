@@ -571,6 +571,15 @@ vsx_game_state_set_language(struct vsx_game_state *game_state,
 }
 
 void
+vsx_game_state_set_player_name(struct vsx_game_state *game_state,
+                               const char *name)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_set_player_name(game_state->connection, name);
+        vsx_worker_unlock(game_state->worker);
+}
+
+void
 vsx_game_state_set_note(struct vsx_game_state *game_state,
                         const char *text)
 {
