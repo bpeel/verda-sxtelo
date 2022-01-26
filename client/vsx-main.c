@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013, 2021  Neil Roberts
+ * Copyright (C) 2012, 2013, 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -353,17 +353,7 @@ init_painter(struct vsx_main_data *main_data)
 static struct vsx_connection *
 create_connection(void)
 {
-        const char *player_name = option_player_name;
-
-        if (player_name == NULL) {
-                player_name = getlogin();
-                if (player_name == NULL)
-                        player_name = "?";
-        }
-
         struct vsx_connection *connection = vsx_connection_new();
-
-        vsx_connection_set_player_name(connection, player_name);
 
         if (option_room)
                 vsx_connection_set_room(connection, option_room);
@@ -462,6 +452,25 @@ handle_mouse_wheel(struct vsx_main_data *main_data,
 }
 
 static void
+set_connection_name(struct vsx_main_data *main_data)
+{
+        if (vsx_game_state_get_dialog(main_data->game_state) != VSX_DIALOG_NAME)
+                return;
+
+        const char *player_name = option_player_name;
+
+        if (player_name == NULL) {
+                player_name = getlogin();
+                if (player_name == NULL)
+                        player_name = "?";
+        }
+
+        vsx_game_state_set_player_name(main_data->game_state, player_name);
+        vsx_game_state_set_dialog(main_data->game_state,
+                                  VSX_DIALOG_INVITE_LINK);
+}
+
+static void
 handle_mouse_button(struct vsx_main_data *main_data,
                     const SDL_MouseButtonEvent *event)
 {
@@ -487,6 +496,13 @@ handle_mouse_button(struct vsx_main_data *main_data,
                 main_data->button_pressed = false;
                 vsx_game_painter_release_finger(main_data->game_painter,
                                                 0 /* finger */);
+
+                /* The SDL client doesn’t implement the input field
+                 * for the name so there’s no proper way to get rid of
+                 * the name dialog. For now there’s this hack to just
+                 * close the dialog whenever a button is pressed.
+                 */
+                set_connection_name(main_data);
         }
 }
 
