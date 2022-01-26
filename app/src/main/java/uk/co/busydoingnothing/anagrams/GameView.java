@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2021  Neil Roberts
+ * Copyright (C) 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@ import android.opengl.GLSurfaceView;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewParent;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -187,6 +189,43 @@ public class GameView extends GLSurfaceView
       });
   }
 
+  public void setNameProperties(boolean visible,
+                                int yPos,
+                                int width)
+  {
+    Handler mainHandler = new Handler(context.getMainLooper());
+
+    mainHandler.post(new Runnable() {
+        @Override
+        public void run()
+        {
+          ViewParent parent = getParent();
+
+          if (!(parent instanceof GameLayout))
+            return;
+
+          GameLayout layout = (GameLayout) parent;
+
+          layout.setNamePosition(yPos, width);
+
+          View nameTextView = layout.findViewById(R.id.player_name);
+
+          if (nameTextView != null)
+            nameTextView.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+      });
+  }
+
+  public void setNameHeight(int height)
+  {
+    queueEvent(new Runnable() {
+        @Override
+        public void run() {
+          renderer.setNameHeight(nativeData, height);
+        }
+      });
+  }
+
   @Override
   public boolean onTouchEvent(MotionEvent event)
   {
@@ -281,6 +320,7 @@ public class GameView extends GLSurfaceView
     private native void setInviteUrl(long nativeData, String inviteUrl);
     private native void setGameLanguageCode(long nativeData,
                                             String languageCode);
+    private native void setNameHeight(long nativeData, int height);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,
                                int width, int height);

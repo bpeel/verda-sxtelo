@@ -53,6 +53,7 @@ struct data {
         struct vsx_asset_manager *asset_manager;
 
         struct vsx_game_state *game_state;
+        struct vsx_listener modified_listener;
 
         bool has_conversation_id;
         uint64_t conversation_id;
@@ -75,6 +76,8 @@ struct data {
         jmethodID queue_flush_idle_method_id;
 
         jmethodID share_link_method_id;
+
+        jmethodID set_name_properties_method_id;
 
         /* Graphics data that needs to be recreated when the context changes */
         void *gl_lib;
@@ -213,6 +216,12 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "shareLink",
                                     "(Ljava/lang/String;)V");
 
+        data->set_name_properties_method_id =
+                (*env)->GetMethodID(env,
+                                    data->surface_class,
+                                    "setNameProperties",
+                                    "(ZII)V");
+
         vsx_thread_set_jvm(data->jvm);
 
         data->asset_manager = vsx_asset_manager_new(env, asset_manager_jni);
@@ -258,6 +267,40 @@ load_instance_state(struct data *data)
         free_instance_state(data);
 }
 
+static void
+update_name_properties(struct data *data)
+{
+        enum vsx_dialog dialog = vsx_game_state_get_dialog(data->game_state);
+
+        int y_pos, width;
+
+        vsx_game_state_get_name_position(data->game_state, &y_pos, &width);
+
+        call_void_surface_method(data,
+                                 data->set_name_properties_method_id,
+                                 (int) (dialog == VSX_DIALOG_NAME),
+                                 y_pos, width);
+}
+
+static void
+modified_cb(struct vsx_listener *listener,
+            void *user_data)
+{
+        struct data *data = vsx_container_of(listener,
+                                             struct data,
+                                             modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
+        case VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION:
+                update_name_properties(data);
+                break;
+        default:
+                break;
+        }
+}
+
 static bool
 ensure_game_state(struct data *data)
 {
@@ -287,6 +330,11 @@ ensure_game_state(struct data *data)
                 data->game_state = vsx_game_state_new(data->worker,
                                                       data->connection);
 
+                struct vsx_signal *signal =
+                        vsx_game_state_get_modified_signal(data->game_state);
+                data->modified_listener.notify = modified_cb;
+                vsx_signal_add(signal, &data->modified_listener);
+
                 load_instance_state(data);
 
                 vsx_worker_lock(data->worker);
@@ -294,6 +342,8 @@ ensure_game_state(struct data *data)
                 vsx_connection_set_running(data->connection, true);
 
                 vsx_worker_unlock(data->worker);
+
+                update_name_properties(data);
         }
 
         return true;
@@ -428,6 +478,17 @@ VSX_JNI_RENDERER_PREFIX(setGameLanguageCode)(JNIEnv *env,
 }
 
 JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setNameHeight)(JNIEnv *env,
+                                       jobject this,
+                                       jlong native_data,
+                                       jint height)
+{
+        struct data *data = GET_DATA(native_data);
+
+        vsx_game_state_set_name_height(data->game_state, height);
+}
+
+JNIEXPORT void JNICALL
 VSX_JNI_RENDERER_PREFIX(resize)(JNIEnv *env,
                                 jobject this,
                                 jlong native_data,
@@ -534,8 +595,10 @@ VSX_JNI_RENDERER_PREFIX(freeNativeData)(JNIEnv *env,
 
         free_instance_state(data);
 
-        if (data->game_state)
+        if (data->game_state) {
+                vsx_list_remove(&data->modified_listener.link);
                 vsx_game_state_free(data->game_state);
+        }
         if (data->worker)
                 vsx_worker_free(data->worker);
         if (data->connection)

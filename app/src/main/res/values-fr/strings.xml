@@ -20,4 +20,5 @@
 
 <resources>
   <string name="game_language_code">fr</string>
+  <string name="name_hint">Saisissez votre nom</string>
 </resources>
