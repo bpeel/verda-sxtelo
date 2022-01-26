@@ -18,7 +18,7 @@ add_custom_command(
   TARGET freetype
   POST_BUILD
   COMMAND ${CMAKE_SOURCE_DIR}/build-freetype-ninja.sh
-  ARGS $<TARGET_FILE:freetype>
+  ARGS $<TARGET_FILE:freetype> ${CMAKE_BUILD_TYPE}
   )
 
 add_library(anagrams SHARED stub.c)
@@ -27,7 +27,7 @@ add_custom_command(
   TARGET anagrams
   POST_BUILD
   COMMAND ${CMAKE_SOURCE_DIR}/build-lib-ninja.sh
-  ARGS $<TARGET_FILE:anagrams>
+  ARGS $<TARGET_FILE:anagrams> ${CMAKE_BUILD_TYPE}
 )
 
 add_dependencies(anagrams freetype CROSS_TXT)
