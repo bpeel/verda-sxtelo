@@ -82,6 +82,9 @@ struct vsx_game_state {
         /* The language reported by the server */
         enum vsx_text_language language;
 
+        int name_y_pos;
+        int name_width, name_height;
+
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -582,6 +585,57 @@ vsx_game_state_set_note(struct vsx_game_state *game_state,
         vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
+
+void
+vsx_game_state_set_name_position(struct vsx_game_state *game_state,
+                                 int y_pos,
+                                 int width)
+{
+        if (game_state->name_y_pos == y_pos &&
+            game_state->name_width == width)
+                return;
+
+        game_state->name_y_pos = y_pos;
+        game_state->name_width = width;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+void
+vsx_game_state_get_name_position(struct vsx_game_state *game_state,
+                                 int *y_pos,
+                                 int *width)
+{
+        *y_pos = game_state->name_y_pos;
+        *width = game_state->name_width;
+}
+
+void
+vsx_game_state_set_name_height(struct vsx_game_state *game_state,
+                               int height)
+{
+        if (game_state->name_height == height)
+                return;
+
+        game_state->name_height = height;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+int
+vsx_game_state_get_name_height(struct vsx_game_state *game_state)
+{
+        return game_state->name_height;
+}
+
 bool
 vsx_game_state_get_started(struct vsx_game_state *game_state)
 {
@@ -628,6 +682,8 @@ vsx_game_state_new(struct vsx_worker *worker,
         vsx_instance_state_init(&game_state->instance_state);
 
         game_state->instance_state.dialog = game_state->dialog;
+
+        game_state->name_height = 30;
 
         vsx_worker_lock(game_state->worker);
 
