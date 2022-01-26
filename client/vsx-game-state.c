@@ -230,6 +230,17 @@ remove_shout_cb(void *data)
         vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
+static enum vsx_text_language
+get_language_for_code(const char *code)
+{
+        for (int i = 0; i < VSX_TEXT_N_LANGUAGES; i++) {
+                if (!strcmp(code, vsx_text_get(i, VSX_TEXT_LANGUAGE_CODE)))
+                        return i;
+        }
+
+        return VSX_TEXT_LANGUAGE_ENGLISH;
+}
+
 static void
 handle_header(struct vsx_game_state *game_state,
               const struct vsx_connection_event *event)
@@ -387,15 +398,8 @@ static void
 handle_language_changed(struct vsx_game_state *game_state,
                         const struct vsx_connection_event *event)
 {
-        enum vsx_text_language language = VSX_TEXT_LANGUAGE_ENGLISH;
-
-        for (int i = 0; i < VSX_TEXT_N_LANGUAGES; i++) {
-                if (!strcmp(event->language_changed.code,
-                            vsx_text_get(i, VSX_TEXT_LANGUAGE_CODE))) {
-                        language = i;
-                        break;
-                }
-        }
+        enum vsx_text_language language =
+                get_language_for_code(event->language_changed.code);
 
         if (language == game_state->language)
                 return;
@@ -689,7 +693,8 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
 
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
-                   struct vsx_connection *connection)
+                   struct vsx_connection *connection,
+                   const char *default_language)
 {
         struct vsx_game_state *game_state = vsx_calloc(sizeof *game_state);
 
@@ -708,6 +713,8 @@ vsx_game_state_new(struct vsx_worker *worker,
         game_state->shouting_player = -1;
 
         game_state->dialog = VSX_DIALOG_NAME;
+
+        game_state->language = get_language_for_code(default_language);
 
         game_state->worker = worker;
         game_state->connection = connection;

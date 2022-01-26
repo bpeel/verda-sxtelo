@@ -76,7 +76,8 @@ struct vsx_game_state_modified_event {
 
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_worker *worker,
-                   struct vsx_connection *connection);
+                   struct vsx_connection *connection,
+                   const char *default_language);
 
 /* Gets the number of tiles in the game, as reported by the server.
  * This includes the tiles that are still in the bag so it is just

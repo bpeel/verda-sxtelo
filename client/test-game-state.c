@@ -508,7 +508,8 @@ create_harness_no_start(void)
         }
 
         harness->game_state = vsx_game_state_new(harness->worker,
-                                                 harness->connection);
+                                                 harness->connection,
+                                                 "en");
 
         return harness;
 

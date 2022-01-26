@@ -326,7 +326,8 @@ ensure_game_state(struct data *data)
 
         if (data->game_state == NULL) {
                 data->game_state = vsx_game_state_new(data->worker,
-                                                      data->connection);
+                                                      data->connection,
+                                                      data->game_language_code);
 
                 if (data->has_conversation_id) {
                         enum vsx_text note =

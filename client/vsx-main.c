@@ -402,7 +402,8 @@ init_restartable_data(struct vsx_main_data *main_data)
                 return false;
 
         main_data->game_state = vsx_game_state_new(main_data->worker,
-                                                   main_data->connection);
+                                                   main_data->connection,
+                                                   "en");
 
         if (option_conversation_id_specified || option_room) {
                 vsx_game_state_set_name_note(main_data->game_state,
