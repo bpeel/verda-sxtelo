@@ -674,7 +674,7 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         game_state->shouting_player = -1;
 
-        game_state->dialog = VSX_DIALOG_INVITE_LINK;
+        game_state->dialog = VSX_DIALOG_NAME;
 
         game_state->worker = worker;
         game_state->connection = connection;

@@ -2249,9 +2249,9 @@ test_dialog(void)
         vsx_signal_add(signal, &closure.listener);
 
         if (vsx_game_state_get_dialog(harness->game_state) !=
-            VSX_DIALOG_INVITE_LINK) {
+            VSX_DIALOG_NAME) {
                 fprintf(stderr,
-                        "dialog didn’t start off as invite_link\n");
+                        "dialog didn’t start off as NAME\n");
                 ret = false;
                 goto out;
         }
