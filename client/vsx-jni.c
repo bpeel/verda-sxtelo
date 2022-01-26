@@ -237,8 +237,6 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 static void
 configure_connection(struct data *data)
 {
-        vsx_connection_set_player_name(data->connection, "test");
-
         if (data->has_conversation_id) {
                 vsx_connection_set_conversation_id(data->connection,
                                                    data->conversation_id);
@@ -486,6 +484,30 @@ VSX_JNI_RENDERER_PREFIX(setNameHeight)(JNIEnv *env,
         struct data *data = GET_DATA(native_data);
 
         vsx_game_state_set_name_height(data->game_state, height);
+}
+
+JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setPlayerName)(JNIEnv *env,
+                                       jobject this,
+                                       jlong native_data,
+                                       jstring name_str)
+{
+        struct data *data = GET_DATA(native_data);
+
+        if (data->game_state == NULL)
+                return;
+
+        const char *name =
+                (*env)->GetStringUTFChars(env,
+                                          name_str,
+                                          NULL /* isCopy */);
+
+        vsx_game_state_set_player_name(data->game_state, name);
+
+        (*env)->ReleaseStringUTFChars(env, name_str, name);
+
+        vsx_game_state_set_dialog(data->game_state,
+                                  VSX_DIALOG_INVITE_LINK);
 }
 
 JNIEXPORT void JNICALL

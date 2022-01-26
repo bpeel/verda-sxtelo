@@ -226,6 +226,19 @@ public class GameView extends GLSurfaceView
       });
   }
 
+  public void setPlayerName(CharSequence name)
+  {
+    if (name.length() <= 0)
+      return;
+
+    queueEvent(new Runnable() {
+        @Override
+        public void run() {
+          renderer.setPlayerName(nativeData, name.toString());
+        }
+      });
+  }
+
   @Override
   public boolean onTouchEvent(MotionEvent event)
   {
@@ -321,6 +334,7 @@ public class GameView extends GLSurfaceView
     private native void setGameLanguageCode(long nativeData,
                                             String languageCode);
     private native void setNameHeight(long nativeData, int height);
+    private native void setPlayerName(long nativeData, String name);
     private native boolean initContext(long nativeData);
     private native void resize(long nativeData,
                                int width, int height);

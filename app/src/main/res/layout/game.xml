@@ -35,5 +35,6 @@
       a:inputType="textPersonName"
       a:hint="@string/name_hint"
       a:visibility="gone"
+      a:imeOptions="actionDone"
       a:maxLength="30" />
 </uk.co.busydoingnothing.anagrams.GameLayout>

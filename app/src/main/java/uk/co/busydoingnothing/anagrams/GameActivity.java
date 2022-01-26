@@ -25,7 +25,11 @@ import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.opengl.GLSurfaceView;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.TextView;
 
 public class GameActivity extends AppCompatActivity
 {
@@ -50,6 +54,19 @@ public class GameActivity extends AppCompatActivity
     }
 
     handleIntent();
+
+    EditText nameEdit = (EditText) findViewById(R.id.player_name);
+    nameEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+        @Override
+        public boolean onEditorAction(TextView v,
+                                      int actionId,
+                                      KeyEvent event) {
+          if (actionId == EditorInfo.IME_ACTION_DONE)
+            surface.setPlayerName(nameEdit.getText());
+
+          return false;
+        }
+      });
   }
 
   private void handleIntent()
