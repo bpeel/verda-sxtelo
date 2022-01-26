@@ -218,9 +218,9 @@ prepare_cb(void *painter_data)
 
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
-        vsx_layout_set_text(painter->layout,
-                            vsx_text_get(language,
-                                         VSX_TEXT_ENTER_NAME_NEW_GAME));
+        enum vsx_text note =
+                vsx_game_state_get_name_note(painter->game_state);
+        vsx_layout_set_text(painter->layout, vsx_text_get(language, note));
 
         vsx_layout_prepare(painter->layout);
 
