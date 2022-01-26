@@ -39,6 +39,8 @@ english[] = {
         "Send the link below or scan the code to invite friends.",
         [VSX_TEXT_LINK_COPIED] =
         "Link copied to the clipboard",
+        [VSX_TEXT_ENTER_NAME_NEW_GAME] =
+        "Please enter your name to start a new game.",
 };
 
 static const char *const
@@ -58,6 +60,8 @@ french[] = {
         "des ami·es.",
         [VSX_TEXT_LINK_COPIED] =
         "Le lien a été copié",
+        [VSX_TEXT_ENTER_NAME_NEW_GAME] =
+        "Veuillez saisir votre nom pour commencer une nouvelle partie.",
 };
 
 static const char *const
@@ -75,6 +79,8 @@ esperanto[] = {
         "Sendu la jenan ligilon aŭ skanu la kodon por inviti amikojn.",
         [VSX_TEXT_LINK_COPIED] =
         "La ligilo estis kopiita",
+        [VSX_TEXT_ENTER_NAME_NEW_GAME] =
+        "Bonvolu entajpi vian nomon por komenci novan ludon.",
 };
 
 static const char *const * const

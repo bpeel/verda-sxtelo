@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 
+#include "vsx-name-painter.h"
 #include "vsx-menu-painter.h"
 #include "vsx-invite-painter.h"
 #include "vsx-language-painter.h"
@@ -41,6 +42,7 @@ struct vsx_dialog_painter {
 static const struct vsx_painter * const
 child_painters[] = {
         [VSX_DIALOG_NONE] = NULL,
+        [VSX_DIALOG_NAME] = &vsx_name_painter,
         [VSX_DIALOG_MENU] = &vsx_menu_painter,
         [VSX_DIALOG_INVITE_LINK] = &vsx_invite_painter,
         [VSX_DIALOG_LANGUAGE] = &vsx_language_painter,

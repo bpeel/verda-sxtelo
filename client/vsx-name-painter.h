@@ -16,32 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_TEXT_H
-#define VSX_TEXT_H
+#ifndef VSX_NAME_PAINTER_H
+#define VSX_NAME_PAINTER_H
 
-enum vsx_text_language {
-        VSX_TEXT_LANGUAGE_ENGLISH,
-        VSX_TEXT_LANGUAGE_FRENCH,
-        VSX_TEXT_LANGUAGE_ESPERANTO,
-};
+#include "vsx-painter.h"
 
-enum vsx_text {
-        VSX_TEXT_LANGUAGE_CODE,
-        VSX_TEXT_LANGUAGE_BUTTON,
-        VSX_TEXT_SHARE_BUTTON,
-        VSX_TEXT_SHORT_GAME,
-        VSX_TEXT_LONG_GAME,
-        VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED,
-        VSX_TEXT_CANT_CHANGE_LENGTH_STARTED,
-        VSX_TEXT_INVITE_EXPLANATION,
-        VSX_TEXT_LINK_COPIED,
-        VSX_TEXT_ENTER_NAME_NEW_GAME,
-};
+extern const struct vsx_painter
+vsx_name_painter;
 
-#define VSX_TEXT_N_LANGUAGES 3
-
-const char *
-vsx_text_get(enum vsx_text_language language,
-             enum vsx_text text);
-
-#endif /* VSX_TEXT_H */
+#endif /* VSX_NAME_PAINTER_H */
