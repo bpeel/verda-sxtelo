@@ -27,6 +27,7 @@
 static const char * const
 names[] = {
         [VSX_DIALOG_NONE] = "none",
+        [VSX_DIALOG_NAME] = "name",
         [VSX_DIALOG_MENU] = "menu",
         [VSX_DIALOG_INVITE_LINK] = "invite",
         [VSX_DIALOG_LANGUAGE] = "language",
