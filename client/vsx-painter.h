@@ -28,8 +28,10 @@
 #include "vsx-paint-state.h"
 #include "vsx-signal.h"
 #include "vsx-input-event.h"
+#include "vsx-gl.h"
 
 struct vsx_painter_toolbox {
+        struct vsx_gl *gl;
         struct vsx_shader_data shader_data;
         struct vsx_image_loader *image_loader;
         struct vsx_font_library *font_library;

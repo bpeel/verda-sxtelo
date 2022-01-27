@@ -133,6 +133,8 @@ init_toolbox(struct vsx_game_painter *painter,
 {
         struct vsx_painter_toolbox *toolbox = &painter->toolbox;
 
+        toolbox->gl = &vsx_gl;
+
         if (!vsx_shader_data_init(&toolbox->shader_data,
                                   asset_manager,
                                   error))
