@@ -324,21 +324,21 @@ texture_load_cb(const struct vsx_image *image,
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glGenTextures(1, &painter->tex);
+        gl->glGenTextures(1, &painter->tex);
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_S,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_T,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MIN_FILTER,
-                               GL_LINEAR_MIPMAP_NEAREST);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MAG_FILTER,
-                               GL_LINEAR);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_S,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_T,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_NEAREST);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR);
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
@@ -615,11 +615,11 @@ free_buffer(struct vsx_tile_painter *painter)
                 painter->vao = 0;
         }
         if (painter->vbo) {
-                vsx_gl.glDeleteBuffers(1, &painter->vbo);
+                gl->glDeleteBuffers(1, &painter->vbo);
                 painter->vbo = 0;
         }
         if (painter->element_buffer) {
-                vsx_gl.glDeleteBuffers(1, &painter->element_buffer);
+                gl->glDeleteBuffers(1, &painter->element_buffer);
                 painter->element_buffer = 0;
         }
 }
@@ -687,12 +687,12 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glGenBuffers(1, &painter->vbo);
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            n_vertices * sizeof (struct vertex),
-                            NULL, /* data */
-                            GL_DYNAMIC_DRAW);
+        gl->glGenBuffers(1, &painter->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         n_vertices * sizeof (struct vertex),
+                         NULL, /* data */
+                         GL_DYNAMIC_DRAW);
 
         painter->vao = vsx_array_object_new(gl);
 
@@ -806,7 +806,9 @@ paint_cb(void *painter_data)
 
         ensure_buffer_size(painter, n_tiles);
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         struct vertex *vertices =
                 vsx_map_buffer_map(painter->toolbox->map_buffer,
@@ -839,26 +841,24 @@ paint_cb(void *painter_data)
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
 
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        vsx_gl.glUseProgram(program->program);
+        gl->glUseProgram(program->program);
         vsx_array_object_bind(painter->vao, gl);
 
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  paint_state->board_matrix);
-        vsx_gl.glUniform2f(program->translation_uniform,
-                           paint_state->board_translation[0],
-                           paint_state->board_translation[1]);
+        gl->glUniformMatrix2fv(program->matrix_uniform,
+                               1, /* count */
+                               GL_FALSE, /* transpose */
+                               paint_state->board_matrix);
+        gl->glUniform2f(program->translation_uniform,
+                        paint_state->board_translation[0],
+                        paint_state->board_translation[1]);
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
 
-        vsx_gl.glEnable(GL_SCISSOR_TEST);
-        vsx_gl.glScissor(paint_state->board_scissor_x,
-                         paint_state->board_scissor_y,
-                         paint_state->board_scissor_width,
-                         paint_state->board_scissor_height);
+        gl->glEnable(GL_SCISSOR_TEST);
+        gl->glScissor(paint_state->board_scissor_x,
+                      paint_state->board_scissor_y,
+                      paint_state->board_scissor_width,
+                      paint_state->board_scissor_height);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
                                    0, n_vertices - 1,
@@ -866,7 +866,7 @@ paint_cb(void *painter_data)
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
-        vsx_gl.glDisable(GL_SCISSOR_TEST);
+        gl->glDisable(GL_SCISSOR_TEST);
 
         if (any_tiles_animating)
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
@@ -889,10 +889,12 @@ free_cb(void *painter_data)
 
         free_buffer(painter);
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         if (painter->image_token)
                 vsx_image_loader_cancel(painter->image_token);
         if (painter->tex)
-                vsx_gl.glDeleteTextures(1, &painter->tex);
+                gl->glDeleteTextures(1, &painter->tex);
 
         vsx_buffer_destroy(&painter->tiles_by_index);
         vsx_slab_destroy(&painter->tile_allocator);
