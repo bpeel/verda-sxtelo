@@ -30,7 +30,7 @@
 struct vsx_dialog_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
-        struct vsx_painter_toolbox *toolbox;
+        struct vsx_toolbox *toolbox;
 
         const struct vsx_painter *child_painter;
         void *child_data;
@@ -124,7 +124,7 @@ child_redraw_needed_cb(struct vsx_listener *listener,
 
 static void *
 create_cb(struct vsx_game_state *game_state,
-          struct vsx_painter_toolbox *toolbox)
+          struct vsx_toolbox *toolbox)
 {
         struct vsx_dialog_painter *painter = vsx_calloc(sizeof *painter);
 

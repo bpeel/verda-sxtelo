@@ -55,7 +55,7 @@ struct vsx_tile_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener event_listener;
 
-        struct vsx_painter_toolbox *toolbox;
+        struct vsx_toolbox *toolbox;
 
         struct vsx_array_object *vao;
         GLuint vbo;
@@ -354,7 +354,7 @@ init_tiles_cb(const struct vsx_connection_event *event,
 
 static void *
 create_cb(struct vsx_game_state *game_state,
-          struct vsx_painter_toolbox *toolbox)
+          struct vsx_toolbox *toolbox)
 {
         struct vsx_tile_painter *painter = vsx_calloc(sizeof *painter);
 

@@ -43,7 +43,7 @@ struct vsx_invite_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
 
-        struct vsx_painter_toolbox *toolbox;
+        struct vsx_toolbox *toolbox;
 
         struct vsx_array_object *vao;
         GLuint vbo;
@@ -284,7 +284,7 @@ create_layouts(struct vsx_invite_painter *painter)
 
 static void *
 create_cb(struct vsx_game_state *game_state,
-          struct vsx_painter_toolbox *toolbox)
+          struct vsx_toolbox *toolbox)
 {
         struct vsx_invite_painter *painter = vsx_calloc(sizeof *painter);
 

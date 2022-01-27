@@ -21,27 +21,15 @@
 
 #include <stdbool.h>
 
-#include "vsx-shader-data.h"
-#include "vsx-image-loader.h"
-#include "vsx-font.h"
+#include "vsx-toolbox.h"
 #include "vsx-game-state.h"
-#include "vsx-paint-state.h"
 #include "vsx-signal.h"
 #include "vsx-input-event.h"
-#include "vsx-gl.h"
-
-struct vsx_painter_toolbox {
-        struct vsx_gl *gl;
-        struct vsx_shader_data shader_data;
-        struct vsx_image_loader *image_loader;
-        struct vsx_font_library *font_library;
-        struct vsx_paint_state paint_state;
-};
 
 struct vsx_painter {
         void *
         (* create_cb)(struct vsx_game_state *game_state,
-                      struct vsx_painter_toolbox *toolbox);
+                      struct vsx_toolbox *toolbox);
 
         void
         (* fb_size_changed_cb)(void *painter);

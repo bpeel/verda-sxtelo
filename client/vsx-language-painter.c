@@ -52,7 +52,7 @@ struct language_button {
 
 struct vsx_language_painter {
         struct vsx_game_state *game_state;
-        struct vsx_painter_toolbox *toolbox;
+        struct vsx_toolbox *toolbox;
 
         struct language_button buttons[N_LANGUAGES];
 
@@ -156,7 +156,7 @@ create_buffer(struct vsx_language_painter *painter)
 
 static void *
 create_cb(struct vsx_game_state *game_state,
-          struct vsx_painter_toolbox *toolbox)
+          struct vsx_toolbox *toolbox)
 {
         struct vsx_language_painter *painter = vsx_calloc(sizeof *painter);
 

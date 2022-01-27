@@ -48,7 +48,7 @@ struct vsx_board_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
 
-        struct vsx_painter_toolbox *toolbox;
+        struct vsx_toolbox *toolbox;
 
         struct box_draw_command box_draw_commands
         [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
@@ -608,7 +608,7 @@ load_name_cb(int player_num,
 
 static void *
 create_cb(struct vsx_game_state *game_state,
-          struct vsx_painter_toolbox *toolbox)
+          struct vsx_toolbox *toolbox)
 {
         struct vsx_board_painter *painter = vsx_calloc(sizeof *painter);
 

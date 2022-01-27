@@ -58,7 +58,7 @@ struct painter_data {
 };
 
 struct vsx_game_painter {
-        struct vsx_painter_toolbox toolbox;
+        struct vsx_toolbox toolbox;
         bool shader_data_inited;
 
         struct vsx_game_state *game_state;
@@ -131,7 +131,7 @@ init_toolbox(struct vsx_game_painter *painter,
              int dpi,
              struct vsx_error **error)
 {
-        struct vsx_painter_toolbox *toolbox = &painter->toolbox;
+        struct vsx_toolbox *toolbox = &painter->toolbox;
 
         toolbox->gl = &vsx_gl;
 
@@ -155,7 +155,7 @@ init_toolbox(struct vsx_game_painter *painter,
 static void
 destroy_toolbox(struct vsx_game_painter *painter)
 {
-        struct vsx_painter_toolbox *toolbox = &painter->toolbox;
+        struct vsx_toolbox *toolbox = &painter->toolbox;
 
         if (toolbox->font_library)
                 vsx_font_library_free(toolbox->font_library);
