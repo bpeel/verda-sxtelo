@@ -63,10 +63,12 @@ struct vsx_shader_data {
 
 bool
 vsx_shader_data_init(struct vsx_shader_data *data,
+                     struct vsx_gl *gl,
                      struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error);
 
 void
-vsx_shader_data_destroy(struct vsx_shader_data *data);
+vsx_shader_data_destroy(struct vsx_shader_data *data,
+                        struct vsx_gl *gl);
 
 #endif /* VSX_SHADER_DATA_H */

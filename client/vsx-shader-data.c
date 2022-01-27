@@ -73,7 +73,8 @@ vsx_shader_data_shaders[] = {
 };
 
 static GLuint
-create_shader(const char *name,
+create_shader(struct vsx_gl *gl,
+              const char *name,
               GLenum type,
               const char *source,
               int source_length,
@@ -87,24 +88,24 @@ create_shader(const char *name,
         GLint lengths[VSX_N_ELEMENTS(source_strings)];
         int n_strings = 0;
 
-        shader = vsx_gl.glCreateShader(type);
+        shader = gl->glCreateShader(type);
 
         source_strings[n_strings] = source;
         lengths[n_strings++] = source_length;
-        vsx_gl.glShaderSource(shader,
-                              n_strings,
-                              (const GLchar **) source_strings,
-                              lengths);
+        gl->glShaderSource(shader,
+                           n_strings,
+                           (const GLchar **) source_strings,
+                           lengths);
 
-        vsx_gl.glCompileShader(shader);
+        gl->glCompileShader(shader);
 
-        vsx_gl.glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+        gl->glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
 
         if (length > 0) {
                 info_log = malloc(length);
-                vsx_gl.glGetShaderInfoLog(shader, length,
-                                          &actual_length,
-                                          info_log);
+                gl->glGetShaderInfoLog(shader, length,
+                                       &actual_length,
+                                       info_log);
                 if (*info_log) {
                         fprintf(stderr,
                                 "Info log for %s:\n%s\n",
@@ -113,7 +114,7 @@ create_shader(const char *name,
                 free(info_log);
         }
 
-        vsx_gl.glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
+        gl->glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
 
         if (!compile_status) {
                 vsx_set_error(error,
@@ -121,7 +122,7 @@ create_shader(const char *name,
                               VSX_SHADER_DATA_ERROR_COMPILATION_FAILED,
                               "%s compilation failed",
                               name);
-                vsx_gl.glDeleteShader(shader);
+                gl->glDeleteShader(shader);
                 return 0;
         }
 
@@ -129,7 +130,8 @@ create_shader(const char *name,
 }
 
 static GLuint
-create_shader_from_files(struct vsx_asset_manager *asset_manager,
+create_shader_from_files(struct vsx_gl *gl,
+                         struct vsx_asset_manager *asset_manager,
                          GLenum shader_type,
                          const char **filenames,
                          struct vsx_error **error)
@@ -185,7 +187,8 @@ create_shader_from_files(struct vsx_asset_manager *asset_manager,
          */
         source[total_length] = '\0';
 
-        shader = create_shader(filenames[n_files - 1],
+        shader = create_shader(gl,
+                               filenames[n_files - 1],
                                shader_type,
                                source,
                                total_length,
@@ -246,29 +249,31 @@ get_program_name(enum vsx_shader_data_program program_num)
 }
 
 static void
-get_uniforms(struct vsx_shader_data_program_data *program)
+get_uniforms(struct vsx_shader_data_program_data *program,
+             struct vsx_gl *gl)
 {
         program->tex_uniform =
-                vsx_gl.glGetUniformLocation(program->program, "tex");
+                gl->glGetUniformLocation(program->program, "tex");
 
         if (program->tex_uniform != -1) {
-                vsx_gl.glUseProgram(program->program);
-                vsx_gl.glUniform1i(program->tex_uniform, 0);
+                gl->glUseProgram(program->program);
+                gl->glUniform1i(program->tex_uniform, 0);
         }
 
         program->matrix_uniform =
-                vsx_gl.glGetUniformLocation(program->program,
-                                            "transform_matrix");
+                gl->glGetUniformLocation(program->program,
+                                         "transform_matrix");
         program->translation_uniform =
-                vsx_gl.glGetUniformLocation(program->program,
-                                            "translation");
+                gl->glGetUniformLocation(program->program,
+                                         "translation");
         program->color_uniform =
-                vsx_gl.glGetUniformLocation(program->program,
-                                            "color");
+                gl->glGetUniformLocation(program->program,
+                                         "color");
 }
 
 static bool
 link_program(struct vsx_shader_data *data,
+             struct vsx_gl *gl,
              enum vsx_shader_data_program program_num,
              struct vsx_error **error)
 {
@@ -280,28 +285,28 @@ link_program(struct vsx_shader_data *data,
 
         program = data->programs[program_num].program;
 
-        vsx_gl.glBindAttribLocation(program,
-                                    VSX_SHADER_DATA_ATTRIB_POSITION,
-                                    "position");
-        vsx_gl.glBindAttribLocation(program,
-                                    VSX_SHADER_DATA_ATTRIB_TEX_COORD,
-                                    "tex_coord_attrib");
-        vsx_gl.glBindAttribLocation(program,
-                                    VSX_SHADER_DATA_ATTRIB_NORMAL,
-                                    "normal_attrib");
-        vsx_gl.glBindAttribLocation(program,
-                                    VSX_SHADER_DATA_ATTRIB_COLOR,
-                                    "color_attrib");
+        gl->glBindAttribLocation(program,
+                                 VSX_SHADER_DATA_ATTRIB_POSITION,
+                                 "position");
+        gl->glBindAttribLocation(program,
+                                 VSX_SHADER_DATA_ATTRIB_TEX_COORD,
+                                 "tex_coord_attrib");
+        gl->glBindAttribLocation(program,
+                                 VSX_SHADER_DATA_ATTRIB_NORMAL,
+                                 "normal_attrib");
+        gl->glBindAttribLocation(program,
+                                 VSX_SHADER_DATA_ATTRIB_COLOR,
+                                 "color_attrib");
 
-        vsx_gl.glLinkProgram(program);
+        gl->glLinkProgram(program);
 
-        vsx_gl.glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+        gl->glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
 
         if (length > 0) {
                 info_log = malloc(length);
-                vsx_gl.glGetProgramInfoLog(program, length,
-                                           &actual_length,
-                                           info_log);
+                gl->glGetProgramInfoLog(program, length,
+                                        &actual_length,
+                                        info_log);
                 if (*info_log) {
                         program_name = get_program_name(program_num);
                         fprintf(stderr, "Link info log for %s:\n%s\n",
@@ -312,7 +317,7 @@ link_program(struct vsx_shader_data *data,
                 free(info_log);
         }
 
-        vsx_gl.glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+        gl->glGetProgramiv(program, GL_LINK_STATUS, &link_status);
 
         if (!link_status) {
                 program_name = get_program_name(program_num);
@@ -325,19 +330,20 @@ link_program(struct vsx_shader_data *data,
                 return false;
         }
 
-        get_uniforms(data->programs + program_num);
+        get_uniforms(data->programs + program_num, gl);
 
         return true;
 }
 
 static bool
 link_programs(struct vsx_shader_data *data,
+              struct vsx_gl *gl,
               struct vsx_error **error)
 {
         int i;
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++) {
-                if (!link_program(data, i, error))
+                if (!link_program(data, gl, i, error))
                         return false;
         }
 
@@ -346,6 +352,7 @@ link_programs(struct vsx_shader_data *data,
 
 bool
 vsx_shader_data_init(struct vsx_shader_data *data,
+                     struct vsx_gl *gl,
                      struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error)
 {
@@ -359,7 +366,8 @@ vsx_shader_data_init(struct vsx_shader_data *data,
         for (n_shaders = 0; n_shaders < VSX_N_ELEMENTS(shaders); n_shaders++) {
                 shader = vsx_shader_data_shaders + n_shaders;
                 shaders[n_shaders] =
-                        create_shader_from_files(asset_manager,
+                        create_shader_from_files(gl,
+                                                 asset_manager,
                                                  shader->type,
                                                  shader->filenames,
                                                  error);
@@ -370,34 +378,35 @@ vsx_shader_data_init(struct vsx_shader_data *data,
         }
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                data->programs[i].program = vsx_gl.glCreateProgram();
+                data->programs[i].program = gl->glCreateProgram();
 
         for (i = 0; i < VSX_N_ELEMENTS(shaders); i++) {
                 shader = vsx_shader_data_shaders + i;
                 for (j = 0; shader->programs[j] != PROGRAMS_END; j++) {
                         program = data->programs[shader->programs[j]].program;
-                        vsx_gl.glAttachShader(program, shaders[i]);
+                        gl->glAttachShader(program, shaders[i]);
                 }
         }
 
-        if (!link_programs(data, error)) {
+        if (!link_programs(data, gl, error)) {
                 for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                        vsx_gl.glDeleteProgram(data->programs[i].program);
+                        gl->glDeleteProgram(data->programs[i].program);
                 result = false;
         }
 
 out:
         for (i = 0; i < n_shaders; i++)
-                vsx_gl.glDeleteShader(shaders[i]);
+                gl->glDeleteShader(shaders[i]);
 
         return result;
 }
 
 void
-vsx_shader_data_destroy(struct vsx_shader_data *data)
+vsx_shader_data_destroy(struct vsx_shader_data *data,
+                        struct vsx_gl *gl)
 {
         int i;
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
-                vsx_gl.glDeleteProgram(data->programs[i].program);
+                gl->glDeleteProgram(data->programs[i].program);
 }
