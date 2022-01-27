@@ -237,7 +237,6 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
         data->dpi = dpi;
 
         vsx_main_thread_set_wakeup_func(wakeup_cb, data);
-        vsx_share_link_set_callback(share_link_cb, data);
 
         return (jlong) data;
 }
@@ -387,6 +386,8 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
                                                   data->game_state,
                                                   data->asset_manager,
                                                   data->dpi,
+                                                  share_link_cb,
+                                                  data,
                                                   &error);
 
         if (data->game_painter == NULL) {

@@ -25,6 +25,7 @@
 #include "vsx-image-loader.h"
 #include "vsx-font.h"
 #include "vsx-paint-state.h"
+#include "vsx-share-link-callback.h"
 
 struct vsx_toolbox {
         struct vsx_gl *gl;
@@ -33,6 +34,9 @@ struct vsx_toolbox {
         struct vsx_image_loader *image_loader;
         struct vsx_font_library *font_library;
         struct vsx_paint_state paint_state;
+
+        vsx_share_link_callback share_link_callback;
+        void *share_link_data;
 };
 
 #endif /* VSX_TOOLBOX_H */

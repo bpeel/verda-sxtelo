@@ -31,7 +31,6 @@
 #include "vsx-qr.h"
 #include "vsx-id-url.h"
 #include "vsx-layout.h"
-#include "vsx-share-link.h"
 
 struct paragraph {
         struct vsx_layout *layout;
@@ -520,7 +519,9 @@ handle_click(struct vsx_invite_painter *painter,
 
         int x, y;
 
-        vsx_paint_state_screen_to_pixel(&painter->toolbox->paint_state,
+        struct vsx_toolbox *toolbox = painter->toolbox;
+
+        vsx_paint_state_screen_to_pixel(&toolbox->paint_state,
                                         event->click.x, event->click.y,
                                         &x, &y);
 
@@ -546,7 +547,7 @@ handle_click(struct vsx_invite_painter *painter,
                 char url[VSX_ID_URL_ENCODED_SIZE + 1];
 
                 vsx_id_url_encode(painter->id_in_texture, url);
-                vsx_share_link(painter->game_state, url);
+                toolbox->share_link_callback(url, toolbox->share_link_data);
 
                 return true;
         }

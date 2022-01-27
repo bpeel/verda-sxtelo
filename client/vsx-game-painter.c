@@ -184,6 +184,8 @@ vsx_game_painter_new(struct vsx_gl *gl,
                      struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
                      int dpi,
+                     vsx_share_link_callback share_link_callback,
+                     void *share_link_data,
                      struct vsx_error **error)
 {
         struct vsx_game_painter *painter = vsx_calloc(sizeof *painter);
@@ -199,6 +201,9 @@ vsx_game_painter_new(struct vsx_gl *gl,
 
         if (!init_toolbox(painter, gl, asset_manager, dpi, error))
                 goto error;
+
+        painter->toolbox.share_link_callback = share_link_callback;
+        painter->toolbox.share_link_data = share_link_data;
 
         init_painters(painter);
 

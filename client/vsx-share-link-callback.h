@@ -19,14 +19,8 @@
 #ifndef VSX_SHARE_LINK_CALLBACK_H
 #define VSX_SHARE_LINK_CALLBACK_H
 
-#include "vsx-share-link.h"
-
 typedef void
 (* vsx_share_link_callback)(const char *link,
-                            void *user_data);
-
-void
-vsx_share_link_set_callback(vsx_share_link_callback callback,
                             void *user_data);
 
 #endif /* VSX_SHARE_LINK_CALLBACK_H */

@@ -327,6 +327,20 @@ redraw_needed_cb(struct vsx_listener *listener,
         main_data->redraw_queued = true;
 }
 
+static void
+share_link_cb(const char *link,
+              void *user_data)
+{
+        struct vsx_main_data *main_data = user_data;
+
+        SDL_SetClipboardText(link);
+
+        enum vsx_text_language language =
+                vsx_game_state_get_language(main_data->game_state);
+        vsx_game_state_set_note(main_data->game_state,
+                                vsx_text_get(language, VSX_TEXT_LINK_COPIED));
+}
+
 static bool
 init_painter(struct vsx_main_data *main_data)
 {
@@ -337,6 +351,8 @@ init_painter(struct vsx_main_data *main_data)
                                      main_data->game_state,
                                      main_data->asset_manager,
                                      DPI,
+                                     share_link_cb,
+                                     main_data, /* share_link_data */
                                      &error);
 
         if (game_painter == NULL) {
