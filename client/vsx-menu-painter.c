@@ -237,6 +237,8 @@ texture_load_cb(const struct vsx_image *image,
                 return;
         }
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glGenTextures(1, &painter->tex);
 
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
@@ -253,7 +255,7 @@ texture_load_cb(const struct vsx_image *image,
                                GL_TEXTURE_MAG_FILTER,
                                GL_LINEAR);
 
-        vsx_mipmap_load_image(image, painter->tex);
+        vsx_mipmap_load_image(image, gl, painter->tex);
 
         vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }

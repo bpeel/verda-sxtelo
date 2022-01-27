@@ -40,7 +40,8 @@ vsx_mipmap_get_actual_image_size(const struct vsx_image *image,
 }
 
 void
-vsx_mipmap_create_texture_storage(GLenum format,
+vsx_mipmap_create_texture_storage(struct vsx_gl *gl,
+                                  GLenum format,
                                   GLenum type,
                                   int width,
                                   int height)
@@ -48,14 +49,14 @@ vsx_mipmap_create_texture_storage(GLenum format,
         int mipmap_level = 0;
 
         while (true) {
-                vsx_gl.glTexImage2D(GL_TEXTURE_2D,
-                                    mipmap_level,
-                                    format,
-                                    width, height,
-                                    0, /* border */
-                                    format,
-                                    type,
-                                    NULL /* data */);
+                gl->glTexImage2D(GL_TEXTURE_2D,
+                                 mipmap_level,
+                                 format,
+                                 width, height,
+                                 0, /* border */
+                                 format,
+                                 type,
+                                 NULL /* data */);
 
                 if (width <= 1 && height <= 1)
                         break;
@@ -91,27 +92,30 @@ format_for_image(const struct vsx_image *image)
 
 void
 vsx_mipmap_load_image(const struct vsx_image *image,
+                      struct vsx_gl *gl,
                       GLuint tex)
 {
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, tex);
+        gl->glBindTexture(GL_TEXTURE_2D, tex);
 
         int width, height;
         vsx_mipmap_get_actual_image_size(image, &width, &height);
 
-        vsx_mipmap_create_texture_storage(format_for_image(image),
+        vsx_mipmap_create_texture_storage(gl,
+                                          format_for_image(image),
                                           GL_UNSIGNED_BYTE,
                                           width, height);
 
-        vsx_mipmap_load_image_at_offset(image, tex, 0, 0);
+        vsx_mipmap_load_image_at_offset(image, gl, tex, 0, 0);
 }
 
 void
 vsx_mipmap_load_image_at_offset(const struct vsx_image *image,
+                                struct vsx_gl *gl,
                                 GLuint tex,
                                 int x_off,
                                 int y_off)
 {
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, tex);
+        gl->glBindTexture(GL_TEXTURE_2D, tex);
 
         bool go_down = true;
         int mipmap_level = 0;
@@ -137,13 +141,13 @@ vsx_mipmap_load_image_at_offset(const struct vsx_image *image,
                                    image_stride);
                 }
 
-                vsx_gl.glTexSubImage2D(GL_TEXTURE_2D,
-                                       mipmap_level,
-                                       x_off, y_off,
-                                       width, height,
-                                       format,
-                                       GL_UNSIGNED_BYTE,
-                                       image->data);
+                gl->glTexSubImage2D(GL_TEXTURE_2D,
+                                    mipmap_level,
+                                    x_off, y_off,
+                                    width, height,
+                                    format,
+                                    GL_UNSIGNED_BYTE,
+                                    image->data);
 
                 if (width <= 1 && height <= 1)
                         break;

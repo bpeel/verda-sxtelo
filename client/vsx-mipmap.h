@@ -24,7 +24,8 @@
 #include "vsx-image.h"
 
 void
-vsx_mipmap_create_texture_storage(GLenum format,
+vsx_mipmap_create_texture_storage(struct vsx_gl *gl,
+                                  GLenum format,
                                   GLenum type,
                                   int width,
                                   int height);
@@ -36,10 +37,12 @@ vsx_mipmap_get_actual_image_size(const struct vsx_image *image,
 
 void
 vsx_mipmap_load_image(const struct vsx_image *image,
+                      struct vsx_gl *gl,
                       GLuint tex);
 
 void
 vsx_mipmap_load_image_at_offset(const struct vsx_image *image,
+                                struct vsx_gl *gl,
                                 GLuint tex,
                                 int x_off,
                                 int y_off);
