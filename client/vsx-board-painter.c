@@ -701,8 +701,8 @@ update_name_label_position(struct vsx_board_painter *painter,
         } else {
                 board_left = paint_state->board_scissor_x;
                 board_top = (paint_state->height -
-                              paint_state->board_scissor_y -
-                              paint_state->board_scissor_height);
+                             paint_state->board_scissor_y -
+                             paint_state->board_scissor_height);
 
                 board_width = paint_state->board_scissor_width;
                 board_height = paint_state->board_scissor_height;
