@@ -327,7 +327,8 @@ init_painter(struct vsx_main_data *main_data)
         struct vsx_error *error = NULL;
 
         struct vsx_game_painter *game_painter =
-                vsx_game_painter_new(main_data->game_state,
+                vsx_game_painter_new(&vsx_gl,
+                                     main_data->game_state,
                                      main_data->asset_manager,
                                      DPI,
                                      &error);

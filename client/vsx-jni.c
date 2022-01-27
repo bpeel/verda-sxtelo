@@ -375,7 +375,8 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
 
         vsx_gl_init(get_proc_address_func, data);
 
-        data->game_painter = vsx_game_painter_new(data->game_state,
+        data->game_painter = vsx_game_painter_new(&vsx_gl,
+                                                  data->game_state,
                                                   data->asset_manager,
                                                   data->dpi,
                                                   &error);

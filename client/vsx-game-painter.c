@@ -127,13 +127,14 @@ init_painters(struct vsx_game_painter *painter)
 
 static bool
 init_toolbox(struct vsx_game_painter *painter,
+             struct vsx_gl *gl,
              struct vsx_asset_manager *asset_manager,
              int dpi,
              struct vsx_error **error)
 {
         struct vsx_toolbox *toolbox = &painter->toolbox;
 
-        toolbox->gl = &vsx_gl;
+        toolbox->gl = gl;
 
         toolbox->map_buffer = vsx_map_buffer_new(toolbox->gl);
 
@@ -179,7 +180,8 @@ destroy_toolbox(struct vsx_game_painter *painter)
 }
 
 struct vsx_game_painter *
-vsx_game_painter_new(struct vsx_game_state *game_state,
+vsx_game_painter_new(struct vsx_gl *gl,
+                     struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
                      int dpi,
                      struct vsx_error **error)
@@ -195,7 +197,7 @@ vsx_game_painter_new(struct vsx_game_state *game_state,
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
-        if (!init_toolbox(painter, asset_manager, dpi, error))
+        if (!init_toolbox(painter, gl, asset_manager, dpi, error))
                 goto error;
 
         init_painters(painter);
@@ -436,15 +438,17 @@ vsx_game_painter_paint(struct vsx_game_painter *painter)
 
         /* Painting */
 
+        struct vsx_gl *gl = painter->toolbox.gl;
+
         if (painter->viewport_dirty) {
-                vsx_gl.glViewport(0, 0,
-                                  painter->toolbox.paint_state.width,
-                                  painter->toolbox.paint_state.height);
+                gl->glViewport(0, 0,
+                               painter->toolbox.paint_state.width,
+                               painter->toolbox.paint_state.height);
 
                 painter->viewport_dirty = false;
         }
 
-        vsx_gl.glClear(GL_COLOR_BUFFER_BIT);
+        gl->glClear(GL_COLOR_BUFFER_BIT);
 
         for (unsigned i = 0; i < N_PAINTERS; i++) {
                 if (painters[i]->paint_cb == NULL)

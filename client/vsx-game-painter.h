@@ -20,6 +20,7 @@
 #define VSX_GAME_PAINTER_H
 
 #include "vsx-error.h"
+#include "vsx-gl.h"
 #include "vsx-game-state.h"
 #include "vsx-asset.h"
 
@@ -32,7 +33,8 @@
 struct vsx_game_painter;
 
 struct vsx_game_painter *
-vsx_game_painter_new(struct vsx_game_state *game_state,
+vsx_game_painter_new(struct vsx_gl *gl,
+                     struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
                      int dpi,
                      struct vsx_error **error);
