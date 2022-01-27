@@ -37,7 +37,7 @@ vsx_quad_buffer_generate(struct vsx_array_object *vao,
         GLuint element_buffer;
         vsx_gl.glGenBuffers(1, &element_buffer);
 
-        vsx_array_object_set_element_buffer(vao, element_buffer);
+        vsx_array_object_set_element_buffer(vao, &vsx_gl, element_buffer);
 
         vsx_gl.glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                             buffer_size,

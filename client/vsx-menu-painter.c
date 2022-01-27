@@ -261,6 +261,8 @@ texture_load_cb(const struct vsx_image *image,
 static void
 create_buffer(struct vsx_menu_painter *painter)
 {
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glGenBuffers(1, &painter->vbo);
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
         vsx_gl.glBufferData(GL_ARRAY_BUFFER,
@@ -268,9 +270,10 @@ create_buffer(struct vsx_menu_painter *painter)
                             NULL, /* data */
                             GL_DYNAMIC_DRAW);
 
-        painter->vao = vsx_array_object_new();
+        painter->vao = vsx_array_object_new(gl);
 
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_SHORT,
@@ -280,6 +283,7 @@ create_buffer(struct vsx_menu_painter *painter)
                                        painter->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
                                        GL_FLOAT,
@@ -533,6 +537,8 @@ paint_cb(void *painter_data)
         if (painter->tex == 0)
                 return;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         ensure_vertices(painter);
@@ -552,7 +558,7 @@ paint_cb(void *painter_data)
                            painter->translation[0],
                            painter->translation[1]);
 
-        vsx_array_object_bind(painter->vao);
+        vsx_array_object_bind(painter->vao, gl);
 
         vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
 
@@ -586,8 +592,10 @@ free_cb(void *painter_data)
         for (int i = 0; i < N_BUTTONS; i++)
                 vsx_layout_free(painter->labels[i].layout);
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         if (painter->vao)
-                vsx_array_object_free(painter->vao);
+                vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 vsx_gl.glDeleteBuffers(1, &painter->vbo);
         if (painter->element_buffer)

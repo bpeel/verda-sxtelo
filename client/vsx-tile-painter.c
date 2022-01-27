@@ -606,8 +606,10 @@ input_event_cb(void *painter_data,
 static void
 free_buffer(struct vsx_tile_painter *painter)
 {
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         if (painter->vao) {
-                vsx_array_object_free(painter->vao);
+                vsx_array_object_free(painter->vao, gl);
                 painter->vao = 0;
         }
         if (painter->vbo) {
@@ -681,6 +683,8 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
 
         int n_vertices = n_tiles * 4;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glGenBuffers(1, &painter->vbo);
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
         vsx_gl.glBufferData(GL_ARRAY_BUFFER,
@@ -688,9 +692,10 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
                             NULL, /* data */
                             GL_DYNAMIC_DRAW);
 
-        painter->vao = vsx_array_object_new();
+        painter->vao = vsx_array_object_new(gl);
 
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_FLOAT,
@@ -700,6 +705,7 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
                                        painter->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
                                        GL_UNSIGNED_SHORT,
@@ -825,8 +831,10 @@ paint_cb(void *painter_data)
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glUseProgram(program->program);
-        vsx_array_object_bind(painter->vao);
+        vsx_array_object_bind(painter->vao, gl);
 
         vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
                                   1, /* count */

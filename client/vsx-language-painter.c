@@ -138,9 +138,12 @@ create_buffer(struct vsx_language_painter *painter)
                             vertices,
                             GL_STATIC_DRAW);
 
-        painter->vao = vsx_array_object_new();
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        painter->vao = vsx_array_object_new(gl);
 
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_SHORT,
@@ -281,11 +284,13 @@ paint_cb(void *painter_data)
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_SOLID;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glUseProgram(program->program);
 
         update_uniforms(painter, program);
 
-        vsx_array_object_bind(painter->vao);
+        vsx_array_object_bind(painter->vao, gl);
 
         vsx_gl.glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 
@@ -323,8 +328,10 @@ free_cb(void *painter_data)
         for (int i = 0; i < VSX_N_ELEMENTS(painter->buttons); i++)
                 vsx_layout_free(painter->buttons[i].layout);
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         if (painter->vao)
-                vsx_array_object_free(painter->vao);
+                vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 vsx_gl.glDeleteBuffers(1, &painter->vbo);
 

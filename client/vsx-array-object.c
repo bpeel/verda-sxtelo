@@ -55,13 +55,13 @@ struct vsx_array_object {
 #define VSX_ARRAY_OBJECT_FROM_POINTER(x) ((GLuint) (uintptr_t) (x))
 
 struct vsx_array_object *
-vsx_array_object_new(void)
+vsx_array_object_new(struct vsx_gl *gl)
 {
         struct vsx_array_object *array;
         GLuint vao;
 
-        if (vsx_gl.have_vertex_array_objects) {
-                vsx_gl.glGenVertexArrays(1, &vao);
+        if (gl->have_vertex_array_objects) {
+                gl->glGenVertexArrays(1, &vao);
                 array = VSX_ARRAY_OBJECT_TO_POINTER(vao);
         } else {
                 array = vsx_alloc(sizeof *array);
@@ -74,6 +74,7 @@ vsx_array_object_new(void)
 
 void
 vsx_array_object_set_attribute(struct vsx_array_object *array,
+                               struct vsx_gl *gl,
                                GLuint index,
                                GLint size,
                                GLenum type,
@@ -85,19 +86,19 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
 {
         GLuint vao;
 
-        if (vsx_gl.have_vertex_array_objects) {
+        if (gl->have_vertex_array_objects) {
                 vao = VSX_ARRAY_OBJECT_FROM_POINTER(array);
-                vsx_gl.glBindVertexArray(vao);
-                vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, buffer);
-                vsx_gl.glVertexAttribPointer(index,
-                                             size,
-                                             type,
-                                             normalized,
-                                             stride,
-                                             (void *) (intptr_t) buffer_offset);
+                gl->glBindVertexArray(vao);
+                gl->glBindBuffer(GL_ARRAY_BUFFER, buffer);
+                gl->glVertexAttribPointer(index,
+                                          size,
+                                          type,
+                                          normalized,
+                                          stride,
+                                          (void *) (intptr_t) buffer_offset);
                 if (divisor)
-                        vsx_gl.glVertexAttribDivisor(index, divisor);
-                vsx_gl.glEnableVertexAttribArray(index);
+                        gl->glVertexAttribDivisor(index, divisor);
+                gl->glEnableVertexAttribArray(index);
         } else {
                 array->enabled_attribs |= 1 << index;
 
@@ -113,10 +114,11 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
 
 void
 vsx_array_object_set_element_buffer(struct vsx_array_object *array,
+                                    struct vsx_gl *gl,
                                     GLuint buffer)
 {
-        if (vsx_gl.have_vertex_array_objects)
-                vsx_gl.glBindVertexArray(VSX_ARRAY_OBJECT_FROM_POINTER(array));
+        if (gl->have_vertex_array_objects)
+                gl->glBindVertexArray(VSX_ARRAY_OBJECT_FROM_POINTER(array));
         else
                 array->element_buffer = buffer;
 
@@ -124,19 +126,20 @@ vsx_array_object_set_element_buffer(struct vsx_array_object *array,
          * available so that the callee can assume it's bound and fill
          * it with data.
          */
-        vsx_gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+        gl->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
 }
 
 void
-vsx_array_object_bind(struct vsx_array_object *array)
+vsx_array_object_bind(struct vsx_array_object *array,
+                      struct vsx_gl *gl)
 {
         const struct vsx_array_object_attribute *attrib;
         GLuint last_buffer;
         uint32_t attribs;
         int index;
 
-        if (vsx_gl.have_vertex_array_objects) {
-                vsx_gl.glBindVertexArray(VSX_ARRAY_OBJECT_FROM_POINTER(array));
+        if (gl->have_vertex_array_objects) {
+                gl->glBindVertexArray(VSX_ARRAY_OBJECT_FROM_POINTER(array));
                 return;
         }
 
@@ -150,19 +153,19 @@ vsx_array_object_bind(struct vsx_array_object *array)
 
                 if (last_buffer != attrib->buffer) {
                         last_buffer = attrib->buffer;
-                        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, last_buffer);
+                        gl->glBindBuffer(GL_ARRAY_BUFFER, last_buffer);
                 }
 
-                vsx_gl.glVertexAttribPointer(index,
-                                             attrib->size,
-                                             attrib->type,
-                                             attrib->normalized,
-                                             attrib->stride,
-                                             (GLvoid *) (intptr_t)
-                                             attrib->buffer_offset);
+                gl->glVertexAttribPointer(index,
+                                          attrib->size,
+                                          attrib->type,
+                                          attrib->normalized,
+                                          attrib->stride,
+                                          (GLvoid *) (intptr_t)
+                                          attrib->buffer_offset);
 
-                if (vsx_gl.have_instanced_arrays)
-                        vsx_gl.glVertexAttribDivisor(index, attrib->divisor);
+                if (gl->have_instanced_arrays)
+                        gl->glVertexAttribDivisor(index, attrib->divisor);
         }
 
         attribs = array->enabled_attribs ^ enabled_attribs;
@@ -172,26 +175,27 @@ vsx_array_object_bind(struct vsx_array_object *array)
                 attribs &= ~(1 << index);
 
                 if (array->enabled_attribs & (1 << index))
-                        vsx_gl.glEnableVertexAttribArray(index);
+                        gl->glEnableVertexAttribArray(index);
                 else
-                        vsx_gl.glDisableVertexAttribArray(index);
+                        gl->glDisableVertexAttribArray(index);
         }
 
         enabled_attribs = array->enabled_attribs;
 
         if (array->element_buffer)
-                vsx_gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                                    array->element_buffer);
+                gl->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                                 array->element_buffer);
 }
 
 void
-vsx_array_object_free(struct vsx_array_object *array)
+vsx_array_object_free(struct vsx_array_object *array,
+                      struct vsx_gl *gl)
 {
         GLuint vao;
 
-        if (vsx_gl.have_vertex_array_objects) {
+        if (gl->have_vertex_array_objects) {
                 vao = VSX_ARRAY_OBJECT_FROM_POINTER(array);
-                vsx_gl.glDeleteVertexArrays(1, &vao);
+                gl->glDeleteVertexArrays(1, &vao);
         } else {
                 vsx_free(array);
         }

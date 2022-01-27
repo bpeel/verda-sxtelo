@@ -329,7 +329,7 @@ static void
 free_buffer(struct vsx_layout *layout)
 {
         if (layout->vao) {
-                vsx_array_object_free(layout->vao);
+                vsx_array_object_free(layout->vao, &vsx_gl);
                 layout->vao = NULL;
         }
 
@@ -368,8 +368,9 @@ ensure_buffer_size(struct vsx_layout *layout,
                             NULL,
                             GL_DYNAMIC_DRAW);
 
-        layout->vao = vsx_array_object_new();
+        layout->vao = vsx_array_object_new(&vsx_gl);
         vsx_array_object_set_attribute(layout->vao,
+                                       &vsx_gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_SHORT,
@@ -379,6 +380,7 @@ ensure_buffer_size(struct vsx_layout *layout,
                                        layout->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(layout->vao,
+                                       &vsx_gl,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
                                        GL_UNSIGNED_SHORT,
@@ -591,7 +593,7 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
                 if (pos->layout->draw_calls.length <= 0)
                         continue;
 
-                vsx_array_object_bind(pos->layout->vao);
+                vsx_array_object_bind(pos->layout->vao, &vsx_gl);
 
                 set_translation_uniform(program,
                                         params,

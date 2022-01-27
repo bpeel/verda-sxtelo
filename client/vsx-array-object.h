@@ -26,10 +26,11 @@
 struct vsx_array_object;
 
 struct vsx_array_object *
-vsx_array_object_new(void);
+vsx_array_object_new(struct vsx_gl *gl);
 
 void
 vsx_array_object_set_attribute(struct vsx_array_object *array,
+                               struct vsx_gl *gl,
                                GLuint index,
                                GLint size,
                                GLenum type,
@@ -45,12 +46,15 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
  */
 void
 vsx_array_object_set_element_buffer(struct vsx_array_object *array,
+                                    struct vsx_gl *gl,
                                     GLuint buffer);
 
 void
-vsx_array_object_bind(struct vsx_array_object *array);
+vsx_array_object_bind(struct vsx_array_object *array,
+                      struct vsx_gl *gl);
 
 void
-vsx_array_object_free(struct vsx_array_object *array);
+vsx_array_object_free(struct vsx_array_object *array,
+                      struct vsx_gl *gl);
 
 #endif /* VSX_ARRAY_OBJECT_H */

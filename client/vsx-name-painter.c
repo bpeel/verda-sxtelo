@@ -122,6 +122,8 @@ update_vertices(struct vsx_name_painter *painter)
 static void
 create_buffer(struct vsx_name_painter *painter)
 {
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glGenBuffers(1, &painter->vbo);
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
         vsx_gl.glBufferData(GL_ARRAY_BUFFER,
@@ -129,9 +131,10 @@ create_buffer(struct vsx_name_painter *painter)
                             NULL, /* data */
                             GL_DYNAMIC_DRAW);
 
-        painter->vao = vsx_array_object_new();
+        painter->vao = vsx_array_object_new(gl);
 
         vsx_array_object_set_attribute(painter->vao,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_FLOAT,
@@ -282,11 +285,13 @@ paint_cb(void *painter_data)
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_SOLID;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         vsx_gl.glUseProgram(program->program);
 
         set_uniforms(painter, program);
 
-        vsx_array_object_bind(painter->vao);
+        vsx_array_object_bind(painter->vao, gl);
 
         vsx_gl.glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 
@@ -339,8 +344,10 @@ free_cb(void *painter_data)
 
         vsx_list_remove(&painter->modified_listener.link);
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
         if (painter->vao)
-                vsx_array_object_free(painter->vao);
+                vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 vsx_gl.glDeleteBuffers(1, &painter->vbo);
 
