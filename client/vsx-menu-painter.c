@@ -294,7 +294,7 @@ create_buffer(struct vsx_menu_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, N_BUTTONS);
+                vsx_quad_buffer_generate(painter->vao, gl, N_BUTTONS);
 }
 
 static void *

@@ -591,7 +591,7 @@ create_buffer(struct vsx_board_painter *painter)
         vsx_map_buffer_unmap();
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, total_n_quads);
+                vsx_quad_buffer_generate(painter->vao, gl, total_n_quads);
 }
 
 static void

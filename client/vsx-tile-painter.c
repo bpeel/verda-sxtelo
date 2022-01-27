@@ -716,7 +716,7 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, n_tiles);
+                vsx_quad_buffer_generate(painter->vao, gl, n_tiles);
 
         painter->buffer_n_tiles = n_tiles;
 }

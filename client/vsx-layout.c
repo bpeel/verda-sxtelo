@@ -392,6 +392,7 @@ ensure_buffer_size(struct vsx_layout *layout,
 
         layout->element_buffer =
                 vsx_quad_buffer_generate(layout->vao,
+                                         &vsx_gl,
                                          alloc_size /
                                          sizeof (struct vertex) /
                                          4);

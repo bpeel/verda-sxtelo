@@ -192,7 +192,7 @@ create_buffer(struct vsx_button_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, TOTAL_N_QUADS);
+                vsx_quad_buffer_generate(painter->vao, gl, TOTAL_N_QUADS);
 }
 
 static void *

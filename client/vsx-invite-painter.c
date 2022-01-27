@@ -261,7 +261,7 @@ create_buffer(struct vsx_invite_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, N_QUADS);
+                vsx_quad_buffer_generate(painter->vao, gl, N_QUADS);
 }
 
 static void

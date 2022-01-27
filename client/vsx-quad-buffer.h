@@ -24,6 +24,7 @@
 
 GLuint
 vsx_quad_buffer_generate(struct vsx_array_object *vao,
+                         struct vsx_gl *gl,
                          size_t n_quads);
 
 #endif /* VSX_QUAD_BUFFER_H */
