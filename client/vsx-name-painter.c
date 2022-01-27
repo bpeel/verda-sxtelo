@@ -112,11 +112,13 @@ update_vertices(struct vsx_name_painter *painter)
         v->y = painter->dialog_y + painter->dialog_height;
         v++;
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            sizeof vertices,
-                            vertices,
-                            GL_DYNAMIC_DRAW);
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         sizeof vertices,
+                         vertices,
+                         GL_DYNAMIC_DRAW);
 }
 
 static void
@@ -124,12 +126,12 @@ create_buffer(struct vsx_name_painter *painter)
 {
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glGenBuffers(1, &painter->vbo);
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            N_VERTICES * sizeof (struct vertex),
-                            NULL, /* data */
-                            GL_DYNAMIC_DRAW);
+        gl->glGenBuffers(1, &painter->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         N_VERTICES * sizeof (struct vertex),
+                         NULL, /* data */
+                         GL_DYNAMIC_DRAW);
 
         painter->vao = vsx_array_object_new(gl);
 
@@ -265,13 +267,15 @@ static void
 set_uniforms(struct vsx_name_painter *painter,
              const struct vsx_shader_data_program_data *program)
 {
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  painter->matrix);
-        vsx_gl.glUniform2f(program->translation_uniform, -1.0f, 1.0f);
+        struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
+        gl->glUniformMatrix2fv(program->matrix_uniform,
+                               1, /* count */
+                               GL_FALSE, /* transpose */
+                               painter->matrix);
+        gl->glUniform2f(program->translation_uniform, -1.0f, 1.0f);
+
+        gl->glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
 }
 
 static void
@@ -286,13 +290,13 @@ paint_cb(void *painter_data)
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glUseProgram(program->program);
+        gl->glUseProgram(program->program);
 
         set_uniforms(painter, program);
 
         vsx_array_object_bind(painter->vao, gl);
 
-        vsx_gl.glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
+        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 
         struct vsx_layout_paint_position pos = {
                 .layout = painter->layout,
@@ -348,7 +352,7 @@ free_cb(void *painter_data)
         if (painter->vao)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
-                vsx_gl.glDeleteBuffers(1, &painter->vbo);
+                gl->glDeleteBuffers(1, &painter->vbo);
 
         if (painter->layout)
                 vsx_layout_free(painter->layout);
