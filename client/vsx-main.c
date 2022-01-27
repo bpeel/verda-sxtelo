@@ -69,6 +69,7 @@ struct vsx_main_data {
 
         bool sdl_inited;
 
+        struct vsx_main_thread *main_thread;
         struct vsx_connection *connection;
         struct vsx_worker *worker;
         struct vsx_asset_manager *asset_manager;
@@ -348,6 +349,7 @@ init_painter(struct vsx_main_data *main_data)
 
         struct vsx_game_painter *game_painter =
                 vsx_game_painter_new(main_data->gl,
+                                     main_data->main_thread,
                                      main_data->game_state,
                                      main_data->asset_manager,
                                      DPI,
@@ -424,7 +426,8 @@ init_restartable_data(struct vsx_main_data *main_data)
         if (main_data->worker == NULL)
                 return false;
 
-        main_data->game_state = vsx_game_state_new(main_data->worker,
+        main_data->game_state = vsx_game_state_new(main_data->main_thread,
+                                                   main_data->worker,
                                                    main_data->connection,
                                                    "en");
 
@@ -643,7 +646,7 @@ handle_event(struct vsx_main_data *main_data,
         }
 
         if (event->type == main_data->wakeup_event.type) {
-                vsx_main_thread_flush_idle_events();
+                vsx_main_thread_flush_idle_events(main_data->main_thread);
                 goto handled;
         }
 
@@ -694,6 +697,9 @@ run_main_loop(struct vsx_main_data *main_data)
 static void
 finish_sdl(struct vsx_main_data *main_data)
 {
+        if (main_data->main_thread)
+                vsx_main_thread_free(main_data->main_thread);
+
         if (main_data->sdl_inited)
                 SDL_Quit();
 }
@@ -734,7 +740,9 @@ init_sdl(struct vsx_main_data *main_data)
         main_data->sdl_inited = true;
 
         main_data->wakeup_event.type = SDL_RegisterEvents(1);
-        vsx_main_thread_set_wakeup_func(wakeup_cb, main_data);
+
+        main_data->main_thread =
+                vsx_main_thread_new(wakeup_cb, main_data);
 
         return true;
 }
@@ -774,8 +782,6 @@ main(int argc, char **argv)
 
 out:
         free_main_data(main_data);
-
-        vsx_main_thread_clean_up();
 
         return ret;
 }

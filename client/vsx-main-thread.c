@@ -29,6 +29,8 @@
 #include "vsx-thread.h"
 
 struct vsx_main_thread_token {
+        struct vsx_main_thread *mt;
+
         bool cancelled;
         vsx_main_thread_idle_func func;
         void *user_data;
@@ -40,7 +42,7 @@ struct vsx_main_thread_token {
         int64_t wakeup_time;
 };
 
-struct data {
+struct vsx_main_thread {
         vsx_main_thread_wakeup_func wakeup_func;
         void *wakeup_user_data;
         pthread_mutex_t mutex;
@@ -57,23 +59,24 @@ struct data {
         pthread_cond_t cond;
 };
 
-static struct data
-data = {
-        .mutex = PTHREAD_MUTEX_INITIALIZER,
-};
-
-void
-vsx_main_thread_set_wakeup_func(vsx_main_thread_wakeup_func func,
-                                void *user_data)
+struct vsx_main_thread *
+vsx_main_thread_new(vsx_main_thread_wakeup_func func,
+                    void *user_data)
 {
-        data.wakeup_func = func;
-        data.wakeup_user_data = user_data;
+        struct vsx_main_thread *mt = vsx_calloc(sizeof *mt);
+
+        pthread_mutex_init(&mt->mutex, NULL);
+
+        mt->wakeup_func = func;
+        mt->wakeup_user_data = user_data;
+
+        return mt;
 }
 
 static void
-flush_ready_timeout_events_locked()
+flush_ready_timeout_events_locked(struct vsx_main_thread *mt)
 {
-        if (data.timeout_queue == NULL)
+        if (mt->timeout_queue == NULL)
                 return;
 
         int64_t now = vsx_monotonic_get();
@@ -81,76 +84,80 @@ flush_ready_timeout_events_locked()
         bool found_something = false;
 
         while (true) {
-                struct vsx_main_thread_token *token = data.timeout_queue;
+                struct vsx_main_thread_token *token = mt->timeout_queue;
 
                 if (token == NULL || token->wakeup_time > now)
                         break;
 
                 /* Move the token into the idle queue */
-                data.timeout_queue = token->next;
+                mt->timeout_queue = token->next;
 
                 if (token->cancelled) {
-                        token->next = data.freed_tokens;
-                        data.freed_tokens = token;
+                        token->next = mt->freed_tokens;
+                        mt->freed_tokens = token;
                 } else {
-                        token->next = data.queue;
-                        data.queue = token;
+                        token->next = mt->queue;
+                        mt->queue = token;
                         found_something = true;
                 }
         }
 
-        if (found_something && data.wakeup_func)
-                data.wakeup_func(data.wakeup_user_data);
+        if (found_something && mt->wakeup_func)
+                mt->wakeup_func(mt->wakeup_user_data);
 }
 
 static void *
 timeout_thread_func(void *user_data)
 {
-        pthread_mutex_lock(&data.mutex);
+        struct vsx_main_thread *mt = user_data;
 
-        while (!data.timeout_thread_should_quit) {
-                if (data.timeout_queue == NULL) {
+        pthread_mutex_lock(&mt->mutex);
+
+        while (!mt->timeout_thread_should_quit) {
+                if (mt->timeout_queue == NULL) {
                         /* Wait forever */
-                        pthread_cond_wait(&data.cond, &data.mutex);
+                        pthread_cond_wait(&mt->cond, &mt->mutex);
                 } else {
-                        int64_t wakeup_time = data.timeout_queue->wakeup_time;
+                        int64_t wakeup_time = mt->timeout_queue->wakeup_time;
 
                         struct timespec wait_timespec = {
                                 .tv_sec = wakeup_time / 1000000,
                                 .tv_nsec = wakeup_time % 1000000 * 1000,
                         };
 
-                        pthread_cond_timedwait(&data.cond,
-                                               &data.mutex,
+                        pthread_cond_timedwait(&mt->cond,
+                                               &mt->mutex,
                                                &wait_timespec);
 
 
                 }
 
-                if (data.timeout_thread_should_quit)
+                if (mt->timeout_thread_should_quit)
                         break;
 
-                flush_ready_timeout_events_locked();
+                flush_ready_timeout_events_locked(mt);
         }
 
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&mt->mutex);
 
         return NULL;
 }
 
 static struct vsx_main_thread_token *
-create_token_locked(vsx_main_thread_idle_func func,
+create_token_locked(struct vsx_main_thread *mt,
+                    vsx_main_thread_idle_func func,
                     void *user_data)
 {
         struct vsx_main_thread_token *token;
 
-        if (data.freed_tokens == NULL) {
+        if (mt->freed_tokens == NULL) {
                 token = vsx_alloc(sizeof *token);
         } else {
-                token = data.freed_tokens;
-                data.freed_tokens = token->next;
+                token = mt->freed_tokens;
+                mt->freed_tokens = token->next;
         }
 
+        token->mt = mt;
         token->func = func;
         token->user_data = user_data;
         token->cancelled = false;
@@ -159,41 +166,41 @@ create_token_locked(vsx_main_thread_idle_func func,
 }
 
 static bool
-create_cond_locked(void)
+create_cond_locked(struct vsx_main_thread *mt)
 {
         pthread_condattr_t attr;
 
-        if (data.have_cond)
+        if (mt->have_cond)
                 return true;
 
         if (pthread_condattr_init(&attr))
                 return false;
 
         if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0 &&
-            pthread_cond_init(&data.cond, &attr) == 0)
-                data.have_cond = true;
+            pthread_cond_init(&mt->cond, &attr) == 0)
+                mt->have_cond = true;
 
         pthread_condattr_destroy(&attr);
 
-        return data.have_cond;
+        return mt->have_cond;
 }
 
 static bool
-create_thread_locked(void)
+create_thread_locked(struct vsx_main_thread *mt)
 {
-        if (data.have_timeout_thread)
+        if (mt->have_timeout_thread)
                 return true;
 
-        if (!create_cond_locked())
+        if (!create_cond_locked(mt))
                 return false;
 
-        data.timeout_thread_should_quit = false;
+        mt->timeout_thread_should_quit = false;
 
-        if (vsx_thread_create(&data.timeout_thread,
+        if (vsx_thread_create(&mt->timeout_thread,
                               NULL, /* attr */
                               timeout_thread_func,
-                              NULL /* arg */) == 0) {
-                data.have_timeout_thread = true;
+                              mt) == 0) {
+                mt->have_timeout_thread = true;
                 return true;
         } else {
                 return false;
@@ -201,18 +208,19 @@ create_thread_locked(void)
 }
 
 struct vsx_main_thread_token *
-vsx_main_thread_queue_timeout(uint32_t microseconds,
+vsx_main_thread_queue_timeout(struct vsx_main_thread *mt,
+                              uint32_t microseconds,
                               vsx_main_thread_idle_func func,
                               void *user_data)
 {
-        pthread_mutex_lock(&data.mutex);
+        pthread_mutex_lock(&mt->mutex);
 
         struct vsx_main_thread_token *token =
-                create_token_locked(func, user_data);
+                create_token_locked(mt, func, user_data);
 
         token->wakeup_time = vsx_monotonic_get() + microseconds;
 
-        struct vsx_main_thread_token **prev = &data.timeout_queue;
+        struct vsx_main_thread_token **prev = &mt->timeout_queue;
 
         while (*prev && (*prev)->wakeup_time < token->wakeup_time)
                 prev = &(*prev)->next;
@@ -221,30 +229,31 @@ vsx_main_thread_queue_timeout(uint32_t microseconds,
         *prev = token;
 
 
-        if (create_thread_locked())
-                pthread_cond_signal(&data.cond);
+        if (create_thread_locked(mt))
+                pthread_cond_signal(&mt->cond);
 
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&mt->mutex);
 
         return token;
 }
 
 struct vsx_main_thread_token *
-vsx_main_thread_queue_idle(vsx_main_thread_idle_func func,
+vsx_main_thread_queue_idle(struct vsx_main_thread *mt,
+                           vsx_main_thread_idle_func func,
                            void *user_data)
 {
-        pthread_mutex_lock(&data.mutex);
+        pthread_mutex_lock(&mt->mutex);
 
         struct vsx_main_thread_token *token =
-                create_token_locked(func, user_data);
+                create_token_locked(mt, func, user_data);
 
-        if (data.queue == NULL && data.wakeup_func)
-                data.wakeup_func(data.wakeup_user_data);
+        if (mt->queue == NULL && mt->wakeup_func)
+                mt->wakeup_func(mt->wakeup_user_data);
 
-        token->next = data.queue;
-        data.queue = token;
+        token->next = mt->queue;
+        mt->queue = token;
 
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&mt->mutex);
 
         return token;
 }
@@ -252,20 +261,20 @@ vsx_main_thread_queue_idle(vsx_main_thread_idle_func func,
 void
 vsx_main_thread_cancel_idle(struct vsx_main_thread_token *token)
 {
-        pthread_mutex_lock(&data.mutex);
+        pthread_mutex_lock(&token->mt->mutex);
         token->cancelled = true;
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&token->mt->mutex);
 }
 
 void
-vsx_main_thread_flush_idle_events(void)
+vsx_main_thread_flush_idle_events(struct vsx_main_thread *mt)
 {
-        pthread_mutex_lock(&data.mutex);
+        pthread_mutex_lock(&mt->mutex);
 
-        struct vsx_main_thread_token *queue = data.queue;
-        data.queue = NULL;
+        struct vsx_main_thread_token *queue = mt->queue;
+        mt->queue = NULL;
 
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&mt->mutex);
 
         for (struct vsx_main_thread_token *token = queue;
              token;
@@ -276,7 +285,7 @@ vsx_main_thread_flush_idle_events(void)
                 token->func(token->user_data);
         }
 
-        pthread_mutex_lock(&data.mutex);
+        pthread_mutex_lock(&mt->mutex);
 
         if (queue) {
                 struct vsx_main_thread_token *last = queue;
@@ -284,11 +293,11 @@ vsx_main_thread_flush_idle_events(void)
                 while (last->next)
                         last = last->next;
 
-                last->next = data.freed_tokens;
-                data.freed_tokens = queue;
+                last->next = mt->freed_tokens;
+                mt->freed_tokens = queue;
         }
 
-        pthread_mutex_unlock(&data.mutex);
+        pthread_mutex_unlock(&mt->mutex);
 }
 
 static void
@@ -303,28 +312,32 @@ free_tokens(struct vsx_main_thread_token *list)
 }
 
 void
-vsx_main_thread_clean_up(void)
+vsx_main_thread_free(struct vsx_main_thread *mt)
 {
-        if (data.have_timeout_thread) {
-                pthread_mutex_lock(&data.mutex);
-                data.timeout_thread_should_quit = true;
-                pthread_cond_signal(&data.cond);
-                pthread_mutex_unlock(&data.mutex);
+        if (mt->have_timeout_thread) {
+                pthread_mutex_lock(&mt->mutex);
+                mt->timeout_thread_should_quit = true;
+                pthread_cond_signal(&mt->cond);
+                pthread_mutex_unlock(&mt->mutex);
 
-                pthread_join(data.timeout_thread, NULL /* retval */);
+                pthread_join(mt->timeout_thread, NULL /* retval */);
 
-                data.have_timeout_thread = false;
+                mt->have_timeout_thread = false;
         }
 
-        if (data.have_cond) {
-                pthread_cond_destroy(&data.cond);
-                data.have_cond = false;
+        if (mt->have_cond) {
+                pthread_cond_destroy(&mt->cond);
+                mt->have_cond = false;
         }
 
-        free_tokens(data.queue);
-        data.queue = NULL;
-        free_tokens(data.freed_tokens);
-        data.freed_tokens = NULL;
-        free_tokens(data.timeout_queue);
-        data.timeout_queue = NULL;
+        free_tokens(mt->queue);
+        mt->queue = NULL;
+        free_tokens(mt->freed_tokens);
+        mt->freed_tokens = NULL;
+        free_tokens(mt->timeout_queue);
+        mt->timeout_queue = NULL;
+
+        pthread_mutex_destroy(&mt->mutex);
+
+        vsx_free(mt);
 }

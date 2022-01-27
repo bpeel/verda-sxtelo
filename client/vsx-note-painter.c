@@ -103,7 +103,8 @@ set_note_text(struct vsx_note_painter *painter,
         cancel_timeout(painter);
 
         painter->remove_note_timeout =
-                vsx_main_thread_queue_timeout(3 * 1000 * 1000,
+                vsx_main_thread_queue_timeout(painter->toolbox->main_thread,
+                                              3 * 1000 * 1000,
                                               remove_note_cb,
                                               painter);
 

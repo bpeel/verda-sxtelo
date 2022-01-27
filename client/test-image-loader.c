@@ -30,6 +30,7 @@
 #include "vsx-image-loader.h"
 
 struct data {
+        struct vsx_main_thread *main_thread;
         SDL_Event wakeup_event;
         struct vsx_image_loader *loader;
         struct vsx_asset_manager *asset_manager;
@@ -47,7 +48,7 @@ run_main_loop_until_finished(struct data *data,
                 assert(res);
 
                 if (event.type == data->wakeup_event.type)
-                        vsx_main_thread_flush_idle_events();
+                        vsx_main_thread_flush_idle_events(data->main_thread);
         }
 }
 
@@ -225,10 +226,13 @@ test_cancel(struct data *data,
                 int after = SDL_GetTicks();
 
                 if (res) {
-                        if (immediate)
+                        if (immediate) {
                                 assert(event.type != data->wakeup_event.type);
-                        else if (event.type == data->wakeup_event.type)
-                                vsx_main_thread_flush_idle_events();
+                        } else if (event.type == data->wakeup_event.type) {
+                                struct vsx_main_thread *main_thread =
+                                        data->main_thread;
+                                vsx_main_thread_flush_idle_events(main_thread);
+                        }
                 } else {
                         /* Make sure that we really waited for 3 seconds. */
                         assert(after - before > 2999);
@@ -250,7 +254,8 @@ static void
 test_free_while_loading(struct data *data)
 {
         struct vsx_image_loader *loader =
-                vsx_image_loader_new(data->asset_manager);
+                vsx_image_loader_new(data->main_thread,
+                                     data->asset_manager);
 
         assert(loader);
 
@@ -280,8 +285,11 @@ test_free_while_loading(struct data *data)
                 int after = SDL_GetTicks();
 
                 if (res) {
-                        if (event.type == data->wakeup_event.type)
-                                vsx_main_thread_flush_idle_events();
+                        if (event.type == data->wakeup_event.type) {
+                                struct vsx_main_thread *main_thread =
+                                        data->main_thread;
+                                vsx_main_thread_flush_idle_events(main_thread);
+                        }
                 } else {
                         /* Make sure that we really waited for 3 seconds. */
                         assert(after - before > 2999);
@@ -310,16 +318,16 @@ main(int argc, char **argv)
         assert(res >= 0);
 
         struct data data = {
+                .main_thread = vsx_main_thread_new(wakeup_cb, &data),
                 .wakeup_event.type = SDL_RegisterEvents(1),
         };
-
-        vsx_main_thread_set_wakeup_func(wakeup_cb, &data);
 
         data.asset_manager = vsx_asset_manager_new();
 
         assert(data.asset_manager != NULL);
 
-        data.loader = vsx_image_loader_new(data.asset_manager);
+        data.loader = vsx_image_loader_new(data.main_thread,
+                                           data.asset_manager);
 
         test_load_tiles(&data);
         test_load_multiple(&data);
@@ -333,7 +341,7 @@ main(int argc, char **argv)
 
         vsx_asset_manager_free(data.asset_manager);
 
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(data.main_thread);
 
         SDL_Quit();
 

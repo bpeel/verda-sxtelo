@@ -20,6 +20,7 @@
 #define VSX_IMAGE_LOADER_H
 
 #include "vsx-image.h"
+#include "vsx-main-thread.h"
 #include "vsx-asset.h"
 #include "vsx-error.h"
 
@@ -32,7 +33,8 @@ typedef void
                               void *data);
 
 struct vsx_image_loader *
-vsx_image_loader_new(struct vsx_asset_manager *asset_manager);
+vsx_image_loader_new(struct vsx_main_thread *main_thread,
+                     struct vsx_asset_manager *asset_manager);
 
 struct vsx_image_loader_token *
 vsx_image_loader_load(struct vsx_image_loader *loader,

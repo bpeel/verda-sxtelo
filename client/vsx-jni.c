@@ -48,6 +48,7 @@
 struct data {
         JavaVM *jvm;
 
+        struct vsx_main_thread *main_thread;
         struct vsx_connection *connection;
         struct vsx_worker *worker;
         struct vsx_asset_manager *asset_manager;
@@ -236,7 +237,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 
         data->dpi = dpi;
 
-        vsx_main_thread_set_wakeup_func(wakeup_cb, data);
+        data->main_thread = vsx_main_thread_new(wakeup_cb, data);
 
         return (jlong) data;
 }
@@ -332,7 +333,8 @@ ensure_game_state(struct data *data)
         }
 
         if (data->game_state == NULL) {
-                data->game_state = vsx_game_state_new(data->worker,
+                data->game_state = vsx_game_state_new(data->main_thread,
+                                                      data->worker,
                                                       data->connection,
                                                       data->game_language_code);
 
@@ -383,6 +385,7 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
         data->gl = vsx_gl_new(get_proc_address_func, data);
 
         data->game_painter = vsx_game_painter_new(data->gl,
+                                                  data->main_thread,
                                                   data->game_state,
                                                   data->asset_manager,
                                                   data->dpi,
@@ -565,7 +568,9 @@ VSX_JNI_RENDERER_PREFIX(flushIdleEvents)(JNIEnv *env,
                                          jobject this,
                                          jlong native_data)
 {
-        vsx_main_thread_flush_idle_events();
+        struct data *data = GET_DATA(native_data);
+
+        vsx_main_thread_flush_idle_events(data->main_thread);
 }
 
 JNIEXPORT void JNICALL
@@ -647,8 +652,7 @@ VSX_JNI_RENDERER_PREFIX(freeNativeData)(JNIEnv *env,
 
         (*env)->DeleteWeakGlobalRef(env, data->surface);
 
-        vsx_main_thread_set_wakeup_func(NULL, NULL);
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(data->main_thread);
 
         vsx_free(data);
 }

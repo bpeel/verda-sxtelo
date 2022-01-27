@@ -43,6 +43,7 @@
 
 struct harness {
         int server_sock;
+        struct vsx_main_thread *main_thread;
         struct vsx_connection *connection;
         struct vsx_worker *worker;
         struct vsx_game_state *game_state;
@@ -97,6 +98,9 @@ free_harness(struct harness *harness)
 
         if (harness->server_sock != -1)
                 vsx_close(harness->server_sock);
+
+        if (harness->main_thread)
+                vsx_main_thread_free(harness->main_thread);
 
         vsx_free(harness);
 }
@@ -168,7 +172,7 @@ wait_for_idle_queue(struct harness *harness)
         if (!wait_for_idle_queue_no_flush(harness))
                 return false;
 
-        vsx_main_thread_flush_idle_events();
+        vsx_main_thread_flush_idle_events(harness->main_thread);
 
         return true;
 }
@@ -444,7 +448,8 @@ create_harness_no_start(void)
 
         harness->server_fd = -1;
 
-        vsx_main_thread_set_wakeup_func(main_thread_wakeup_cb, harness);
+        harness->main_thread =
+                vsx_main_thread_new(main_thread_wakeup_cb, harness);
 
         harness->server_sock = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -507,7 +512,8 @@ create_harness_no_start(void)
                 goto error;
         }
 
-        harness->game_state = vsx_game_state_new(harness->worker,
+        harness->game_state = vsx_game_state_new(harness->main_thread,
+                                                 harness->worker,
                                                  harness->connection,
                                                  "en");
 
@@ -1426,7 +1432,7 @@ test_shouting(void)
         };
         nanosleep(&sleep_time, NULL /* rem */);
 
-        vsx_main_thread_flush_idle_events();
+        vsx_main_thread_flush_idle_events(harness->main_thread);
 
         int actual_shouting_player =
                 vsx_game_state_get_shouting_player(harness->game_state);
@@ -2480,13 +2486,6 @@ main(int argc, char **argv)
 
         if (!test_dangling_events())
                 ret = EXIT_FAILURE;
-
-        /* Flush any pending main thread events to make sure they were
-         * all cleaned up
-         */
-        vsx_main_thread_flush_idle_events();
-
-        vsx_main_thread_clean_up();
 
         return ret;
 }

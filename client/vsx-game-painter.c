@@ -128,6 +128,7 @@ init_painters(struct vsx_game_painter *painter)
 static bool
 init_toolbox(struct vsx_game_painter *painter,
              struct vsx_gl *gl,
+             struct vsx_main_thread *main_thread,
              struct vsx_asset_manager *asset_manager,
              int dpi,
              struct vsx_error **error)
@@ -135,6 +136,7 @@ init_toolbox(struct vsx_game_painter *painter,
         struct vsx_toolbox *toolbox = &painter->toolbox;
 
         toolbox->gl = gl;
+        toolbox->main_thread = main_thread;
 
         toolbox->map_buffer = vsx_map_buffer_new(toolbox->gl);
 
@@ -146,7 +148,8 @@ init_toolbox(struct vsx_game_painter *painter,
 
         painter->shader_data_inited = true;
 
-        toolbox->image_loader = vsx_image_loader_new(asset_manager);
+        toolbox->image_loader = vsx_image_loader_new(main_thread,
+                                                     asset_manager);
 
         toolbox->font_library = vsx_font_library_new(toolbox->gl,
                                                      asset_manager,
@@ -181,6 +184,7 @@ destroy_toolbox(struct vsx_game_painter *painter)
 
 struct vsx_game_painter *
 vsx_game_painter_new(struct vsx_gl *gl,
+                     struct vsx_main_thread *main_thread,
                      struct vsx_game_state *game_state,
                      struct vsx_asset_manager *asset_manager,
                      int dpi,
@@ -199,7 +203,7 @@ vsx_game_painter_new(struct vsx_gl *gl,
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
-        if (!init_toolbox(painter, gl, asset_manager, dpi, error))
+        if (!init_toolbox(painter, gl, main_thread, asset_manager, dpi, error))
                 goto error;
 
         painter->toolbox.share_link_callback = share_link_callback;

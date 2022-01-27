@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 
+struct vsx_main_thread;
 struct vsx_main_thread_token;
 
 typedef void
@@ -29,13 +30,19 @@ typedef void
 typedef void
 (* vsx_main_thread_wakeup_func)(void *data);
 
+struct vsx_main_thread *
+vsx_main_thread_new(vsx_main_thread_wakeup_func func,
+                    void *user_data);
+
 struct vsx_main_thread_token *
-vsx_main_thread_queue_timeout(uint32_t microseconds,
+vsx_main_thread_queue_timeout(struct vsx_main_thread *main_thread,
+                              uint32_t microseconds,
                               vsx_main_thread_idle_func func,
                               void *user_data);
 
 struct vsx_main_thread_token *
-vsx_main_thread_queue_idle(vsx_main_thread_idle_func func,
+vsx_main_thread_queue_idle(struct vsx_main_thread *main_thread,
+                           vsx_main_thread_idle_func func,
                            void *user_data);
 
 /* This should only be called from the main thread */
@@ -43,13 +50,9 @@ void
 vsx_main_thread_cancel_idle(struct vsx_main_thread_token *token);
 
 void
-vsx_main_thread_set_wakeup_func(vsx_main_thread_wakeup_func func,
-                                void *user_data);
+vsx_main_thread_flush_idle_events(struct vsx_main_thread *mt);
 
 void
-vsx_main_thread_flush_idle_events(void);
-
-void
-vsx_main_thread_clean_up(void);
+vsx_main_thread_free(struct vsx_main_thread *mt);
 
 #endif /* VSX_MAIN_THREAD_H */

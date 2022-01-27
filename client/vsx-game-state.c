@@ -87,6 +87,7 @@ struct vsx_game_state {
 
         enum vsx_text name_note;
 
+        struct vsx_main_thread *main_thread;
         struct vsx_worker *worker;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
@@ -328,7 +329,8 @@ handle_player_shouted(struct vsx_game_state *game_state,
 
         clear_remove_shout_timeout(game_state);
         game_state->remove_shout_timeout =
-                vsx_main_thread_queue_timeout(VSX_GAME_STATE_SHOUT_TIME,
+                vsx_main_thread_queue_timeout(game_state->main_thread,
+                                              VSX_GAME_STATE_SHOUT_TIME,
                                               remove_shout_cb,
                                               game_state);
 
@@ -530,7 +532,8 @@ event_cb(struct vsx_listener *listener,
 
         if (game_state->flush_queue_token == NULL) {
                 game_state->flush_queue_token =
-                        vsx_main_thread_queue_idle(flush_queue_cb,
+                        vsx_main_thread_queue_idle(game_state->main_thread,
+                                                   flush_queue_cb,
                                                    game_state);
         }
 
@@ -692,7 +695,8 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
 }
 
 struct vsx_game_state *
-vsx_game_state_new(struct vsx_worker *worker,
+vsx_game_state_new(struct vsx_main_thread *main_thread,
+                   struct vsx_worker *worker,
                    struct vsx_connection *connection,
                    const char *default_language)
 {
@@ -716,6 +720,7 @@ vsx_game_state_new(struct vsx_worker *worker,
 
         game_state->language = get_language_for_code(default_language);
 
+        game_state->main_thread = main_thread;
         game_state->worker = worker;
         game_state->connection = connection;
 

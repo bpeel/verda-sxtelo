@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "vsx-main-thread.h"
 #include "vsx-connection.h"
 #include "vsx-worker.h"
 #include "vsx-signal.h"
@@ -75,7 +76,8 @@ struct vsx_game_state_modified_event {
 };
 
 struct vsx_game_state *
-vsx_game_state_new(struct vsx_worker *worker,
+vsx_game_state_new(struct vsx_main_thread *main_thread,
+                   struct vsx_worker *worker,
                    struct vsx_connection *connection,
                    const char *default_language);
 

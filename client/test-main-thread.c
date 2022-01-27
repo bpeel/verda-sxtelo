@@ -30,6 +30,7 @@
 #include "vsx-monotonic.h"
 
 struct harness {
+        struct vsx_main_thread *main_thread;
         bool idle_queued;
 };
 
@@ -44,8 +45,7 @@ wakeup_cb(void *user_data)
 static void
 free_harness(struct harness *harness)
 {
-        vsx_main_thread_set_wakeup_func(NULL, NULL);
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(harness->main_thread);
         vsx_free(harness);
 }
 
@@ -54,7 +54,7 @@ create_harness(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
 
-        vsx_main_thread_set_wakeup_func(wakeup_cb, harness);
+        harness->main_thread = vsx_main_thread_new(wakeup_cb, harness);
 
         return harness;
 }
@@ -62,6 +62,7 @@ create_harness(void)
 #define N_IDLES_PER_THREAD 1024
 
 struct threaded_queue_event_closure {
+        struct harness *harness;
         pthread_t self;
         int n_idles_invoked;
         bool succeeded;
@@ -86,8 +87,11 @@ threaded_queue_thread_func(void *user_data)
 {
         struct threaded_queue_event_closure *closure = user_data;
 
-        for (int i = 0; i < N_IDLES_PER_THREAD; i++)
-                vsx_main_thread_queue_idle(threaded_queue_idle_cb, closure);
+        for (int i = 0; i < N_IDLES_PER_THREAD; i++) {
+                vsx_main_thread_queue_idle(closure->harness->main_thread,
+                                           threaded_queue_idle_cb,
+                                           closure);
+        }
 
         return NULL;
 }
@@ -98,6 +102,7 @@ test_threaded_queue_event(void)
         struct harness *harness = create_harness();
 
         struct threaded_queue_event_closure closure = {
+                .harness = harness,
                 .n_idles_invoked = 0,
                 .succeeded = true,
                 .self = pthread_self(),
@@ -146,7 +151,7 @@ test_threaded_queue_event(void)
                 ret = false;
         }
 
-        vsx_main_thread_flush_idle_events();
+        vsx_main_thread_flush_idle_events(harness->main_thread);
 
         int expected_n_idles = VSX_N_ELEMENTS(threads) * N_IDLES_PER_THREAD;
 
@@ -171,8 +176,11 @@ test_threaded_queue_event(void)
 static bool
 test_flush_empty(void)
 {
-        vsx_main_thread_flush_idle_events();
-        vsx_main_thread_clean_up();
+        struct vsx_main_thread *main_thread = vsx_main_thread_new(NULL, NULL);
+
+        vsx_main_thread_flush_idle_events(main_thread);
+
+        vsx_main_thread_free(main_thread);
 
         return true;
 }
@@ -190,8 +198,12 @@ test_no_wakeup_func(void)
 {
         int invocation_count = 0;
 
-        vsx_main_thread_queue_idle(count_invocations_cb, &invocation_count);
-        vsx_main_thread_flush_idle_events();
+        struct vsx_main_thread *main_thread = vsx_main_thread_new(NULL, NULL);
+
+        vsx_main_thread_queue_idle(main_thread,
+                                   count_invocations_cb,
+                                   &invocation_count);
+        vsx_main_thread_flush_idle_events(main_thread);
 
         bool ret = true;
 
@@ -205,7 +217,7 @@ test_no_wakeup_func(void)
                 ret = false;
         }
 
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(main_thread);
 
         return ret;
 }
@@ -215,7 +227,10 @@ test_no_wakeup_func_timeout(void)
 {
         int invocation_count = 0;
 
-        vsx_main_thread_queue_timeout(0, /* microseconds */
+        struct vsx_main_thread *main_thread = vsx_main_thread_new(NULL, NULL);
+
+        vsx_main_thread_queue_timeout(main_thread,
+                                      0, /* microseconds */
                                       count_invocations_cb,
                                       &invocation_count);
 
@@ -226,7 +241,7 @@ test_no_wakeup_func_timeout(void)
         };
         nanosleep(&sleep_time, NULL /* rem */);
 
-        vsx_main_thread_flush_idle_events();
+        vsx_main_thread_flush_idle_events(main_thread);
 
         bool ret = true;
 
@@ -240,7 +255,7 @@ test_no_wakeup_func_timeout(void)
                 ret = false;
         }
 
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(main_thread);
 
         return ret;
 }
@@ -250,7 +265,9 @@ test_simple_queue_and_flush(struct harness *harness)
 {
         int invocation_count = 0;
 
-        vsx_main_thread_queue_idle(count_invocations_cb, &invocation_count);
+        vsx_main_thread_queue_idle(harness->main_thread,
+                                   count_invocations_cb,
+                                   &invocation_count);
 
         bool ret = true;
 
@@ -267,7 +284,7 @@ test_simple_queue_and_flush(struct harness *harness)
                 ret = false;
         }
 
-        vsx_main_thread_flush_idle_events();
+        vsx_main_thread_flush_idle_events(harness->main_thread);
 
         if (invocation_count > 1) {
                 fprintf(stderr,
@@ -309,7 +326,8 @@ test_cancel(void)
         int cancelled_invocation_count = 0;
 
         struct vsx_main_thread_token *token =
-                vsx_main_thread_queue_idle(count_invocations_cb,
+                vsx_main_thread_queue_idle(harness->main_thread,
+                                           count_invocations_cb,
                                            &cancelled_invocation_count);
 
         vsx_main_thread_cancel_idle(token);
@@ -335,8 +353,11 @@ test_dangling_tokens(void)
 {
         struct vsx_main_thread_token *tokens[16];
 
+        struct vsx_main_thread *main_thread = vsx_main_thread_new(NULL, NULL);
+
         for (int i = 0; i < VSX_N_ELEMENTS(tokens); i++) {
-                tokens[i] = vsx_main_thread_queue_idle(count_invocations_cb,
+                tokens[i] = vsx_main_thread_queue_idle(main_thread,
+                                                       count_invocations_cb,
                                                        NULL);
         }
 
@@ -347,7 +368,8 @@ test_dangling_tokens(void)
 
         /* Check the timeout queue as well */
 
-        vsx_main_thread_queue_timeout(10 * 1000 * 1000,
+        vsx_main_thread_queue_timeout(main_thread,
+                                      10 * 1000 * 1000,
                                       count_invocations_cb,
                                       NULL /* user_data */);
 
@@ -355,7 +377,7 @@ test_dangling_tokens(void)
 
         int64_t cleanup_start = vsx_monotonic_get();
 
-        vsx_main_thread_clean_up();
+        vsx_main_thread_free(main_thread);
 
         int64_t cleanup_time = vsx_monotonic_get() - cleanup_start;
 
@@ -389,7 +411,8 @@ test_timeout(void)
                 int timeout_num = i ^ 1;
                 int timeout_microseconds = (timeout_num + 1) * 2 * 1000 * 1000;
 
-                vsx_main_thread_queue_timeout(timeout_microseconds,
+                vsx_main_thread_queue_timeout(harness->main_thread,
+                                              timeout_microseconds,
                                               count_invocations_cb,
                                               invocation_counts + timeout_num);
         }
@@ -428,7 +451,7 @@ test_timeout(void)
                         ret = false;
                 }
 
-                vsx_main_thread_flush_idle_events();
+                vsx_main_thread_flush_idle_events(harness->main_thread);
 
                 if (invocation_counts[i] == 0) {
                         fprintf(stderr,

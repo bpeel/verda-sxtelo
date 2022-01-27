@@ -44,6 +44,7 @@ struct vsx_image_loader {
         pthread_mutex_t mutex;
         pthread_cond_t cond;
         pthread_t thread;
+        struct vsx_main_thread *main_thread;
         struct vsx_asset_manager *asset_manager;
         bool quit;
 
@@ -154,8 +155,13 @@ thread_func(void *user_data)
                                 loader->notify_slot = token;
 
                                 assert(loader->idle_token == NULL);
+
+                                struct vsx_main_thread *mt =
+                                        loader->main_thread;
+
                                 loader->idle_token =
-                                        vsx_main_thread_queue_idle(idle_cb,
+                                        vsx_main_thread_queue_idle(mt,
+                                                                   idle_cb,
                                                                    loader);
                         }
                 }
@@ -167,10 +173,12 @@ thread_func(void *user_data)
 }
 
 struct vsx_image_loader *
-vsx_image_loader_new(struct vsx_asset_manager *asset_manager)
+vsx_image_loader_new(struct vsx_main_thread *main_thread,
+                     struct vsx_asset_manager *asset_manager)
 {
         struct vsx_image_loader *loader = vsx_calloc(sizeof *loader);
 
+        loader->main_thread = main_thread;
         loader->asset_manager = asset_manager;
 
         pthread_mutex_init(&loader->mutex, NULL);
