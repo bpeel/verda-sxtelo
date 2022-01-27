@@ -269,8 +269,7 @@ create_layouts(struct vsx_invite_painter *painter)
 {
         for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
                 struct vsx_layout *layout =
-                        vsx_layout_new(painter->toolbox->font_library,
-                                       &painter->toolbox->shader_data);
+                        vsx_layout_new(painter->toolbox);
 
                 vsx_layout_set_font(layout, PARAGRAPHS_FONT);
 
@@ -490,7 +489,6 @@ paint_cb(void *painter_data)
                 const struct paragraph *paragraph = painter->paragraphs + i;
 
                 vsx_layout_paint(paragraph->layout,
-                                 &painter->toolbox->paint_state,
                                  paragraph->x,
                                  paragraph->y,
                                  paragraph->r,

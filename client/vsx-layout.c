@@ -34,10 +34,9 @@
 #include "vsx-quad-buffer.h"
 
 struct vsx_layout {
-        struct vsx_font_library *library;
+        struct vsx_toolbox *toolbox;
         struct vsx_font *font;
         struct vsx_array_object *vao;
-        const struct vsx_shader_data_program_data *program;
         GLuint vbo, element_buffer;
         char *text;
         bool dirty;
@@ -68,18 +67,14 @@ struct draw_call {
 #define VSX_LAYOUT_MINIMUM_BUFFER_SIZE 1024
 
 struct vsx_layout *
-vsx_layout_new(struct vsx_font_library *library,
-               struct vsx_shader_data *shader_data)
+vsx_layout_new(struct vsx_toolbox *toolbox)
 {
         struct vsx_layout *layout = vsx_calloc(sizeof *layout);
 
-        layout->library = library;
-        layout->font = vsx_font_library_get_font(library, 0);
+        layout->toolbox = toolbox;
+        layout->font = vsx_font_library_get_font(toolbox->font_library, 0);
         vsx_buffer_init(&layout->draw_calls);
         layout->width = UINT_MAX;
-
-        layout->program =
-                shader_data->programs + VSX_SHADER_DATA_PROGRAM_LAYOUT;
 
         return layout;
 }
@@ -98,7 +93,9 @@ void
 vsx_layout_set_font(struct vsx_layout *layout,
                     enum vsx_font_type font)
 {
-        layout->font = vsx_font_library_get_font(layout->library, font);
+        struct vsx_font_library *library = layout->toolbox->font_library;
+
+        layout->font = vsx_font_library_get_font(library, font);
         layout->dirty = true;
 }
 
@@ -328,18 +325,20 @@ get_glyph_quads(struct vsx_layout *layout,
 static void
 free_buffer(struct vsx_layout *layout)
 {
+        struct vsx_gl *gl = layout->toolbox->gl;
+
         if (layout->vao) {
-                vsx_array_object_free(layout->vao, &vsx_gl);
+                vsx_array_object_free(layout->vao, gl);
                 layout->vao = NULL;
         }
 
         if (layout->vbo) {
-                vsx_gl.glDeleteBuffers(1, &layout->vbo);
+                gl->glDeleteBuffers(1, &layout->vbo);
                 layout->vbo = 0;
         }
 
         if (layout->element_buffer) {
-                vsx_gl.glDeleteBuffers(1, &layout->element_buffer);
+                gl->glDeleteBuffers(1, &layout->element_buffer);
                 layout->element_buffer = 0;
         }
 }
@@ -361,16 +360,18 @@ ensure_buffer_size(struct vsx_layout *layout,
 
         layout->buffer_size = alloc_size;
 
-        vsx_gl.glGenBuffers(1, &layout->vbo);
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, layout->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            alloc_size,
-                            NULL,
-                            GL_DYNAMIC_DRAW);
+        struct vsx_gl *gl = layout->toolbox->gl;
 
-        layout->vao = vsx_array_object_new(&vsx_gl);
+        gl->glGenBuffers(1, &layout->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, layout->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         alloc_size,
+                         NULL,
+                         GL_DYNAMIC_DRAW);
+
+        layout->vao = vsx_array_object_new(gl);
         vsx_array_object_set_attribute(layout->vao,
-                                       &vsx_gl,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_POSITION,
                                        2, /* size */
                                        GL_SHORT,
@@ -380,7 +381,7 @@ ensure_buffer_size(struct vsx_layout *layout,
                                        layout->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(layout->vao,
-                                       &vsx_gl,
+                                       gl,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
                                        GL_UNSIGNED_SHORT,
@@ -392,7 +393,7 @@ ensure_buffer_size(struct vsx_layout *layout,
 
         layout->element_buffer =
                 vsx_quad_buffer_generate(layout->vao,
-                                         &vsx_gl,
+                                         gl,
                                          alloc_size /
                                          sizeof (struct vertex) /
                                          4);
@@ -491,7 +492,9 @@ vsx_layout_prepare(struct vsx_layout *layout)
 
         ensure_buffer_size(layout, buffer_size);
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, layout->vbo);
+        struct vsx_gl *gl = layout->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, layout->vbo);
 
         struct vertex *vertices =
                 vsx_map_buffer_map(GL_ARRAY_BUFFER,
@@ -519,7 +522,8 @@ vsx_layout_get_logical_extents(struct vsx_layout *layout)
 }
 
 static void
-set_translation_uniform(const struct vsx_shader_data_program_data *program,
+set_translation_uniform(struct vsx_gl *gl,
+                        const struct vsx_shader_data_program_data *program,
                         const struct vsx_layout_paint_params *params,
                         int x, int y)
 {
@@ -530,7 +534,7 @@ set_translation_uniform(const struct vsx_shader_data_program_data *program,
                     params->matrix[3] * y +
                     params->translation_y);
 
-        vsx_gl.glUniform2f(program->translation_uniform, tx, ty);
+        gl->glUniform2f(program->translation_uniform, tx, ty);
 }
 
 static void
@@ -541,8 +545,10 @@ submit_layout(struct vsx_layout *layout)
         size_t n_draw_calls = layout->draw_calls.length / sizeof draw_calls[0];
         GLuint start_index = 0;
 
+        struct vsx_gl *gl = layout->toolbox->gl;
+
         for (unsigned i = 0; i < n_draw_calls; i++) {
-                vsx_gl.glBindTexture(GL_TEXTURE_2D, draw_calls[i].tex_num);
+                gl->glBindTexture(GL_TEXTURE_2D, draw_calls[i].tex_num);
 
                 int n_verts = draw_calls[i].n_elements * 4 / 6;
 
@@ -564,23 +570,27 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
         if (params->n_layouts <= 0)
                 return;
 
+        struct vsx_toolbox *toolbox = params->layouts[0].layout->toolbox;
+
         const struct vsx_shader_data_program_data *program =
-                params->layouts[0].layout->program;
+                toolbox->shader_data.programs + VSX_SHADER_DATA_PROGRAM_LAYOUT;
 
-        vsx_gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        vsx_gl.glEnable(GL_BLEND);
+        struct vsx_gl *gl = toolbox->gl;
 
-        vsx_gl.glUseProgram(program->program);
+        gl->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        gl->glEnable(GL_BLEND);
 
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  params->matrix);
+        gl->glUseProgram(program->program);
 
-        vsx_gl.glUniform3f(program->color_uniform,
-                           params->r,
-                           params->g,
-                           params->b);
+        gl->glUniformMatrix2fv(program->matrix_uniform,
+                               1, /* count */
+                               GL_FALSE, /* transpose */
+                               params->matrix);
+
+        gl->glUniform3f(program->color_uniform,
+                        params->r,
+                        params->g,
+                        params->b);
 
         for (unsigned i = 0; i < params->n_layouts; i++) {
                 const struct vsx_layout_paint_position *pos =
@@ -594,24 +604,30 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
                 if (pos->layout->draw_calls.length <= 0)
                         continue;
 
-                vsx_array_object_bind(pos->layout->vao, &vsx_gl);
+                vsx_array_object_bind(pos->layout->vao, gl);
 
-                set_translation_uniform(program,
+                set_translation_uniform(gl,
+                                        program,
                                         params,
                                         pos->x, pos->y);
 
                 submit_layout(pos->layout);
         }
 
-        vsx_gl.glDisable(GL_BLEND);
+        gl->glDisable(GL_BLEND);
 }
 
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                           size_t n_layouts,
-                          struct vsx_paint_state *paint_state,
                           float r, float g, float b)
 {
+        if (n_layouts <= 0)
+                return;
+
+        struct vsx_paint_state *paint_state =
+                &layouts[0].layout->toolbox->paint_state;
+
         vsx_paint_state_ensure_layout(paint_state);
 
         struct vsx_layout_paint_params params = {
@@ -630,12 +646,14 @@ vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
 
 void
 vsx_layout_paint(struct vsx_layout *layout,
-                 struct vsx_paint_state *paint_state,
                  int x, int y,
                  float r, float g, float b)
 {
         if (layout->draw_calls.length <= 0)
                 return;
+
+        struct vsx_paint_state *paint_state =
+                &layout->toolbox->paint_state;
 
         vsx_paint_state_ensure_layout(paint_state);
 

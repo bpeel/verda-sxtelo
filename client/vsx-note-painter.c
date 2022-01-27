@@ -168,8 +168,7 @@ create_cb(struct vsx_game_state *game_state,
 
         painter->layout_dirty = true;
 
-        painter->layout = vsx_layout_new(toolbox->font_library,
-                                         &toolbox->shader_data);
+        painter->layout = vsx_layout_new(toolbox);
         vsx_layout_set_font(painter->layout,
                             VSX_FONT_TYPE_LABEL);
 
@@ -278,7 +277,6 @@ paint_cb(void *painter_data)
         vsx_gl.glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         vsx_layout_paint(painter->layout,
-                         &painter->toolbox->paint_state,
                          painter->layout_x,
                          painter->layout_y,
                          1.0f, 1.0f, 1.0f);

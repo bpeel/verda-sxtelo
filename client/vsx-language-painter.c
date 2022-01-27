@@ -92,8 +92,7 @@ create_buttons(struct vsx_language_painter *painter)
         for (int i = 0; i < N_LANGUAGES; i++) {
                 struct language_button *button = painter->buttons + i;
 
-                button->layout = vsx_layout_new(painter->toolbox->font_library,
-                                                &painter->toolbox->shader_data);
+                button->layout = vsx_layout_new(painter->toolbox);
 
                 vsx_layout_set_text(button->layout, languages[i].name);
                 vsx_layout_set_font(button->layout, VSX_FONT_TYPE_LABEL);
@@ -316,7 +315,6 @@ paint_cb(void *painter_data)
         }
 
         vsx_layout_paint_multiple(pos, N_LANGUAGES,
-                                  &painter->toolbox->paint_state,
                                   0.0f, 0.0f, 0.0f);
 }
 

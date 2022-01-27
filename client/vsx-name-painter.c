@@ -160,8 +160,7 @@ create_cb(struct vsx_game_state *game_state,
         create_buffer(painter);
         update_vertices(painter);
 
-        painter->layout = vsx_layout_new(toolbox->font_library,
-                                         &toolbox->shader_data);
+        painter->layout = vsx_layout_new(toolbox);
         vsx_layout_set_font(painter->layout, FONT);
 
         painter->modified_listener.notify = modified_cb;

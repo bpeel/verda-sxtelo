@@ -617,11 +617,8 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
-                painter->name_labels[i].layout =
-                        vsx_layout_new(toolbox->font_library,
-                                       &toolbox->shader_data);
-        }
+        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
+                painter->name_labels[i].layout = vsx_layout_new(toolbox);
 
         create_buffer(painter);
 
@@ -805,7 +802,6 @@ paint_cb(void *painter_data)
 
         vsx_layout_paint_multiple(painter->name_labels,
                                   VSX_N_ELEMENTS(painter->name_labels),
-                                  paint_state,
                                   0.0f, 0.0f, 0.0f);
 }
 

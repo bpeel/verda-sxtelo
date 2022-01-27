@@ -7,8 +7,7 @@
 #define VSX_LAYOUT_H
 
 #include "vsx-font.h"
-#include "vsx-shader-data.h"
-#include "vsx-paint-state.h"
+#include "vsx-toolbox.h"
 
 struct vsx_layout;
 
@@ -34,8 +33,7 @@ struct vsx_layout_paint_params {
 };
 
 struct vsx_layout *
-vsx_layout_new(struct vsx_font_library *library,
-               struct vsx_shader_data *shader_data);
+vsx_layout_new(struct vsx_toolbox *toolbox);
 
 void
 vsx_layout_set_text(struct vsx_layout *layout,
@@ -61,12 +59,10 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params);
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                           size_t n_layouts,
-                          struct vsx_paint_state *paint_state,
                           float r, float g, float b);
 
 void
 vsx_layout_paint(struct vsx_layout *layout,
-                 struct vsx_paint_state *paint_state,
                  int x, int y,
                  float r, float g, float b);
 

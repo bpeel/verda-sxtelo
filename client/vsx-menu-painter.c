@@ -316,11 +316,8 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
 
-        for (int i = 0; i < N_BUTTONS; i++) {
-                painter->labels[i].layout =
-                        vsx_layout_new(toolbox->font_library,
-                                       &toolbox->shader_data);
-        }
+        for (int i = 0; i < N_BUTTONS; i++)
+                painter->labels[i].layout = vsx_layout_new(toolbox);
 
         struct vsx_image_loader *image_loader =
                 painter->toolbox->image_loader;
@@ -570,7 +567,6 @@ paint_cb(void *painter_data)
 
         vsx_layout_paint_multiple(painter->labels,
                                   N_BUTTONS,
-                                  &painter->toolbox->paint_state,
                                   0.0f, 0.0f, 0.0f);
 }
 
