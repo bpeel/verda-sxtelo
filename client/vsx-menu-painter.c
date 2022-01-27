@@ -565,7 +565,8 @@ paint_cb(void *painter_data)
 
         gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
 
-        vsx_gl_draw_range_elements(GL_TRIANGLES,
+        vsx_gl_draw_range_elements(gl,
+                                   GL_TRIANGLES,
                                    0, N_VERTICES - 1,
                                    N_BUTTONS * 6,
                                    GL_UNSIGNED_SHORT,

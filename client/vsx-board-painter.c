@@ -668,7 +668,8 @@ paint_box_cb(int player_num,
         else
                 style = box->styles + 0;
 
-        vsx_gl_draw_range_elements(GL_TRIANGLES,
+        vsx_gl_draw_range_elements(painter->toolbox->gl,
+                                   GL_TRIANGLES,
                                    style->min_vertex,
                                    style->max_vertex,
                                    player_boxes[player_num].n_quads * 6,
@@ -796,7 +797,8 @@ paint_cb(void *painter_data)
 
         gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
 
-        vsx_gl_draw_range_elements(GL_TRIANGLES,
+        vsx_gl_draw_range_elements(gl,
+                                   GL_TRIANGLES,
                                    0, N_BOARD_VERTICES - 1,
                                    N_BOARD_QUADS * 6,
                                    GL_UNSIGNED_SHORT,

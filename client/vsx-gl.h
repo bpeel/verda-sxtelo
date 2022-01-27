@@ -51,23 +51,25 @@ vsx_gl_init(vsx_gl_get_proc_address_func get_proc_address_func,
             void *get_proc_address_data);
 
 static inline void
-vsx_gl_draw_range_elements(GLenum mode,
+vsx_gl_draw_range_elements(struct vsx_gl *gl,
+                           GLenum mode,
                            GLuint start, GLuint end,
                            GLsizei count,
                            GLenum type,
                            const GLvoid *indices)
 {
-        if (vsx_gl.glDrawRangeElements)
-                vsx_gl.glDrawRangeElements(mode,
-                                           start, end,
-                                           count,
-                                           type,
-                                           indices);
-        else
-                vsx_gl.glDrawElements(mode,
-                                      count,
-                                      type,
-                                      indices);
+        if (gl->glDrawRangeElements) {
+                gl->glDrawRangeElements(mode,
+                                        start, end,
+                                        count,
+                                        type,
+                                        indices);
+        } else {
+                gl->glDrawElements(mode,
+                                   count,
+                                   type,
+                                   indices);
+        }
 }
 
 #endif /* VSX_GL_H */

@@ -860,7 +860,8 @@ paint_cb(void *painter_data)
                       paint_state->board_scissor_width,
                       paint_state->board_scissor_height);
 
-        vsx_gl_draw_range_elements(GL_TRIANGLES,
+        vsx_gl_draw_range_elements(gl,
+                                   GL_TRIANGLES,
                                    0, n_vertices - 1,
                                    n_quads * 6,
                                    GL_UNSIGNED_SHORT,

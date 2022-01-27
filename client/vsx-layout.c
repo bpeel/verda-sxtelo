@@ -554,7 +554,8 @@ submit_layout(struct vsx_layout *layout)
 
                 int n_verts = draw_calls[i].n_elements * 4 / 6;
 
-                vsx_gl_draw_range_elements(GL_TRIANGLES,
+                vsx_gl_draw_range_elements(gl,
+                                           GL_TRIANGLES,
                                            start_index,
                                            start_index + n_verts - 1,
                                            draw_calls[i].n_elements,
