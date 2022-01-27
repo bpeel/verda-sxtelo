@@ -394,6 +394,7 @@ ensure_buffer_size(struct vsx_layout *layout,
         layout->element_buffer =
                 vsx_quad_buffer_generate(layout->vao,
                                          gl,
+                                         layout->toolbox->map_buffer,
                                          alloc_size /
                                          sizeof (struct vertex) /
                                          4);
@@ -497,16 +498,17 @@ vsx_layout_prepare(struct vsx_layout *layout)
         gl->glBindBuffer(GL_ARRAY_BUFFER, layout->vbo);
 
         struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(layout->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    layout->buffer_size,
                                    true, /* flush_explicit */
                                    GL_DYNAMIC_DRAW);
 
         generate_vertices(layout, quads, n_quads, vertices, buffer_size);
 
-        vsx_map_buffer_flush(0, buffer_size);
+        vsx_map_buffer_flush(layout->toolbox->map_buffer, 0, buffer_size);
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(layout->toolbox->map_buffer);
 
         generate_draw_calls(layout, quads, n_quads);
 

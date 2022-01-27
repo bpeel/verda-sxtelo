@@ -716,7 +716,10 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, gl, n_tiles);
+                vsx_quad_buffer_generate(painter->vao,
+                                         gl,
+                                         painter->toolbox->map_buffer,
+                                         n_tiles);
 
         painter->buffer_n_tiles = n_tiles;
 }
@@ -804,7 +807,8 @@ paint_cb(void *painter_data)
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(painter->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    painter->buffer_n_tiles *
                                    4 * sizeof (struct vertex),
                                    true, /* flush_explicit */
@@ -815,9 +819,11 @@ paint_cb(void *painter_data)
 
         assert(n_quads <= n_tiles);
 
-        vsx_map_buffer_flush(0, n_vertices * sizeof (struct vertex));
+        vsx_map_buffer_flush(painter->toolbox->map_buffer,
+                             0,
+                             n_vertices * sizeof (struct vertex));
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
         /* This shouldn’t happen unless for some reason all of the
          * tiles that the server sent had letters that we don’t

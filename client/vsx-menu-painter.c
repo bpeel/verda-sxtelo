@@ -294,7 +294,10 @@ create_buffer(struct vsx_menu_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, gl, N_BUTTONS);
+                vsx_quad_buffer_generate(painter->vao,
+                                         gl,
+                                         painter->toolbox->map_buffer,
+                                         N_BUTTONS);
 }
 
 static void *
@@ -470,7 +473,8 @@ ensure_vertices(struct vsx_menu_painter *painter)
                 return;
 
         struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(painter->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    N_VERTICES * sizeof (struct vertex),
                                    false, /* flush explicit */
                                    GL_DYNAMIC_DRAW);
@@ -508,7 +512,7 @@ ensure_vertices(struct vsx_menu_painter *painter)
                 v += 4;
         }
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
         assert(v - vertices == N_VERTICES);
 

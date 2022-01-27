@@ -553,7 +553,8 @@ create_buffer(struct vsx_board_painter *painter)
                                        offsetof(struct vertex, s));
 
         struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(painter->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    total_n_vertices * sizeof (struct vertex),
                                    false, /* flush explicit */
                                    GL_STATIC_DRAW);
@@ -588,10 +589,13 @@ create_buffer(struct vsx_board_painter *painter)
 
         assert(v - vertices == total_n_vertices);
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, gl, total_n_quads);
+                vsx_quad_buffer_generate(painter->vao,
+                                         gl,
+                                         painter->toolbox->map_buffer,
+                                         total_n_quads);
 }
 
 static void

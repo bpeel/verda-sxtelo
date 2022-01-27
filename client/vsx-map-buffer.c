@@ -23,20 +23,30 @@
 #include "vsx-gl.h"
 #include "vsx-buffer.h"
 
-static struct
-{
+struct vsx_map_buffer {
+        struct vsx_gl *gl;
         GLenum target;
         GLenum usage;
         GLsizeiptr length;
         bool flush_explicit;
         bool using_buffer;
         struct vsx_buffer buffer;
-} vsx_map_buffer_state = {
-        .buffer = VSX_BUFFER_STATIC_INIT
 };
 
+struct vsx_map_buffer *
+vsx_map_buffer_new(struct vsx_gl *gl)
+{
+        struct vsx_map_buffer *map_buffer = vsx_calloc(sizeof *map_buffer);
+
+        map_buffer->gl = gl;
+        vsx_buffer_init(&map_buffer->buffer);
+
+        return map_buffer;
+}
+
 void *
-vsx_map_buffer_map(GLenum target,
+vsx_map_buffer_map(struct vsx_map_buffer *map_buffer,
+                   GLenum target,
                    GLsizeiptr length,
                    bool flush_explicit,
                    GLenum usage)
@@ -44,68 +54,83 @@ vsx_map_buffer_map(GLenum target,
         GLbitfield flags;
         void *ret = NULL;
 
-        vsx_map_buffer_state.target = target;
-        vsx_map_buffer_state.usage = usage;
-        vsx_map_buffer_state.length = length;
-        vsx_map_buffer_state.flush_explicit = flush_explicit;
+        map_buffer->target = target;
+        map_buffer->usage = usage;
+        map_buffer->length = length;
+        map_buffer->flush_explicit = flush_explicit;
 
-        if (vsx_gl.have_map_buffer_range) {
+        struct vsx_gl *gl = map_buffer->gl;
+
+        if (gl->have_map_buffer_range) {
                 flags = (GL_MAP_WRITE_BIT |
                          GL_MAP_INVALIDATE_BUFFER_BIT);
                 if (flush_explicit)
                         flags |= GL_MAP_FLUSH_EXPLICIT_BIT;
-                ret = vsx_gl.glMapBufferRange(target,
-                                              0, /* offset */
-                                              length,
-                                              flags);
+                ret = gl->glMapBufferRange(target,
+                                           0, /* offset */
+                                           length,
+                                           flags);
                 if (ret) {
-                        vsx_map_buffer_state.using_buffer = false;
+                        map_buffer->using_buffer = false;
                         return ret;
                 }
         }
 
-        vsx_map_buffer_state.using_buffer = true;
+        map_buffer->using_buffer = true;
 
-        vsx_buffer_set_length(&vsx_map_buffer_state.buffer, length);
+        vsx_buffer_set_length(&map_buffer->buffer, length);
 
         if (flush_explicit) {
                 /* Reset the data to NULL so that the GL driver can
                  * know that it doesn't need to preserve the old
                  * contents if only a subregion is flushed.
                  */
-                vsx_gl.glBufferData(target, length, NULL, usage);
+                gl->glBufferData(target, length, NULL, usage);
         }
 
-        return vsx_map_buffer_state.buffer.data;
+        return map_buffer->buffer.data;
 }
 
 void
-vsx_map_buffer_flush(GLintptr offset,
+vsx_map_buffer_flush(struct vsx_map_buffer *map_buffer,
+                     GLintptr offset,
                      GLsizeiptr length)
 {
-        if (vsx_map_buffer_state.using_buffer) {
-                vsx_gl.glBufferSubData(vsx_map_buffer_state.target,
-                                       offset,
-                                       length,
-                                       vsx_map_buffer_state.buffer.data +
-                                       offset);
+        struct vsx_gl *gl = map_buffer->gl;
+
+        if (map_buffer->using_buffer) {
+                gl->glBufferSubData(map_buffer->target,
+                                    offset,
+                                    length,
+                                    map_buffer->buffer.data +
+                                    offset);
         } else {
-                vsx_gl.glFlushMappedBufferRange(vsx_map_buffer_state.target,
-                                                offset,
-                                                length);
+                gl->glFlushMappedBufferRange(map_buffer->target,
+                                             offset,
+                                             length);
         }
 }
 
 void
-vsx_map_buffer_unmap(void)
+vsx_map_buffer_unmap(struct vsx_map_buffer *map_buffer)
 {
-        if (vsx_map_buffer_state.using_buffer) {
-                if (!vsx_map_buffer_state.flush_explicit)
-                        vsx_gl.glBufferData(vsx_map_buffer_state.target,
-                                            vsx_map_buffer_state.length,
-                                            vsx_map_buffer_state.buffer.data,
-                                            vsx_map_buffer_state.usage);
+        struct vsx_gl *gl = map_buffer->gl;
+
+        if (map_buffer->using_buffer) {
+                if (!map_buffer->flush_explicit) {
+                        gl->glBufferData(map_buffer->target,
+                                         map_buffer->length,
+                                         map_buffer->buffer.data,
+                                         map_buffer->usage);
+                }
         } else {
-                vsx_gl.glUnmapBuffer(vsx_map_buffer_state.target);
+                gl->glUnmapBuffer(map_buffer->target);
         }
+}
+
+void
+vsx_map_buffer_free(struct vsx_map_buffer *map_buffer)
+{
+        vsx_buffer_destroy(&map_buffer->buffer);
+        vsx_free(map_buffer);
 }

@@ -192,7 +192,10 @@ create_buffer(struct vsx_button_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, gl, TOTAL_N_QUADS);
+                vsx_quad_buffer_generate(painter->vao,
+                                         gl,
+                                         painter->toolbox->map_buffer,
+                                         TOTAL_N_QUADS);
 }
 
 static void *
@@ -488,7 +491,8 @@ ensure_vertices(struct vsx_button_painter *painter)
 
 
         struct vertex *vertices =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(painter->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    TOTAL_N_VERTICES * sizeof (struct vertex),
                                    false, /* flush explicit */
                                    GL_DYNAMIC_DRAW);
@@ -496,7 +500,7 @@ ensure_vertices(struct vsx_button_painter *painter)
         generate_button_vertices(painter, vertices);
         generate_n_tiles_vertices(painter, vertices + N_BUTTON_VERTICES);
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
         painter->vertices_dirty = false;
 }

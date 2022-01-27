@@ -193,7 +193,8 @@ update_vertices(struct vsx_invite_painter *painter,
         vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         struct vertex *v =
-                vsx_map_buffer_map(GL_ARRAY_BUFFER,
+                vsx_map_buffer_map(painter->toolbox->map_buffer,
+                                   GL_ARRAY_BUFFER,
                                    N_VERTICES * sizeof (struct vertex),
                                    false, /* flush explicit */
                                    GL_DYNAMIC_DRAW);
@@ -222,7 +223,7 @@ update_vertices(struct vsx_invite_painter *painter,
         v->t = t2;
         v++;
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 }
 
 static void
@@ -261,7 +262,10 @@ create_buffer(struct vsx_invite_painter *painter)
                                        offsetof(struct vertex, s));
 
         painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao, gl, N_QUADS);
+                vsx_quad_buffer_generate(painter->vao,
+                                         gl,
+                                         painter->toolbox->map_buffer,
+                                         N_QUADS);
 }
 
 static void

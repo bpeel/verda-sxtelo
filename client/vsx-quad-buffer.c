@@ -27,6 +27,7 @@
 GLuint
 vsx_quad_buffer_generate(struct vsx_array_object *vao,
                          struct vsx_gl *gl,
+                         struct vsx_map_buffer *map_buffer,
                          size_t n_quads)
 {
         /* For every 4 vertices we want to generate 6 elements to make
@@ -46,7 +47,8 @@ vsx_quad_buffer_generate(struct vsx_array_object *vao,
                             GL_STATIC_DRAW);
 
         uint16_t *elements =
-                vsx_map_buffer_map(GL_ELEMENT_ARRAY_BUFFER,
+                vsx_map_buffer_map(map_buffer,
+                                   GL_ELEMENT_ARRAY_BUFFER,
                                    buffer_size,
                                    false, /* flush_explicit */
                                    GL_STATIC_DRAW);
@@ -63,7 +65,7 @@ vsx_quad_buffer_generate(struct vsx_array_object *vao,
 
         assert((e - elements) == n_elements);
 
-        vsx_map_buffer_unmap();
+        vsx_map_buffer_unmap(map_buffer);
 
         return element_buffer;
 }

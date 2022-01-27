@@ -135,6 +135,8 @@ init_toolbox(struct vsx_game_painter *painter,
 
         toolbox->gl = &vsx_gl;
 
+        toolbox->map_buffer = vsx_map_buffer_new(toolbox->gl);
+
         if (!vsx_shader_data_init(&toolbox->shader_data,
                                   asset_manager,
                                   error))
@@ -165,6 +167,9 @@ destroy_toolbox(struct vsx_game_painter *painter)
 
         if (painter->shader_data_inited)
                 vsx_shader_data_destroy(&toolbox->shader_data);
+
+        if (toolbox->map_buffer)
+                vsx_map_buffer_free(toolbox->map_buffer);
 }
 
 struct vsx_game_painter *

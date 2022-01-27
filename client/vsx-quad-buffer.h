@@ -21,10 +21,12 @@
 
 #include "vsx-gl.h"
 #include "vsx-array-object.h"
+#include "vsx-map-buffer.h"
 
 GLuint
 vsx_quad_buffer_generate(struct vsx_array_object *vao,
                          struct vsx_gl *gl,
+                         struct vsx_map_buffer *map_buffer,
                          size_t n_quads);
 
 #endif /* VSX_QUAD_BUFFER_H */
