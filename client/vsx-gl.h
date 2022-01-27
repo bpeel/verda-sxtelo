@@ -40,15 +40,13 @@ struct vsx_gl {
         bool have_instanced_arrays;
 };
 
-extern struct vsx_gl vsx_gl;
-
 typedef void *
 (* vsx_gl_get_proc_address_func)(char const *procname,
                                  void *user_data);
 
-void
-vsx_gl_init(vsx_gl_get_proc_address_func get_proc_address_func,
-            void *get_proc_address_data);
+struct vsx_gl *
+vsx_gl_new(vsx_gl_get_proc_address_func get_proc_address_func,
+           void *get_proc_address_data);
 
 static inline void
 vsx_gl_draw_range_elements(struct vsx_gl *gl,
@@ -71,5 +69,8 @@ vsx_gl_draw_range_elements(struct vsx_gl *gl,
                                    indices);
         }
 }
+
+void
+vsx_gl_free(struct vsx_gl *gl);
 
 #endif /* VSX_GL_H */

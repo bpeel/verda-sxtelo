@@ -65,6 +65,7 @@
 struct vsx_main_data {
         SDL_Window *window;
         SDL_GLContext gl_context;
+        struct vsx_gl *gl;
 
         bool sdl_inited;
 
@@ -175,6 +176,11 @@ process_arguments(int argc, char **argv)
 static void
 finish_sdl_window(struct vsx_main_data *main_data)
 {
+        if (main_data->gl) {
+                vsx_gl_free(main_data->gl);
+                main_data->gl = NULL;
+        }
+
         if (main_data->gl_context) {
                 SDL_GL_MakeCurrent(NULL, NULL);
                 SDL_GL_DeleteContext(main_data->gl_context);
@@ -222,21 +228,21 @@ gl_get_proc_address(const char *func_name,
 }
 
 static bool
-check_gl_version(void)
+check_gl_version(struct vsx_gl *gl)
 {
-        if (vsx_gl.major_version < 0 ||
-            vsx_gl.minor_version < 0) {
+        if (gl->major_version < 0 ||
+            gl->minor_version < 0) {
                 fprintf(stderr,
                         "Invalid GL version string encountered: %s",
                         (const char *)
-                        vsx_gl.glGetString(GL_VERSION));
+                        gl->glGetString(GL_VERSION));
 
                 return false;
         }
 
-        if (vsx_gl.major_version < MIN_GL_MAJOR_VERSION ||
-            (vsx_gl.major_version == MIN_GL_MAJOR_VERSION &&
-             vsx_gl.minor_version < MIN_GL_MINOR_VERSION)) {
+        if (gl->major_version < MIN_GL_MAJOR_VERSION ||
+            (gl->major_version == MIN_GL_MAJOR_VERSION &&
+             gl->minor_version < MIN_GL_MINOR_VERSION)) {
                 fprintf(stderr,
                         "GL version %i.%i is required but the driver "
                         "is reporting:\n"
@@ -246,11 +252,11 @@ check_gl_version(void)
                         MIN_GL_MAJOR_VERSION,
                         MIN_GL_MINOR_VERSION,
                         (const char *)
-                        vsx_gl.glGetString(GL_VERSION),
+                        gl->glGetString(GL_VERSION),
                         (const char *)
-                        vsx_gl.glGetString(GL_VENDOR),
+                        gl->glGetString(GL_VENDOR),
                         (const char *)
-                        vsx_gl.glGetString(GL_RENDERER));
+                        gl->glGetString(GL_RENDERER));
 
                 return false;
         }
@@ -301,9 +307,9 @@ init_sdl_window(struct vsx_main_data *main_data)
 
         SDL_GL_MakeCurrent(main_data->window, main_data->gl_context);
 
-        vsx_gl_init(gl_get_proc_address, NULL /* user_data */);
+        main_data->gl = vsx_gl_new(gl_get_proc_address, NULL /* user_data */);
 
-        if (!check_gl_version())
+        if (!check_gl_version(main_data->gl))
                 return false;
 
         return true;
@@ -327,7 +333,7 @@ init_painter(struct vsx_main_data *main_data)
         struct vsx_error *error = NULL;
 
         struct vsx_game_painter *game_painter =
-                vsx_game_painter_new(&vsx_gl,
+                vsx_game_painter_new(main_data->gl,
                                      main_data->game_state,
                                      main_data->asset_manager,
                                      DPI,

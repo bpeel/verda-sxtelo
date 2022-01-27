@@ -24,9 +24,8 @@
 
 #include "vsx-buffer.h"
 
-struct vsx_gl vsx_gl;
-
 struct loader_data {
+        struct vsx_gl *gl;
         vsx_gl_get_proc_address_func get_proc_address_func;
         void *get_proc_address_data;
         struct vsx_buffer extensions;
@@ -69,7 +68,7 @@ parse_extensions(struct loader_data *data)
          * list of zero-terminated strings.
          */
 
-        const char *exts = (const char *) vsx_gl.glGetString(GL_EXTENSIONS);
+        const char *exts = (const char *) data->gl->glGetString(GL_EXTENSIONS);
 
         while (true) {
                 while (*exts == ' ')
@@ -107,10 +106,10 @@ is_extension_supported(struct loader_data *data,
 }
 
 static void
-get_gl_version(void)
+get_gl_version(struct vsx_gl *gl)
 {
         const char *version_string =
-                (const char *) vsx_gl.glGetString(GL_VERSION);
+                (const char *) gl->glGetString(GL_VERSION);
         static const char version_string_prefix[] = "OpenGL ES ";
         int major_version = 0;
         int minor_version = 0;
@@ -144,21 +143,22 @@ get_gl_version(void)
         if (number_start == p)
                 goto invalid;
 
-        vsx_gl.major_version = major_version;
-        vsx_gl.minor_version = minor_version;
+        gl->major_version = major_version;
+        gl->minor_version = minor_version;
 
         return;
 
 invalid:
-        vsx_gl.major_version = -1;
-        vsx_gl.minor_version = -1;
+        gl->major_version = -1;
+        gl->minor_version = -1;
 }
 
 static void
 init_group(struct loader_data *data,
            const struct vsx_gl_group *group)
 {
-        int minor_gl_version = vsx_gl.minor_version;
+        struct vsx_gl *gl = data->gl;
+        int minor_gl_version = gl->minor_version;
         const char *suffix;
         struct vsx_buffer buffer;
         void *func;
@@ -167,7 +167,7 @@ init_group(struct loader_data *data,
 
         if (minor_gl_version >= 10)
                 minor_gl_version = 9;
-        gl_version = vsx_gl.major_version * 10 + minor_gl_version;
+        gl_version = gl->major_version * 10 + minor_gl_version;
 
         if (group->minimum_gl_version >= 0 &&
             gl_version >= group->minimum_gl_version)
@@ -186,46 +186,53 @@ init_group(struct loader_data *data,
                 vsx_buffer_append_string(&buffer, suffix);
                 func = data->get_proc_address_func((char *) buffer.data,
                                                    data->get_proc_address_data);
-                *(void **) ((char *) &vsx_gl + group->funcs[i].offset) = func;
+                *(void **) ((char *) gl + group->funcs[i].offset) = func;
         }
 
         vsx_buffer_destroy(&buffer);
 }
 
-void
-vsx_gl_init(vsx_gl_get_proc_address_func get_proc_address_func,
-            void *get_proc_address_data)
+struct vsx_gl *
+vsx_gl_new(vsx_gl_get_proc_address_func get_proc_address_func,
+           void *get_proc_address_data)
 {
         struct loader_data data = {
+                .gl = vsx_calloc(sizeof (struct vsx_gl)),
                 .get_proc_address_func = get_proc_address_func,
                 .get_proc_address_data = get_proc_address_data,
                 .extensions = VSX_BUFFER_STATIC_INIT,
         };
 
-        memset(&vsx_gl, 0, sizeof vsx_gl);
-
-        vsx_gl.glGetString =
+        data.gl->glGetString =
                 get_proc_address_func("glGetString",
                                       get_proc_address_data);
 
         parse_extensions(&data);
 
-        get_gl_version();
+        get_gl_version(data.gl);
 
         for (int i = 0; i < VSX_N_ELEMENTS(gl_groups); i++)
                 init_group(&data, gl_groups + i);
 
-        vsx_gl.have_map_buffer_range = vsx_gl.glMapBufferRange != NULL;
-        vsx_gl.have_vertex_array_objects = vsx_gl.glGenVertexArrays != NULL;
+        data.gl->have_map_buffer_range = data.gl->glMapBufferRange != NULL;
+        data.gl->have_vertex_array_objects = data.gl->glGenVertexArrays != NULL;
 
         int max_vertex_attribs;
 
-        vsx_gl.glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &max_vertex_attribs);
+        data.gl->glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &max_vertex_attribs);
 
-        vsx_gl.have_instanced_arrays =
-                vsx_gl.glVertexAttribDivisor != NULL &&
-                vsx_gl.glDrawElementsInstanced != NULL &&
+        data.gl->have_instanced_arrays =
+                data.gl->glVertexAttribDivisor != NULL &&
+                data.gl->glDrawElementsInstanced != NULL &&
                 max_vertex_attribs >= 11;
 
         vsx_buffer_destroy(&data.extensions);
+
+        return data.gl;
+}
+
+void
+vsx_gl_free(struct vsx_gl *gl)
+{
+        vsx_free(gl);
 }

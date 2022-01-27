@@ -80,6 +80,9 @@ struct data {
         jmethodID set_name_properties_method_id;
 
         /* Graphics data that needs to be recreated when the context changes */
+
+        struct vsx_gl *gl;
+
         void *gl_lib;
 
         int fb_width, fb_height;
@@ -104,6 +107,11 @@ destroy_graphics(struct data *data)
         if (data->game_painter) {
                 vsx_game_painter_free(data->game_painter);
                 data->game_painter = NULL;
+        }
+
+        if (data->gl) {
+                vsx_gl_free(data->gl);
+                data->gl = NULL;
         }
 
         if (data->gl_lib) {
@@ -373,9 +381,9 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
 
         struct vsx_error *error = NULL;
 
-        vsx_gl_init(get_proc_address_func, data);
+        data->gl = vsx_gl_new(get_proc_address_func, data);
 
-        data->game_painter = vsx_game_painter_new(&vsx_gl,
+        data->game_painter = vsx_game_painter_new(data->gl,
                                                   data->game_state,
                                                   data->asset_manager,
                                                   data->dpi,
