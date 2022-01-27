@@ -110,7 +110,9 @@ static void
 free_texture(struct vsx_invite_painter *painter)
 {
         if (painter->tex) {
-                vsx_gl.glDeleteTextures(1, &painter->tex);
+                struct vsx_gl *gl = painter->toolbox->gl;
+
+                gl->glDeleteTextures(1, &painter->tex);
                 painter->tex = 0;
         }
 }
@@ -130,42 +132,44 @@ create_texture(struct vsx_invite_painter *painter,
                        "invite URL");
         vsx_qr_create((const uint8_t *) url, image);
 
-        vsx_gl.glGenTextures(1, &painter->tex);
+        struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_S,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_T,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MIN_FILTER,
-                               GL_NEAREST);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MAG_FILTER,
-                               GL_NEAREST);
+        gl->glGenTextures(1, &painter->tex);
 
-        vsx_gl.glTexImage2D(GL_TEXTURE_2D,
-                            0, /* level */
-                            GL_LUMINANCE,
-                            VSX_QR_IMAGE_SIZE,
-                            VSX_QR_IMAGE_SIZE,
-                            0, /* border */
-                            GL_LUMINANCE,
-                            GL_UNSIGNED_BYTE,
-                            NULL /* data */);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_S,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_T,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_NEAREST);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MAG_FILTER,
+                            GL_NEAREST);
+
+        gl->glTexImage2D(GL_TEXTURE_2D,
+                         0, /* level */
+                         GL_LUMINANCE,
+                         VSX_QR_IMAGE_SIZE,
+                         VSX_QR_IMAGE_SIZE,
+                         0, /* border */
+                         GL_LUMINANCE,
+                         GL_UNSIGNED_BYTE,
+                         NULL /* data */);
 
         for (int y = 0; y < VSX_QR_IMAGE_SIZE; y++) {
-                vsx_gl.glTexSubImage2D(GL_TEXTURE_2D,
-                                       0, /* level */
-                                       0, /* x_offset */
-                                       y,
-                                       VSX_QR_IMAGE_SIZE,
-                                       1, /* height */
-                                       GL_LUMINANCE,
-                                       GL_UNSIGNED_BYTE,
-                                       image + y * VSX_QR_IMAGE_SIZE);
+                gl->glTexSubImage2D(GL_TEXTURE_2D,
+                                    0, /* level */
+                                    0, /* x_offset */
+                                    y,
+                                    VSX_QR_IMAGE_SIZE,
+                                    1, /* height */
+                                    GL_LUMINANCE,
+                                    GL_UNSIGNED_BYTE,
+                                    image + y * VSX_QR_IMAGE_SIZE);
         }
 }
 
@@ -190,7 +194,9 @@ update_vertices(struct vsx_invite_painter *painter,
         float t1 = -height_in_tex_coords / 2.0f + 0.5f;
         float t2 = t1 + height_in_tex_coords;
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         struct vertex *v =
                 vsx_map_buffer_map(painter->toolbox->map_buffer,
@@ -229,14 +235,14 @@ update_vertices(struct vsx_invite_painter *painter,
 static void
 create_buffer(struct vsx_invite_painter *painter)
 {
-        vsx_gl.glGenBuffers(1, &painter->vbo);
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            N_VERTICES * sizeof (struct vertex),
-                            NULL, /* data */
-                            GL_DYNAMIC_DRAW);
-
         struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glGenBuffers(1, &painter->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         N_VERTICES * sizeof (struct vertex),
+                         NULL, /* data */
+                         GL_DYNAMIC_DRAW);
 
         painter->vao = vsx_array_object_new(gl);
 
@@ -449,14 +455,15 @@ set_uniforms(struct vsx_invite_painter *painter,
              const struct vsx_shader_data_program_data *program)
 {
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  paint_state->pixel_matrix);
-        vsx_gl.glUniform2f(program->translation_uniform,
-                           paint_state->pixel_translation[0],
-                           paint_state->pixel_translation[1]);
+        gl->glUniformMatrix2fv(program->matrix_uniform,
+                               1, /* count */
+                               GL_FALSE, /* transpose */
+                               paint_state->pixel_matrix);
+        gl->glUniform2f(program->translation_uniform,
+                        paint_state->pixel_translation[0],
+                        paint_state->pixel_translation[1]);
 
 }
 
@@ -475,13 +482,13 @@ paint_cb(void *painter_data)
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glUseProgram(program->program);
+        gl->glUseProgram(program->program);
 
         set_uniforms(painter, program);
 
         vsx_array_object_bind(painter->vao, gl);
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
                                    0, N_VERTICES - 1,
@@ -586,9 +593,9 @@ free_cb(void *painter_data)
         if (painter->vao)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
-                vsx_gl.glDeleteBuffers(1, &painter->vbo);
+                gl->glDeleteBuffers(1, &painter->vbo);
         if (painter->element_buffer)
-                vsx_gl.glDeleteBuffers(1, &painter->element_buffer);
+                gl->glDeleteBuffers(1, &painter->element_buffer);
 
         for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
                 if (painter->paragraphs[i].layout)
