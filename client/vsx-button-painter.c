@@ -137,21 +137,21 @@ texture_load_cb(const struct vsx_image *image,
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        vsx_gl.glGenTextures(1, &painter->tex);
+        gl->glGenTextures(1, &painter->tex);
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_S,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_T,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MIN_FILTER,
-                               GL_LINEAR_MIPMAP_NEAREST);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MAG_FILTER,
-                               GL_LINEAR);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_S,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_T,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_NEAREST);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR);
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
@@ -161,14 +161,14 @@ texture_load_cb(const struct vsx_image *image,
 static void
 create_buffer(struct vsx_button_painter *painter)
 {
-        vsx_gl.glGenBuffers(1, &painter->vbo);
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        vsx_gl.glBufferData(GL_ARRAY_BUFFER,
-                            TOTAL_N_VERTICES * sizeof (struct vertex),
-                            NULL, /* data */
-                            GL_DYNAMIC_DRAW);
-
         struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glGenBuffers(1, &painter->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBufferData(GL_ARRAY_BUFFER,
+                         TOTAL_N_VERTICES * sizeof (struct vertex),
+                         NULL, /* data */
+                         GL_DYNAMIC_DRAW);
 
         painter->vao = vsx_array_object_new(gl);
 
@@ -519,7 +519,7 @@ paint_cb(void *painter_data)
 
         ensure_layout(painter);
 
-        vsx_gl.glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         ensure_vertices(painter);
 
@@ -528,18 +528,18 @@ paint_cb(void *painter_data)
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
 
-        vsx_gl.glUseProgram(program->program);
+        gl->glUseProgram(program->program);
         vsx_array_object_bind(painter->vao, gl);
 
-        vsx_gl.glUniformMatrix2fv(program->matrix_uniform,
-                                  1, /* count */
-                                  GL_FALSE, /* transpose */
-                                  painter->toolbox->paint_state.pixel_matrix);
-        vsx_gl.glUniform2f(program->translation_uniform,
-                           painter->translation[0],
-                           painter->translation[1]);
+        gl->glUniformMatrix2fv(program->matrix_uniform,
+                               1, /* count */
+                               GL_FALSE, /* transpose */
+                               painter->toolbox->paint_state.pixel_matrix);
+        gl->glUniform2f(program->translation_uniform,
+                        painter->translation[0],
+                        painter->translation[1]);
 
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, painter->tex);
+        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
 
         vsx_gl_draw_range_elements(GL_TRIANGLES,
                                    0, TOTAL_N_VERTICES - 1,
@@ -568,14 +568,14 @@ free_cb(void *painter_data)
         if (painter->vao)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
-                vsx_gl.glDeleteBuffers(1, &painter->vbo);
+                gl->glDeleteBuffers(1, &painter->vbo);
         if (painter->element_buffer)
-                vsx_gl.glDeleteBuffers(1, &painter->element_buffer);
+                gl->glDeleteBuffers(1, &painter->element_buffer);
 
         if (painter->image_token)
                 vsx_image_loader_cancel(painter->image_token);
         if (painter->tex)
-                vsx_gl.glDeleteTextures(1, &painter->tex);
+                gl->glDeleteTextures(1, &painter->tex);
 
         vsx_free(painter);
 }
