@@ -147,7 +147,10 @@ init_toolbox(struct vsx_game_painter *painter,
 
         toolbox->image_loader = vsx_image_loader_new(asset_manager);
 
-        toolbox->font_library = vsx_font_library_new(asset_manager, dpi, error);
+        toolbox->font_library = vsx_font_library_new(toolbox->gl,
+                                                     asset_manager,
+                                                     dpi,
+                                                     error);
 
         if (toolbox->font_library == NULL)
                 return false;

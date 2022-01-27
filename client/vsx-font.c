@@ -46,6 +46,7 @@ struct vsx_font {
 };
 
 struct vsx_font_library {
+        struct vsx_gl *gl;
         FT_Library library;
         /* Temporary bitmap for converting to grayscale */
         FT_Bitmap temp_bitmap;
@@ -184,7 +185,8 @@ open_fonts(struct vsx_font_library *library,
 }
 
 struct vsx_font_library *
-vsx_font_library_new(struct vsx_asset_manager *asset_manager,
+vsx_font_library_new(struct vsx_gl *gl,
+                     struct vsx_asset_manager *asset_manager,
                      int dpi,
                      struct vsx_error **error)
 {
@@ -202,6 +204,7 @@ vsx_font_library_new(struct vsx_asset_manager *asset_manager,
 
         struct vsx_font_library *library = vsx_calloc(sizeof *library);
 
+        library->gl = gl;
         library->library = ft_library;
         library->textures = NULL;
         FT_Bitmap_Init(&library->temp_bitmap);
@@ -235,31 +238,33 @@ reserve_texture_space(struct vsx_font *font,
         texture->next = font->library->textures;
         font->library->textures = texture;
 
+        struct vsx_gl *gl = font->library->gl;
+
         texture->bsp = vsx_bsp_new(VSX_FONT_TEXTURE_SIZE,
                                    VSX_FONT_TEXTURE_SIZE);
-        vsx_gl.glGenTextures(1, &texture->tex);
-        vsx_gl.glBindTexture(GL_TEXTURE_2D, texture->tex);
-        vsx_gl.glTexImage2D(GL_TEXTURE_2D,
-                            0, /* level */
-                            GL_ALPHA, /* internal_format */
-                            VSX_FONT_TEXTURE_SIZE,
-                            VSX_FONT_TEXTURE_SIZE,
-                            0, /* border */
-                            GL_ALPHA, /* format */
-                            GL_UNSIGNED_BYTE,
-                            NULL /* data */);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_S,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_WRAP_T,
-                               GL_CLAMP_TO_EDGE);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MIN_FILTER,
-                               GL_NEAREST);
-        vsx_gl.glTexParameteri(GL_TEXTURE_2D,
-                               GL_TEXTURE_MAG_FILTER,
-                               GL_LINEAR);
+        gl->glGenTextures(1, &texture->tex);
+        gl->glBindTexture(GL_TEXTURE_2D, texture->tex);
+        gl->glTexImage2D(GL_TEXTURE_2D,
+                         0, /* level */
+                         GL_ALPHA, /* internal_format */
+                         VSX_FONT_TEXTURE_SIZE,
+                         VSX_FONT_TEXTURE_SIZE,
+                         0, /* border */
+                         GL_ALPHA, /* format */
+                         GL_UNSIGNED_BYTE,
+                         NULL /* data */);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_S,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_T,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_NEAREST);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR);
 
         vsx_bsp_add(texture->bsp, width, height, &x, &y);
 
@@ -315,6 +320,8 @@ vsx_font_prepare_glyph(struct vsx_font *font,
         hash_entry->width = font->library->temp_bitmap.width;
         hash_entry->height = font->library->temp_bitmap.rows;
 
+        struct vsx_gl *gl = font->library->gl;
+
         if (hash_entry->width > 0 && hash_entry->height > 0) {
                 int tex_x, tex_y;
 
@@ -327,15 +334,15 @@ vsx_font_prepare_glyph(struct vsx_font *font,
                 hash_entry->left = glyph->bitmap_left;
                 hash_entry->top = glyph->bitmap_top;
 
-                vsx_gl.glBindTexture(GL_TEXTURE_2D, hash_entry->tex_num);
-                vsx_gl.glTexSubImage2D(GL_TEXTURE_2D,
-                                       0, /* level */
-                                       tex_x, tex_y,
-                                       hash_entry->width,
-                                       hash_entry->height,
-                                       GL_ALPHA,
-                                       GL_UNSIGNED_BYTE,
-                                       font->library->temp_bitmap.buffer);
+                gl->glBindTexture(GL_TEXTURE_2D, hash_entry->tex_num);
+                gl->glTexSubImage2D(GL_TEXTURE_2D,
+                                    0, /* level */
+                                    tex_x, tex_y,
+                                    hash_entry->width,
+                                    hash_entry->height,
+                                    GL_ALPHA,
+                                    GL_UNSIGNED_BYTE,
+                                    font->library->temp_bitmap.buffer);
         }
 
         return hash_entry;
@@ -381,11 +388,13 @@ vsx_font_library_free(struct vsx_font_library *library)
                         free_font(library->fonts[i]);
         }
 
+        struct vsx_gl *gl = library->gl;
+
         for (struct vsx_font_texture *tex = library->textures;
              tex;
              tex = next) {
                 next = tex->next;
-                vsx_gl.glDeleteTextures(1, &tex->tex);
+                gl->glDeleteTextures(1, &tex->tex);
                 vsx_bsp_free(tex->bsp);
                 vsx_free(tex);
         }

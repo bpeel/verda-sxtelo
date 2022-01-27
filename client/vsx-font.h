@@ -22,6 +22,7 @@
 #include <stdint.h>
 
 #include "vsx-error.h"
+#include "vsx-gl.h"
 #include "vsx-asset.h"
 #include "vsx-glyph-hash.h"
 
@@ -47,7 +48,8 @@ struct vsx_font_metrics {
 };
 
 struct vsx_font_library *
-vsx_font_library_new(struct vsx_asset_manager *asset_manager,
+vsx_font_library_new(struct vsx_gl *gl,
+                     struct vsx_asset_manager *asset_manager,
                      int dpi,
                      struct vsx_error **error);
 
