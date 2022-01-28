@@ -2785,6 +2785,16 @@ test_stop_running(void)
 
         harness->events_triggered = 0;
 
+        vsx_connection_set_running(harness->connection, true);
+
+        if (harness->events_triggered != 0) {
+                fprintf(stderr,
+                        "Events received after setting running state to same "
+                        "value.\n");
+                ret = false;
+                goto out;
+        }
+
         vsx_connection_set_running(harness->connection, false);
 
         if (harness->events_triggered !=
@@ -2806,6 +2816,16 @@ test_stop_running(void)
         }
 
         harness->events_triggered = 0;
+
+        vsx_connection_set_running(harness->connection, false);
+
+        if (harness->events_triggered != 0) {
+                fprintf(stderr,
+                        "Events received after setting running state to same "
+                        "value.\n");
+                ret = false;
+                goto out;
+        }
 
         vsx_connection_set_running(harness->connection, true);
 

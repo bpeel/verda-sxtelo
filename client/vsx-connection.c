@@ -1674,6 +1674,9 @@ void
 vsx_connection_set_running(struct vsx_connection *connection,
                            bool running)
 {
+        if (running == vsx_connection_get_running(connection))
+                return;
+
         vsx_connection_set_running_internal(connection, running);
 
         struct vsx_connection_event event = {
