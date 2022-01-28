@@ -587,6 +587,10 @@ handle_key_down_event(struct vsx_main_data *main_data,
         case SDLK_r:
                 recreate_resources(main_data);
                 return true;
+
+        case SDLK_g:
+                vsx_game_state_reset(main_data->game_state);
+                return true;
         }
 
         return false;
