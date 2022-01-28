@@ -2833,6 +2833,247 @@ out:
         return ret;
 }
 
+struct test_bad_id_closure {
+        bool succeeded;
+        bool had_reset;
+        bool had_error;
+        bool had_note;
+        enum vsx_connection_error error_code;
+        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
+};
+
+static void
+test_bad_id_event_cb(struct vsx_listener *listener,
+                     void *user_data)
+{
+        struct test_bad_id_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_bad_id_closure,
+                                 event_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        if (event->type != VSX_CONNECTION_EVENT_TYPE_ERROR) {
+                fprintf(stderr,
+                        "Unexpected event type: %i\n",
+                        event->type);
+                closure->succeeded = false;
+        } else if (event->error.error->domain != &vsx_connection_error ||
+                   event->error.error->code != closure->error_code) {
+                fprintf(stderr,
+                        "Unexpected error: %s\n",
+                        event->error.error->message);
+                closure->succeeded = false;
+        } else if (closure->had_error) {
+                fprintf(stderr, "Bad ID error received multiple times\n");
+                closure->succeeded = false;
+        } else {
+                closure->had_error = true;
+        }
+}
+
+static void
+test_bad_id_modified_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct test_bad_id_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_bad_id_closure,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        static const char expected_note[] =
+                "This game is no longer available. "
+                "Please start a new one instead.";
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_RESET:
+                if (closure->had_reset) {
+                        fprintf(stderr,
+                                "Reset event received multiple times\n");
+                        closure->succeeded = false;
+                } else {
+                        closure->had_reset = true;
+                }
+                break;
+
+        case VSX_GAME_STATE_MODIFIED_TYPE_NOTE:
+                if (closure->had_note) {
+                        fprintf(stderr,
+                                "Multiple notes received\n");
+                        closure->succeeded = false;
+                } else if (strcmp(event->note.text, expected_note)) {
+                        fprintf(stderr,
+                                "Note text wrong.\n"
+                                " Expected: %s\n"
+                                " Received: %s\n",
+                                event->note.text,
+                                expected_note);
+                        closure->succeeded = false;
+                } else {
+                        closure->had_note = true;
+                }
+                break;
+
+        default:
+                break;
+        }
+}
+
+static bool
+test_bad_id(int command,
+            enum vsx_connection_error code)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        struct test_bad_id_closure closure = {
+                .succeeded = true,
+                .error_code = code,
+                .event_listener = {
+                        .notify = test_bad_id_event_cb,
+                },
+                .modified_listener = {
+                        .notify = test_bad_id_modified_cb,
+                },
+        };
+
+        uint8_t message[] = {
+                0x82, 0x01, command
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        if (!write_data(harness, message, sizeof message) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_error) {
+                fprintf(stderr, "No bad ID error received.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_reset) {
+                fprintf(stderr,
+                        "Reset received after bad ID before flushing idle.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!harness->idle_queued) {
+                fprintf(stderr,
+                        "No idle queued after getting bad ID event.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_reset) {
+                fprintf(stderr, "No reset received after bad ID event.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_note) {
+                fprintf(stderr, "No note received after bad ID event.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+check_bad_conversation_error(struct harness *harness,
+                             const struct vsx_connection_event *event,
+                             void *user_data)
+{
+        if (event->error.error->domain != &vsx_connection_error ||
+            event->error.error->code !=
+            VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID) {
+                fprintf(stderr,
+                        "Unexpected error: %s\n",
+                        event->error.error->message);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_dangling_bad_id(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        uint8_t message[] = {
+                0x82, 0x01, 0x0b
+        };
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_ERROR,
+                         check_bad_conversation_error,
+                         message, sizeof message,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!harness->idle_queued) {
+                fprintf(stderr,
+                        "No idle queued after getting bad ID event.\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_free(harness->game_state);
+        harness->game_state = NULL;
+
+        /* Flush the idle queue so that if the game state didn’t
+         * successfully clean up its pending idle then it will
+         * probably crash.
+         */
+        vsx_main_thread_flush_idle_events(harness->main_thread);
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2842,6 +3083,17 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_reset())
+                ret = EXIT_FAILURE;
+
+        if (!test_bad_id(VSX_PROTO_BAD_CONVERSATION_ID,
+                         VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID))
+                ret = EXIT_FAILURE;
+
+        if (!test_bad_id(VSX_PROTO_BAD_PLAYER_ID,
+                         VSX_CONNECTION_ERROR_BAD_PLAYER_ID))
+                ret = EXIT_FAILURE;
+
+        if (!test_dangling_bad_id())
                 ret = EXIT_FAILURE;
 
         if (!test_load_instance_state())

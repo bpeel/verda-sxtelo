@@ -37,6 +37,7 @@ enum vsx_text {
         VSX_TEXT_LINK_COPIED,
         VSX_TEXT_ENTER_NAME_NEW_GAME,
         VSX_TEXT_ENTER_NAME_JOIN_GAME,
+        VSX_TEXT_BAD_GAME,
 };
 
 #define VSX_TEXT_N_LANGUAGES 3

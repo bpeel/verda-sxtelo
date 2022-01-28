@@ -43,6 +43,8 @@ english[] = {
         "Please enter your name to start a new game.",
         [VSX_TEXT_ENTER_NAME_JOIN_GAME] =
         "Please enter your name to join the game.",
+        [VSX_TEXT_BAD_GAME] =
+        "This game is no longer available. Please start a new one instead.",
 };
 
 static const char *const
@@ -66,6 +68,9 @@ french[] = {
         "Veuillez saisir votre nom pour commencer une nouvelle partie.",
         [VSX_TEXT_ENTER_NAME_JOIN_GAME] =
         "Veuillez saisir votre nom pour rejoindre la partie.",
+        [VSX_TEXT_BAD_GAME] =
+        "Cette partie n’est plus disponible. Veuillez en commencez une "
+        "de nouveau à la place.",
 };
 
 static const char *const
@@ -87,6 +92,8 @@ esperanto[] = {
         "Bonvolu entajpi vian nomon por komenci novan ludon.",
         [VSX_TEXT_ENTER_NAME_JOIN_GAME] =
         "Bonvolu entajpi vian nomon por aliĝi al la ludo.",
+        [VSX_TEXT_BAD_GAME] =
+        "Ĉi tiu ludo ne plu disponeblas. Bonvolu komenci novan anstataŭe.",
 };
 
 static const char *const * const

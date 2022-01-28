@@ -95,6 +95,8 @@ struct vsx_game_state {
         struct vsx_signal event_signal;
         struct vsx_signal modified_signal;
 
+        struct vsx_main_thread_token *reset_on_idle_token;
+
         pthread_mutex_t mutex;
 
         /* The following data is protected by the mutex and can be
@@ -252,6 +254,28 @@ remove_conversation_id(struct vsx_game_state *game_state)
         };
 
         vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+static void
+reset_on_idle_cb(void *user_data)
+{
+        struct vsx_game_state *game_state = user_data;
+
+        game_state->reset_on_idle_token = NULL;
+
+        vsx_game_state_reset(game_state);
+}
+
+static void
+queue_reset_on_idle(struct vsx_game_state *game_state)
+{
+        if (game_state->reset_on_idle_token)
+                return;
+
+        game_state->reset_on_idle_token =
+                vsx_main_thread_queue_idle(game_state->main_thread,
+                                           reset_on_idle_cb,
+                                           game_state);
 }
 
 static enum vsx_text_language
@@ -439,6 +463,33 @@ handle_language_changed(struct vsx_game_state *game_state,
 }
 
 static void
+handle_bad_game(struct vsx_game_state *game_state)
+{
+        queue_reset_on_idle(game_state);
+
+        const char *text = vsx_text_get(game_state->language,
+                                        VSX_TEXT_BAD_GAME);
+        vsx_game_state_set_note(game_state, text);
+}
+
+static void
+handle_error(struct vsx_game_state *game_state,
+             const struct vsx_connection_event *event)
+{
+        if (event->error.error->domain != &vsx_connection_error)
+                return;
+
+        switch (event->error.error->code) {
+        case VSX_CONNECTION_ERROR_BAD_PLAYER_ID:
+        case VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID:
+                handle_bad_game(game_state);
+                break;
+        default:
+                break;
+        }
+}
+
+static void
 handle_event(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
@@ -466,6 +517,9 @@ handle_event(struct vsx_game_state *game_state,
                 break;
         case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
                 handle_language_changed(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                handle_error(game_state, event);
                 break;
         default:
                 break;
@@ -566,6 +620,16 @@ event_cb(struct vsx_listener *listener,
         handle_instance_state_event_locked(&game_state->instance_state, event);
 
         pthread_mutex_unlock(&game_state->mutex);
+}
+
+static void
+remove_reset_on_idle(struct vsx_game_state *game_state)
+{
+        if (game_state->reset_on_idle_token == NULL)
+                return;
+
+        vsx_main_thread_cancel_idle(game_state->reset_on_idle_token);
+        game_state->reset_on_idle_token = NULL;
 }
 
 void
@@ -872,6 +936,8 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
 
         pthread_mutex_unlock(&game_state->mutex);
 
+        remove_reset_on_idle(game_state);
+
         remove_shout(game_state);
         remove_conversation_id(game_state);
         reset_player_names(game_state);
@@ -1016,6 +1082,8 @@ vsx_game_state_free(struct vsx_game_state *game_state)
 
         if (game_state->flush_queue_token)
                 vsx_main_thread_cancel_idle(game_state->flush_queue_token);
+
+        remove_reset_on_idle(game_state);
 
         clear_remove_shout_timeout(game_state);
 
