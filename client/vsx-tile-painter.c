@@ -54,6 +54,7 @@ struct vsx_tile_painter_tile {
 struct vsx_tile_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
 
         struct vsx_toolbox *toolbox;
 
@@ -307,6 +308,39 @@ event_cb(struct vsx_listener *listener,
 }
 
 static void
+clear_tiles(struct vsx_tile_painter *painter)
+{
+        painter->snap_tile = NULL;
+        cancel_drag(painter);
+
+        vsx_buffer_set_length(&painter->tiles_by_index, 0);
+        vsx_list_init(&painter->tile_list);
+        vsx_slab_destroy(&painter->tile_allocator);
+        vsx_slab_init(&painter->tile_allocator);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
+modified_cb(struct vsx_listener *listener,
+            void *user_data)
+{
+        struct vsx_tile_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_tile_painter,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_RESET:
+                clear_tiles(painter);
+                break;
+        default:
+                break;
+        }
+}
+
+static void
 texture_load_cb(const struct vsx_image *image,
                 struct vsx_error *error,
                 void *data)
@@ -377,6 +411,10 @@ create_cb(struct vsx_game_state *game_state,
         painter->event_listener.notify = event_cb;
         vsx_signal_add(vsx_game_state_get_event_signal(game_state),
                        &painter->event_listener);
+
+        painter->modified_listener.notify = modified_cb;
+        vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
+                       &painter->modified_listener);
 
         vsx_game_state_foreach_tile(painter->game_state,
                                     init_tiles_cb,
@@ -887,6 +925,7 @@ free_cb(void *painter_data)
         struct vsx_tile_painter *painter = painter_data;
 
         vsx_list_remove(&painter->event_listener.link);
+        vsx_list_remove(&painter->modified_listener.link);
 
         free_buffer(painter);
 
