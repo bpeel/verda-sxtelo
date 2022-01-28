@@ -2850,6 +2850,142 @@ out:
         return ret;
 }
 
+static bool
+check_message_cb(struct harness *harness,
+                 const struct vsx_connection_event *event,
+                 void *user_data)
+{
+        if (strcmp(event->message.message, "gh")) {
+                fprintf(stderr,
+                        "Message mismatch:\n"
+                        " Expected: gh\n"
+                        " Received: %s\n",
+                        event->message.message);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_reset(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Send a message to increase the next_message_num so we can
+         * check that it gets reset.
+         */
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_MESSAGE,
+                         check_message_cb,
+                         (const uint8_t *)
+                         "\x82\x05\x01\x0gh\0",
+                         7,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Queue up a bunch of state so that we can test that it won’t
+         * be sent after we reset the connection.
+         */
+        vsx_connection_set_typing(harness->connection, true);
+        vsx_connection_shout(harness->connection);
+        vsx_connection_turn(harness->connection);
+        vsx_connection_move_tile(harness->connection, 0, 1, 2);
+        vsx_connection_set_n_tiles(harness->connection, 8);
+        vsx_connection_set_language(harness->connection, "fr");
+        vsx_connection_send_message(harness->connection,
+                                    "Manĝu terpomojn");
+
+        harness->events_triggered = 0;
+
+        vsx_connection_reset(harness->connection);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_connection_get_running(harness->connection)) {
+                fprintf(stderr,
+                        "Connection is running after reset");
+                ret = false;
+                goto out;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Connection has a poll fd after reset.\n");
+                ret = false;
+                goto out;
+        }
+
+        uint64_t person_id;
+
+        if (vsx_connection_get_person_id(harness->connection,
+                                         &person_id)) {
+                fprintf(stderr,
+                        "Connection has a person ID after reset\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_running(harness->connection, true);
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x0e\x8c"
+                         "\x0" /* empty language code */
+                         "test_player\0",
+                         16)) {
+                ret = false;
+                goto out;
+        }
+
+        /* The connection shouldn’t have any other data to send */
+        if ((harness->poll_events & POLLOUT) ||
+            fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection wants to send more data after header.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2952,6 +3088,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_stop_running())
+                ret = EXIT_FAILURE;
+
+        if (!test_reset())
                 ret = EXIT_FAILURE;
 
         return ret;

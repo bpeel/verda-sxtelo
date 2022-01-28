@@ -1694,29 +1694,6 @@ vsx_connection_get_running(struct vsx_connection *connection)
                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED);
 }
 
-struct vsx_connection *
-vsx_connection_new(void)
-{
-        struct vsx_connection *connection = vsx_calloc(sizeof *connection);
-
-        vsx_signal_init(&connection->event_signal);
-
-        connection->keep_alive_timestamp = INT64_MAX;
-        connection->reconnect_timestamp = INT64_MAX;
-
-        connection->poll_changed_event.type =
-                VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
-
-        connection->sock = -1;
-
-        connection->next_message_num = 0;
-
-        vsx_list_init(&connection->tiles_to_move);
-        vsx_list_init(&connection->messages_to_send);
-
-        return connection;
-}
-
 static void
 free_tiles_to_move(struct vsx_connection *connection)
 {
@@ -1725,6 +1702,8 @@ free_tiles_to_move(struct vsx_connection *connection)
         vsx_list_for_each_safe(tile, tmp, &connection->tiles_to_move, link) {
                 vsx_free(tile);
         }
+
+        vsx_list_init(&connection->tiles_to_move);
 }
 
 static void
@@ -1738,18 +1717,74 @@ free_messages_to_send(struct vsx_connection *connection)
                                link) {
                 vsx_free(message);
         }
+
+        vsx_list_init(&connection->messages_to_send);
+}
+
+void
+vsx_connection_reset(struct vsx_connection *connection)
+{
+        close_socket(connection);
+
+        vsx_free(connection->room);
+        connection->room = NULL;
+
+        vsx_free(connection->player_name);
+        connection->player_name = NULL;
+
+        connection->has_person_id = false;
+        connection->has_conversation_id = false;
+        connection->finished = false;
+        connection->typing = false;
+        connection->sent_typing_state = false;
+        connection->next_message_num = 0;
+        connection->language_to_send[0] = '\0';
+
+        connection->dirty_flags = 0;
+
+        connection->keep_alive_timestamp = INT64_MAX;
+        connection->reconnect_timestamp = INT64_MAX;
+        connection->player_id_received_timestamp = INT64_MAX;
+
+        connection->reconnect_timeout = 0;
+
+        free_tiles_to_move(connection);
+        free_messages_to_send(connection);
+
+        vsx_connection_set_running(connection, false);
+
+        update_poll(connection);
+}
+
+struct vsx_connection *
+vsx_connection_new(void)
+{
+        struct vsx_connection *connection = vsx_calloc(sizeof *connection);
+
+        vsx_signal_init(&connection->event_signal);
+
+        connection->poll_changed_event.type =
+                VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
+
+        connection->sock = -1;
+
+        vsx_list_init(&connection->tiles_to_move);
+        vsx_list_init(&connection->messages_to_send);
+
+        vsx_connection_reset(connection);
+
+        return connection;
 }
 
 void
 vsx_connection_free(struct vsx_connection *connection)
 {
-        close_socket(connection);
+        /* Reinitialise the signal so that reset the connection won’t
+         * emit the poll changed event.
+         */
+        vsx_signal_init(&connection->event_signal);
 
-        vsx_free(connection->room);
-        vsx_free(connection->player_name);
-
-        free_tiles_to_move(connection);
-        free_messages_to_send(connection);
+        vsx_connection_reset(connection);
 
         vsx_free(connection);
 }

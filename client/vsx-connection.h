@@ -148,6 +148,14 @@ vsx_connection_error;
 struct vsx_connection *
 vsx_connection_new(void);
 
+/* Resets the connection so that it is like a fresh one returned from
+ * vsx_connection_new, except that it doesn’t remove the signal
+ * listeners. All of the configuration state is reset except the
+ * server address. The connection will no longer be running.
+ */
+void
+vsx_connection_reset(struct vsx_connection *connection);
+
 void
 vsx_connection_set_player_name(struct vsx_connection *connection,
                                const char *player_name);
