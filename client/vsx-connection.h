@@ -140,6 +140,7 @@ enum vsx_connection_error {
         VSX_CONNECTION_ERROR_BAD_DATA,
         VSX_CONNECTION_ERROR_CONNECTION_CLOSED,
         VSX_CONNECTION_ERROR_BAD_PLAYER_ID,
+        VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID,
 };
 
 extern struct vsx_error_domain

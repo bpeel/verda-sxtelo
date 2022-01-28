@@ -148,6 +148,10 @@ frame_error_tests[] = {
                 "The server sent an invalid bad player ID command"
         },
         {
+                BIN_STR("\x82\x04\x0b!!!"),
+                "The server sent an invalid bad conversation ID command"
+        },
+        {
                 BIN_STR("\x82\x04\x07!!!"),
                 "The server sent an invalid sync command"
         },
@@ -2509,6 +2513,45 @@ out:
 }
 
 static bool
+check_after_bad_thing_error(struct harness *harness)
+{
+        /* The connection should close the write end of the socket */
+        uint8_t byte;
+        int got = read(harness->server_fd, &byte, 1);
+
+        if (got != 0) {
+                fprintf(stderr,
+                        "Expected connection to close, got %i bytes\n",
+                        got);
+                return false;
+        }
+
+        shutdown(harness->server_fd, SHUT_WR);
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->wakeup_time != INT64_MAX) {
+                fprintf(stderr,
+                        "Expected connection to block forever after "
+                        "bad player ID, but got timeout of %f seconds\n",
+                        (harness->wakeup_time -
+                         vsx_monotonic_get()) /
+                        1000000.0f);
+                return false;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Expected connection to close fd, but it still has "
+                        "a poll fd\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
 test_bad_player_id(void)
 {
         struct harness *harness = create_harness_no_start();
@@ -2555,40 +2598,64 @@ test_bad_player_id(void)
                 goto out;
         }
 
-        /* The connection should close the write end of the socket */
-        uint8_t byte;
-        int got = read(harness->server_fd, &byte, 1);
-
-        if (got != 0) {
-                fprintf(stderr,
-                        "Expected connection to close, got %i bytes\n",
-                        got);
+        if (!check_after_bad_thing_error(harness)) {
                 ret = false;
                 goto out;
         }
 
-        shutdown(harness->server_fd, SHUT_WR);
+out:
+        free_harness(harness);
+        return ret;
+}
 
-        if (!wake_up_connection(harness)) {
+static bool
+test_bad_conversation_id(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        vsx_connection_set_conversation_id(harness->connection,
+                                           UINT64_C(0xfedcba9876543210));
+
+        if (!start_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
                 ret = false;
                 goto out;
         }
 
-        if (harness->wakeup_time != INT64_MAX) {
-                fprintf(stderr,
-                        "Expected connection to block forever after "
-                        "bad player ID, but got timeout of %f seconds\n",
-                        (harness->wakeup_time -
-                         vsx_monotonic_get()) /
-                        1000000.0f);
+        const uint8_t expected_data[] =
+                "\x82\x15\x8d\x10\x32\x54\x76\x98\xba\xdc\xfe" "test_player\0";
+
+        if (!expect_data(harness, expected_data, (sizeof expected_data) - 1)) {
                 ret = false;
                 goto out;
         }
 
-        if (harness->poll_fd != -1) {
+        harness->expected_error_domain = &vsx_connection_error;
+        harness->expected_error_code = VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID;
+        harness->expected_error_message =
+                "The conversation ID no longer exists";
+
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x01\x0b", 3)) {
+                ret = false;
+                goto out;
+        }
+
+        if (harness->expected_error_message != NULL) {
                 fprintf(stderr,
-                        "Expected connection to close fd, but it still has "
-                        "a poll fd\n");
+                        "No error received after sending bad conversation ID "
+                        "message\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!check_after_bad_thing_error(harness)) {
                 ret = false;
                 goto out;
         }
@@ -3070,6 +3137,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_bad_player_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_bad_conversation_id())
                 ret = EXIT_FAILURE;
 
         if (!test_leak_pendings())

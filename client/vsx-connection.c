@@ -732,6 +732,45 @@ handle_bad_player_id(struct vsx_connection *connection,
 }
 
 static bool
+handle_bad_conversation_id(struct vsx_connection *connection,
+                           const uint8_t *payload,
+                           size_t payload_length,
+                           struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid bad conversation ID "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID,
+                      "The conversation ID no longer exists");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
+
+        return true;
+}
+
+static bool
 process_message(struct vsx_connection *connection,
                 const uint8_t *payload,
                 size_t payload_length, struct vsx_error **error)
@@ -793,6 +832,10 @@ process_message(struct vsx_connection *connection,
                 return handle_bad_player_id(connection,
                                             payload, payload_length,
                                             error);
+        case VSX_PROTO_BAD_CONVERSATION_ID:
+                return handle_bad_conversation_id(connection,
+                                                  payload, payload_length,
+                                                  error);
         }
 
         return true;
