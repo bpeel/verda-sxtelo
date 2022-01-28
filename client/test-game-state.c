@@ -81,6 +81,10 @@ struct check_event_listener {
         void *user_data;
 };
 
+static const uint8_t
+conversation_id_message[] =
+        "\x82\x09\x0a\x81\x82\x83\x84\x85\x86\x87\x88";
+
 static void
 free_harness(struct harness *harness)
 {
@@ -1080,6 +1084,58 @@ add_player(struct harness *harness)
                                        NULL /* user_data */);
 }
 
+static bool
+check_typing_event_cb(struct harness *harness,
+                      const struct vsx_connection_event *event,
+                      void *user_data)
+{
+        if (event->player_flags_changed.player_num != 1) {
+                fprintf(stderr,
+                        "Expected other player to have number 1 but got %i\n",
+                        event->player_flags_changed.player_num);
+                return false;
+        }
+
+        if (event->player_flags_changed.flags != 1) {
+                fprintf(stderr,
+                        "Other player flags are %i but should be 1\n",
+                        event->player_flags_changed.flags);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+check_typing_modified_cb(struct harness *harness,
+                         const struct vsx_game_state_modified_event *event,
+                         void *user_data)
+{
+       return true;
+}
+
+static bool
+set_typing(struct harness *harness)
+{
+        const struct check_event_setup setup = {
+                .event_cb = check_typing_event_cb,
+                .expected_event_type =
+                VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                .modified_cb = check_typing_modified_cb,
+                .expected_modified_type =
+                VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+        };
+
+        static const uint8_t set_typing_message[] =
+                "\x82\x03\x05\x01\x01";
+
+        return check_event_or_modified(harness,
+                                       &setup,
+                                       set_typing_message,
+                                       sizeof set_typing_message - 1,
+                                       NULL /* user_data */);
+}
+
 struct check_player_added_closure {
         int player_num;
 };
@@ -1604,6 +1660,42 @@ check_conversation_id_modified_cb(struct harness *harness,
 }
 
 static bool
+send_conversation_id(struct harness *harness)
+{
+        if (!check_modified(harness,
+                            VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+                            check_conversation_id_modified_cb,
+                            conversation_id_message,
+                            sizeof conversation_id_message - 1,
+                            NULL /* user_data */))
+                return false;
+
+        uint64_t conversation_id;
+
+        if (!vsx_game_state_get_conversation_id(harness->game_state,
+                                                &conversation_id)) {
+                fprintf(stderr,
+                        "The game state doesn’t have a conversation ID even "
+                        "after one was sent.\n");
+                return false;
+        }
+
+        uint64_t expected_id = UINT64_C(0x8887868584838281);
+
+        if (expected_id != conversation_id) {
+                fprintf(stderr,
+                        "Game state conversation id does not match.\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        conversation_id);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
 test_conversation_id(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1624,37 +1716,7 @@ test_conversation_id(void)
                 goto out;
         }
 
-        static const uint8_t conversation_id_message[] =
-                "\x82\x09\x0a\x81\x82\x83\x84\x85\x86\x87\x88";
-
-        if (!check_modified(harness,
-                            VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
-                            check_conversation_id_modified_cb,
-                            conversation_id_message,
-                            sizeof conversation_id_message - 1,
-                            NULL /* user_data */)) {
-                ret = false;
-                goto out;
-        }
-
-        if (!vsx_game_state_get_conversation_id(harness->game_state,
-                                                &conversation_id)) {
-                fprintf(stderr,
-                        "The game state doesn’t have a conversation ID even "
-                        "after one was sent.\n");
-                ret = false;
-                goto out;
-        }
-
-        uint64_t expected_id = UINT64_C(0x8887868584838281);
-
-        if (expected_id != conversation_id) {
-                fprintf(stderr,
-                        "Game state conversation id does not match.\n"
-                        " Expected: 0x%" PRIx64 "\n"
-                        " Received: 0x%" PRIx64 "\n",
-                        expected_id,
-                        conversation_id);
+        if (!send_conversation_id(harness)) {
                 ret = false;
                 goto out;
         }
@@ -1828,6 +1890,27 @@ check_language(struct harness *harness,
         return true;
 }
 
+static bool
+check_dialog(struct harness *harness,
+             enum vsx_dialog expected_dialog)
+{
+        enum vsx_dialog dialog = vsx_game_state_get_dialog(harness->game_state);
+
+        if (dialog != expected_dialog) {
+                fprintf(stderr,
+                        "Dialog not as expected.\n"
+                        " Expected: %i (%s)\n"
+                        " Got: %i (%s)\n",
+                        expected_dialog,
+                        vsx_dialog_to_name(expected_dialog),
+                        dialog,
+                        vsx_dialog_to_name(dialog));
+                return false;
+        }
+
+        return true;
+}
+
 struct check_language_modified_closure {
         enum vsx_text_language expected_language;
 };
@@ -1969,6 +2052,347 @@ out:
 }
 
 static bool
+set_to_french(struct harness *harness)
+{
+        struct check_language_modified_closure closure = {
+                .expected_language = VSX_TEXT_LANGUAGE_FRENCH,
+        };
+
+        return check_modified(harness,
+                              VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
+                              check_language_modified_cb,
+                              (const uint8_t *)
+                              "\x82\x04\x0c" "fr", 6,
+                              &closure);
+}
+
+struct test_reset_closure {
+        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
+        uint64_t events_triggered;
+        uint64_t modifieds_triggered;
+};
+
+static void
+test_reset_event_cb(struct vsx_listener *listener,
+                    void *user_data)
+{
+        struct test_reset_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_reset_closure,
+                                 event_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        closure->events_triggered |= UINT64_C(1) << event->type;
+}
+
+static void
+test_reset_modified_cb(struct vsx_listener *listener,
+                       void *user_data)
+{
+        struct test_reset_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_reset_closure,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        closure->modifieds_triggered |= UINT64_C(1) << event->type;
+}
+
+static void
+count_tiles_cb(const struct vsx_connection_event *tile,
+               void *user_data)
+{
+        int *n_tiles = user_data;
+
+        (*n_tiles)++;
+}
+
+static bool
+check_no_tiles(struct harness *harness)
+{
+        int n_tiles = 0;
+
+        vsx_game_state_foreach_tile(harness->game_state,
+                                    count_tiles_cb,
+                                    &n_tiles);
+
+        if (n_tiles) {
+                fprintf(stderr,
+                        "Expected game_state to have no tiles but found %i\n",
+                        n_tiles);
+                return false;
+        }
+
+        return true;
+}
+
+struct check_blank_players_closure {
+        bool succeeded;
+};
+
+static void
+check_blank_players_cb(int player_num,
+                       const char *name,
+                       enum vsx_game_state_player_flag flags,
+                       void *user_data)
+{
+        struct check_blank_players_closure *closure = user_data;
+
+        if (name && *name) {
+                fprintf(stderr,
+                        "Player %i has name “%s” but expected to be blank.\n",
+                        player_num,
+                        name);
+                closure->succeeded = false;
+        }
+
+        if (flags) {
+                fprintf(stderr,
+                        "Player %i has flags 0x%x but expected to be 0.\n",
+                        player_num,
+                        flags);
+                closure->succeeded = false;
+        }
+}
+
+static bool
+check_blank_players(struct harness *harness)
+{
+        struct check_blank_players_closure closure = {
+                .succeeded = true,
+        };
+
+        vsx_game_state_foreach_player(harness->game_state,
+                                      check_blank_players_cb,
+                                      &closure);
+
+        return closure.succeeded;
+}
+
+static bool
+check_name_note(struct harness *harness,
+                enum vsx_text expected_text)
+{
+        enum vsx_text actual_text =
+                vsx_game_state_get_name_note(harness->game_state);
+
+        if (actual_text != expected_text) {
+                fprintf(stderr,
+                        "Name note not as expected.\n"
+                        " Expected: %i (%s)\n"
+                        " Received: %i (%s)\n",
+                        expected_text,
+                        vsx_text_get(0, expected_text),
+                        actual_text,
+                        vsx_text_get(0, actual_text));
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+check_instance_state(struct harness *harness,
+                     const char *expected_instance_state)
+{
+        char *actual_instance_state =
+                vsx_game_state_save_instance_state(harness->game_state);
+        bool ret = true;
+
+        if (strcmp(actual_instance_state, expected_instance_state)) {
+                fprintf(stderr,
+                        "Instance state mismatch.\n"
+                        " Expected: %s\n"
+                        " Received: %s\n",
+                        expected_instance_state,
+                        actual_instance_state);
+                ret = false;
+        }
+
+        vsx_free(actual_instance_state);
+
+        return ret;
+}
+
+static bool
+test_reset(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        struct test_reset_closure closure = {
+                .event_listener = {
+                        .notify = test_reset_event_cb,
+                },
+                .modified_listener = {
+                        .notify = test_reset_modified_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        bool ret = true;
+
+        if (!set_to_french(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_tile(harness, 0, 1, 2, 'C', 0, INT_MAX)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!add_player(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!set_typing(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_shout(harness, 1, -1)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!send_conversation_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send an event so that the event queue won’t be empty */
+        if (!write_data(harness, (const uint8_t *) "\x82\x04\x01\x00!\0", 6)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Wait for the idle event without flushing it so that the
+         * game state doesn’t have a chance to clear the queue before
+         * the reset.
+         */
+        if (!wait_for_idle_queue_no_flush(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Set some state that should be cleared so we can check for
+         * the modified events.
+         */
+        vsx_game_state_set_dialog(harness->game_state,
+                                  VSX_DIALOG_INVITE_LINK);
+        vsx_game_state_set_name_note(harness->game_state,
+                                     VSX_TEXT_ENTER_NAME_JOIN_GAME);
+
+        closure.events_triggered = 0;
+        closure.modifieds_triggered = 0;
+
+        vsx_game_state_reset(harness->game_state);
+
+        vsx_main_thread_flush_idle_events(harness->main_thread);
+
+        if (closure.events_triggered) {
+                fprintf(stderr,
+                        "Events were triggered after resetting the game "
+                        "state.\n");
+                ret = false;
+                goto out;
+        }
+
+        uint64_t expected_modifieds =
+                ((UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_DIALOG) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_RESET) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES));
+
+        if (closure.modifieds_triggered != expected_modifieds) {
+                fprintf(stderr,
+                        "Expected modified event mask to be 0x%" PRIx64
+                        " but got 0x%" PRIx64 "\n",
+                        expected_modifieds,
+                        closure.modifieds_triggered);
+                ret = false;
+                goto out;
+        }
+
+        /* The language should still be French */
+        if (!check_language(harness, VSX_TEXT_LANGUAGE_FRENCH)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_dialog(harness, VSX_DIALOG_NAME)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_no_tiles(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!check_blank_players(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        int shouting_player =
+                vsx_game_state_get_shouting_player(harness->game_state);
+
+        if (shouting_player != -1) {
+                fprintf(stderr,
+                        "Player %i is shouting event after reset.\n",
+                        shouting_player);
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_game_state_get_started(harness->game_state)) {
+                fprintf(stderr, "Game is started after reset.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!check_name_note(harness, VSX_TEXT_ENTER_NAME_NEW_GAME)) {
+                ret = false;
+                goto out;
+        }
+
+        uint64_t conversation_id;
+
+        if (vsx_game_state_get_conversation_id(harness->game_state,
+                                               &conversation_id)) {
+                fprintf(stderr, "Game has a conversation ID after reset.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* The person ID should have been removed from the instance state */
+        if (!check_instance_state(harness, "dialog=name")) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_load_instance_state(void)
 {
         struct harness *harness = create_harness_no_start();
@@ -1981,17 +2405,7 @@ test_load_instance_state(void)
         vsx_game_state_load_instance_state(harness->game_state,
                                            "person_id=5,dialog=none");
 
-        enum vsx_dialog dialog = vsx_game_state_get_dialog(harness->game_state);
-
-        if (dialog != VSX_DIALOG_NONE) {
-                fprintf(stderr,
-                        "Dialog not as expected after loading a state.\n"
-                        " Expected: %i (%s)\n"
-                        " Got: %i (%s)\n",
-                        VSX_DIALOG_NONE,
-                        vsx_dialog_to_name(VSX_DIALOG_NONE),
-                        dialog,
-                        vsx_dialog_to_name(dialog));
+        if (!check_dialog(harness, VSX_DIALOG_NONE)) {
                 ret = false;
                 goto out;
         }
@@ -2059,22 +2473,10 @@ test_save_instance_state(void)
 
         vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_NONE);
 
-        char *str = vsx_game_state_save_instance_state(harness->game_state);
-
-        const char *expected_str =
-                "person_id=6e6d6c6b6a696867,dialog=none";
-
-        if (strcmp(str, expected_str)) {
-                fprintf(stderr,
-                        "String from saved instance state does not match.\n"
-                        " Expected: %s\n"
-                        " Received: %s\n",
-                        expected_str,
-                        str);
+        if (!check_instance_state(harness,
+                                  "person_id=6e6d6c6b6a696867,dialog=none"))
                 ret = false;
-        }
 
-        vsx_free(str);
         free_harness(harness);
 
         return ret;
@@ -2437,6 +2839,9 @@ main(int argc, char **argv)
         int ret = EXIT_SUCCESS;
 
         if (!test_self())
+                ret = EXIT_FAILURE;
+
+        if (!test_reset())
                 ret = EXIT_FAILURE;
 
         if (!test_load_instance_state())

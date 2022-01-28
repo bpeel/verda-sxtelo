@@ -58,6 +58,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE,
+        VSX_GAME_STATE_MODIFIED_TYPE_RESET,
 };
 
 struct vsx_game_state_modified_event {
@@ -80,6 +81,16 @@ vsx_game_state_new(struct vsx_main_thread *main_thread,
                    struct vsx_worker *worker,
                    struct vsx_connection *connection,
                    const char *default_language);
+
+/* Resets the connection and all the stored state to be the same as a
+ * new game state except that the last language reported by the
+ * connection will be preserved. The connection will be set as running
+ * but it won’t actually connect until a name is set on it. Any
+ * appropriate events for the state changes will be sent as well as a
+ * final RESET event.
+ */
+void
+vsx_game_state_reset(struct vsx_game_state *game_state);
 
 /* Gets the number of tiles in the game, as reported by the server.
  * This includes the tiles that are still in the bag so it is just

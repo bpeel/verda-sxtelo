@@ -213,19 +213,42 @@ clear_remove_shout_timeout(struct vsx_game_state *game_state)
 }
 
 static void
+remove_shout(struct vsx_game_state *game_state)
+{
+        if (game_state->shouting_player == -1)
+                return;
+
+        clear_remove_shout_timeout(game_state);
+
+        game_state->shouting_player = -1;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+static void
 remove_shout_cb(void *data)
 {
         struct vsx_game_state *game_state = data;
 
         game_state->remove_shout_timeout = NULL;
 
-        if (game_state->shouting_player == -1)
+        remove_shout(game_state);
+}
+
+static void
+remove_conversation_id(struct vsx_game_state *game_state)
+{
+        if (!game_state->has_conversation_id)
                 return;
 
-        game_state->shouting_player = -1;
+        game_state->has_conversation_id = false;
 
         struct vsx_game_state_modified_event event = {
-                .type = VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         };
 
         vsx_signal_emit(&game_state->modified_signal, &event);
@@ -742,6 +765,129 @@ vsx_game_state_new(struct vsx_main_thread *main_thread,
         return game_state;
 }
 
+static void
+free_event_queue(struct vsx_game_state *game_state)
+{
+        struct queued_event *queued_event;
+
+        vsx_list_for_each(queued_event,
+                          &game_state->event_queue,
+                          link) {
+                vsx_connection_destroy_event(&queued_event->event);
+        }
+
+        vsx_list_insert_list(&game_state->freed_events,
+                             &game_state->event_queue);
+        vsx_list_init(&game_state->event_queue);
+}
+
+static void
+reset_player_names(struct vsx_game_state *game_state)
+{
+        for (unsigned i = 0; i < VSX_N_ELEMENTS(game_state->players); i++) {
+                struct vsx_game_state_player *player = game_state->players + i;
+
+                if (player->name == NULL || *player->name == '\0')
+                        continue;
+
+                vsx_free(player->name);
+                player->name = vsx_strdup("");
+
+                struct vsx_game_state_modified_event event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME,
+                        .player_name = {
+                                .player_num = i,
+                                .name = player->name,
+                        },
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &event);
+        }
+}
+
+static void
+reset_player_flags(struct vsx_game_state *game_state)
+{
+        bool changed = false;
+
+        for (unsigned i = 0; i < VSX_N_ELEMENTS(game_state->players); i++) {
+                struct vsx_game_state_player *player = game_state->players + i;
+
+                if (player->flags == 0)
+                        continue;
+
+                player->flags = 0;
+                changed = true;
+        }
+
+        if (changed) {
+                struct vsx_game_state_modified_event event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &event);
+        }
+}
+
+static void
+reset_tiles(struct vsx_game_state *game_state)
+{
+        bool had_tiles = game_state->tiles_by_index.length > 0;
+
+        vsx_buffer_set_length(&game_state->tiles_by_index, 0);
+        vsx_list_init(&game_state->tile_list);
+        vsx_slab_destroy(&game_state->tile_allocator);
+        vsx_slab_init(&game_state->tile_allocator);
+
+        if (had_tiles) {
+                struct vsx_game_state_modified_event event = {
+                        .type = VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
+                };
+
+                vsx_signal_emit(&game_state->modified_signal, &event);
+        }
+}
+
+void
+vsx_game_state_reset(struct vsx_game_state *game_state)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_reset(game_state->connection);
+        vsx_connection_set_language(game_state->connection,
+                                    vsx_text_get(game_state->language,
+                                                 VSX_TEXT_LANGUAGE_CODE));
+        vsx_connection_set_running(game_state->connection, true);
+        vsx_worker_unlock(game_state->worker);
+
+        pthread_mutex_lock(&game_state->mutex);
+
+        free_event_queue(game_state);
+
+        if (game_state->flush_queue_token) {
+                vsx_main_thread_cancel_idle(game_state->flush_queue_token);
+                game_state->flush_queue_token = NULL;
+        }
+
+        game_state->instance_state.has_person_id = false;
+
+        pthread_mutex_unlock(&game_state->mutex);
+
+        remove_shout(game_state);
+        remove_conversation_id(game_state);
+        reset_player_names(game_state);
+        reset_player_flags(game_state);
+        vsx_game_state_set_dialog(game_state, VSX_DIALOG_NAME);
+        vsx_game_state_set_name_note(game_state, VSX_TEXT_ENTER_NAME_NEW_GAME);
+
+        reset_tiles(game_state);
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_RESET,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
 int
 vsx_game_state_get_shouting_player(struct vsx_game_state *game_state)
 {
@@ -843,20 +989,6 @@ struct vsx_signal *
 vsx_game_state_get_modified_signal(struct vsx_game_state *game_state)
 {
         return &game_state->modified_signal;
-}
-
-static void
-free_event_queue(struct vsx_game_state *game_state)
-{
-        struct queued_event *queued_event, *tmp;
-
-        vsx_list_for_each_safe(queued_event,
-                               tmp,
-                               &game_state->event_queue,
-                               link) {
-                vsx_connection_destroy_event(&queued_event->event);
-                vsx_free(queued_event);
-        }
 }
 
 static void
