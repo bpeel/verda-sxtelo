@@ -1184,6 +1184,54 @@ out:
 }
 
 static bool
+test_reconnect_pending_data(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Send an incomplete message so that the data will be pending
+         * in the input buffer of the connection. The message
+         * deliberately contains the websocket terminator so that if
+         * the pending data isn’t cleared then it will confuse the
+         * part that skips the websocket header.
+         */
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x08\x01\r\n\r\n",
+                        7)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!do_unexpected_close(harness) ||
+            !wake_up_connection(harness) ||
+            !accept_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n") ||
+            !read_reconnect_message(harness, 0)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send any message that would trigger an event to check that
+         * the connection is correctly processing messages.
+         */
+
+        if (!send_player_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_keep_alive(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2740,6 +2788,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_reconnect_delay())
+                ret = EXIT_FAILURE;
+
+        if (!test_reconnect_pending_data())
                 ret = EXIT_FAILURE;
 
         if (!test_keep_alive())
