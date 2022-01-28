@@ -2773,6 +2773,63 @@ out:
         return ret;
 }
 
+static bool
+test_stop_running(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        harness->events_triggered = 0;
+
+        vsx_connection_set_running(harness->connection, false);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Connection has a poll fd after stopping running.\n");
+                ret = false;
+                goto out;
+        }
+
+        harness->events_triggered = 0;
+
+        vsx_connection_set_running(harness->connection, true);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2872,6 +2929,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_join_private_game())
+                ret = EXIT_FAILURE;
+
+        if (!test_stop_running())
                 ret = EXIT_FAILURE;
 
         return ret;
