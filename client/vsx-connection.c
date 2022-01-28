@@ -1448,6 +1448,8 @@ try_reconnect(struct vsx_connection *connection)
 
         connection->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER |
                                     VSX_CONNECTION_DIRTY_FLAG_HEADER);
+        connection->output_length = 0;
+        connection->input_length = 0;
         connection->ws_terminator_pos = 0;
         connection->write_finished = false;
         connection->synced = false;
