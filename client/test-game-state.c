@@ -1646,6 +1646,16 @@ test_send_commands(void)
                 goto out;
         }
 
+        vsx_game_state_leave(harness->game_state);
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x01\x84",
+                         3)) {
+                ret = false;
+                goto out;
+        }
+
 out:
         free_harness(harness);
         return ret;

@@ -781,6 +781,14 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
         vsx_worker_unlock(game_state->worker);
 }
 
+void
+vsx_game_state_leave(struct vsx_game_state *game_state)
+{
+        vsx_worker_lock(game_state->worker);
+        vsx_connection_leave(game_state->connection);
+        vsx_worker_unlock(game_state->worker);
+}
+
 struct vsx_game_state *
 vsx_game_state_new(struct vsx_main_thread *main_thread,
                    struct vsx_worker *worker,

@@ -199,6 +199,9 @@ vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
                          int x, int y);
 
+void
+vsx_game_state_leave(struct vsx_game_state *game_state);
+
 /* This can be called from any thread. The caller must free the
  * returned string.
  */
