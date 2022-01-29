@@ -341,6 +341,31 @@ handle_player_name_changed(struct vsx_game_state *game_state,
 }
 
 static void
+set_player_left_note(struct vsx_game_state *game_state,
+                     int player_num)
+{
+        if (player_num == game_state->self)
+                return;
+
+        const struct vsx_game_state_player *player =
+                game_state->players + player_num;
+
+        if (player->name == NULL || player->name[0] == '\0')
+                return;
+
+        struct vsx_buffer buffer = VSX_BUFFER_STATIC_INIT;
+
+        vsx_buffer_append_printf(&buffer,
+                                 vsx_text_get(game_state->language,
+                                              VSX_TEXT_PLAYER_LEFT),
+                                 player->name);
+
+        vsx_game_state_set_note(game_state, (char *) buffer.data);
+
+        vsx_buffer_destroy(&buffer);
+}
+
+static void
 handle_player_flags_changed(struct vsx_game_state *game_state,
                             const struct vsx_connection_event *event)
 {
@@ -358,6 +383,11 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
 
         if (new_flags == player->flags)
                 return;
+
+        if (event->synced &&
+            (player->flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) &&
+            (new_flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) == 0)
+                set_player_left_note(game_state, player_num);
 
         player->flags = new_flags;
 
