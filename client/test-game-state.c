@@ -1136,6 +1136,79 @@ set_typing(struct harness *harness)
                                        NULL /* user_data */);
 }
 
+struct set_player_flags_closure {
+        int player_num;
+        int expected_flags;
+};
+
+static bool
+set_player_flags_event_cb(struct harness *harness,
+                          const struct vsx_connection_event *event,
+                          void *user_data)
+{
+        struct set_player_flags_closure *closure = user_data;
+
+        if (event->player_flags_changed.player_num != closure->player_num) {
+                fprintf(stderr,
+                        "Expected flags changed event for %i but got %i\n",
+                        closure->player_num,
+                        event->player_flags_changed.player_num);
+                return false;
+        }
+
+        if (event->player_flags_changed.flags != closure->expected_flags) {
+                fprintf(stderr,
+                        "Expected flags to be 0x%x but got 0x%x\n",
+                        closure->expected_flags,
+                        event->player_flags_changed.flags);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+set_player_flags_modified_cb(struct harness *harness,
+                             const struct vsx_game_state_modified_event *event,
+                             void *user_data)
+{
+        return true;
+}
+
+static bool
+set_player_flags(struct harness *harness,
+                 int player_num,
+                 int flags,
+                 bool modified)
+{
+        struct set_player_flags_closure closure = {
+                .player_num = player_num,
+                .expected_flags = flags,
+        };
+
+        struct check_event_setup setup = {
+                .expected_event_type =
+                VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                .event_cb = set_player_flags_event_cb,
+                .expected_modified_type =
+                VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,
+                .modified_cb = set_player_flags_modified_cb,
+        };
+
+        if (!modified)
+                setup.modified_cb = NULL;
+
+        uint8_t message[] = {
+                0x82, 0x03, 0x05, player_num, flags,
+        };
+
+        return check_event_or_modified(harness,
+                                       &setup,
+                                       message,
+                                       sizeof message,
+                                       &closure);
+}
+
 struct check_player_added_closure {
         int player_num;
 };
@@ -1178,34 +1251,6 @@ out:
 }
 
 static bool
-check_player_flags_added_cb(struct harness *harness,
-                            const struct vsx_connection_event *event,
-                            void *user_data)
-{
-        struct check_player_added_closure *closure = user_data;
-
-        if (event->player_flags_changed.player_num != closure->player_num) {
-                fprintf(stderr,
-                        "Expected flags changed event for %i but got %i\n",
-                        closure->player_num,
-                        event->player_flags_changed.player_num);
-                return false;
-        }
-
-        int expected_flags = closure->player_num & 0x3;
-
-        if (event->player_flags_changed.flags != expected_flags) {
-                fprintf(stderr,
-                        "Expected flags to be 0x%x but got 0x%x\n",
-                        expected_flags,
-                        event->player_flags_changed.flags);
-                return false;
-        }
-
-        return true;
-}
-
-static bool
 test_send_all_players(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1241,16 +1286,11 @@ test_send_all_players(void)
                         goto out;
                 }
 
-                vsx_buffer_set_length(&buf, 0);
-                vsx_buffer_append_string(&buf, "\x82\x03\x05");
-                vsx_buffer_append_c(&buf, player_num);
-                vsx_buffer_append_c(&buf, player_num & 0x3);
-
-                if (!check_event(harness,
-                                 VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
-                                 check_player_flags_added_cb,
-                                 buf.data, buf.length,
-                                 &closure)) {
+                if (!set_player_flags(harness,
+                                      player_num,
+                                      player_num & 0x3,
+                                      (player_num & 0x3) != 0 &&
+                                      player_num < 6)) {
                         ret = false;
                         goto out;
                 }
