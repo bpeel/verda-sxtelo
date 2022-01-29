@@ -33,7 +33,7 @@
 #include "vsx-quad-buffer.h"
 #include "vsx-layout.h"
 
-#define N_BUTTONS 3
+#define N_BUTTONS 4
 
 struct vsx_menu_painter {
         struct vsx_game_state *game_state;
@@ -69,6 +69,7 @@ enum menu_button {
         MENU_BUTTON_LANGUAGE,
         MENU_BUTTON_SHARE,
         MENU_BUTTON_LENGTH,
+        MENU_BUTTON_LEAVE,
 };
 
 enum menu_image {
@@ -76,11 +77,12 @@ enum menu_image {
         MENU_IMAGE_SHARE,
         MENU_IMAGE_SHORT_GAME,
         MENU_IMAGE_LONG_GAME,
+        MENU_IMAGE_LEAVE,
 };
 
 #define N_VERTICES (N_BUTTONS * 4)
 
-#define N_IMAGES 4
+#define N_IMAGES 8
 
 /* Size in mm of a button */
 #define BUTTON_SIZE 15
@@ -147,6 +149,9 @@ update_label_text(struct vsx_menu_painter *painter)
                         text = (is_long_game(painter) ?
                                 VSX_TEXT_LONG_GAME :
                                 VSX_TEXT_SHORT_GAME);
+                        break;
+                case MENU_BUTTON_LEAVE:
+                        text = VSX_TEXT_LEAVE_BUTTON;
                         break;
                 }
 
@@ -402,7 +407,7 @@ handle_click(struct vsx_menu_painter *painter,
                 return true;
         }
 
-        switch (x / painter->button_size) {
+        switch ((enum menu_button) (x / painter->button_size)) {
         case MENU_BUTTON_LANGUAGE:
                 handle_language_button(painter);
                 break;
@@ -412,6 +417,9 @@ handle_click(struct vsx_menu_painter *painter,
                 break;
         case MENU_BUTTON_LENGTH:
                 handle_toggle_length(painter);
+                break;
+        case MENU_BUTTON_LEAVE:
+                vsx_game_state_leave(painter->game_state);
                 break;
         }
 
@@ -497,6 +505,9 @@ ensure_vertices(struct vsx_menu_painter *painter)
                         image = (is_long_game(painter) ?
                                  MENU_IMAGE_LONG_GAME :
                                  MENU_IMAGE_SHORT_GAME);
+                        break;
+                case MENU_BUTTON_LEAVE:
+                        image = MENU_IMAGE_LEAVE;
                         break;
                 }
 

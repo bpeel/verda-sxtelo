@@ -30,6 +30,7 @@ english[] = {
         [VSX_TEXT_LANGUAGE_BUTTON] = "Game in English",
         [VSX_TEXT_SHARE_BUTTON] = "Invite friends",
         [VSX_TEXT_LONG_GAME] = "Long game",
+        [VSX_TEXT_LEAVE_BUTTON] = "Leave game",
         [VSX_TEXT_SHORT_GAME] = "Short game",
         [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
         "The language can’t be changed after the game has started",
@@ -53,6 +54,7 @@ french[] = {
         [VSX_TEXT_LANGUAGE_BUTTON] = "Jeu en français",
         [VSX_TEXT_SHARE_BUTTON] = "Inviter des ami·es",
         [VSX_TEXT_LONG_GAME] = "Jeu long",
+        [VSX_TEXT_LEAVE_BUTTON] = "Quitter le jeu",
         [VSX_TEXT_SHORT_GAME] = "Jeu court",
         [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
         "La langue ne peut pas être changée après que le jeu ait commencé",
@@ -80,6 +82,7 @@ esperanto[] = {
         [VSX_TEXT_SHARE_BUTTON] = "Inviti amikojn",
         [VSX_TEXT_LONG_GAME] = "Longa ludo",
         [VSX_TEXT_SHORT_GAME] = "Mallonga ludo",
+        [VSX_TEXT_LEAVE_BUTTON] = "Forlasi la ludon",
         [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
         "Ne eblas ŝanĝi la lingvon post kiam la ludo komenciĝis",
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
