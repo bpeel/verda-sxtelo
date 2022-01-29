@@ -490,6 +490,18 @@ handle_error(struct vsx_game_state *game_state,
 }
 
 static void
+handle_end(struct vsx_game_state *game_state,
+           const struct vsx_connection_event *event)
+{
+        /* This should probably only happen because the player has
+         * clicked the leave button and the server has received the
+         * request. Let’s just make the game reset without displaying
+         * an error.
+         */
+        queue_reset_on_idle(game_state);
+}
+
+static void
 handle_event(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
@@ -520,6 +532,9 @@ handle_event(struct vsx_game_state *game_state,
                 break;
         case VSX_CONNECTION_EVENT_TYPE_ERROR:
                 handle_error(game_state, event);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_END:
+                handle_end(game_state, event);
                 break;
         default:
                 break;

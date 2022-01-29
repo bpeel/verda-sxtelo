@@ -3022,6 +3022,154 @@ out:
         return ret;
 }
 
+struct test_end_closure {
+        bool succeeded;
+        bool had_reset;
+        bool had_end;
+        struct vsx_listener event_listener;
+        struct vsx_listener modified_listener;
+};
+
+static void
+test_end_event_cb(struct vsx_listener *listener,
+                  void *user_data)
+{
+        struct test_end_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_end_closure,
+                                 event_listener);
+        const struct vsx_connection_event *event = user_data;
+
+        if (event->type != VSX_CONNECTION_EVENT_TYPE_END) {
+                fprintf(stderr,
+                        "Unexpected event type: %i\n",
+                        event->type);
+                closure->succeeded = false;
+        } else if (closure->had_end) {
+                fprintf(stderr, "End event received multiple times\n");
+                closure->succeeded = false;
+        } else {
+                closure->had_end = true;
+        }
+}
+
+static void
+test_end_modified_cb(struct vsx_listener *listener,
+                     void *user_data)
+{
+        struct test_bad_id_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_bad_id_closure,
+                                 modified_listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_RESET:
+                if (closure->had_reset) {
+                        fprintf(stderr,
+                                "Reset event received multiple times\n");
+                        closure->succeeded = false;
+                } else {
+                        closure->had_reset = true;
+                }
+                break;
+
+        case VSX_GAME_STATE_MODIFIED_TYPE_NOTE:
+                fprintf(stderr,
+                        "Unexpected note modified event received.\n");
+                closure->succeeded = false;
+                break;
+
+        default:
+                break;
+        }
+}
+
+static bool
+test_end(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        struct test_end_closure closure = {
+                .succeeded = true,
+                .event_listener = {
+                        .notify = test_end_event_cb,
+                },
+                .modified_listener = {
+                        .notify = test_end_modified_cb,
+                },
+        };
+
+        uint8_t message[] = {
+                0x82, 0x01, 0x08
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        if (!write_data(harness, message, sizeof message) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_end) {
+                fprintf(stderr, "No end event received.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_reset) {
+                fprintf(stderr,
+                        "Reset received after end event before "
+                        "flushing idle.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!harness->idle_queued) {
+                fprintf(stderr,
+                        "No idle queued after getting end event.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_reset) {
+                fprintf(stderr, "No reset received after end event.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
 static bool
 check_bad_conversation_error(struct harness *harness,
                              const struct vsx_connection_event *event,
@@ -3101,6 +3249,9 @@ main(int argc, char **argv)
 
         if (!test_bad_id(VSX_PROTO_BAD_PLAYER_ID,
                          VSX_CONNECTION_ERROR_BAD_PLAYER_ID))
+                ret = EXIT_FAILURE;
+
+        if (!test_end())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_bad_id())
