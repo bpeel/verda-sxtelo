@@ -2116,7 +2116,7 @@ set_to_french(struct harness *harness)
                               &closure);
 }
 
-struct test_reset_closure {
+struct event_flags_closure {
         struct vsx_listener event_listener;
         struct vsx_listener modified_listener;
         uint64_t events_triggered;
@@ -2124,12 +2124,12 @@ struct test_reset_closure {
 };
 
 static void
-test_reset_event_cb(struct vsx_listener *listener,
-                    void *user_data)
+event_flags_event_cb(struct vsx_listener *listener,
+                     void *user_data)
 {
-        struct test_reset_closure *closure =
+        struct event_flags_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_reset_closure,
+                                 struct event_flags_closure,
                                  event_listener);
         const struct vsx_connection_event *event = user_data;
 
@@ -2137,12 +2137,12 @@ test_reset_event_cb(struct vsx_listener *listener,
 }
 
 static void
-test_reset_modified_cb(struct vsx_listener *listener,
-                       void *user_data)
+event_flags_modified_cb(struct vsx_listener *listener,
+                        void *user_data)
 {
-        struct test_reset_closure *closure =
+        struct event_flags_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_reset_closure,
+                                 struct event_flags_closure,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
 
@@ -2273,12 +2273,12 @@ test_reset(void)
         if (harness == NULL)
                 return NULL;
 
-        struct test_reset_closure closure = {
+        struct event_flags_closure closure = {
                 .event_listener = {
-                        .notify = test_reset_event_cb,
+                        .notify = event_flags_event_cb,
                 },
                 .modified_listener = {
-                        .notify = test_reset_modified_cb,
+                        .notify = event_flags_modified_cb,
                 },
         };
 
@@ -2365,7 +2365,8 @@ test_reset(void)
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID) |
-                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES));
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED));
 
         if (closure.modifieds_triggered != expected_modifieds) {
                 fprintf(stderr,
@@ -2394,6 +2395,13 @@ test_reset(void)
         }
 
         if (!check_blank_players(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_game_state_get_connected(harness->game_state)) {
+                fprintf(stderr,
+                        "The game state is connected after a reset.\n");
                 ret = false;
                 goto out;
         }
@@ -2431,6 +2439,115 @@ test_reset(void)
 
         /* The person ID should have been removed from the instance state */
         if (!check_instance_state(harness, "dialog=name")) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_connected(void)
+{
+        struct harness *harness = create_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        struct event_flags_closure closure = {
+                .event_listener = {
+                        .notify = event_flags_event_cb,
+                },
+                .modified_listener = {
+                        .notify = event_flags_modified_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        bool ret = true;
+
+        if (vsx_game_state_get_connected(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state is already connected just after "
+                        "starting\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!negotiate_harness(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if ((closure.modifieds_triggered &
+             (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED)) == 0) {
+                fprintf(stderr,
+                        "No connected modified received after negotiating "
+                        "connection.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!vsx_game_state_get_connected(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state is not connected just after "
+                        "negotiation\n");
+                ret = false;
+                goto out;
+        }
+
+        closure.modifieds_triggered = 0;
+
+        /* Send the header again to make sure it doesn’t trigger
+         * another event.
+         */
+
+        if (!send_player_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if ((closure.modifieds_triggered &
+             (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED))) {
+                fprintf(stderr,
+                        "Connected modified received after sending "
+                        "duplicate header.\n");
+                ret = false;
+                goto out;
+        }
+
+        closure.modifieds_triggered = 0;
+
+        /* Close the server end of the socket to trigger an error */
+        vsx_close(harness->server_fd);
+        harness->server_fd = -1;
+
+        if (!wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if ((closure.modifieds_triggered &
+             (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED)) == 0) {
+                fprintf(stderr,
+                        "No connected modified event received after forcing "
+                        "disconnect.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_game_state_get_connected(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state is already connected just after "
+                        "forcing disconnect\n");
                 ret = false;
                 goto out;
         }
@@ -3679,6 +3796,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_reset())
+                ret = EXIT_FAILURE;
+
+        if (!test_connected())
                 ret = EXIT_FAILURE;
 
         if (!test_bad_id(VSX_PROTO_BAD_CONVERSATION_ID,

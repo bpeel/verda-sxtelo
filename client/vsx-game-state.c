@@ -62,6 +62,8 @@ struct vsx_game_state {
         bool has_conversation_id;
         uint64_t conversation_id;
 
+        bool connected;
+
         enum vsx_dialog dialog;
 
         int self;
@@ -290,9 +292,30 @@ get_language_for_code(const char *code)
 }
 
 static void
+set_connected(struct vsx_game_state *game_state,
+              bool value)
+{
+        if (game_state->connected == value)
+                return;
+
+        game_state->connected = value;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+static void
 handle_header(struct vsx_game_state *game_state,
               const struct vsx_connection_event *event)
 {
+        /* Once we get the header we can assume the connection has
+         * succeeded.
+         */
+        set_connected(game_state, true);
+
         game_state->self = event->header.self_num;
 }
 
@@ -511,6 +534,8 @@ static void
 handle_error(struct vsx_game_state *game_state,
              const struct vsx_connection_event *event)
 {
+        set_connected(game_state, false);
+
         if (event->error.error->domain != &vsx_connection_error)
                 return;
 
@@ -819,6 +844,12 @@ vsx_game_state_get_started(struct vsx_game_state *game_state)
         return game_state->tiles_by_index.length > 0;
 }
 
+bool
+vsx_game_state_get_connected(struct vsx_game_state *game_state)
+{
+        return game_state->connected;
+}
+
 void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
                          int tile_num,
@@ -1004,6 +1035,8 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
         vsx_game_state_set_name_note(game_state, VSX_TEXT_ENTER_NAME_NEW_GAME);
 
         reset_tiles(game_state);
+
+        set_connected(game_state, false);
 
         struct vsx_game_state_modified_event event = {
                 .type = VSX_GAME_STATE_MODIFIED_TYPE_RESET,

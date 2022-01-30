@@ -59,6 +59,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE,
         VSX_GAME_STATE_MODIFIED_TYPE_RESET,
+        VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED,
 };
 
 struct vsx_game_state_modified_event {
@@ -193,6 +194,9 @@ vsx_game_state_get_name_note(struct vsx_game_state *game_state);
 
 bool
 vsx_game_state_get_started(struct vsx_game_state *game_state);
+
+bool
+vsx_game_state_get_connected(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_move_tile(struct vsx_game_state *game_state,
