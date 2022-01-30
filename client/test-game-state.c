@@ -3227,7 +3227,8 @@ check_bad_conversation_error(struct harness *harness,
         return true;
 }
 
-struct test_player_left_note_closure {
+struct test_player_note_closure {
+        const char *expected_note;
         bool succeeded;
         bool had_flags;
         bool had_note;
@@ -3235,16 +3236,14 @@ struct test_player_left_note_closure {
 };
 
 static void
-test_player_left_note_cb(struct vsx_listener *listener,
-                         void *user_data)
+test_player_note_cb(struct vsx_listener *listener,
+                    void *user_data)
 {
-        struct test_player_left_note_closure *closure =
+        struct test_player_note_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_player_left_note_closure,
+                                 struct test_player_note_closure,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
-
-        static const char expected_note[] = "George left the game";
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS:
@@ -3264,12 +3263,12 @@ test_player_left_note_cb(struct vsx_listener *listener,
                                 "Note modified event received multiple "
                                 "times\n");
                         closure->succeeded = false;
-                } else if (strcmp(event->note.text, expected_note)) {
+                } else if (strcmp(event->note.text, closure->expected_note)) {
                         fprintf(stderr,
                                 "Wrong note received.\n"
                                 " Expected: %s\n"
                                 " Received: %s\n",
-                                expected_note,
+                                closure->expected_note,
                                 event->note.text);
                         closure->succeeded = false;
                 } else {
@@ -3292,9 +3291,10 @@ test_player_left_note(void)
 
         bool ret = true;
 
-        struct test_player_left_note_closure closure = {
+        struct test_player_note_closure closure = {
+                .expected_note = "George left the game",
                 .modified_listener = {
-                        .notify = test_player_left_note_cb,
+                        .notify = test_player_note_cb,
                 },
                 .succeeded = true,
         };
@@ -3464,6 +3464,168 @@ out:
 }
 
 static bool
+test_player_joined_note(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        struct test_player_note_closure closure = {
+                .expected_note = "George joined the game",
+                .modified_listener = {
+                        .notify = test_player_note_cb,
+                },
+                .succeeded = true,
+        };
+
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        if (!add_player(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!set_player_flags(harness, 1, 1, true)) {
+                ret = false;
+                goto out;
+        }
+
+        closure.had_flags = false;
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_note) {
+                fprintf(stderr,
+                        "Note received when connection is not synced.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!set_player_flags(harness, 1, 0, true)) {
+                ret = false;
+                goto out;
+        }
+
+        closure.had_flags = false;
+
+        if (!write_data(harness,
+                        (const uint8_t *)
+                        /* sync */
+                        "\x82\x01\x07"
+                        /* set player flags to 1 */
+                        "\x82\x03\x05\x01\x01",
+                        8) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_note) {
+                fprintf(stderr,
+                        "No note modified event received when player "
+                        "joined.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_flags) {
+                fprintf(stderr,
+                        "No player flags modified event received when player "
+                        "joined.\n");
+                ret = false;
+                goto out;
+        }
+
+        closure.had_note = false;
+        closure.had_flags = false;
+
+        /* Change some other flags and make sure we don’t get the note */
+        if (!set_player_flags(harness, 1, 3, true)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_note) {
+                fprintf(stderr,
+                        "Got player joined note after changing flags a second "
+                        "time.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* Change a player with a NULL name */
+        closure.had_note = false;
+        closure.had_flags = false;
+
+        if (!set_player_flags(harness, 2, 1, true)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_note) {
+                fprintf(stderr,
+                        "Got player joined note for player with no name.\n");
+                ret = false;
+                goto out;
+        }
+
+        closure.had_flags = false;
+
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x06\x04\x00" "bob\x0", 8) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        /* If self joins there shouldn’t be any message */
+        if (!set_player_flags(harness, 0, 1, true)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_note) {
+                fprintf(stderr,
+                        "Note received when self joined.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_dangling_bad_id(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -3534,6 +3696,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_player_left_note())
+                ret = EXIT_FAILURE;
+
+        if (!test_player_joined_note())
                 ret = EXIT_FAILURE;
 
         if (!test_load_instance_state())

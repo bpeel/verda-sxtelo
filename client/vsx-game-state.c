@@ -341,8 +341,8 @@ handle_player_name_changed(struct vsx_game_state *game_state,
 }
 
 static void
-set_player_left_note(struct vsx_game_state *game_state,
-                     int player_num)
+set_player_note(struct vsx_game_state *game_state,
+                int player_num)
 {
         if (player_num == game_state->self)
                 return;
@@ -353,11 +353,15 @@ set_player_left_note(struct vsx_game_state *game_state,
         if (player->name == NULL || player->name[0] == '\0')
                 return;
 
+        enum vsx_text note =
+                (player->flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) ?
+                VSX_TEXT_PLAYER_JOINED :
+                VSX_TEXT_PLAYER_LEFT;
+
         struct vsx_buffer buffer = VSX_BUFFER_STATIC_INIT;
 
         vsx_buffer_append_printf(&buffer,
-                                 vsx_text_get(game_state->language,
-                                              VSX_TEXT_PLAYER_LEFT),
+                                 vsx_text_get(game_state->language, note),
                                  player->name);
 
         vsx_game_state_set_note(game_state, (char *) buffer.data);
@@ -379,16 +383,18 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
 
         enum vsx_game_state_player_flag new_flags =
                 event->player_flags_changed.flags;
+        enum vsx_game_state_player_flag old_flags =
+                player->flags;
 
-        if (new_flags == player->flags)
+        if (new_flags == old_flags)
                 return;
 
-        if (event->synced &&
-            (player->flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) &&
-            (new_flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED) == 0)
-                set_player_left_note(game_state, player_num);
-
         player->flags = new_flags;
+
+        if (event->synced &&
+            ((old_flags ^ new_flags) &
+             VSX_GAME_STATE_PLAYER_FLAG_CONNECTED))
+                set_player_note(game_state, player_num);
 
         struct vsx_game_state_modified_event m_event = {
                 .type = VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS,

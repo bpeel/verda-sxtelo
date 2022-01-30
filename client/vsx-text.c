@@ -46,6 +46,8 @@ english[] = {
         "Please enter your name to join the game.",
         [VSX_TEXT_BAD_GAME] =
         "This game is no longer available. Please start a new one instead.",
+        [VSX_TEXT_PLAYER_JOINED] =
+        "%s joined the game",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s left the game",
 };
@@ -75,6 +77,8 @@ french[] = {
         [VSX_TEXT_BAD_GAME] =
         "Cette partie n’est plus disponible. Veuillez en commencez une "
         "de nouveau à la place.",
+        [VSX_TEXT_PLAYER_JOINED] =
+        "%s a rejoint la partie",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s est parti·e",
 };
@@ -101,6 +105,8 @@ esperanto[] = {
         "Bonvolu entajpi vian nomon por aliĝi al la ludo.",
         [VSX_TEXT_BAD_GAME] =
         "Ĉi tiu ludo ne plu disponeblas. Bonvolu komenci novan anstataŭe.",
+        [VSX_TEXT_PLAYER_JOINED] =
+        "%s aliĝis al la ludo",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s foriris",
 };
