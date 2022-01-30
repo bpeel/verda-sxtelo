@@ -309,6 +309,7 @@ vsx_worker_new(struct vsx_connection *connection,
         }
 
         int thread_ret = vsx_thread_create(&worker->thread,
+                                           "ConnectionWorker",
                                            NULL, /* attr */
                                            thread_func,
                                            worker);

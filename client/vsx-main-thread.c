@@ -197,6 +197,7 @@ create_thread_locked(struct vsx_main_thread *mt)
         mt->timeout_thread_should_quit = false;
 
         if (vsx_thread_create(&mt->timeout_thread,
+                              "TimeoutSleeper",
                               NULL, /* attr */
                               timeout_thread_func,
                               mt) == 0) {

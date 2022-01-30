@@ -27,6 +27,7 @@ static JavaVM *jvm;
 struct thread_create_data {
         void *(*start_routine) (void *);
         void *arg;
+        char *name;
 };
 
 static void *
@@ -36,11 +37,17 @@ thread_create_cb(void *user_data)
         void *(*start_routine) (void *) = data->start_routine;
         void *arg = data->arg;
 
-        vsx_free(data);
-
         JNIEnv *env;
 
-        (*jvm)->AttachCurrentThread(jvm, &env, NULL);
+        JavaVMAttachArgs args = {
+                .version = JNI_VERSION_1_6,
+                .name = data->name,
+        };
+
+        (*jvm)->AttachCurrentThread(jvm, &env, &args);
+
+        vsx_free(data->name);
+        vsx_free(data);
 
         return start_routine(arg);
 }
@@ -53,6 +60,7 @@ vsx_thread_set_jvm(JavaVM *jvm_arg)
 
 int
 vsx_thread_create(pthread_t *thread,
+                  const char *name,
                   const pthread_attr_t *attr,
                   void *(*start_routine) (void *),
                   void *arg)
@@ -61,6 +69,7 @@ vsx_thread_create(pthread_t *thread,
 
         data->start_routine = start_routine;
         data->arg = arg;
+        data->name = vsx_strdup(name);
 
         int ret = pthread_create(thread, attr, thread_create_cb, data);
 

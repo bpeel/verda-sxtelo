@@ -22,6 +22,7 @@
 
 int
 vsx_thread_create(pthread_t *thread,
+                  const char *name,
                   const pthread_attr_t *attr,
                   void *(*start_routine) (void *),
                   void *arg)

@@ -184,7 +184,11 @@ vsx_image_loader_new(struct vsx_main_thread *main_thread,
         pthread_mutex_init(&loader->mutex, NULL);
         pthread_cond_init(&loader->cond, NULL);
 
-        vsx_thread_create(&loader->thread, NULL, thread_func, loader);
+        vsx_thread_create(&loader->thread,
+                          "ImageLoader",
+                          NULL, /* attr */
+                          thread_func,
+                          loader);
 
         return loader;
 }
