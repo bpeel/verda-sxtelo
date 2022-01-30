@@ -49,7 +49,11 @@ thread_create_cb(void *user_data)
         vsx_free(data->name);
         vsx_free(data);
 
-        return start_routine(arg);
+        void *ret = start_routine(arg);
+
+        (*jvm)->DetachCurrentThread(jvm);
+
+        return ret;
 }
 
 void
