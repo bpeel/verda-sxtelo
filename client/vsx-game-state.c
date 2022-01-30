@@ -377,7 +377,6 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
         struct vsx_game_state_player *player =
                 game_state->players + player_num;
 
-        /* Leave the shouting flag as it was */
         enum vsx_game_state_player_flag new_flags =
                 event->player_flags_changed.flags;
 
