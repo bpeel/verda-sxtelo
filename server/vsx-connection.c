@@ -318,6 +318,11 @@ handle_join_game (VsxConnection *conn,
       conn->pending_error = VSX_PROTO_BAD_CONVERSATION_ID;
       conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR;
     }
+  else if (conversation->n_players >= VSX_CONVERSATION_MAX_PLAYERS)
+    {
+      conn->pending_error = VSX_PROTO_CONVERSATION_FULL;
+      conn->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_PENDING_ERROR;
+    }
   else
     {
       conn->person = vsx_person_set_generate_person (conn->person_set,

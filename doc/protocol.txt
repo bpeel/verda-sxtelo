@@ -307,6 +307,12 @@ BAD_CONVERSATION_ID (0x0b)
 This is sent after a JOIN_GAME command if the server doesn’t recognise
 the conversation ID.
 
+CONVERSATION_FULL (0x0d)
+------------------------
+
+This is sent after a JOIN_GAME command if the given conversation is
+already full.
+
 Timeouts
 ========
 

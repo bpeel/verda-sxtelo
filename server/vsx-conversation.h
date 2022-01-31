@@ -29,7 +29,7 @@
 #include "vsx-buffer.h"
 #include "vsx-hash-table.h"
 
-#define VSX_CONVERSATION_MAX_PLAYERS 32
+#define VSX_CONVERSATION_MAX_PLAYERS 6
 
 /* Time in microseconds after someone shouts before someone is allowed
  * to shout again */
