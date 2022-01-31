@@ -765,11 +765,25 @@ read_sync (VsxConnection *conn)
 
 static bool
 read_connect_header (VsxConnection *conn,
-                     uint64_t *person_id_out,
-                     uint8_t *player_num_out)
+                     const char *expected_player_name,
+                     int expected_player_num,
+                     uint64_t *person_id_out)
 {
-  if (!read_player_id (conn, person_id_out, player_num_out))
+  uint8_t actual_player_num;
+
+  if (!read_player_id (conn, person_id_out, &actual_player_num))
     return false;
+
+  if (actual_player_num != expected_player_num)
+    {
+      fprintf (stderr,
+               "Player num in connect header does not match.\n"
+               " Expected: %i\n"
+               " Received: %i\n",
+               expected_player_num,
+               actual_player_num);
+      return false;
+    }
 
   if (!read_conversation_id (conn, NULL /* conversation_id_out */))
     return false;
@@ -780,36 +794,45 @@ read_connect_header (VsxConnection *conn,
   if (!read_language_code (conn, "eo"))
     return false;
 
-  if (!read_player_name (conn,
-                         0, /* expected_player_num */
-                         "Zamenhof"))
-    return false;
+  for (int i = 0; i <= expected_player_num; i++)
+    {
+      if (!read_player_name (conn,
+                             i,
+                             expected_player_name))
+        return false;
+    }
 
-  if (!read_player (conn,
-                    0, /* expected_player_num */
-                    VSX_PLAYER_CONNECTED))
-    return false;
+  for (int i = 0; i <= expected_player_num; i++)
+    {
+      if (!read_player (conn,
+                        i,
+                        VSX_PLAYER_CONNECTED))
+        return false;
+    }
 
   return true;
 }
 
 static bool
-check_new_player (Harness *harness,
+check_new_player (VsxConnection *conn,
+                  VsxPersonSet *person_set,
                   const char *player_name,
+                  int player_num,
                   VsxPerson **person_out)
 {
   bool ret = true;
   uint64_t person_id;
-  uint8_t player_num;
 
-  if (!read_connect_header (harness->conn, &person_id, &player_num))
+  if (!read_connect_header (conn,
+                            player_name,
+                            player_num,
+                            &person_id))
     {
       ret = false;
     }
   else
     {
-      VsxPerson *person = vsx_person_set_get_person (harness->person_set,
-                                                     person_id);
+      VsxPerson *person = vsx_person_set_get_person (person_set, person_id);
 
       if (person == NULL)
         {
@@ -848,10 +871,12 @@ check_new_player (Harness *harness,
 }
 
 static bool
-create_player (Harness *harness,
-               const char *room_name,
-               const char *player_name,
-               VsxPerson **person_out)
+create_player_for_connection (VsxConnection *conn,
+                              VsxPersonSet *person_set,
+                              const char *room_name,
+                              const char *player_name,
+                              int player_num,
+                              VsxPerson **person_out)
 {
   struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
 
@@ -866,7 +891,7 @@ create_player (Harness *harness,
   bool ret = true;
   struct vsx_error *error = NULL;
 
-  if (!vsx_connection_parse_data (harness->conn,
+  if (!vsx_connection_parse_data (conn,
                                   buf.data,
                                   buf.length,
                                   &error))
@@ -877,7 +902,11 @@ create_player (Harness *harness,
       vsx_error_free (error);
       ret = false;
     }
-  else if (!check_new_player (harness, player_name, person_out))
+  else if (!check_new_player (conn,
+                              person_set,
+                              player_name,
+                              player_num,
+                              person_out))
     {
       ret = false;
     }
@@ -885,6 +914,20 @@ create_player (Harness *harness,
   vsx_buffer_destroy (&buf);
 
   return ret;
+}
+
+static bool
+create_player (Harness *harness,
+               const char *room_name,
+               const char *player_name,
+               VsxPerson **person_out)
+{
+  return create_player_for_connection (harness->conn,
+                                       harness->person_set,
+                                       room_name,
+                                       player_name,
+                                       0, /* player_num */
+                                       person_out);
 }
 
 static bool
@@ -934,7 +977,10 @@ reconnect_to_player (VsxConnection *conn,
     {
       uint64_t person_id;
 
-      if (!read_connect_header (conn, &person_id, NULL /* player_num */))
+      if (!read_connect_header (conn,
+                                "Zamenhof",
+                                0,
+                                &person_id))
         {
           ret = false;
         }
@@ -2577,7 +2623,11 @@ create_private_conversation (Harness *harness,
       vsx_error_free (error);
       ret = false;
     }
-  else if (!check_new_player (harness, player_name, person_out))
+  else if (!check_new_player (harness->conn,
+                              harness->person_set,
+                              player_name,
+                              0, /* player_num */
+                              person_out))
     {
       ret = false;
     }
@@ -2610,6 +2660,83 @@ test_private_conversation (void)
     {
       if (!join_conversation_by_id (harness, person->conversation))
         ret = false;
+
+      vsx_object_unref (person);
+    }
+
+  free_harness (harness);
+
+  return ret;
+}
+
+static bool
+test_full_public_conversation (void)
+{
+  Harness *harness = create_negotiated_harness ();
+
+  if (harness == NULL)
+    return false;
+
+  bool ret = true;
+
+  VsxPerson *person;
+
+  if (!create_player (harness, "default:eo", "Zamenhof", &person))
+    {
+      ret = false;
+    }
+  else
+    {
+      VsxPerson *other_people[7];
+      VsxConnection *other_connections[VSX_N_ELEMENTS (other_people)];
+
+      memset (other_people, 0, sizeof other_people);
+      memset (other_connections, 0, sizeof other_connections);
+
+      for (int i = 0; i < VSX_N_ELEMENTS (other_people); i++)
+        {
+          other_connections[i] = vsx_connection_new (&harness->socket_address,
+                                                     harness->conversation_set,
+                                                     harness->person_set);
+
+          if (!negotiate_connection (other_connections[i]) ||
+              !create_player_for_connection (other_connections[i],
+                                             harness->person_set,
+                                             "default:eo",
+                                             "Zamenhof",
+                                             (i + 1) % 6, /* player_num */
+                                             other_people + i))
+            {
+              ret = false;
+              break;
+            }
+
+          bool expected_same_conv = i < 5;
+          bool actual_same_conv =
+            person->conversation == other_people[i]->conversation;
+
+          if (actual_same_conv != expected_same_conv)
+            {
+              fprintf (stderr,
+                       "When creating extra person %i in conversation, "
+                       "expected same conversation value does not match.\n"
+                       " Expected: %i\n"
+                       " Received: %i\n",
+                       i,
+                       (int) expected_same_conv,
+                       (int) actual_same_conv);
+              ret = false;
+              break;
+            }
+        }
+
+      for (int i = 0; i < VSX_N_ELEMENTS (other_people); i++)
+        {
+          if (other_connections[i])
+            vsx_connection_free (other_connections[i]);
+          if (other_people[i])
+            vsx_object_unref (other_people[i]);
+        }
 
       vsx_object_unref (person);
     }
@@ -2685,6 +2812,9 @@ main (int argc, char **argv)
     ret = EXIT_FAILURE;
 
   if (!test_private_conversation ())
+    ret = EXIT_FAILURE;
+
+  if (!test_full_public_conversation ())
     ret = EXIT_FAILURE;
 
   vsx_main_context_free (vsx_main_context_get_default (NULL /* error */));
