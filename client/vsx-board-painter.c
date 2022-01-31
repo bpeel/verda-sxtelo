@@ -33,7 +33,7 @@
 #include "vsx-board.h"
 #include "vsx-layout.h"
 
-#define N_BOX_STYLES 3
+#define N_BOX_STYLES 4
 
 struct box_style_draw_command {
         int offset;
@@ -479,8 +479,8 @@ generate_vertices(struct vertex *vertices,
 {
         struct vertex *v = vertices;
 
-        uint16_t left = 96 * corner_image * 65535 / 256;
-        uint16_t right = (96 * corner_image + 64) * 65535 / 256;
+        uint16_t left = 149 * corner_image * 65535 / 512;
+        uint16_t right = (149 * corner_image + 64) * 65535 / 512;
         uint16_t top = 0;
         uint16_t bottom = 65535;
 
@@ -627,9 +627,6 @@ create_cb(struct vsx_game_state *game_state,
                 struct vsx_layout_paint_position *label =
                         painter->name_labels + i;
                 label->layout = vsx_layout_new(toolbox);
-                label->r = 0.0f;
-                label->g = 0.0f;
-                label->b = 0.0f;
         }
 
         create_buffer(painter);
@@ -667,12 +664,27 @@ paint_box_cb(int player_num,
         int shouting_player =
                 vsx_game_state_get_shouting_player(painter->game_state);
 
-        if (player_num == shouting_player)
-                style = box->styles + 2;
-        else if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
-                style = box->styles + 1;
-        else
-                style = box->styles + 0;
+        struct vsx_layout_paint_position *label =
+                painter->name_labels + player_num;
+
+        if (name && *name && !(flags & VSX_GAME_STATE_PLAYER_FLAG_CONNECTED)) {
+                style = box->styles + 3;
+
+                label->r = 0.4f;
+                label->g = 0.4f;
+                label->b = 0.4f;
+        } else {
+                if (player_num == shouting_player)
+                        style = box->styles + 2;
+                else if ((flags & VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN))
+                        style = box->styles + 1;
+                else
+                        style = box->styles + 0;
+
+                label->r = 0.0f;
+                label->g = 0.0f;
+                label->b = 0.0f;
+        }
 
         vsx_gl_draw_range_elements(painter->toolbox->gl,
                                    GL_TRIANGLES,
