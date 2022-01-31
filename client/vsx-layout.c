@@ -590,11 +590,6 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
                                GL_FALSE, /* transpose */
                                params->matrix);
 
-        gl->glUniform3f(program->color_uniform,
-                        params->r,
-                        params->g,
-                        params->b);
-
         for (unsigned i = 0; i < params->n_layouts; i++) {
                 const struct vsx_layout_paint_position *pos =
                         params->layouts + i;
@@ -609,6 +604,11 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
 
                 vsx_array_object_bind(pos->layout->vao, gl);
 
+                gl->glUniform3f(program->color_uniform,
+                                pos->r,
+                                pos->g,
+                                pos->b);
+
                 set_translation_uniform(gl,
                                         program,
                                         params,
@@ -622,8 +622,7 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params)
 
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
-                          size_t n_layouts,
-                          float r, float g, float b)
+                          size_t n_layouts)
 {
         if (n_layouts <= 0)
                 return;
@@ -639,9 +638,6 @@ vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
                 .matrix = paint_state->pixel_matrix,
                 .translation_x = paint_state->pixel_translation[0],
                 .translation_y = paint_state->pixel_translation[1],
-                .r = r,
-                .g = g,
-                .b = b,
         };
 
         vsx_layout_paint_params(&params);
@@ -664,6 +660,9 @@ vsx_layout_paint(struct vsx_layout *layout,
                 .layout = layout,
                 .x = x,
                 .y = y,
+                .r = r,
+                .g = g,
+                .b = b,
         };
 
         struct vsx_layout_paint_params params = {
@@ -672,9 +671,6 @@ vsx_layout_paint(struct vsx_layout *layout,
                 .matrix = paint_state->pixel_matrix,
                 .translation_x = paint_state->pixel_translation[0],
                 .translation_y = paint_state->pixel_translation[1],
-                .r = r,
-                .g = g,
-                .b = b,
         };
 
         vsx_layout_paint_params(&params);

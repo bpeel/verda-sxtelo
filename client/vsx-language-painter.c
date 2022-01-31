@@ -314,10 +314,12 @@ paint_cb(void *painter_data)
                 pos[i].layout = painter->buttons[i].layout;
                 pos[i].x = painter->buttons[i].x + x_off;
                 pos[i].y = painter->layout_y + y_off;
+                pos[i].r = 0.0f;
+                pos[i].g = 0.0f;
+                pos[i].b = 0.0f;
         }
 
-        vsx_layout_paint_multiple(pos, N_LANGUAGES,
-                                  0.0f, 0.0f, 0.0f);
+        vsx_layout_paint_multiple(pos, N_LANGUAGES);
 }
 
 static void

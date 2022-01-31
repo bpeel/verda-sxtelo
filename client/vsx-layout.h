@@ -22,6 +22,7 @@ struct vsx_layout_extents {
 struct vsx_layout_paint_position {
         struct vsx_layout *layout;
         int x, y;
+        float r, g, b;
 };
 
 struct vsx_layout_paint_params {
@@ -29,7 +30,6 @@ struct vsx_layout_paint_params {
         size_t n_layouts;
         const float *matrix;
         float translation_x, translation_y;
-        float r, g, b;
 };
 
 struct vsx_layout *
@@ -58,8 +58,7 @@ vsx_layout_paint_params(const struct vsx_layout_paint_params *params);
 
 void
 vsx_layout_paint_multiple(const struct vsx_layout_paint_position *layouts,
-                          size_t n_layouts,
-                          float r, float g, float b);
+                          size_t n_layouts);
 
 void
 vsx_layout_paint(struct vsx_layout *layout,

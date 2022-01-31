@@ -623,8 +623,14 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
-                painter->name_labels[i].layout = vsx_layout_new(toolbox);
+        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+                struct vsx_layout_paint_position *label =
+                        painter->name_labels + i;
+                label->layout = vsx_layout_new(toolbox);
+                label->r = 0.0f;
+                label->g = 0.0f;
+                label->b = 0.0f;
+        }
 
         create_buffer(painter);
 
@@ -809,8 +815,7 @@ paint_cb(void *painter_data)
                                       painter);
 
         vsx_layout_paint_multiple(painter->name_labels,
-                                  VSX_N_ELEMENTS(painter->name_labels),
-                                  0.0f, 0.0f, 0.0f);
+                                  VSX_N_ELEMENTS(painter->name_labels));
 }
 
 static struct vsx_signal *
