@@ -61,9 +61,9 @@ french[] = {
         [VSX_TEXT_LEAVE_BUTTON] = "Quitter le jeu",
         [VSX_TEXT_SHORT_GAME] = "Jeu court",
         [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
-        "La langue ne peut pas être changée après que le jeu ait commencé",
+        "La langue ne peut pas être changée après que le jeu a commencé",
         [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
-        "La durée de jeu ne peut pas être changée après que le jeu ait "
+        "La durée de jeu ne peut pas être changée après que le jeu a "
         "commencé",
         [VSX_TEXT_INVITE_EXPLANATION] =
         "Envoyez le lien ci-dessous ou flashez le code pour inviter "
