@@ -3000,7 +3000,7 @@ out:
         return ret;
 }
 
-struct test_bad_id_closure {
+struct test_join_error_closure {
         bool succeeded;
         bool had_reset;
         bool had_error;
@@ -3008,15 +3008,16 @@ struct test_bad_id_closure {
         enum vsx_connection_error error_code;
         struct vsx_listener event_listener;
         struct vsx_listener modified_listener;
+        const char *expected_note;
 };
 
 static void
-test_bad_id_event_cb(struct vsx_listener *listener,
-                     void *user_data)
+test_join_error_event_cb(struct vsx_listener *listener,
+                         void *user_data)
 {
-        struct test_bad_id_closure *closure =
+        struct test_join_error_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_bad_id_closure,
+                                 struct test_join_error_closure,
                                  event_listener);
         const struct vsx_connection_event *event = user_data;
 
@@ -3040,18 +3041,14 @@ test_bad_id_event_cb(struct vsx_listener *listener,
 }
 
 static void
-test_bad_id_modified_cb(struct vsx_listener *listener,
-                        void *user_data)
+test_join_error_modified_cb(struct vsx_listener *listener,
+                            void *user_data)
 {
-        struct test_bad_id_closure *closure =
+        struct test_join_error_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_bad_id_closure,
+                                 struct test_join_error_closure,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
-
-        static const char expected_note[] =
-                "This game is no longer available. "
-                "Please start a new one instead.";
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_RESET:
@@ -3069,13 +3066,13 @@ test_bad_id_modified_cb(struct vsx_listener *listener,
                         fprintf(stderr,
                                 "Multiple notes received\n");
                         closure->succeeded = false;
-                } else if (strcmp(event->note.text, expected_note)) {
+                } else if (strcmp(event->note.text, closure->expected_note)) {
                         fprintf(stderr,
                                 "Note text wrong.\n"
                                 " Expected: %s\n"
                                 " Received: %s\n",
                                 event->note.text,
-                                expected_note);
+                                closure->expected_note);
                         closure->succeeded = false;
                 } else {
                         closure->had_note = true;
@@ -3088,8 +3085,9 @@ test_bad_id_modified_cb(struct vsx_listener *listener,
 }
 
 static bool
-test_bad_id(int command,
-            enum vsx_connection_error code)
+test_join_error(int command,
+                enum vsx_connection_error code,
+                const char *expected_note)
 {
         struct harness *harness = create_negotiated_harness();
 
@@ -3098,15 +3096,16 @@ test_bad_id(int command,
 
         bool ret = true;
 
-        struct test_bad_id_closure closure = {
+        struct test_join_error_closure closure = {
                 .succeeded = true,
                 .error_code = code,
                 .event_listener = {
-                        .notify = test_bad_id_event_cb,
+                        .notify = test_join_error_event_cb,
                 },
                 .modified_listener = {
-                        .notify = test_bad_id_modified_cb,
+                        .notify = test_join_error_modified_cb,
                 },
+                .expected_note = expected_note,
         };
 
         uint8_t message[] = {
@@ -3130,21 +3129,22 @@ test_bad_id(int command,
         }
 
         if (!closure.had_error) {
-                fprintf(stderr, "No bad ID error received.\n");
+                fprintf(stderr, "No join error received.\n");
                 ret = false;
                 goto out;
         }
 
         if (closure.had_reset) {
                 fprintf(stderr,
-                        "Reset received after bad ID before flushing idle.\n");
+                        "Reset received after join error before flushing "
+                        "idle.\n");
                 ret = false;
                 goto out;
         }
 
         if (!harness->idle_queued) {
                 fprintf(stderr,
-                        "No idle queued after getting bad ID event.\n");
+                        "No idle queued after getting join error event.\n");
                 ret = false;
                 goto out;
         }
@@ -3160,13 +3160,13 @@ test_bad_id(int command,
         }
 
         if (!closure.had_reset) {
-                fprintf(stderr, "No reset received after bad ID event.\n");
+                fprintf(stderr, "No reset received after join error event.\n");
                 ret = false;
                 goto out;
         }
 
         if (!closure.had_note) {
-                fprintf(stderr, "No note received after bad ID event.\n");
+                fprintf(stderr, "No note received after join error event.\n");
                 ret = false;
                 goto out;
         }
@@ -3177,6 +3177,25 @@ out:
         free_harness(harness);
 
         return ret;
+}
+
+static bool
+test_bad_id(int command,
+            enum vsx_connection_error code)
+{
+        return test_join_error(command,
+                               code,
+                               "This game is no longer available. "
+                               "Please start a new one instead.");
+}
+
+static bool
+test_game_full(void)
+{
+        return test_join_error(0x0d,
+                               VSX_CONNECTION_ERROR_CONVERSATION_FULL,
+                               "This game is full. "
+                               "Please start a new one instead.");
 }
 
 struct test_end_closure {
@@ -3807,6 +3826,9 @@ main(int argc, char **argv)
 
         if (!test_bad_id(VSX_PROTO_BAD_PLAYER_ID,
                          VSX_CONNECTION_ERROR_BAD_PLAYER_ID))
+                ret = EXIT_FAILURE;
+
+        if (!test_game_full())
                 ret = EXIT_FAILURE;
 
         if (!test_end())

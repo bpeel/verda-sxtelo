@@ -521,12 +521,13 @@ handle_language_changed(struct vsx_game_state *game_state,
 }
 
 static void
-handle_bad_game(struct vsx_game_state *game_state)
+handle_join_error(struct vsx_game_state *game_state,
+                  enum vsx_text note)
 {
         queue_reset_on_idle(game_state);
 
-        const char *text = vsx_text_get(game_state->language,
-                                        VSX_TEXT_BAD_GAME);
+        const char *text = vsx_text_get(game_state->language, note);
+
         vsx_game_state_set_note(game_state, text);
 }
 
@@ -542,8 +543,13 @@ handle_error(struct vsx_game_state *game_state,
         switch (event->error.error->code) {
         case VSX_CONNECTION_ERROR_BAD_PLAYER_ID:
         case VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID:
-                handle_bad_game(game_state);
+                handle_join_error(game_state, VSX_TEXT_BAD_GAME);
                 break;
+
+        case VSX_CONNECTION_ERROR_CONVERSATION_FULL:
+                handle_join_error(game_state, VSX_TEXT_GAME_FULL);
+                break;
+
         default:
                 break;
         }
