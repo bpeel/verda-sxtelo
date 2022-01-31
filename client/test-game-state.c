@@ -3214,9 +3214,9 @@ static void
 test_end_modified_cb(struct vsx_listener *listener,
                      void *user_data)
 {
-        struct test_bad_id_closure *closure =
+        struct test_end_closure *closure =
                 vsx_container_of(listener,
-                                 struct test_bad_id_closure,
+                                 struct test_end_closure,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
 
