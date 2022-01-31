@@ -30,6 +30,7 @@
 #include "vsx-button-painter.h"
 #include "vsx-dialog-painter.h"
 #include "vsx-note-painter.h"
+#include "vsx-error-painter.h"
 #include "vsx-gl.h"
 #include "vsx-board.h"
 
@@ -40,6 +41,7 @@ painters[] = {
         &vsx_button_painter,
         &vsx_dialog_painter,
         &vsx_note_painter,
+        &vsx_error_painter,
 };
 
 #define N_PAINTERS VSX_N_ELEMENTS(painters)
