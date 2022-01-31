@@ -32,12 +32,6 @@
 #include "vsx-id-url.h"
 #include "vsx-layout.h"
 
-struct paragraph {
-        struct vsx_layout *layout;
-        int x, y;
-        float r, g, b;
-};
-
 struct vsx_invite_painter {
         struct vsx_game_state *game_state;
         struct vsx_listener modified_listener;
@@ -52,7 +46,7 @@ struct vsx_invite_painter {
         int dialog_x, dialog_y;
         int dialog_width, dialog_height;
 
-        struct paragraph paragraphs[2];
+        struct vsx_layout_paint_position paragraphs[2];
 
         GLuint tex;
 
@@ -364,7 +358,8 @@ get_paragraphs_size(struct vsx_invite_painter *painter,
         int y = 0;
 
         for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
-                struct paragraph *paragraph = painter->paragraphs + i;
+                struct vsx_layout_paint_position *paragraph =
+                        painter->paragraphs + i;
                 const struct vsx_layout_extents *extents =
                         vsx_layout_get_logical_extents(paragraph->layout);
 
@@ -430,7 +425,8 @@ ensure_layout(struct vsx_invite_painter *painter)
         painter->dialog_height = total_height;
 
         for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
-                struct paragraph *paragraph = painter->paragraphs + i;
+                struct vsx_layout_paint_position *paragraph =
+                        painter->paragraphs + i;
 
                 paragraph->x += painter->dialog_x + qr_code_size;
                 paragraph->y += (painter->dialog_y +
@@ -496,16 +492,8 @@ paint_cb(void *painter_data)
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
-        for (int i = 0; i < VSX_N_ELEMENTS(painter->paragraphs); i++) {
-                const struct paragraph *paragraph = painter->paragraphs + i;
-
-                vsx_layout_paint(paragraph->layout,
-                                 paragraph->x,
-                                 paragraph->y,
-                                 paragraph->r,
-                                 paragraph->g,
-                                 paragraph->b);
-        }
+        vsx_layout_paint_multiple(painter->paragraphs,
+                                  VSX_N_ELEMENTS(painter->paragraphs));
 }
 
 static bool
@@ -534,7 +522,7 @@ handle_click(struct vsx_invite_painter *painter,
                 return true;
         }
 
-        const struct paragraph *link =
+        const struct vsx_layout_paint_position *link =
                 painter->paragraphs + VSX_N_ELEMENTS(painter->paragraphs) - 1;
 
         const struct vsx_layout_extents *extents =
