@@ -152,6 +152,10 @@ frame_error_tests[] = {
                 "The server sent an invalid bad conversation ID command"
         },
         {
+                BIN_STR("\x82\x04\x0d!!!"),
+                "The server sent an invalid conversation full command"
+        },
+        {
                 BIN_STR("\x82\x04\x07!!!"),
                 "The server sent an invalid sync command"
         },
@@ -2609,7 +2613,9 @@ out:
 }
 
 static bool
-test_bad_conversation_id(void)
+test_join_error(enum vsx_connection_error error_code,
+                const char *error_message,
+                uint8_t protocol_code)
 {
         struct harness *harness = create_harness_no_start();
 
@@ -2637,19 +2643,21 @@ test_bad_conversation_id(void)
         }
 
         harness->expected_error_domain = &vsx_connection_error;
-        harness->expected_error_code = VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID;
-        harness->expected_error_message =
-                "The conversation ID no longer exists";
+        harness->expected_error_code = error_code;
+        harness->expected_error_message = error_message;
 
-        if (!write_data(harness,
-                        (const uint8_t *) "\x82\x01\x0b", 3)) {
+        uint8_t command[] = {
+                0x82, 0x01, protocol_code,
+        };
+
+        if (!write_data(harness, command, sizeof command)) {
                 ret = false;
                 goto out;
         }
 
         if (harness->expected_error_message != NULL) {
                 fprintf(stderr,
-                        "No error received after sending bad conversation ID "
+                        "No error received after sending conversation ID error "
                         "message\n");
                 ret = false;
                 goto out;
@@ -2663,6 +2671,22 @@ test_bad_conversation_id(void)
 out:
         free_harness(harness);
         return ret;
+}
+
+static bool
+test_bad_conversation_id(void)
+{
+        return test_join_error(VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID,
+                               "The conversation ID no longer exists",
+                               0x0b);
+}
+
+static bool
+test_conversation_full(void)
+{
+        return test_join_error(VSX_CONNECTION_ERROR_CONVERSATION_FULL,
+                               "The conversation is full",
+                               0x0d);
 }
 
 static bool
@@ -3140,6 +3164,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_bad_conversation_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_conversation_full())
                 ret = EXIT_FAILURE;
 
         if (!test_leak_pendings())

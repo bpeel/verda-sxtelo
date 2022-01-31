@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013, 2021  Neil Roberts
+ * Copyright (C) 2012, 2013, 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -771,6 +771,45 @@ handle_bad_conversation_id(struct vsx_connection *connection,
 }
 
 static bool
+handle_conversation_full(struct vsx_connection *connection,
+                         const uint8_t *payload,
+                         size_t payload_length,
+                         struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid conversation full "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_CONVERSATION_FULL,
+                      "The conversation is full");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
+
+        return true;
+}
+
+static bool
 process_message(struct vsx_connection *connection,
                 const uint8_t *payload,
                 size_t payload_length, struct vsx_error **error)
@@ -836,6 +875,10 @@ process_message(struct vsx_connection *connection,
                 return handle_bad_conversation_id(connection,
                                                   payload, payload_length,
                                                   error);
+        case VSX_PROTO_CONVERSATION_FULL:
+                return handle_conversation_full(connection,
+                                                payload, payload_length,
+                                                error);
         }
 
         return true;
