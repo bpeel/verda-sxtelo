@@ -153,6 +153,11 @@ init_toolbox(struct vsx_game_painter *painter,
         toolbox->image_loader = vsx_image_loader_new(main_thread,
                                                      asset_manager);
 
+        toolbox->shadow_painter = vsx_shadow_painter_new(toolbox->gl,
+                                                         toolbox->image_loader,
+                                                         toolbox->map_buffer,
+                                                         dpi);
+
         toolbox->font_library = vsx_font_library_new(toolbox->gl,
                                                      asset_manager,
                                                      dpi,
@@ -171,6 +176,9 @@ destroy_toolbox(struct vsx_game_painter *painter)
 
         if (toolbox->font_library)
                 vsx_font_library_free(toolbox->font_library);
+
+        if (toolbox->shadow_painter)
+                vsx_shadow_painter_free(toolbox->shadow_painter);
 
         if (toolbox->image_loader)
                 vsx_image_loader_free(toolbox->image_loader);
