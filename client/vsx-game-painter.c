@@ -27,6 +27,7 @@
 #include "vsx-painter.h"
 #include "vsx-board-painter.h"
 #include "vsx-tile-painter.h"
+#include "vsx-fireworks-painter.h"
 #include "vsx-button-painter.h"
 #include "vsx-dialog-painter.h"
 #include "vsx-note-painter.h"
@@ -38,6 +39,7 @@ static const struct vsx_painter * const
 painters[] = {
         &vsx_board_painter,
         &vsx_tile_painter,
+        &vsx_fireworks_painter,
         &vsx_button_painter,
         &vsx_dialog_painter,
         &vsx_note_painter,

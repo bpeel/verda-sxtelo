@@ -87,6 +87,8 @@ VSX_GL_FUNC(void,
 VSX_GL_FUNC(GLint,
             glGetAttribLocation, (GLuint program, const GLchar *name))
 VSX_GL_FUNC(void,
+            glGetFloatv, (GLenum pname, GLfloat *data))
+VSX_GL_FUNC(void,
             glGetIntegerv, (GLenum pname, GLint *params))
 VSX_GL_FUNC(void,
             glGenTextures, (GLsizei n, GLuint *textures))

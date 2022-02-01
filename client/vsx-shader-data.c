@@ -70,6 +70,16 @@ vsx_shader_data_shaders[] = {
                 (const char *[]) { "vsx-solid-vertex.glsl", NULL },
                 { VSX_SHADER_DATA_PROGRAM_SOLID, PROGRAMS_END }
         },
+        {
+                GL_VERTEX_SHADER,
+                (const char *[]) { "vsx-fireworks-vertex.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_FIREWORKS, PROGRAMS_END }
+        },
+        {
+                GL_FRAGMENT_SHADER,
+                (const char *[]) { "vsx-fireworks-fragment.glsl", NULL },
+                { VSX_SHADER_DATA_PROGRAM_FIREWORKS, PROGRAMS_END }
+        },
 };
 
 static GLuint

@@ -27,6 +27,7 @@ client_common_src = [
         'vsx-dialog.c',
         'vsx-dialog-painter.c',
         'vsx-error-painter.c',
+        'vsx-fireworks-painter.c',
         'vsx-font.c',
         'vsx-game-painter.c',
         'vsx-game-state.c',
