@@ -187,7 +187,7 @@ create_buffer(struct vsx_button_painter *painter)
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
                                        GL_FLOAT,
-                                       true, /* normalized */
+                                       false, /* normalized */
                                        sizeof (struct vertex),
                                        0, /* divisor */
                                        painter->vbo,
