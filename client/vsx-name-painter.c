@@ -51,6 +51,9 @@ struct vsx_name_painter {
          */
         GLfloat matrix[4];
 
+        struct vsx_shadow_painter_shadow *shadow;
+        struct vsx_listener shadow_painter_ready_listener;
+
         struct vsx_signal redraw_needed_signal;
 };
 
@@ -87,6 +90,44 @@ modified_cb(struct vsx_listener *listener,
         default:
                 break;
         }
+}
+
+static void
+shadow_painter_ready_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct vsx_name_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_name_painter,
+                                 shadow_painter_ready_listener);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
+clear_shadow(struct vsx_name_painter *painter)
+{
+        if (painter->shadow == NULL)
+                return;
+
+        vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
+                                       painter->shadow);
+        painter->shadow = NULL;
+}
+
+static void
+create_shadow(struct vsx_name_painter *painter)
+{
+        clear_shadow(painter);
+
+        struct vsx_shadow_painter *shadow_painter =
+                painter->toolbox->shadow_painter;
+
+        int w = painter->dialog_width;
+        int h = painter->dialog_height;
+
+        painter->shadow =
+                vsx_shadow_painter_create_shadow(shadow_painter, w, h);
 }
 
 static void
@@ -168,6 +209,12 @@ create_cb(struct vsx_game_state *game_state,
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
+
+        painter->shadow_painter_ready_listener.notify =
+                shadow_painter_ready_cb;
+        struct vsx_shadow_painter *shadow_painter = toolbox->shadow_painter;
+        vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
+                       &painter->shadow_painter_ready_listener);
 
         return painter;
 }
@@ -260,6 +307,8 @@ prepare_cb(void *painter_data)
 
         update_vertices(painter);
 
+        create_shadow(painter);
+
         painter->layout_dirty = false;
 }
 
@@ -279,9 +328,32 @@ set_uniforms(struct vsx_name_painter *painter,
 }
 
 static void
+paint_shadow(struct vsx_name_painter *painter)
+{
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        GLfloat translation[] = {
+                painter->dialog_x * 2.0f / paint_state->width - 1.0f,
+                -painter->dialog_y * 2.0f / paint_state->height + 1.0f,
+        };
+
+        vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
+                                 painter->shadow,
+                                 &painter->toolbox->shader_data,
+                                 painter->matrix,
+                                 translation);
+}
+
+static void
 paint_cb(void *painter_data)
 {
         struct vsx_name_painter *painter = painter_data;
+
+        if (!vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
+                return;
+
+        paint_shadow(painter);
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
@@ -345,6 +417,7 @@ free_cb(void *painter_data)
 {
         struct vsx_name_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->shadow_painter_ready_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
 
         struct vsx_gl *gl = painter->toolbox->gl;
@@ -356,6 +429,8 @@ free_cb(void *painter_data)
 
         if (painter->layout)
                 vsx_layout_free(painter->layout);
+
+        clear_shadow(painter);
 
         vsx_free(painter);
 }
