@@ -62,6 +62,11 @@ struct vsx_language_painter {
 
         struct vsx_array_object *vao;
         GLuint vbo;
+
+        struct vsx_shadow_painter_shadow *shadow;
+        struct vsx_listener shadow_painter_ready_listener;
+
+        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -75,6 +80,18 @@ struct vertex {
 
 /* Border in mm around all the buttons */
 #define BORDER 4
+
+static void
+shadow_painter_ready_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct vsx_language_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_language_painter,
+                                 shadow_painter_ready_listener);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
 
 static void
 create_buttons(struct vsx_language_painter *painter)
@@ -159,11 +176,25 @@ create_cb(struct vsx_game_state *game_state,
 {
         struct vsx_language_painter *painter = vsx_calloc(sizeof *painter);
 
+        vsx_signal_init(&painter->redraw_needed_signal);
+
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
         create_buttons(painter);
         create_buffer(painter);
+
+        struct vsx_shadow_painter *shadow_painter = toolbox->shadow_painter;
+
+        painter->shadow =
+                vsx_shadow_painter_create_shadow(shadow_painter,
+                                                 painter->total_width,
+                                                 painter->total_height);
+
+        painter->shadow_painter_ready_listener.notify =
+                shadow_painter_ready_cb;
+        vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
+                       &painter->shadow_painter_ready_listener);
 
         return painter;
 }
@@ -224,6 +255,14 @@ handle_click(struct vsx_language_painter *painter,
         return true;
 }
 
+static struct vsx_signal *
+get_redraw_needed_signal_cb(void *painter_data)
+{
+        struct vsx_language_painter *painter = painter_data;
+
+        return &painter->redraw_needed_signal;
+}
+
 static bool
 input_event_cb(void *painter_data,
                const struct vsx_input_event *event)
@@ -242,6 +281,27 @@ input_event_cb(void *painter_data,
         }
 
         return false;
+}
+
+static void
+paint_shadow(struct vsx_language_painter *painter,
+             int x_off,
+             int y_off)
+{
+        struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        GLfloat translation[2];
+
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 x_off, y_off,
+                                                 translation);
+
+        vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
+                                 painter->shadow,
+                                 &painter->toolbox->shader_data,
+                                 paint_state->pixel_matrix,
+                                 translation);
 }
 
 static void
@@ -280,6 +340,15 @@ paint_cb(void *painter_data)
 {
         struct vsx_language_painter *painter = painter_data;
 
+        if (!vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
+                return;
+
+        int x_off, y_off;
+
+        get_origin(painter, &x_off, &y_off);
+
+        paint_shadow(painter, x_off, y_off);
+
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
         const struct vsx_shader_data_program_data *program =
@@ -294,10 +363,6 @@ paint_cb(void *painter_data)
         vsx_array_object_bind(painter->vao, gl);
 
         gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
-
-        int x_off, y_off;
-
-        get_origin(painter, &x_off, &y_off);
 
         struct vsx_layout_paint_position pos[N_LANGUAGES];
 
@@ -318,6 +383,8 @@ free_cb(void *painter_data)
 {
         struct vsx_language_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->shadow_painter_ready_listener.link);
+
         for (int i = 0; i < VSX_N_ELEMENTS(painter->buttons); i++)
                 vsx_layout_free(painter->buttons[i].layout);
 
@@ -328,6 +395,11 @@ free_cb(void *painter_data)
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
 
+        if (painter->shadow) {
+                vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
+                                               painter->shadow);
+        }
+
         vsx_free(painter);
 }
 
@@ -336,5 +408,6 @@ vsx_language_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
+        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };
