@@ -87,7 +87,16 @@ copy_image(uint8_t *dst,
 static GLenum
 format_for_image(const struct vsx_image *image)
 {
-        return image->components == 4 ? GL_RGBA : GL_RGB;
+        switch (image->components) {
+        case 4:
+                return GL_RGBA;
+        case 3:
+                return GL_RGB;
+        case 2:
+                return GL_LUMINANCE_ALPHA;
+        case 1:
+                return GL_ALPHA;
+        }
 }
 
 void
