@@ -46,6 +46,9 @@ struct vsx_error_painter {
 
         struct vsx_main_thread_token *delay_timeout;
 
+        struct vsx_shadow_painter_shadow *shadow;
+        struct vsx_listener shadow_painter_ready_listener;
+
         struct vsx_signal redraw_needed_signal;
 };
 
@@ -61,6 +64,14 @@ struct vertex {
 
 /* Gap in mm from the top of the screen to the icon */
 #define GAP 5
+
+static bool
+can_paint(struct vsx_error_painter *painter)
+{
+        return (painter->error_visible &&
+                painter->tex &&
+                vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter));
+}
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -98,7 +109,7 @@ texture_load_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
-        if (painter->error_visible)
+        if (can_paint(painter))
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
@@ -132,7 +143,7 @@ set_visible_cb(void *user_data)
                                                       texture_load_cb,
                                                       painter);
                 }
-        } else {
+        } else if (can_paint(painter)) {
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
         }
 }
@@ -174,14 +185,29 @@ update_error_visible(struct vsx_error_painter *painter)
                 remove_delay_timeout(painter);
 
                 if (painter->error_visible) {
+                        bool could_paint = can_paint(painter);
+
                         painter->error_visible = false;
 
-                        if (painter->tex) {
+                        if (could_paint) {
                                 vsx_signal_emit(&painter->redraw_needed_signal,
                                                 NULL);
                         }
                 }
         }
+}
+
+static void
+shadow_painter_ready_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct vsx_error_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_error_painter,
+                                 shadow_painter_ready_listener);
+
+        if (can_paint(painter))
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static void
@@ -295,18 +321,28 @@ create_cb(struct vsx_game_state *game_state,
 
         create_buffer(painter);
 
+        struct vsx_shadow_painter *shadow_painter = toolbox->shadow_painter;
+
+        painter->shadow =
+                vsx_shadow_painter_create_shadow(shadow_painter,
+                                                 painter->icon_size,
+                                                 painter->icon_size);
+
+        painter->shadow_painter_ready_listener.notify =
+                shadow_painter_ready_cb;
+        vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
+                       &painter->shadow_painter_ready_listener);
+
         update_error_visible(painter);
 
         return painter;
 }
 
 static void
-set_translation(struct vsx_error_painter *painter,
-                const struct vsx_shader_data_program_data *program)
+get_translation(struct vsx_error_painter *painter,
+                GLfloat *translation)
 {
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-
-        float translation[2];
 
         float x = (paint_state->pixel_width / 2.0f -
                    painter->icon_size / 2.0f);
@@ -315,12 +351,6 @@ set_translation(struct vsx_error_painter *painter,
         vsx_paint_state_offset_pixel_translation(paint_state,
                                                  x, y,
                                                  translation);
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glUniform2f(program->translation_uniform,
-                        translation[0],
-                        translation[1]);
 }
 
 static void
@@ -328,30 +358,42 @@ paint_cb(void *painter_data)
 {
         struct vsx_error_painter *painter = painter_data;
 
-        if (!painter->error_visible || painter->tex == 0)
+        if (!can_paint(painter))
                 return;
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-
-        const struct vsx_shader_data *shader_data =
-                &painter->toolbox->shader_data;
-        const struct vsx_shader_data_program_data *program =
-                shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
-
-        gl->glUseProgram(program->program);
 
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         vsx_paint_state_ensure_layout(paint_state);
 
+        GLfloat translation[2];
+
+        get_translation(painter, translation);
+
+        const struct vsx_shader_data *shader_data =
+                &painter->toolbox->shader_data;
+
+        vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
+                                 painter->shadow,
+                                 shader_data,
+                                 paint_state->pixel_matrix,
+                                 translation);
+
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+
+        const struct vsx_shader_data_program_data *program =
+                shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+
+        gl->glUseProgram(program->program);
+
         gl->glUniformMatrix2fv(program->matrix_uniform,
                                1, /* count */
                                GL_FALSE, /* transpose */
                                painter->toolbox->paint_state.pixel_matrix);
-
-        set_translation(painter, program);
+        gl->glUniform2f(program->translation_uniform,
+                        translation[0],
+                        translation[1]);
 
         vsx_array_object_bind(painter->vao, gl);
 
@@ -373,6 +415,7 @@ free_cb(void *painter_data)
 {
         struct vsx_error_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->shadow_painter_ready_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
 
         remove_delay_timeout(painter);
@@ -388,6 +431,11 @@ free_cb(void *painter_data)
                 vsx_image_loader_cancel(painter->image_token);
         if (painter->tex)
                 gl->glDeleteTextures(1, &painter->tex);
+
+        if (painter->shadow) {
+                vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
+                                               painter->shadow);
+        }
 
         vsx_free(painter);
 }
