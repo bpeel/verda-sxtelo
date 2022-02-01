@@ -40,7 +40,8 @@ struct vsx_shadow_painter {
         struct vsx_image_loader_token *image_token;
         GLuint element_buffer;
 
-        int shadow_width;
+        int top_left_shadow_width;
+        int bottom_right_shadow_width;
 
         struct vsx_signal ready_signal;
 };
@@ -68,7 +69,8 @@ struct vertex {
 #define ELEMENT_BUFFER_SIZE (N_ELEMENTS * sizeof (uint8_t))
 
 /* Width in mm of the shadow */
-#define SHADOW_WIDTH 4
+#define TOP_LEFT_SHADOW_WIDTH 2
+#define BOTTOM_RIGHT_SHADOW_WIDTH 4
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -128,7 +130,10 @@ vsx_shadow_painter_new(struct vsx_gl *gl,
                                                      texture_load_cb,
                                                      painter);
 
-        painter->shadow_width = SHADOW_WIDTH * dpi * 10 / 254;
+        painter->top_left_shadow_width =
+                TOP_LEFT_SHADOW_WIDTH * dpi * 10 / 254;
+        painter->bottom_right_shadow_width =
+                BOTTOM_RIGHT_SHADOW_WIDTH * dpi * 10 / 254;
 
         return painter;
 }
@@ -252,30 +257,38 @@ store_quad(struct vertex *v,
 static void
 generate_vertices(struct vertex *vertices,
                   int w, int h,
-                  int shadow_width)
+                  int top_left_shadow_width,
+                  int bottom_right_shadow_width)
 {
         /* Top-left corner */
         store_quad(vertices + 0,
-                   -shadow_width, -shadow_width, /* x/y */
-                   shadow_width, shadow_width,
+                   -top_left_shadow_width, /* x */
+                   -top_left_shadow_width, /* y */
+                   top_left_shadow_width, /* w */
+                   top_left_shadow_width, /* h */
                    255, 255, /* s1, t1 */
                    0, 0 /* s2, t2 */);
         /* Top-right corner */
         store_quad(vertices + 4,
-                   w, -shadow_width,
-                   shadow_width, shadow_width,
+                   w, /* x */
+                   -top_left_shadow_width, /* y */
+                   bottom_right_shadow_width, /* w */
+                   top_left_shadow_width, /* h */
                    0, 255, /* s1, t1 */
                    255, 0 /* s2, t2 */);
         /* Bottom-left corner */
         store_quad(vertices + 8,
-                   -shadow_width, h,
-                   shadow_width, shadow_width,
+                   -top_left_shadow_width, /* x */
+                   h, /* y */
+                   top_left_shadow_width, /* w */
+                   bottom_right_shadow_width, /* h */
                    255, 0, /* s1, t1 */
                    0, 255 /* s2, t2 */);
         /* Bottom-right corner */
         store_quad(vertices + 12,
-                   w, h,
-                   shadow_width, shadow_width,
+                   w, h, /* x/y */
+                   bottom_right_shadow_width, /* w */
+                   bottom_right_shadow_width, /* h */
                    0, 0, /* s1, t1 */
                    255, 255 /* s2, t2 */);
 }
@@ -325,7 +338,10 @@ vsx_shadow_painter_create_shadow(struct vsx_shadow_painter *painter,
                                    false, /* flush_explicit */
                                    GL_STATIC_DRAW);
 
-        generate_vertices(vertices, w, h, painter->shadow_width);
+        generate_vertices(vertices,
+                          w, h,
+                          painter->top_left_shadow_width,
+                          painter->bottom_right_shadow_width);
 
         vsx_map_buffer_unmap(painter->map_buffer);
 
