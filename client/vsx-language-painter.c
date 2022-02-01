@@ -295,18 +295,9 @@ paint_cb(void *painter_data)
 
         gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 
-        const struct vsx_paint_state *paint_state =
-                &painter->toolbox->paint_state;
-
         int x_off, y_off;
 
-        if (paint_state->board_rotated) {
-                x_off = paint_state->height / 2 - painter->total_width / 2;
-                y_off = paint_state->width / 2 - painter->total_height / 2;
-        } else {
-                x_off = paint_state->width / 2 - painter->total_width / 2;
-                y_off = paint_state->height / 2 - painter->total_height / 2;
-        }
+        get_origin(painter, &x_off, &y_off);
 
         struct vsx_layout_paint_position pos[N_LANGUAGES];
 
