@@ -2027,6 +2027,56 @@ test_shout (void)
 }
 
 static bool
+check_set_n_tiles (Harness *harness, VsxPerson *person, int n_tiles)
+{
+  struct vsx_error *error = NULL;
+
+  uint8_t command[] =
+    {
+      0x82, 0x02, 0x8b, n_tiles,
+    };
+
+  if (!vsx_connection_parse_data (harness->conn,
+                                  command, sizeof command,
+                                  &error))
+    {
+      fprintf (stderr,
+               "test_set_n_tiles: Unexpected error: %s\n",
+               error->message);
+      vsx_error_free (error);
+      return false;
+    }
+
+  if (person->conversation->total_n_tiles != n_tiles)
+    {
+      fprintf (stderr,
+               "test_set_n_tiles: failed to set total_n_tiles.\n"
+               " Expected: %i\n"
+               " Received: %i\n",
+               n_tiles,
+               person->conversation->total_n_tiles);
+      return false;
+    }
+
+  uint8_t got_n_tiles;
+
+  if (!read_n_tiles (harness->conn, &got_n_tiles))
+    return false;
+
+  if (got_n_tiles != n_tiles)
+    {
+      fprintf (stderr,
+               "test_set_n_tiles: After sending set_n_tiles %i, the "
+               "connection reported %i tiles\n",
+               n_tiles,
+               got_n_tiles);
+      return false;
+    }
+
+  return true;
+}
+
+static bool
 test_set_n_tiles (void)
 {
   Harness *harness = create_negotiated_harness ();
@@ -2045,42 +2095,8 @@ test_set_n_tiles (void)
     }
   else
     {
-      struct vsx_error *error = NULL;
-
-      if (!vsx_connection_parse_data (harness->conn,
-                                      (uint8_t *) "\x82\x2\x8b\x5",
-                                      4,
-                                      &error))
-        {
-          fprintf (stderr,
-                   "test_set_n_tiles: Unexpected error: %s\n",
-                   error->message);
-          vsx_error_free (error);
-          ret = false;
-        }
-      else if (person->conversation->total_n_tiles != 5)
-        {
-          fprintf (stderr,
-                   "test_set_n_tiles: failed to set total_n_tiles "
-                   "(%i != 5)\n",
-                   person->conversation->total_n_tiles);
-          ret = false;
-        }
-      else
-        {
-          uint8_t got_n_tiles;
-
-          if (!read_n_tiles (harness->conn, &got_n_tiles))
-            ret = false;
-          else if (got_n_tiles != 5)
-            {
-              fprintf (stderr,
-                       "test_set_n_tiles: After sending set_n_tiles 5, the "
-                       "connection reported %i tiles\n",
-                       got_n_tiles);
-              ret = false;
-            }
-        }
+      if (!check_set_n_tiles (harness, person, 5))
+        ret = false;
 
       vsx_object_unref (person);
     }
@@ -2246,62 +2262,68 @@ test_turn_all_tiles (void)
                       &person))
     {
       ret = false;
+      goto out_harness;
     }
-  else
+
+  if (!check_set_n_tiles (harness, person, 122))
     {
-      for (int i = 0; i < 122; i++)
+      ret = false;
+      goto out;
+    }
+
+  for (int i = 0; i < 122; i++)
+    {
+      struct vsx_error *error = NULL;
+
+      if (!vsx_connection_parse_data (harness->conn,
+                                      (uint8_t *) "\x82\x1\x89",
+                                      3,
+                                      &error))
         {
-          struct vsx_error *error = NULL;
+          fprintf (stderr,
+                   "Unexpected error after turn command: %s\n",
+                   error->message);
+          vsx_error_free (error);
 
-          if (!vsx_connection_parse_data (harness->conn,
-                                          (uint8_t *) "\x82\x1\x89",
-                                          3,
-                                          &error))
-            {
-              fprintf (stderr,
-                       "Unexpected error after turn command: %s\n",
-                       error->message);
-              vsx_error_free (error);
-
-              ret = false;
-              break;
-            }
-
-          /* When the first and last tiles are turned the player flags
-           * will change to update the current player.
-           */
-          if ((i == 0 || i == 121)
-              && !read_player (harness->conn,
-                               0, /* expected_player_num */
-                               VSX_PLAYER_CONNECTED |
-                               (i == 0 ? VSX_PLAYER_NEXT_TURN : 0)))
-            {
-              ret = false;
-              break;
-            }
-
-          int tile_num;
-
-          if (!read_tile (harness->conn, &tile_num, NULL, NULL, NULL))
-            {
-              ret = false;
-              break;
-            }
-
-          if (tile_num != i)
-            {
-              fprintf (stderr,
-                       "After turning tile %i, server updated tile %i\n",
-                       i,
-                       tile_num);
-              ret = false;
-              break;
-            }
+          ret = false;
+          goto out;
         }
 
-      vsx_object_unref (person);
+      /* When the first and last tiles are turned the player flags
+       * will change to update the current player.
+       */
+      if ((i == 0 || i == 121)
+          && !read_player (harness->conn,
+                           0, /* expected_player_num */
+                           VSX_PLAYER_CONNECTED |
+                           (i == 0 ? VSX_PLAYER_NEXT_TURN : 0)))
+        {
+          ret = false;
+          goto out;
+        }
+
+      int tile_num;
+
+      if (!read_tile (harness->conn, &tile_num, NULL, NULL, NULL))
+        {
+          ret = false;
+          goto out;
+        }
+
+      if (tile_num != i)
+        {
+          fprintf (stderr,
+                   "After turning tile %i, server updated tile %i\n",
+                   i,
+                   tile_num);
+          ret = false;
+          goto out;
+        }
     }
 
+ out:
+  vsx_object_unref (person);
+ out_harness:
   free_harness (harness);
 
   return ret;
