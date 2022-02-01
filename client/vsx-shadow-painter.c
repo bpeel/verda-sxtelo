@@ -69,8 +69,8 @@ struct vertex {
 #define ELEMENT_BUFFER_SIZE (N_ELEMENTS * sizeof (uint8_t))
 
 /* Width in mm of the shadow */
-#define TOP_LEFT_SHADOW_WIDTH 2
-#define BOTTOM_RIGHT_SHADOW_WIDTH 4
+#define TOP_LEFT_SHADOW_WIDTH 1
+#define BOTTOM_RIGHT_SHADOW_WIDTH 2
 
 static void
 texture_load_cb(const struct vsx_image *image,
