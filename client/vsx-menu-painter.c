@@ -43,6 +43,7 @@ struct vsx_menu_painter {
         bool layout_dirty;
         GLfloat translation[2];
         int button_size;
+        int border;
         int dialog_x, dialog_y;
         int dialog_height;
 
@@ -80,12 +81,19 @@ enum menu_image {
         MENU_IMAGE_LEAVE,
 };
 
-#define N_VERTICES (N_BUTTONS * 4)
+/* Each button is extended up and down to draw the border. There are
+ * an additonal two quads to draw the left and right border.
+ */
+#define N_QUADS (N_BUTTONS + 2)
+#define N_VERTICES (N_QUADS * 4)
 
 #define N_IMAGES 8
 
 /* Size in mm of a button */
 #define BUTTON_SIZE 15
+
+/* Border in mm around all the buttons */
+#define BORDER 4
 
 #define SHORT_GAME_N_TILES 50
 #define LONG_GAME_N_TILES 122
@@ -168,7 +176,9 @@ update_label_text(struct vsx_menu_painter *painter)
                         bottom_most = bottom;
         }
 
-        painter->dialog_height = painter->button_size + bottom_most;
+        painter->dialog_height = (painter->button_size +
+                                  bottom_most +
+                                  painter->border * 2);
 }
 
 static void
@@ -182,11 +192,13 @@ update_label_positions(struct vsx_menu_painter *painter)
 
                 painter->labels[i].x =
                         painter->dialog_x +
+                        painter->border +
                         i * painter->button_size +
                         painter->button_size / 2 -
                         extents->right / 2;
                 painter->labels[i].y =
                         painter->dialog_y +
+                        painter->border +
                         painter->button_size +
                         extents->top;
         }
@@ -202,16 +214,21 @@ ensure_layout(struct vsx_menu_painter *painter)
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        /* Convert the button size from mm to pixels */
+        /* Convert the measurements from mm to pixels */
         painter->button_size = BUTTON_SIZE * paint_state->dpi * 10 / 254;
+        painter->border = BORDER * paint_state->dpi * 10 / 254;
 
-        if (painter->button_size * N_BUTTONS > paint_state->pixel_width)
-                painter->button_size = paint_state->pixel_width / N_BUTTONS;
+        int button_space = paint_state->pixel_width - painter->border * 2;
+
+        if (painter->button_size * N_BUTTONS > button_space)
+                painter->button_size = button_space / N_BUTTONS;
 
         update_label_text(painter);
 
         painter->dialog_x = (paint_state->pixel_width / 2 -
-                             painter->button_size * N_BUTTONS / 2);
+                             (painter->button_size * N_BUTTONS +
+                              painter->border * 2) /
+                             2);
         painter->dialog_y = (paint_state->pixel_height / 2 -
                              painter->dialog_height / 2);
 
@@ -304,7 +321,7 @@ create_buffer(struct vsx_menu_painter *painter)
                 vsx_quad_buffer_generate(painter->vao,
                                          gl,
                                          painter->toolbox->map_buffer,
-                                         N_BUTTONS);
+                                         N_QUADS);
 }
 
 static void *
@@ -403,11 +420,11 @@ handle_click(struct vsx_menu_painter *painter,
                                         event->click.y,
                                         &x, &y);
 
-        x -= painter->dialog_x;
-        y -= painter->dialog_y;
+        x -= painter->dialog_x + painter->border;
+        y -= painter->dialog_y + painter->border;
 
         if (x < 0 || x >= painter->button_size * N_BUTTONS ||
-            y < 0 || y >= painter->dialog_height) {
+            y < 0 || y >= painter->dialog_height - painter->border * 2) {
                 vsx_game_state_set_dialog(painter->game_state,
                                           VSX_DIALOG_NONE);
                 return true;
@@ -517,19 +534,37 @@ ensure_vertices(struct vsx_menu_painter *painter)
                         break;
                 }
 
-                /* Button image */
+                /* Button image. The image is extended to paint the
+                 * area above and below as well.
+                 */
                 store_quad(v,
-                           i * painter->button_size,
+                           painter->border + i * painter->button_size,
                            0, /* y */
                            painter->button_size,
                            painter->dialog_height,
                            image / (float) N_IMAGES,
-                           0.0f,
+                           -painter->border / (float) painter->button_size,
                            (image + 1.0f) / N_IMAGES,
-                           painter->dialog_height /
+                           (painter->dialog_height - painter->border) /
                            (float) painter->button_size);
                 v += 4;
         }
+
+        /* Side borders */
+        store_quad(v,
+                   0, 0, /* x/y */
+                   painter->border,
+                   painter->dialog_height,
+                   0.0f, 0.0f, 0.0f, 0.0f);
+        v += 4;
+
+        store_quad(v,
+                   painter->border + N_BUTTONS * painter->button_size,
+                   0, /* x/y */
+                   painter->border,
+                   painter->dialog_height,
+                   0.0f, 0.0f, 0.0f, 0.0f);
+        v += 4;
 
         vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
@@ -585,7 +620,7 @@ paint_cb(void *painter_data)
         vsx_gl_draw_range_elements(gl,
                                    GL_TRIANGLES,
                                    0, N_VERTICES - 1,
-                                   N_BUTTONS * 6,
+                                   N_QUADS * 6,
                                    GL_UNSIGNED_SHORT,
                                    NULL /* indices */);
 
