@@ -53,6 +53,9 @@ struct vsx_invite_painter {
         /* The ID that we last used to generate the texture */
         uint64_t id_in_texture;
 
+        struct vsx_shadow_painter_shadow *shadow;
+        struct vsx_listener shadow_painter_ready_listener;
+
         struct vsx_signal redraw_needed_signal;
 };
 
@@ -97,6 +100,44 @@ modified_cb(struct vsx_listener *listener,
         default:
                 break;
         }
+}
+
+static void
+shadow_painter_ready_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct vsx_invite_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_invite_painter,
+                                 shadow_painter_ready_listener);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
+clear_shadow(struct vsx_invite_painter *painter)
+{
+        if (painter->shadow == NULL)
+                return;
+
+        vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
+                                       painter->shadow);
+        painter->shadow = NULL;
+}
+
+static void
+create_shadow(struct vsx_invite_painter *painter)
+{
+        clear_shadow(painter);
+
+        struct vsx_shadow_painter *shadow_painter =
+                painter->toolbox->shadow_painter;
+
+        int w = painter->dialog_width;
+        int h = painter->dialog_height;
+
+        painter->shadow =
+                vsx_shadow_painter_create_shadow(shadow_painter, w, h);
 }
 
 static void
@@ -303,6 +344,12 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
 
+        painter->shadow_painter_ready_listener.notify =
+                shadow_painter_ready_cb;
+        struct vsx_shadow_painter *shadow_painter = toolbox->shadow_painter;
+        vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
+                       &painter->shadow_painter_ready_listener);
+
         create_layouts(painter);
 
         return painter;
@@ -434,6 +481,8 @@ ensure_layout(struct vsx_invite_painter *painter)
                                  paragraphs_height / 2);
         }
 
+        create_shadow(painter);
+
         painter->layout_dirty = false;
 }
 
@@ -463,15 +512,38 @@ set_uniforms(struct vsx_invite_painter *painter,
 }
 
 static void
+paint_shadow(struct vsx_invite_painter *painter)
+{
+        GLfloat translation[2];
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        vsx_paint_state_offset_pixel_translation(paint_state,
+                                                 painter->dialog_x,
+                                                 painter->dialog_y,
+                                                 translation);
+
+        vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
+                                 painter->shadow,
+                                 &painter->toolbox->shader_data,
+                                 painter->toolbox->paint_state.pixel_matrix,
+                                 translation);
+}
+
+static void
 paint_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
-        if (painter->tex == 0)
+        if (painter->tex == 0 ||
+            !vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
                 return;
+
+        paint_shadow(painter);
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
+
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
 
@@ -576,6 +648,7 @@ free_cb(void *painter_data)
 {
         struct vsx_invite_painter *painter = painter_data;
 
+        vsx_list_remove(&painter->shadow_painter_ready_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
 
         struct vsx_gl *gl = painter->toolbox->gl;
@@ -593,6 +666,8 @@ free_cb(void *painter_data)
         }
 
         free_texture(painter);
+
+        clear_shadow(painter);
 
         vsx_free(painter);
 }
