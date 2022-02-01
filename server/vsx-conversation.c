@@ -32,6 +32,13 @@
 #define VSX_CONVERSATION_CENTER_X (600 / 2 - VSX_TILE_SIZE / 2)
 #define VSX_CONVERSATION_CENTER_Y (360 / 2 - VSX_TILE_SIZE / 2)
 
+#define VSX_CONVERSATION_DEFAULT_N_TILES 50
+
+_Static_assert(VSX_CONVERSATION_DEFAULT_N_TILES <=
+               VSX_TILE_DATA_N_TILES,
+               "The default number of tiles can’t exceed the amount in the "
+               "tile data.");
+
 static uint16_t next_log_id = 0;
 
 static void
@@ -348,7 +355,7 @@ vsx_conversation_new (VsxConversationId id,
 
   self->log_id = next_log_id++;
   self->n_tiles_in_play = 0;
-  self->total_n_tiles = VSX_TILE_DATA_N_TILES;
+  self->total_n_tiles = VSX_CONVERSATION_DEFAULT_N_TILES;
   self->tile_data = tile_data;
 
   vsx_signal_init (&self->changed_signal);
