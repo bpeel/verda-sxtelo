@@ -175,8 +175,34 @@ process_arguments(int argc, char **argv)
 }
 
 static void
+check_gl_leaks(struct vsx_gl *gl)
+{
+        gl->glUseProgram(0);
+
+        for (GLuint id = 1; id <= 10000; id++) {
+#define CHECK(type)                                                     \
+                do {                                                    \
+                        if (gl->glIs##type(id)) {                       \
+                                fprintf(stderr,                         \
+                                        "Leaked gl" #type " handle 0x%x\n", \
+                                        (unsigned int) id);             \
+                        }                                               \
+                } while (0)
+                CHECK(Texture);
+                CHECK(Buffer);
+                CHECK(Shader);
+                CHECK(Program);
+                if (gl->have_vertex_array_objects)
+                        CHECK(VertexArray);
+#undef CHECK
+        }
+}
+
+static void
 finish_sdl_window(struct vsx_main_data *main_data)
 {
+        check_gl_leaks(main_data->gl);
+
         if (main_data->gl) {
                 vsx_gl_free(main_data->gl);
                 main_data->gl = NULL;
