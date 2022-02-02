@@ -63,7 +63,7 @@ struct vsx_font_data {
 static const struct vsx_font_data
 font_types[] = {
         [VSX_FONT_TYPE_LABEL] = {
-                .filename = "GrandHotel-Regular.otf",
+                .filename = "LunaSans-Regular.ttf",
                 .face_index = 0,
                 .size = 10 * 64,
         },
