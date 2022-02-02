@@ -29,8 +29,6 @@
 
 #define MAX_ATTRIBUTES 16
 
-static uint32_t enabled_attribs = 0;
-
 struct vsx_array_object_attribute {
         GLint size;
         GLenum type;
@@ -168,7 +166,7 @@ vsx_array_object_bind(struct vsx_array_object *array,
                         gl->glVertexAttribDivisor(index, attrib->divisor);
         }
 
-        attribs = array->enabled_attribs ^ enabled_attribs;
+        attribs = array->enabled_attribs ^ gl->enabled_attribs;
 
         while ((index = ffs(attribs))) {
                 index--;
@@ -180,7 +178,7 @@ vsx_array_object_bind(struct vsx_array_object *array,
                         gl->glDisableVertexAttribArray(index);
         }
 
-        enabled_attribs = array->enabled_attribs;
+        gl->enabled_attribs = array->enabled_attribs;
 
         if (array->element_buffer)
                 gl->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
