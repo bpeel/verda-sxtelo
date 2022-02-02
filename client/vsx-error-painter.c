@@ -380,8 +380,6 @@ paint_cb(void *painter_data)
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
 
