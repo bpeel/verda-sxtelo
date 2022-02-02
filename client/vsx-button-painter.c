@@ -491,6 +491,9 @@ ensure_vertices(struct vsx_button_painter *painter)
         if (!painter->vertices_dirty)
                 return;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         struct vertex *vertices =
                 vsx_map_buffer_map(painter->toolbox->map_buffer,
@@ -515,11 +518,7 @@ paint_cb(void *painter_data)
         if (painter->tex == 0)
                 return;
 
-        struct vsx_gl *gl = painter->toolbox->gl;
-
         ensure_layout(painter);
-
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
 
         ensure_vertices(painter);
 
@@ -527,6 +526,8 @@ paint_cb(void *painter_data)
                 &painter->toolbox->shader_data;
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+
+        struct vsx_gl *gl = painter->toolbox->gl;
 
         gl->glUseProgram(program->program);
         vsx_array_object_bind(painter->vao, gl);
