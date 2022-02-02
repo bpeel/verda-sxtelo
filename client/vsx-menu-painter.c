@@ -563,6 +563,10 @@ ensure_vertices(struct vsx_menu_painter *painter)
         if (!painter->vertices_dirty)
                 return;
 
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
+
         struct vertex *vertices =
                 vsx_map_buffer_map(painter->toolbox->map_buffer,
                                    GL_ARRAY_BUFFER,
@@ -656,16 +660,14 @@ paint_cb(void *painter_data)
                                  painter->toolbox->paint_state.pixel_matrix,
                                  painter->translation);
 
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-
         ensure_vertices(painter);
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
         const struct vsx_shader_data_program_data *program =
                 shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+
+        struct vsx_gl *gl = painter->toolbox->gl;
 
         gl->glUseProgram(program->program);
 
