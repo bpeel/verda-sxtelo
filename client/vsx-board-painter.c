@@ -50,11 +50,9 @@ struct vsx_board_painter {
 
         struct vsx_toolbox *toolbox;
 
-        struct box_draw_command box_draw_commands
-        [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+        struct box_draw_command box_draw_commands[VSX_BOARD_N_PLAYER_SPACES];
 
-        struct vsx_layout_paint_position name_labels
-        [VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+        struct vsx_layout_paint_position name_labels[VSX_BOARD_N_PLAYER_SPACES];
         bool name_label_positions_dirty;
 
         struct vsx_array_object *vao;
@@ -380,7 +378,7 @@ player_boxes[] = {
         },
 };
 
-_Static_assert(VSX_N_ELEMENTS(player_boxes) == VSX_GAME_STATE_N_VISIBLE_PLAYERS,
+_Static_assert(VSX_N_ELEMENTS(player_boxes) == VSX_BOARD_N_PLAYER_SPACES,
                "The number of defined player boxes doesn’t match the number "
                "of visible players");
 
@@ -615,7 +613,7 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+        for (int i = 0; i < VSX_BOARD_N_PLAYER_SPACES; i++) {
                 struct vsx_layout_paint_position *label =
                         painter->name_labels + i;
                 label->layout = vsx_layout_new(toolbox);
@@ -647,7 +645,7 @@ paint_box_cb(int player_num,
 {
         struct vsx_board_painter *painter = user_data;
 
-        assert(player_num <= VSX_GAME_STATE_N_VISIBLE_PLAYERS);
+        assert(player_num <= VSX_BOARD_N_PLAYER_SPACES);
 
         const struct box_draw_command *box =
                 painter->box_draw_commands + player_num;
@@ -766,7 +764,7 @@ prepare_cb(void *painter_data)
         if (painter->name_label_positions_dirty) {
                 vsx_paint_state_ensure_layout(&painter->toolbox->paint_state);
 
-                for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+                for (int i = 0; i < VSX_BOARD_N_PLAYER_SPACES; i++) {
                         vsx_layout_prepare(painter->name_labels[i].layout);
                         update_name_label_position(painter, i);
                 }
@@ -837,7 +835,7 @@ free_cb(void *painter_data)
 
         vsx_list_remove(&painter->modified_listener.link);
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+        for (int i = 0; i < VSX_BOARD_N_PLAYER_SPACES; i++) {
                 if (painter->name_labels[i].layout)
                         vsx_layout_free(painter->name_labels[i].layout);
         }

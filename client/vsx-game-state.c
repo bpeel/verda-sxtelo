@@ -33,6 +33,7 @@
 #include "vsx-slab.h"
 #include "vsx-main-thread.h"
 #include "vsx-instance-state.h"
+#include "vsx-board.h"
 
 struct vsx_game_state_player {
         char *name;
@@ -54,7 +55,7 @@ struct vsx_game_state {
          * need a mutex.
          */
 
-        struct vsx_game_state_player players[VSX_GAME_STATE_N_VISIBLE_PLAYERS];
+        struct vsx_game_state_player players[VSX_BOARD_N_PLAYER_SPACES];
 
         int shouting_player;
         struct vsx_main_thread_token *remove_shout_timeout;
@@ -198,7 +199,7 @@ vsx_game_state_foreach_player(struct vsx_game_state *game_state,
                               vsx_game_state_foreach_player_cb cb,
                               void *user_data)
 {
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++) {
+        for (int i = 0; i < VSX_BOARD_N_PLAYER_SPACES; i++) {
                 struct vsx_game_state_player *player = game_state->players + i;
 
                 cb(i, player->name, player->flags, user_data);
@@ -343,7 +344,7 @@ handle_player_name_changed(struct vsx_game_state *game_state,
 {
         int player_num = event->player_name_changed.player_num;
 
-        if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
+        if (player_num >= VSX_BOARD_N_PLAYER_SPACES)
                 return;
 
         struct vsx_game_state_player *player =
@@ -398,7 +399,7 @@ handle_player_flags_changed(struct vsx_game_state *game_state,
 {
         int player_num = event->player_flags_changed.player_num;
 
-        if (player_num >= VSX_GAME_STATE_N_VISIBLE_PLAYERS)
+        if (player_num >= VSX_BOARD_N_PLAYER_SPACES)
                 return;
 
         struct vsx_game_state_player *player =
@@ -1174,7 +1175,7 @@ vsx_game_state_free(struct vsx_game_state *game_state)
         vsx_list_remove(&game_state->event_listener.link);
         vsx_worker_unlock(game_state->worker);
 
-        for (int i = 0; i < VSX_GAME_STATE_N_VISIBLE_PLAYERS; i++)
+        for (int i = 0; i < VSX_BOARD_N_PLAYER_SPACES; i++)
                 vsx_free(game_state->players[i].name);
 
         if (game_state->flush_queue_token)

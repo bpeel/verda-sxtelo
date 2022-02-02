@@ -30,4 +30,6 @@
 #define VSX_BOARD_MIDDLE_X (VSX_BOARD_WIDTH / 2 -       \
                             VSX_BOARD_MIDDLE_WIDTH / 2)
 
+#define VSX_BOARD_N_PLAYER_SPACES 6
+
 #endif /* VSX_BOARD_H */

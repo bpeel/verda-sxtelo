@@ -37,8 +37,6 @@
  * thread.
  */
 
-#define VSX_GAME_STATE_N_VISIBLE_PLAYERS 6
-
 enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_CONNECTED = (1 << 0),
         VSX_GAME_STATE_PLAYER_FLAG_TYPING = (1 << 1),

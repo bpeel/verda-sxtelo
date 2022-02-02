@@ -38,6 +38,7 @@
 #include "vsx-main-thread.h"
 #include "vsx-bitmask.h"
 #include "vsx-monotonic.h"
+#include "vsx-board.h"
 
 #define TEST_PORT 6138
 
@@ -1317,7 +1318,7 @@ test_send_all_players(void)
                 goto out;
         }
 
-        if (closure.next_player_num != VSX_GAME_STATE_N_VISIBLE_PLAYERS) {
+        if (closure.next_player_num != VSX_BOARD_N_PLAYER_SPACES) {
                 fprintf(stderr,
                         "vsx_game_state_foreach_player didn’t report "
                         "all the players\n");
