@@ -72,14 +72,6 @@ struct vertex {
         uint16_t s, t;
 };
 
-#define PLAYER_SPACE_SIDE_HEIGHT 170
-#define PLAYER_SPACE_SIDE_WIDTH 90
-#define PLAYER_SPACE_MIDDLE_HEIGHT PLAYER_SPACE_SIDE_WIDTH
-#define PLAYER_SPACE_MIDDLE_WIDTH PLAYER_SPACE_SIDE_HEIGHT
-#define PLAYER_SPACE_CORNER_SIZE 20
-#define PLAYER_SPACE_MIDDLE_X (VSX_BOARD_WIDTH / 2 -            \
-                               PLAYER_SPACE_MIDDLE_WIDTH / 2)
-
 struct board_quad {
         int16_t x1, y1;
         int16_t x2, y2;
@@ -95,18 +87,18 @@ board_quads[] = {
         /* Gap between the players on the left */
         {
                 .x1 = 0,
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH,
-                .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
+                .y1 = VSX_BOARD_SIDE_HEIGHT,
+                .x2 = VSX_BOARD_SIDE_WIDTH,
+                .y2 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
                 .s1 = 1,
                 .s2 = 1,
         },
 
         /* Left gap */
         {
-                .x1 = PLAYER_SPACE_SIDE_WIDTH,
+                .x1 = VSX_BOARD_SIDE_WIDTH,
                 .y1 = 0,
-                .x2 = PLAYER_SPACE_MIDDLE_X,
+                .x2 = VSX_BOARD_MIDDLE_X,
                 .y2 = VSX_BOARD_HEIGHT,
                 .s1 = 1,
                 .s2 = 1,
@@ -114,28 +106,28 @@ board_quads[] = {
 
         /* Middle gap */
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X,
-                .y1 = PLAYER_SPACE_MIDDLE_HEIGHT,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
-                .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT,
+                .x1 = VSX_BOARD_MIDDLE_X,
+                .y1 = VSX_BOARD_MIDDLE_HEIGHT,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
+                .y2 = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT,
                 .s1 = 1, .s2 = 1,
         },
 
         /* Right gap */
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
+                .x1 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
                 .y1 = 0,
-                .x2 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
+                .x2 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT,
                 .s1 = 1, .s2 = 1,
         },
 
         /* Gap between players on the right */
         {
-                .x1 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT,
+                .x1 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
+                .y1 = VSX_BOARD_SIDE_HEIGHT,
                 .x2 = VSX_BOARD_WIDTH,
-                .y2 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
+                .y2 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
                 .s1 = 1,
                 .s2 = 1,
         },
@@ -145,34 +137,34 @@ static const struct board_quad
 player_0_quads[] = {
         /* Top middle */
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X,
+                .x1 = VSX_BOARD_MIDDLE_X,
                 .y1 = 0,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
-                .y2 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
+                .y2 = VSX_BOARD_MIDDLE_HEIGHT - VSX_BOARD_CORNER_SIZE,
         },
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
-                .y1 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
-                .x2 = (PLAYER_SPACE_MIDDLE_X +
-                       PLAYER_SPACE_MIDDLE_WIDTH -
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y2 = PLAYER_SPACE_MIDDLE_HEIGHT,
+                .x1 = VSX_BOARD_MIDDLE_X + VSX_BOARD_CORNER_SIZE,
+                .y1 = VSX_BOARD_MIDDLE_HEIGHT - VSX_BOARD_CORNER_SIZE,
+                .x2 = (VSX_BOARD_MIDDLE_X +
+                       VSX_BOARD_MIDDLE_WIDTH -
+                       VSX_BOARD_CORNER_SIZE),
+                .y2 = VSX_BOARD_MIDDLE_HEIGHT,
         },
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X,
-                .y1 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
-                .y2 = PLAYER_SPACE_MIDDLE_HEIGHT,
+                .x1 = VSX_BOARD_MIDDLE_X,
+                .y1 = VSX_BOARD_MIDDLE_HEIGHT - VSX_BOARD_CORNER_SIZE,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_CORNER_SIZE,
+                .y2 = VSX_BOARD_MIDDLE_HEIGHT,
                 .s1 = 1, .t1 = 1,
                 .s2 = 0, .t2 = 0,
         },
         {
-                .x1 = (PLAYER_SPACE_MIDDLE_X +
-                       PLAYER_SPACE_MIDDLE_WIDTH -
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y1 = PLAYER_SPACE_MIDDLE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
-                .y2 = PLAYER_SPACE_MIDDLE_HEIGHT,
+                .x1 = (VSX_BOARD_MIDDLE_X +
+                       VSX_BOARD_MIDDLE_WIDTH -
+                       VSX_BOARD_CORNER_SIZE),
+                .y1 = VSX_BOARD_MIDDLE_HEIGHT - VSX_BOARD_CORNER_SIZE,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
+                .y2 = VSX_BOARD_MIDDLE_HEIGHT,
                 .s1 = 0, .t1 = 1,
                 .s2 = 1, .t2 = 0,
         },
@@ -182,43 +174,43 @@ static const struct board_quad
 player_1_quads[] = {
         /* Bottom middle */
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X,
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
+                .x1 = VSX_BOARD_MIDDLE_X,
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_CORNER_SIZE,
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_MIDDLE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_MIDDLE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
                 .s1 = 1, .t1 = 0,
                 .s2 = 0, .t2 = 1,
         },
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_CORNER_SIZE,
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT,
-                .x2 = (PLAYER_SPACE_MIDDLE_X +
-                       PLAYER_SPACE_MIDDLE_WIDTH -
-                       PLAYER_SPACE_CORNER_SIZE),
+                .x1 = VSX_BOARD_MIDDLE_X + VSX_BOARD_CORNER_SIZE,
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT,
+                .x2 = (VSX_BOARD_MIDDLE_X +
+                       VSX_BOARD_MIDDLE_WIDTH -
+                       VSX_BOARD_CORNER_SIZE),
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_MIDDLE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_MIDDLE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
         },
         {
-                .x1 = (PLAYER_SPACE_MIDDLE_X +
-                       PLAYER_SPACE_MIDDLE_WIDTH -
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT,
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
+                .x1 = (VSX_BOARD_MIDDLE_X +
+                       VSX_BOARD_MIDDLE_WIDTH -
+                       VSX_BOARD_CORNER_SIZE),
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT,
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_MIDDLE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_MIDDLE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
                 .s1 = 0, .t1 = 0,
                 .s2 = 1, .t2 = 1,
         },
         {
-                .x1 = PLAYER_SPACE_MIDDLE_X,
+                .x1 = VSX_BOARD_MIDDLE_X,
                 .y1 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_MIDDLE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
-                .x2 = PLAYER_SPACE_MIDDLE_X + PLAYER_SPACE_MIDDLE_WIDTH,
+                       VSX_BOARD_MIDDLE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
+                .x2 = VSX_BOARD_MIDDLE_X + VSX_BOARD_MIDDLE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT,
         },
 };
@@ -228,20 +220,20 @@ player_2_quads[] = {
         /* Top left */
         {
                 .x1 = 0, .y1 = 0,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH,
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
+                .x2 = VSX_BOARD_SIDE_WIDTH,
+                .y2 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
         },
         {
                 .x1 = 0,
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH - PLAYER_SPACE_CORNER_SIZE,
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT,
+                .y1 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
+                .x2 = VSX_BOARD_SIDE_WIDTH - VSX_BOARD_CORNER_SIZE,
+                .y2 = VSX_BOARD_SIDE_HEIGHT,
         },
         {
-                .x1 = PLAYER_SPACE_SIDE_WIDTH - PLAYER_SPACE_CORNER_SIZE,
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH,
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT,
+                .x1 = VSX_BOARD_SIDE_WIDTH - VSX_BOARD_CORNER_SIZE,
+                .y1 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
+                .x2 = VSX_BOARD_SIDE_WIDTH,
+                .y2 = VSX_BOARD_SIDE_HEIGHT,
                 .s1 = 0, .t1 = 1,
                 .s2 = 1, .t2 = 0,
         },
@@ -250,28 +242,28 @@ player_2_quads[] = {
 static const struct board_quad
 player_3_quads[] = {
         {
-                .x1 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
+                .x1 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
                 .y1 = 0,
                 .x2 = VSX_BOARD_WIDTH,
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
+                .y2 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
         },
         {
-                .x1 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
+                .x1 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
+                .y1 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
                 .x2 = (VSX_BOARD_WIDTH -
-                       PLAYER_SPACE_SIDE_WIDTH +
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT,
+                       VSX_BOARD_SIDE_WIDTH +
+                       VSX_BOARD_CORNER_SIZE),
+                .y2 = VSX_BOARD_SIDE_HEIGHT,
                 .s1 = 1, .t1 = 1,
                 .s2 = 0, .t2 = 0,
         },
         {
                 .x1 = (VSX_BOARD_WIDTH -
-                       PLAYER_SPACE_SIDE_WIDTH +
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y1 = PLAYER_SPACE_SIDE_HEIGHT - PLAYER_SPACE_CORNER_SIZE,
+                       VSX_BOARD_SIDE_WIDTH +
+                       VSX_BOARD_CORNER_SIZE),
+                .y1 = VSX_BOARD_SIDE_HEIGHT - VSX_BOARD_CORNER_SIZE,
                 .x2 = VSX_BOARD_WIDTH,
-                .y2 = PLAYER_SPACE_SIDE_HEIGHT,
+                .y2 = VSX_BOARD_SIDE_HEIGHT,
         },
 };
 
@@ -280,28 +272,28 @@ player_4_quads[] = {
         /* Bottom left */
         {
                 .x1 = 0,
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH - PLAYER_SPACE_CORNER_SIZE,
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
+                .x2 = VSX_BOARD_SIDE_WIDTH - VSX_BOARD_CORNER_SIZE,
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
         },
         {
-                .x1 = PLAYER_SPACE_SIDE_WIDTH - PLAYER_SPACE_CORNER_SIZE,
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
-                .x2 = PLAYER_SPACE_SIDE_WIDTH,
+                .x1 = VSX_BOARD_SIDE_WIDTH - VSX_BOARD_CORNER_SIZE,
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
+                .x2 = VSX_BOARD_SIDE_WIDTH,
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
                 .s1 = 0, .t1 = 0,
                 .s2 = 1, .t2 = 1,
         },
         {
                 .x1 = 0,
                 .y1 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
-                .x2 = PLAYER_SPACE_SIDE_WIDTH,
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
+                .x2 = VSX_BOARD_SIDE_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT,
         },
 };
@@ -309,32 +301,32 @@ player_4_quads[] = {
 static const struct board_quad
 player_5_quads[] = {
         {
-                .x1 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
+                .x1 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
                 .x2 = (VSX_BOARD_WIDTH -
-                       PLAYER_SPACE_SIDE_WIDTH +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_WIDTH +
+                       VSX_BOARD_CORNER_SIZE),
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
                 .s1 = 1, .t1 = 0,
                 .s2 = 0, .t2 = 1,
         },
         {
                 .x1 = (VSX_BOARD_WIDTH -
-                       PLAYER_SPACE_SIDE_WIDTH +
-                       PLAYER_SPACE_CORNER_SIZE),
-                .y1 = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT,
+                       VSX_BOARD_SIDE_WIDTH +
+                       VSX_BOARD_CORNER_SIZE),
+                .y1 = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT,
                 .x2 = VSX_BOARD_WIDTH,
                 .y2 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
         },
         {
-                .x1 = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH,
+                .x1 = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH,
                 .y1 = (VSX_BOARD_HEIGHT -
-                       PLAYER_SPACE_SIDE_HEIGHT +
-                       PLAYER_SPACE_CORNER_SIZE),
+                       VSX_BOARD_SIDE_HEIGHT +
+                       VSX_BOARD_CORNER_SIZE),
                 .x2 = VSX_BOARD_WIDTH,
                 .y2 = VSX_BOARD_HEIGHT,
         },
@@ -351,40 +343,40 @@ player_boxes[] = {
         {
                 .n_quads = VSX_N_ELEMENTS(player_0_quads),
                 .quads = player_0_quads,
-                .center_x = (PLAYER_SPACE_MIDDLE_X +
-                             PLAYER_SPACE_MIDDLE_WIDTH / 2),
-                .center_y = PLAYER_SPACE_MIDDLE_HEIGHT / 2,
+                .center_x = (VSX_BOARD_MIDDLE_X +
+                             VSX_BOARD_MIDDLE_WIDTH / 2),
+                .center_y = VSX_BOARD_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_1_quads),
                 .quads = player_1_quads,
-                .center_x = (PLAYER_SPACE_MIDDLE_X +
-                             PLAYER_SPACE_MIDDLE_WIDTH / 2),
-                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_MIDDLE_HEIGHT / 2,
+                .center_x = (VSX_BOARD_MIDDLE_X +
+                             VSX_BOARD_MIDDLE_WIDTH / 2),
+                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_2_quads),
                 .quads = player_2_quads,
-                .center_x = PLAYER_SPACE_SIDE_WIDTH / 2,
-                .center_y = PLAYER_SPACE_SIDE_HEIGHT / 2,
+                .center_x = VSX_BOARD_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_3_quads),
                 .quads = player_3_quads,
-                .center_x = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH / 2,
-                .center_y = PLAYER_SPACE_SIDE_HEIGHT / 2,
+                .center_x = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_4_quads),
                 .quads = player_4_quads,
-                .center_x = PLAYER_SPACE_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT / 2,
+                .center_x = VSX_BOARD_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_5_quads),
                 .quads = player_5_quads,
-                .center_x = VSX_BOARD_WIDTH - PLAYER_SPACE_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_HEIGHT - PLAYER_SPACE_SIDE_HEIGHT / 2,
+                .center_x = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH / 2,
+                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT / 2,
         },
 };
 

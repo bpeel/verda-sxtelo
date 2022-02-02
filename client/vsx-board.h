@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2021  Neil Roberts
+ * Copyright (C) 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,5 +21,13 @@
 
 #define VSX_BOARD_WIDTH 600
 #define VSX_BOARD_HEIGHT 360
+
+#define VSX_BOARD_SIDE_HEIGHT 170
+#define VSX_BOARD_SIDE_WIDTH 90
+#define VSX_BOARD_MIDDLE_HEIGHT VSX_BOARD_SIDE_WIDTH
+#define VSX_BOARD_MIDDLE_WIDTH VSX_BOARD_SIDE_HEIGHT
+#define VSX_BOARD_CORNER_SIZE 20
+#define VSX_BOARD_MIDDLE_X (VSX_BOARD_WIDTH / 2 -       \
+                            VSX_BOARD_MIDDLE_WIDTH / 2)
 
 #endif /* VSX_BOARD_H */
