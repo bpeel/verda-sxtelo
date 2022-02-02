@@ -333,7 +333,6 @@ player_5_quads[] = {
 struct player_box {
         int n_quads;
         const struct board_quad *quads;
-        int center_x, center_y;
 };
 
 static const struct player_box
@@ -341,40 +340,26 @@ player_boxes[] = {
         {
                 .n_quads = VSX_N_ELEMENTS(player_0_quads),
                 .quads = player_0_quads,
-                .center_x = (VSX_BOARD_MIDDLE_X +
-                             VSX_BOARD_MIDDLE_WIDTH / 2),
-                .center_y = VSX_BOARD_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_1_quads),
                 .quads = player_1_quads,
-                .center_x = (VSX_BOARD_MIDDLE_X +
-                             VSX_BOARD_MIDDLE_WIDTH / 2),
-                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_MIDDLE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_2_quads),
                 .quads = player_2_quads,
-                .center_x = VSX_BOARD_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_3_quads),
                 .quads = player_3_quads,
-                .center_x = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_4_quads),
                 .quads = player_4_quads,
-                .center_x = VSX_BOARD_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT / 2,
         },
         {
                 .n_quads = VSX_N_ELEMENTS(player_5_quads),
                 .quads = player_5_quads,
-                .center_x = VSX_BOARD_WIDTH - VSX_BOARD_SIDE_WIDTH / 2,
-                .center_y = VSX_BOARD_HEIGHT - VSX_BOARD_SIDE_HEIGHT / 2,
         },
 };
 
@@ -717,10 +702,11 @@ update_name_label_position(struct vsx_board_painter *painter,
                 board_height = paint_state->board_scissor_height;
         }
 
-        const struct player_box *box = player_boxes + player_num;
+        const struct vsx_board_player_space *space =
+                vsx_board_player_spaces + player_num;
 
-        int center_x = box->center_x * board_width / VSX_BOARD_WIDTH;
-        int center_y = box->center_y * board_width / VSX_BOARD_WIDTH;
+        int center_x = space->center_x * board_width / VSX_BOARD_WIDTH;
+        int center_y = space->center_y * board_width / VSX_BOARD_WIDTH;
 
         const struct vsx_layout_extents *extents =
                 vsx_layout_get_logical_extents(layout);

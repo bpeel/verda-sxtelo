@@ -32,4 +32,11 @@
 
 #define VSX_BOARD_N_PLAYER_SPACES 6
 
+struct vsx_board_player_space {
+        int center_x, center_y;
+};
+
+extern const struct vsx_board_player_space
+vsx_board_player_spaces[];
+
 #endif /* VSX_BOARD_H */

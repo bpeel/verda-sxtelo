@@ -20,6 +20,7 @@ connection_src = [
 
 client_common_src = [
         'vsx-array-object.c',
+        'vsx-board.c',
         'vsx-board-painter.c',
         'vsx-bsp.c',
         'vsx-button-painter.c',
