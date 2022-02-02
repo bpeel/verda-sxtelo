@@ -74,26 +74,50 @@ struct vertex {
 /* Duration of the effect in microsecords */
 #define FIREWORKS_DURATION (1000 * 1000)
 
-/* The angle to fire the fireworks at for each player, measured in
- * clockwise radians where 0 is straight up.
- */
-static const float
-fire_angles[] = {
-        /* Straight down */
-        M_PI,
-        /* Straight up */
-        0.0f,
-        /* To the right */
-        M_PI * 0.5f,
-        /* To the left */
-        M_PI * 1.5f,
-        /* Right and upwards */
-        M_PI * 0.25f,
-        /* Left and upwards */
-        M_PI * 1.75f,
+struct fire_properties {
+        /* The angle to fire the fireworks at, measured in clockwise
+         * radians where 0 is straight up.
+         */
+        float angle;
+        /* The range of random velocities */
+        float min_velocity, max_velocity;
 };
 
-_Static_assert(VSX_N_ELEMENTS(fire_angles) == VSX_BOARD_N_PLAYER_SPACES,
+static const struct fire_properties
+fire_properties[] = {
+        {
+                /* Straight up */
+                .angle = 0.0f,
+                .min_velocity = 150.0f, .max_velocity = 300.0f,
+        },
+        {
+                /* Straight up */
+                .angle = 0.0f,
+                .min_velocity = 150.0f, .max_velocity = 600.0f,
+        },
+        {
+                /* To the right */
+                .angle = M_PI * 0.5f,
+                .min_velocity = 150.0f, .max_velocity = 600.0f,
+        },
+        {
+                /* To the left */
+                .angle = M_PI * 1.5f,
+                .min_velocity = 150.0f, .max_velocity = 600.0f,
+        },
+        {
+                /* Right and upwards */
+                .angle = M_PI * 0.25f,
+                .min_velocity = 150.0f, .max_velocity = 600.0f,
+        },
+        {
+                /* Left and upwards */
+                .angle = M_PI * 1.75f,
+                .min_velocity = 150.0f, .max_velocity = 600.0f,
+        },
+};
+
+_Static_assert(VSX_N_ELEMENTS(fire_properties) == VSX_BOARD_N_PLAYER_SPACES,
                "There should be exactly one fire angle for each player space.");
 
 /* Returns the elapsed time of the effect, or -1 if no effect should
@@ -201,19 +225,21 @@ event_cb(struct vsx_listener *listener,
 
 static void
 generate_vertices(struct vertex *v,
-                  float base_angle)
+                  const struct fire_properties *props)
 {
         for (unsigned i = 0; i < N_VERTICES; i++) {
                 /* The x/y position is used as an initial velocity
                  * vector for the point, measured in board units per
                  * duration of the effect.
                  */
-                float velocity = (rand() % VSX_BOARD_WIDTH * 3 / 4 +
-                                  VSX_BOARD_WIDTH / 4);
+                float velocity = (rand() / (float) RAND_MAX *
+                                  (props->max_velocity -
+                                   props->min_velocity) +
+                                  props->min_velocity);
                 /* Angle in radians where 0 is straight up. Pick a
                  * random around that in a range of 45°.
                  */
-                float angle = (base_angle +
+                float angle = (props->angle +
                                (rand() & 0xff) * M_PI / 512.0 -
                                M_PI / 4.0);
 
@@ -253,7 +279,7 @@ create_buffer(struct vsx_fireworks_painter *painter,
                                    false, /* flush_explicit */
                                    GL_STATIC_DRAW);
 
-        generate_vertices(vertices, fire_angles[player_num]);
+        generate_vertices(vertices, fire_properties + player_num);
 
         vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
