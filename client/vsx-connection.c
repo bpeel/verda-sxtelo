@@ -639,7 +639,7 @@ handle_player_shouted(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
