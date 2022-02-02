@@ -21,6 +21,7 @@
 #include "vsx-mipmap.h"
 
 #include <string.h>
+#include <assert.h>
 
 #include "vsx-gl.h"
 #include "vsx-util.h"
@@ -97,6 +98,10 @@ format_for_image(const struct vsx_image *image)
         case 1:
                 return GL_ALPHA;
         }
+
+        assert(!"Unknown image format");
+
+        return GL_ALPHA;
 }
 
 void
