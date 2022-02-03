@@ -40,12 +40,13 @@ struct vsx_name_painter {
 
         bool layout_dirty;
 
-        struct vsx_layout *layout;
+        struct vsx_layout_paint_position layouts[2];
 
         int dialog_x, dialog_y;
         int dialog_width, dialog_height;
 
-        int layout_x, layout_y;
+        int button_x, button_y;
+        int button_width, button_height;
 
         /* This is using its own pixel transformation because we don’t
          * want to take into account the board rotation.
@@ -62,7 +63,7 @@ struct vertex {
         float x, y;
 };
 
-#define N_QUADS 1
+#define N_QUADS 2
 #define N_VERTICES (N_QUADS * 4)
 
 /* Gap in MM around the dialog */
@@ -70,7 +71,11 @@ struct vertex {
 /* Border in MM inside the dialog around the contents */
 #define INNER_BORDER 5
 
+/* Border around the button label in MM */
+#define BUTTON_BORDER 2
+
 #define FONT VSX_FONT_TYPE_LABEL
+
 
 static void
 modified_cb(struct vsx_listener *listener,
@@ -132,27 +137,43 @@ create_shadow(struct vsx_name_painter *painter)
 }
 
 static void
+store_quad(struct vertex *v,
+           int x, int y,
+           int w, int h)
+{
+        v->x = x;
+        v->y = y;
+        v++;
+
+        v->x = x;
+        v->y = y + h;
+        v++;
+
+        v->x = x + w;
+        v->y = y;
+        v++;
+
+        v->x = x + w;
+        v->y = y + h;
+        v++;
+}
+
+static void
 update_vertices(struct vsx_name_painter *painter)
 {
         struct vertex vertices[N_VERTICES];
 
-        struct vertex *v = vertices;
+        store_quad(vertices,
+                   painter->dialog_x,
+                   painter->dialog_y,
+                   painter->dialog_width,
+                   painter->dialog_height);
 
-        v->x = painter->dialog_x;
-        v->y = painter->dialog_y;
-        v++;
-
-        v->x = painter->dialog_x;
-        v->y = painter->dialog_y + painter->dialog_height;
-        v++;
-
-        v->x = painter->dialog_x + painter->dialog_width;
-        v->y = painter->dialog_y;
-        v++;
-
-        v->x = painter->dialog_x + painter->dialog_width;
-        v->y = painter->dialog_y + painter->dialog_height;
-        v++;
+        store_quad(vertices + 4,
+                   painter->button_x,
+                   painter->button_y,
+                   painter->button_width,
+                   painter->button_height);
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
@@ -204,8 +225,14 @@ create_cb(struct vsx_game_state *game_state,
         create_buffer(painter);
         update_vertices(painter);
 
-        painter->layout = vsx_layout_new(toolbox);
-        vsx_layout_set_font(painter->layout, FONT);
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->layouts); i++) {
+                painter->layouts[i].layout = vsx_layout_new(toolbox);
+                vsx_layout_set_font(painter->layouts[i].layout, FONT);
+        }
+
+        painter->layouts[1].r = 1.0f;
+        painter->layouts[1].g = 1.0f;
+        painter->layouts[1].b = 1.0f;
 
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
@@ -249,14 +276,16 @@ update_layout_text(struct vsx_name_painter *painter)
 {
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
-        enum vsx_text note_text;
+        enum vsx_text note_text, button_text;
 
         switch (vsx_game_state_get_name_type(painter->game_state)) {
         case VSX_GAME_STATE_NAME_TYPE_NEW_GAME:
                 note_text = VSX_TEXT_ENTER_NAME_NEW_GAME;
+                button_text = VSX_TEXT_NAME_BUTTON_NEW_GAME;
                 goto found;
         case VSX_GAME_STATE_NAME_TYPE_JOIN_GAME:
                 note_text = VSX_TEXT_ENTER_NAME_JOIN_GAME;
+                button_text = VSX_TEXT_NAME_BUTTON_JOIN_GAME;
                 goto found;
         }
 
@@ -265,7 +294,10 @@ update_layout_text(struct vsx_name_painter *painter)
         return;
 
 found:
-        vsx_layout_set_text(painter->layout, vsx_text_get(language, note_text));
+        vsx_layout_set_text(painter->layouts[0].layout,
+                            vsx_text_get(language, note_text));
+        vsx_layout_set_text(painter->layouts[1].layout,
+                            vsx_text_get(language, button_text));
 }
 
 static void
@@ -290,17 +322,20 @@ prepare_cb(void *painter_data)
 
         int inner_width = painter->dialog_width - inner_border * 2;
 
-        vsx_layout_set_width(painter->layout, inner_width);
+        struct vsx_layout *note_layout = painter->layouts[0].layout;
+
+        vsx_layout_set_width(note_layout, inner_width);
 
         update_layout_text(painter);
 
-        vsx_layout_prepare(painter->layout);
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->layouts); i++)
+                vsx_layout_prepare(painter->layouts[i].layout);
 
         const struct vsx_layout_extents *extents =
-                vsx_layout_get_logical_extents(painter->layout);
+                vsx_layout_get_logical_extents(note_layout);
 
-        painter->layout_x = painter->dialog_x + inner_border;
-        painter->layout_y = painter->dialog_y + inner_border + extents->top;
+        painter->layouts[0].x = painter->dialog_x + inner_border;
+        painter->layouts[0].y = painter->dialog_y + inner_border + extents->top;
 
         struct vsx_font_library *font_library = painter->toolbox->font_library;
         struct vsx_font *font = vsx_font_library_get_font(font_library, FONT);
@@ -308,7 +343,7 @@ prepare_cb(void *painter_data)
 
         vsx_font_get_metrics(font, &font_metrics);
 
-        int name_y_pos = (painter->layout_y -
+        int name_y_pos = (painter->layouts[0].y -
                           font_metrics.ascender +
                           font_metrics.height * extents->n_lines);
 
@@ -319,10 +354,29 @@ prepare_cb(void *painter_data)
 
         int name_height = vsx_game_state_get_name_height(painter->game_state);
 
-        painter->dialog_height = (name_y_pos -
-                                  painter->dialog_y +
-                                  name_height +
-                                  inner_border);
+        int button_border = BUTTON_BORDER * paint_state->dpi * 10 / 254;
+
+        const struct vsx_layout_extents *button_extents =
+                vsx_layout_get_logical_extents(painter->layouts[1].layout);
+
+        painter->button_x = (painter->dialog_x +
+                             painter->dialog_width / 2 -
+                             button_extents->right / 2 -
+                             button_border);
+        painter->button_y = (name_y_pos + name_height +
+                             font_metrics.height / 2);
+        painter->button_width = button_extents->right + button_border * 2;
+        painter->button_height = font_metrics.height + button_border * 2;
+
+        painter->layouts[1].x = painter->button_x + button_border;
+        painter->layouts[1].y = (painter->button_y +
+                                 button_border +
+                                 font_metrics.ascender);
+
+        painter->dialog_height = (painter->button_y +
+                                  painter->button_height +
+                                  inner_border -
+                                  painter->dialog_y);
 
         update_transform(painter, paint_state);
 
@@ -389,17 +443,15 @@ paint_cb(void *painter_data)
 
         vsx_array_object_bind(painter->vao, gl);
 
-        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
+        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        struct vsx_layout_paint_position pos = {
-                .layout = painter->layout,
-                .x = painter->layout_x,
-                .y = painter->layout_y,
-        };
+        gl->glUniform3f(program->color_uniform, 0.498f, 0.523f, 0.781f);
+
+        gl->glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
 
         struct vsx_layout_paint_params params = {
-                .layouts = &pos,
-                .n_layouts = 1,
+                .layouts = painter->layouts,
+                .n_layouts = 2,
                 .matrix = painter->matrix,
                 .translation_x = -1.0f,
                 .translation_y = 1.0f,
@@ -448,8 +500,10 @@ free_cb(void *painter_data)
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
 
-        if (painter->layout)
-                vsx_layout_free(painter->layout);
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->layouts); i++) {
+                if (painter->layouts[i].layout)
+                        vsx_layout_free(painter->layouts[i].layout);
+        }
 
         clear_shadow(painter);
 
