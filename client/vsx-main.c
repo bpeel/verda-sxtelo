@@ -371,6 +371,19 @@ share_link_cb(struct vsx_shell_interface *shell,
                                 vsx_text_get(language, VSX_TEXT_LINK_COPIED));
 }
 
+static void
+set_name_position_cb(struct vsx_shell_interface *shell,
+                     int y_pos,
+                     int max_width)
+{
+}
+
+static int
+get_name_height_cb(struct vsx_shell_interface *shell)
+{
+        return 0;
+}
+
 static bool
 init_painter(struct vsx_main_data *main_data)
 {
@@ -757,7 +770,11 @@ create_main_data(void)
 
         main_data->asset_manager = vsx_asset_manager_new();
 
+        vsx_signal_init(&main_data->shell.name_size_signal);
+
         main_data->shell.share_link_cb = share_link_cb;
+        main_data->shell.set_name_position_cb = set_name_position_cb;
+        main_data->shell.get_name_height_cb = get_name_height_cb;
 
         return main_data;
 }

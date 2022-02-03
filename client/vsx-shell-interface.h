@@ -19,6 +19,8 @@
 #ifndef VSX_SHELL_INTERFACE_H
 #define VSX_SHELL_INTERFACE_H
 
+#include "vsx-signal.h"
+
 /* This struct defines callback functions used to communicate between
  * the upper layers and the painters.
  */
@@ -28,6 +30,26 @@ struct vsx_shell_interface {
         void
         (* share_link_cb)(struct vsx_shell_interface *shell,
                           const char *link);
+
+        /* Tell the upper layers about the y-position that we want the
+         * name entry to appear at.
+         */
+        void
+        (* set_name_position_cb)(struct vsx_shell_interface *shell,
+                                 int y_pos,
+                                 int max_width);
+
+        /* Ask the upper layers what size it has chosen for the name
+         * entry box.
+         */
+        int
+        (* get_name_height_cb)(struct vsx_shell_interface *shell);
+
+        /* Signal emitted by the upper layers to inform that a layout
+         * has occured and the final size of the name entry has been
+         * chosen.
+         */
+        struct vsx_signal name_size_signal;
 };
 
 #endif /* VSX_SHELL_INTERFACE_H */

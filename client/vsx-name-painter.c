@@ -48,6 +48,8 @@ struct vsx_name_painter {
         int button_x, button_y;
         int button_width, button_height;
 
+        struct vsx_listener name_size_listener;
+
         /* This is using its own pixel transformation because we don’t
          * want to take into account the board rotation.
          */
@@ -76,6 +78,18 @@ struct vertex {
 
 #define FONT VSX_FONT_TYPE_LABEL
 
+static void
+name_size_cb(struct vsx_listener *listener,
+             void *user_data)
+{
+        struct vsx_name_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_name_painter,
+                                 name_size_listener);
+
+        painter->layout_dirty = true;
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
 
 static void
 modified_cb(struct vsx_listener *listener,
@@ -89,7 +103,6 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
-        case VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT:
                 painter->layout_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
@@ -244,6 +257,10 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
                        &painter->shadow_painter_ready_listener);
 
+        painter->name_size_listener.notify = name_size_cb;
+        vsx_signal_add(&toolbox->shell->name_size_signal,
+                       &painter->name_size_listener);
+
         return painter;
 }
 
@@ -347,17 +364,19 @@ prepare_cb(void *painter_data)
                           font_metrics.ascender +
                           font_metrics.height * extents->n_lines);
 
-        vsx_game_state_set_name_position(painter->game_state,
-                                         name_y_pos,
-                                         painter->dialog_width -
-                                         inner_border * 2);
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
 
-        int name_height = vsx_game_state_get_name_height(painter->game_state);
+        shell->set_name_position_cb(shell,
+                                    name_y_pos,
+                                    painter->dialog_width -
+                                    inner_border * 2);
 
         int button_border = BUTTON_BORDER * paint_state->dpi * 10 / 254;
 
         const struct vsx_layout_extents *button_extents =
                 vsx_layout_get_logical_extents(painter->layouts[1].layout);
+
+        int name_height = shell->get_name_height_cb(shell);
 
         painter->button_x = (painter->dialog_x +
                              painter->dialog_width / 2 -
@@ -492,6 +511,7 @@ free_cb(void *painter_data)
 
         vsx_list_remove(&painter->shadow_painter_ready_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
+        vsx_list_remove(&painter->name_size_listener.link);
 
         struct vsx_gl *gl = painter->toolbox->gl;
 

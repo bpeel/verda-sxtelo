@@ -58,8 +58,6 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
         VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
         VSX_GAME_STATE_MODIFIED_TYPE_NOTE,
-        VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION,
-        VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
         VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE,
         VSX_GAME_STATE_MODIFIED_TYPE_RESET,
         VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED,
@@ -170,23 +168,6 @@ vsx_game_state_set_player_name(struct vsx_game_state *game_state,
 void
 vsx_game_state_set_note(struct vsx_game_state *game_state,
                         const char *text);
-
-void
-vsx_game_state_set_name_position(struct vsx_game_state *game_state,
-                                 int y_pos,
-                                 int width);
-
-void
-vsx_game_state_get_name_position(struct vsx_game_state *game_state,
-                                 int *y_pos,
-                                 int *width);
-
-void
-vsx_game_state_set_name_height(struct vsx_game_state *game_state,
-                               int height);
-
-int
-vsx_game_state_get_name_height(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_set_start_type(struct vsx_game_state *game_state,

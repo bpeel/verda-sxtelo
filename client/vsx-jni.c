@@ -79,6 +79,8 @@ struct data {
 
         jmethodID set_name_properties_method_id;
 
+        int name_y, name_width, name_height;
+
         /* Graphics data that needs to be recreated when the context changes */
 
         struct vsx_gl *gl;
@@ -196,6 +198,42 @@ share_link_cb(struct vsx_shell_interface *shell,
                                  link_string);
 }
 
+static void
+update_name_properties(struct data *data)
+{
+        enum vsx_dialog dialog = vsx_game_state_get_dialog(data->game_state);
+
+        call_void_surface_method(data,
+                                 data->set_name_properties_method_id,
+                                 (int) (dialog == VSX_DIALOG_NAME),
+                                 data->name_y,
+                                 data->name_width);
+}
+
+static void
+set_name_position_cb(struct vsx_shell_interface *shell,
+                     int y_pos,
+                     int max_width)
+{
+        struct data *data = vsx_container_of(shell, struct data, shell);
+
+        if (y_pos == data->name_y && max_width == data->name_width)
+                return;
+
+        data->name_y = y_pos;
+        data->name_width = max_width;
+
+        update_name_properties(data);
+}
+
+static int
+get_name_height_cb(struct vsx_shell_interface *shell)
+{
+        struct data *data = vsx_container_of(shell, struct data, shell);
+
+        return data->name_height;
+}
+
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -232,7 +270,11 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "setNameProperties",
                                     "(ZII)V");
 
+        vsx_signal_init(&data->shell.name_size_signal);
+
         data->shell.share_link_cb = share_link_cb;
+        data->shell.set_name_position_cb = set_name_position_cb;
+        data->shell.get_name_height_cb = get_name_height_cb;
 
         vsx_thread_set_jvm(data->jvm);
 
@@ -277,21 +319,6 @@ load_instance_state(struct data *data)
 }
 
 static void
-update_name_properties(struct data *data)
-{
-        enum vsx_dialog dialog = vsx_game_state_get_dialog(data->game_state);
-
-        int y_pos, width;
-
-        vsx_game_state_get_name_position(data->game_state, &y_pos, &width);
-
-        call_void_surface_method(data,
-                                 data->set_name_properties_method_id,
-                                 (int) (dialog == VSX_DIALOG_NAME),
-                                 y_pos, width);
-}
-
-static void
 modified_cb(struct vsx_listener *listener,
             void *user_data)
 {
@@ -302,7 +329,6 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
-        case VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION:
                 update_name_properties(data);
                 break;
         default:
@@ -505,7 +531,12 @@ VSX_JNI_RENDERER_PREFIX(setNameHeight)(JNIEnv *env,
 {
         struct data *data = GET_DATA(native_data);
 
-        vsx_game_state_set_name_height(data->game_state, height);
+        if (height == data->name_height)
+                return;
+
+        data->name_height = height;
+
+        vsx_signal_emit(&data->shell.name_size_signal, NULL);
 }
 
 JNIEXPORT void JNICALL
