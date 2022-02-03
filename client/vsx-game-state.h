@@ -43,9 +43,9 @@ enum vsx_game_state_player_flag {
         VSX_GAME_STATE_PLAYER_FLAG_NEXT_TURN = (1 << 2),
 };
 
-enum vsx_game_state_name_type {
-        VSX_GAME_STATE_NAME_TYPE_NEW_GAME,
-        VSX_GAME_STATE_NAME_TYPE_JOIN_GAME,
+enum vsx_game_state_start_type {
+        VSX_GAME_STATE_START_TYPE_NEW_GAME,
+        VSX_GAME_STATE_START_TYPE_JOIN_GAME,
 };
 
 enum vsx_game_state_modified_type {
@@ -60,7 +60,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_NOTE,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_POSITION,
         VSX_GAME_STATE_MODIFIED_TYPE_NAME_HEIGHT,
-        VSX_GAME_STATE_MODIFIED_TYPE_NAME_TYPE,
+        VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE,
         VSX_GAME_STATE_MODIFIED_TYPE_RESET,
         VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED,
 };
@@ -189,11 +189,11 @@ int
 vsx_game_state_get_name_height(struct vsx_game_state *game_state);
 
 void
-vsx_game_state_set_name_type(struct vsx_game_state *game_state,
-                             enum vsx_game_state_name_type type);
+vsx_game_state_set_start_type(struct vsx_game_state *game_state,
+                              enum vsx_game_state_start_type type);
 
-enum vsx_game_state_name_type
-vsx_game_state_get_name_type(struct vsx_game_state *game_state);
+enum vsx_game_state_start_type
+vsx_game_state_get_start_type(struct vsx_game_state *game_state);
 
 bool
 vsx_game_state_get_started(struct vsx_game_state *game_state);

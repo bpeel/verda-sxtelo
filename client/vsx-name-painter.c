@@ -278,12 +278,12 @@ update_layout_text(struct vsx_name_painter *painter)
                 vsx_game_state_get_language(painter->game_state);
         enum vsx_text note_text, button_text;
 
-        switch (vsx_game_state_get_name_type(painter->game_state)) {
-        case VSX_GAME_STATE_NAME_TYPE_NEW_GAME:
+        switch (vsx_game_state_get_start_type(painter->game_state)) {
+        case VSX_GAME_STATE_START_TYPE_NEW_GAME:
                 note_text = VSX_TEXT_ENTER_NAME_NEW_GAME;
                 button_text = VSX_TEXT_NAME_BUTTON_NEW_GAME;
                 goto found;
-        case VSX_GAME_STATE_NAME_TYPE_JOIN_GAME:
+        case VSX_GAME_STATE_START_TYPE_JOIN_GAME:
                 note_text = VSX_TEXT_ENTER_NAME_JOIN_GAME;
                 button_text = VSX_TEXT_NAME_BUTTON_JOIN_GAME;
                 goto found;

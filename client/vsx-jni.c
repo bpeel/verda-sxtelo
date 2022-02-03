@@ -342,9 +342,9 @@ ensure_game_state(struct data *data)
                                                       data->game_language_code);
 
                 if (data->has_conversation_id) {
-                        enum vsx_game_state_name_type type =
-                                VSX_GAME_STATE_NAME_TYPE_JOIN_GAME;
-                        vsx_game_state_set_name_type(data->game_state, type);
+                        enum vsx_game_state_start_type type =
+                                VSX_GAME_STATE_START_TYPE_JOIN_GAME;
+                        vsx_game_state_set_start_type(data->game_state, type);
                 }
 
                 struct vsx_signal *signal =

@@ -2222,11 +2222,11 @@ check_blank_players(struct harness *harness)
 }
 
 static bool
-check_name_type(struct harness *harness,
-                enum vsx_game_state_name_type expected_type)
+check_start_type(struct harness *harness,
+                 enum vsx_game_state_start_type expected_type)
 {
-        enum vsx_game_state_name_type actual_type =
-                vsx_game_state_get_name_type(harness->game_state);
+        enum vsx_game_state_start_type actual_type =
+                vsx_game_state_get_start_type(harness->game_state);
 
         if (actual_type != expected_type) {
                 fprintf(stderr,
@@ -2338,8 +2338,8 @@ test_reset(void)
          */
         vsx_game_state_set_dialog(harness->game_state,
                                   VSX_DIALOG_INVITE_LINK);
-        vsx_game_state_set_name_type(harness->game_state,
-                                     VSX_GAME_STATE_NAME_TYPE_JOIN_GAME);
+        vsx_game_state_set_start_type(harness->game_state,
+                                      VSX_GAME_STATE_START_TYPE_JOIN_GAME);
 
         closure.events_triggered = 0;
         closure.modifieds_triggered = 0;
@@ -2362,7 +2362,7 @@ test_reset(void)
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER) |
-                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_NAME_TYPE) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED));
@@ -2422,7 +2422,7 @@ test_reset(void)
                 goto out;
         }
 
-        if (!check_name_type(harness, VSX_GAME_STATE_NAME_TYPE_NEW_GAME)) {
+        if (!check_start_type(harness, VSX_GAME_STATE_START_TYPE_NEW_GAME)) {
                 ret = false;
                 goto out;
         }
