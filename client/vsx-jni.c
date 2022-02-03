@@ -34,7 +34,6 @@
 #include "vsx-connection.h"
 #include "vsx-worker.h"
 #include "vsx-id-url.h"
-#include "vsx-share-link-callback.h"
 
 #define TAG "Anagrams"
 
@@ -91,6 +90,8 @@ struct data {
 
         struct vsx_game_painter *game_painter;
         struct vsx_listener redraw_needed_listener;
+
+        struct vsx_shell_interface shell;
 };
 
 static void *
@@ -179,10 +180,10 @@ wakeup_cb(void *user_data)
 }
 
 static void
-share_link_cb(const char *link,
-              void *user_data)
+share_link_cb(struct vsx_shell_interface *shell,
+              const char *link)
 {
-        struct data *data = user_data;
+        struct data *data = vsx_container_of(shell, struct data, shell);
 
         JNIEnv *env;
 
@@ -230,6 +231,8 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     data->surface_class,
                                     "setNameProperties",
                                     "(ZII)V");
+
+        data->shell.share_link_cb = share_link_cb;
 
         vsx_thread_set_jvm(data->jvm);
 
@@ -389,8 +392,7 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
                                                   data->game_state,
                                                   data->asset_manager,
                                                   data->dpi,
-                                                  share_link_cb,
-                                                  data,
+                                                  &data->shell,
                                                   &error);
 
         if (data->game_painter == NULL) {

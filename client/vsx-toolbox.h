@@ -27,7 +27,7 @@
 #include "vsx-font.h"
 #include "vsx-shadow-painter.h"
 #include "vsx-paint-state.h"
-#include "vsx-share-link-callback.h"
+#include "vsx-shell-interface.h"
 
 struct vsx_toolbox {
         struct vsx_gl *gl;
@@ -38,9 +38,7 @@ struct vsx_toolbox {
         struct vsx_font_library *font_library;
         struct vsx_shadow_painter *shadow_painter;
         struct vsx_paint_state paint_state;
-
-        vsx_share_link_callback share_link_callback;
-        void *share_link_data;
+        struct vsx_shell_interface *shell;
 };
 
 #endif /* VSX_TOOLBOX_H */

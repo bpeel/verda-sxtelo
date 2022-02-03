@@ -76,6 +76,8 @@ struct vsx_main_data {
 
         struct vsx_game_state *game_state;
 
+        struct vsx_shell_interface shell;
+
         bool button_pressed;
         int mouse_x, mouse_y;
         Uint32 button_pressed_device;
@@ -355,10 +357,11 @@ redraw_needed_cb(struct vsx_listener *listener,
 }
 
 static void
-share_link_cb(const char *link,
-              void *user_data)
+share_link_cb(struct vsx_shell_interface *shell,
+              const char *link)
 {
-        struct vsx_main_data *main_data = user_data;
+        struct vsx_main_data *main_data =
+                vsx_container_of(shell, struct vsx_main_data, shell);
 
         SDL_SetClipboardText(link);
 
@@ -379,8 +382,7 @@ init_painter(struct vsx_main_data *main_data)
                                      main_data->game_state,
                                      main_data->asset_manager,
                                      DPI,
-                                     share_link_cb,
-                                     main_data, /* share_link_data */
+                                     &main_data->shell,
                                      &error);
 
         if (game_painter == NULL) {
@@ -754,6 +756,8 @@ create_main_data(void)
         struct vsx_main_data *main_data = vsx_calloc(sizeof *main_data);
 
         main_data->asset_manager = vsx_asset_manager_new();
+
+        main_data->shell.share_link_cb = share_link_cb;
 
         return main_data;
 }

@@ -16,11 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_SHARE_LINK_CALLBACK_H
-#define VSX_SHARE_LINK_CALLBACK_H
+#ifndef VSX_SHELL_INTERFACE_H
+#define VSX_SHELL_INTERFACE_H
 
-typedef void
-(* vsx_share_link_callback)(const char *link,
-                            void *user_data);
+/* This struct defines callback functions used to communicate between
+ * the upper layers and the painters.
+ */
 
-#endif /* VSX_SHARE_LINK_CALLBACK_H */
+struct vsx_shell_interface {
+        /* Ask the upper layers to share a link */
+        void
+        (* share_link_cb)(struct vsx_shell_interface *shell,
+                          const char *link);
+};
+
+#endif /* VSX_SHELL_INTERFACE_H */
