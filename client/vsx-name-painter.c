@@ -487,17 +487,35 @@ get_redraw_needed_signal_cb(void *painter_data)
         return &painter->redraw_needed_signal;
 }
 
+static void
+handle_click(struct vsx_name_painter *painter,
+             const struct vsx_input_event *event)
+{
+        if (event->click.x < painter->button_x ||
+            event->click.x >= painter->button_x + painter->button_width ||
+            event->click.y < painter->button_y ||
+            event->click.y >= painter->button_y + painter->button_height)
+                return;
+
+        painter->toolbox->shell->request_name_cb(painter->toolbox->shell);
+}
+
 static bool
 input_event_cb(void *painter_data,
                const struct vsx_input_event *event)
 {
+        struct vsx_name_painter *painter = painter_data;
+
         switch (event->type) {
         case VSX_INPUT_EVENT_TYPE_DRAG_START:
         case VSX_INPUT_EVENT_TYPE_DRAG:
         case VSX_INPUT_EVENT_TYPE_ZOOM_START:
         case VSX_INPUT_EVENT_TYPE_ZOOM:
-        case VSX_INPUT_EVENT_TYPE_CLICK:
                 /* Block all input until the player enters a name */
+                return true;
+
+        case VSX_INPUT_EVENT_TYPE_CLICK:
+                handle_click(painter, event);
                 return true;
         }
 
