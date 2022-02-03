@@ -79,6 +79,8 @@ struct data {
 
         jmethodID set_name_properties_method_id;
 
+        jmethodID request_name_method_id;
+
         int name_y, name_width, name_height;
 
         /* Graphics data that needs to be recreated when the context changes */
@@ -234,6 +236,14 @@ get_name_height_cb(struct vsx_shell_interface *shell)
         return data->name_height;
 }
 
+static void
+request_name_cb(struct vsx_shell_interface *shell)
+{
+        struct data *data = vsx_container_of(shell, struct data, shell);
+
+        call_void_surface_method(data, data->request_name_method_id);
+}
+
 JNIEXPORT jlong JNICALL
 VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                           jobject this,
@@ -270,11 +280,18 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "setNameProperties",
                                     "(ZII)V");
 
+        data->request_name_method_id =
+                (*env)->GetMethodID(env,
+                                    data->surface_class,
+                                    "requestName",
+                                    "()V");
+
         vsx_signal_init(&data->shell.name_size_signal);
 
         data->shell.share_link_cb = share_link_cb;
         data->shell.set_name_position_cb = set_name_position_cb;
         data->shell.get_name_height_cb = get_name_height_cb;
+        data->shell.request_name_cb = request_name_cb;
 
         vsx_thread_set_jvm(data->jvm);
 

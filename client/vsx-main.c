@@ -384,6 +384,25 @@ get_name_height_cb(struct vsx_shell_interface *shell)
         return 0;
 }
 
+static void
+request_name_cb(struct vsx_shell_interface *shell)
+{
+        struct vsx_main_data *main_data =
+                vsx_container_of(shell, struct vsx_main_data, shell);
+
+        const char *player_name = option_player_name;
+
+        if (player_name == NULL) {
+                player_name = getlogin();
+                if (player_name == NULL)
+                        player_name = "?";
+        }
+
+        vsx_game_state_set_player_name(main_data->game_state, player_name);
+        vsx_game_state_set_dialog(main_data->game_state,
+                                  VSX_DIALOG_INVITE_LINK);
+}
+
 static bool
 init_painter(struct vsx_main_data *main_data)
 {
@@ -526,25 +545,6 @@ handle_mouse_wheel(struct vsx_main_data *main_data,
 }
 
 static void
-set_connection_name(struct vsx_main_data *main_data)
-{
-        if (vsx_game_state_get_dialog(main_data->game_state) != VSX_DIALOG_NAME)
-                return;
-
-        const char *player_name = option_player_name;
-
-        if (player_name == NULL) {
-                player_name = getlogin();
-                if (player_name == NULL)
-                        player_name = "?";
-        }
-
-        vsx_game_state_set_player_name(main_data->game_state, player_name);
-        vsx_game_state_set_dialog(main_data->game_state,
-                                  VSX_DIALOG_INVITE_LINK);
-}
-
-static void
 handle_mouse_button(struct vsx_main_data *main_data,
                     const SDL_MouseButtonEvent *event)
 {
@@ -570,13 +570,6 @@ handle_mouse_button(struct vsx_main_data *main_data,
                 main_data->button_pressed = false;
                 vsx_game_painter_release_finger(main_data->game_painter,
                                                 0 /* finger */);
-
-                /* The SDL client doesn’t implement the input field
-                 * for the name so there’s no proper way to get rid of
-                 * the name dialog. For now there’s this hack to just
-                 * close the dialog whenever a button is pressed.
-                 */
-                set_connection_name(main_data);
         }
 }
 
@@ -775,6 +768,7 @@ create_main_data(void)
         main_data->shell.share_link_cb = share_link_cb;
         main_data->shell.set_name_position_cb = set_name_position_cb;
         main_data->shell.get_name_height_cb = get_name_height_cb;
+        main_data->shell.request_name_cb = request_name_cb;
 
         return main_data;
 }

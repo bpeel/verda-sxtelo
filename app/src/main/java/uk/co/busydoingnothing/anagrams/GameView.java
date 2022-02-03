@@ -29,6 +29,8 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -212,6 +214,36 @@ public class GameView extends GLSurfaceView
 
           if (nameTextView != null)
             nameTextView.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+      });
+  }
+
+  public void requestName()
+  {
+    Handler mainHandler = new Handler(context.getMainLooper());
+
+    mainHandler.post(new Runnable() {
+        @Override
+        public void run()
+        {
+          ViewParent parent = getParent();
+
+          if (!(parent instanceof GameLayout))
+            return;
+
+          GameLayout layout = (GameLayout) parent;
+
+          EditText nameTextView = layout.findViewById(R.id.player_name);
+
+          if (nameTextView != null) {
+            setPlayerName(nameTextView.getText());
+
+            InputMethodManager imm =
+              (InputMethodManager)
+              context.getSystemService(Context.INPUT_METHOD_SERVICE);
+
+            imm.hideSoftInputFromWindow(nameTextView.getWindowToken(), 0);
+          }
         }
       });
   }

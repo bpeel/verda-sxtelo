@@ -45,6 +45,13 @@ struct vsx_shell_interface {
         int
         (* get_name_height_cb)(struct vsx_shell_interface *shell);
 
+        /* Request that the upper layers set the name that the user
+         * has typed in. This is called in response to the user
+         * clicking the join/new game button.
+         */
+        void
+        (* request_name_cb)(struct vsx_shell_interface *shell);
+
         /* Signal emitted by the upper layers to inform that a layout
          * has occured and the final size of the name entry has been
          * chosen.
