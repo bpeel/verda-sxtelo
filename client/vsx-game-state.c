@@ -88,7 +88,7 @@ struct vsx_game_state {
         int name_y_pos;
         int name_width, name_height;
 
-        enum vsx_text name_note;
+        enum vsx_game_state_name_type name_type;
 
         struct vsx_main_thread *main_thread;
         struct vsx_worker *worker;
@@ -824,25 +824,25 @@ vsx_game_state_get_name_height(struct vsx_game_state *game_state)
 }
 
 void
-vsx_game_state_set_name_note(struct vsx_game_state *game_state,
-                             enum vsx_text note)
+vsx_game_state_set_name_type(struct vsx_game_state *game_state,
+                             enum vsx_game_state_name_type type)
 {
-        if (game_state->name_note == note)
+        if (game_state->name_type == type)
                 return;
 
-        game_state->name_note = note;
+        game_state->name_type = type;
 
         struct vsx_game_state_modified_event event = {
-                .type = VSX_GAME_STATE_MODIFIED_TYPE_NAME_NOTE,
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_NAME_TYPE,
         };
 
         vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
-enum vsx_text
-vsx_game_state_get_name_note(struct vsx_game_state *game_state)
+enum vsx_game_state_name_type
+vsx_game_state_get_name_type(struct vsx_game_state *game_state)
 {
-        return game_state->name_note;
+        return game_state->name_type;
 }
 
 bool
@@ -912,7 +912,7 @@ vsx_game_state_new(struct vsx_main_thread *main_thread,
         game_state->instance_state.dialog = game_state->dialog;
 
         game_state->name_height = 30;
-        game_state->name_note = VSX_TEXT_ENTER_NAME_NEW_GAME;
+        game_state->name_type = VSX_GAME_STATE_NAME_TYPE_NEW_GAME;
 
         vsx_worker_lock(game_state->worker);
 
@@ -1039,7 +1039,8 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
         reset_player_names(game_state);
         reset_player_flags(game_state);
         vsx_game_state_set_dialog(game_state, VSX_DIALOG_NAME);
-        vsx_game_state_set_name_note(game_state, VSX_TEXT_ENTER_NAME_NEW_GAME);
+        vsx_game_state_set_name_type(game_state,
+                                     VSX_GAME_STATE_NAME_TYPE_NEW_GAME);
 
         reset_tiles(game_state);
 

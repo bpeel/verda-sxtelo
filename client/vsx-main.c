@@ -458,8 +458,9 @@ init_restartable_data(struct vsx_main_data *main_data)
                                                    "en");
 
         if (option_conversation_id_specified || option_room) {
-                vsx_game_state_set_name_note(main_data->game_state,
-                                             VSX_TEXT_ENTER_NAME_JOIN_GAME);
+                enum vsx_game_state_name_type type =
+                        VSX_GAME_STATE_NAME_TYPE_JOIN_GAME;
+                vsx_game_state_set_name_type(main_data->game_state, type);
         }
 
         if (!init_painter(main_data))

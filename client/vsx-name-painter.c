@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <assert.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-gl.h"
@@ -244,6 +245,30 @@ update_transform(struct vsx_name_painter *painter,
 }
 
 static void
+update_layout_text(struct vsx_name_painter *painter)
+{
+        enum vsx_text_language language =
+                vsx_game_state_get_language(painter->game_state);
+        enum vsx_text note_text;
+
+        switch (vsx_game_state_get_name_type(painter->game_state)) {
+        case VSX_GAME_STATE_NAME_TYPE_NEW_GAME:
+                note_text = VSX_TEXT_ENTER_NAME_NEW_GAME;
+                goto found;
+        case VSX_GAME_STATE_NAME_TYPE_JOIN_GAME:
+                note_text = VSX_TEXT_ENTER_NAME_JOIN_GAME;
+                goto found;
+        }
+
+        assert(!"Unknown name type");
+
+        return;
+
+found:
+        vsx_layout_set_text(painter->layout, vsx_text_get(language, note_text));
+}
+
+static void
 prepare_cb(void *painter_data)
 {
         struct vsx_name_painter *painter = painter_data;
@@ -267,11 +292,7 @@ prepare_cb(void *painter_data)
 
         vsx_layout_set_width(painter->layout, inner_width);
 
-        enum vsx_text_language language =
-                vsx_game_state_get_language(painter->game_state);
-        enum vsx_text note =
-                vsx_game_state_get_name_note(painter->game_state);
-        vsx_layout_set_text(painter->layout, vsx_text_get(language, note));
+        update_layout_text(painter);
 
         vsx_layout_prepare(painter->layout);
 
