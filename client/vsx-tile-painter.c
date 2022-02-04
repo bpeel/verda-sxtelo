@@ -40,9 +40,27 @@
 
 struct vsx_tile_painter_tile {
         int num;
+        /* The position that the tile should be drawn at. This will
+         * change as the tile is animated.
+         */
         int16_t current_x, current_y;
+        /* The start position of the animation */
         int16_t start_x, start_y;
+        /* The end position of the animation */
         int16_t target_x, target_y;
+        /* The last position reported by the server. This can be
+         * different from the target position if the tile currently
+         * has an override.
+         */
+        int16_t server_x, server_y;
+
+        /* True if the tile has been manipulated by the user and it’s
+         * target position has been overriden to be different from
+         * what the server reported.
+         */
+        bool overridden;
+        /* Link if the override list if the tile is overridden */
+        struct vsx_list override_link;
 
         bool animating;
         int64_t animation_start_time;
@@ -72,6 +90,17 @@ struct vsx_tile_painter {
         struct vsx_list tile_list;
         /* Slab allocator for the tiles */
         struct vsx_slab_allocator tile_allocator;
+
+        /* Timeout that will clear all of the overides when fired. The
+         * idea is that after this point the server will have had
+         * enough time to process the update and if it hasn’t updated
+         * the tile position before then then the manipulation hasn’t
+         * worked and it’s better to revert back to the server’s
+         * position.
+         */
+        struct vsx_main_thread_token *override_timeout;
+        /* List of tiles that are currently overriden */
+        struct vsx_list overrides;
 
         /* The tile that is currently being dragged or NULL if there
          * is no tile.
@@ -114,6 +143,21 @@ struct vertex {
  * 0.5 second to travel the width of the board.
  */
 #define ANIMATION_SPEED (VSX_BOARD_WIDTH * 2)
+
+/* Time in microseconds since the last override before reverting back
+ * to what the server reported.
+ */
+#define OVERRIDE_TIMEOUT (3 * 1000 * 1000)
+
+static void
+remove_override_timeout(struct vsx_tile_painter *painter)
+{
+        if (painter->override_timeout == NULL)
+                return;
+
+        vsx_main_thread_cancel_idle(painter->override_timeout);
+        painter->override_timeout = NULL;
+}
 
 static void
 ensure_n_tiles(struct vsx_tile_painter *painter,
@@ -218,16 +262,75 @@ start_animation(struct vsx_tile_painter_tile *tile)
 }
 
 static void
-cancel_drag(struct vsx_tile_painter *painter)
+cancel_override(struct vsx_tile_painter *painter,
+                struct vsx_tile_painter_tile *tile)
 {
-        struct vsx_tile_painter_tile *tile = painter->dragging_tile;
-
-        if (tile == NULL)
+        if (!tile->overridden)
                 return;
 
-        start_animation(tile);
+        tile->overridden = false;
+        vsx_list_remove(&tile->override_link);
 
-        painter->dragging_tile = NULL;
+        tile->target_x = tile->server_x;
+        tile->target_y = tile->server_y;
+
+        if (painter->dragging_tile == tile)
+                painter->dragging_tile = NULL;
+
+        start_animation(tile);
+}
+
+static void
+cancel_all_overrides(struct vsx_tile_painter *painter)
+{
+        struct vsx_tile_painter_tile *tile, *tmp;
+
+        vsx_list_for_each_safe(tile, tmp, &painter->overrides, override_link) {
+                cancel_override(painter, tile);
+        }
+
+        assert(vsx_list_empty(&painter->overrides));
+        assert(painter->dragging_tile == NULL);
+
+        remove_override_timeout(painter);
+}
+
+static void
+cancel_overrides_cb(void *user_data)
+{
+        struct vsx_tile_painter *painter = user_data;
+
+        painter->override_timeout = NULL;
+
+        if (!vsx_list_empty(&painter->overrides)) {
+                cancel_all_overrides(painter);
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        }
+}
+
+static void
+set_override_timeout(struct vsx_tile_painter *painter)
+{
+        remove_override_timeout(painter);
+
+        painter->override_timeout =
+                vsx_main_thread_queue_timeout(painter->toolbox->main_thread,
+                                              OVERRIDE_TIMEOUT,
+                                              cancel_overrides_cb,
+                                              painter);
+}
+
+static void
+override_tile(struct vsx_tile_painter *painter,
+              struct vsx_tile_painter_tile *tile)
+{
+        set_override_timeout(painter);
+
+        if (tile->overridden)
+                return;
+
+        vsx_list_insert(&painter->overrides, &tile->override_link);
+        tile->overridden = true;
 }
 
 static void
@@ -253,27 +356,33 @@ handle_tile_event(struct vsx_tile_painter *painter,
                 tile->letter_data = find_letter(event->tile_changed.letter);
                 tile->current_x = VSX_BOARD_WIDTH;
                 tile->current_y = VSX_BOARD_HEIGHT / 4;
+                tile->overridden = false;
         }
 
-        tile->target_x = event->tile_changed.x;
-        tile->target_y = event->tile_changed.y;
+        tile->server_x = event->tile_changed.x;
+        tile->server_y = event->tile_changed.y;
 
         int self = vsx_game_state_get_self(painter->game_state);
 
-        if (tile == painter->dragging_tile) {
+        if (tile->overridden) {
                 if (event->tile_changed.last_player_moved != self) {
                         /* The tile has been moved by someone else
-                         * while we were trying to drag it. Cancel the
-                         * drag.
+                         * while we were trying to manipulate it. Cancel the
+                         * override.
                          */
-                        cancel_drag(painter);
+                        cancel_override(painter, tile);
                 }
-        } else if (event->synced) {
-                start_animation(tile);
         } else {
-                tile->animating = false;
-                tile->current_x = tile->target_x;
-                tile->current_y = tile->target_y;
+                tile->target_x = tile->server_x;
+                tile->target_y = tile->server_y;
+
+                if (event->synced) {
+                        start_animation(tile);
+                } else {
+                        tile->animating = false;
+                        tile->current_x = tile->target_x;
+                        tile->current_y = tile->target_y;
+                }
         }
 
         if (is_new || event->tile_changed.last_player_moved != self)
@@ -307,10 +416,11 @@ static void
 clear_tiles(struct vsx_tile_painter *painter)
 {
         painter->snap_tile = NULL;
-        cancel_drag(painter);
+        cancel_all_overrides(painter);
 
         vsx_buffer_set_length(&painter->tiles_by_index, 0);
         vsx_list_init(&painter->tile_list);
+        vsx_list_init(&painter->overrides);
         vsx_slab_destroy(&painter->tile_allocator);
         vsx_slab_init(&painter->tile_allocator);
 
@@ -396,6 +506,7 @@ create_cb(struct vsx_game_state *game_state,
         vsx_buffer_init(&painter->tiles_by_index);
         vsx_slab_init(&painter->tile_allocator);
         vsx_list_init(&painter->tile_list);
+        vsx_list_init(&painter->overrides);
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
@@ -512,7 +623,8 @@ static bool
 handle_click(struct vsx_tile_painter *painter,
              const struct vsx_input_event *event)
 {
-        cancel_drag(painter);
+        if (is_other_shouting(painter))
+                return false;
 
         if (painter->snap_tile == NULL)
                 return false;
@@ -544,7 +656,16 @@ handle_click(struct vsx_tile_painter *painter,
                                  tile->num,
                                  painter->snap_x,
                                  painter->snap_y);
+
+        tile->target_x = painter->snap_x;
+        tile->target_y = painter->snap_y;
+
         painter->snap_x += TILE_SIZE;
+
+        override_tile(painter, tile);
+        start_animation(tile);
+        raise_tile(painter, tile);
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 
         return true;
 }
@@ -562,13 +683,13 @@ handle_drag_start(struct vsx_tile_painter *painter,
                               event->drag.x, event->drag.y,
                               &board_x, &board_y);
 
-        cancel_drag(painter);
-
         struct vsx_tile_painter_tile *tile =
                 find_tile_at_pos(painter, board_x, board_y);
 
         if (tile == NULL)
                 return false;
+
+        override_tile(painter, tile);
 
         painter->dragging_tile = tile;
         painter->drag_offset_x = tile->current_x - board_x;
@@ -835,13 +956,13 @@ paint_cb(void *painter_data)
         if (n_tiles <= 0)
                 return;
 
-        /* Cancel any running drag if another player started shouting
+        /* Cancel any overrides if another player started shouting
          * before the server heard about our attempt. That way the
          * tile will snap back to where the server last reported it to
          * be.
          */
         if (is_other_shouting(painter))
-                cancel_drag(painter);
+                cancel_all_overrides(painter);
 
         bool any_tiles_animating = update_tile_animations(painter);
 
@@ -926,6 +1047,8 @@ static void
 free_cb(void *painter_data)
 {
         struct vsx_tile_painter *painter = painter_data;
+
+        remove_override_timeout(painter);
 
         vsx_list_remove(&painter->event_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
