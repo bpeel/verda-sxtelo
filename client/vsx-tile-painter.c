@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdalign.h>
+#include <limits.h>
 
 #include "vsx-map-buffer.h"
 #include "vsx-quad-buffer.h"
@@ -103,6 +104,12 @@ struct vertex {
 };
 
 #define TILE_SIZE 20
+
+/* We’ll pretend the tile is bigger than it is when looking for a tile
+ * to process an input event in order to give the player a bigger area
+ * to click on.
+ */
+#define INPUT_TILE_SIZE (TILE_SIZE * 2)
 
 /* The speed of tile animations measured in board units per second.
  *
@@ -457,20 +464,38 @@ find_tile_at_pos(struct vsx_tile_painter *painter,
             board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
                 return NULL;
 
-        struct vsx_tile_painter_tile *found_tile = NULL;
+        struct vsx_tile_painter_tile *best_tile = NULL;
         struct vsx_tile_painter_tile *tile;
 
-        vsx_list_for_each(tile, &painter->tile_list, link) {
-                if (board_x < tile->current_x ||
-                    board_x >= tile->current_x + TILE_SIZE ||
-                    board_y < tile->current_y ||
-                    board_y >= tile->current_y + TILE_SIZE)
+        int best_distance_2 = INT_MAX;
+
+        vsx_list_for_each_reverse(tile, &painter->tile_list, link) {
+                int tile_center_x = tile->current_x + TILE_SIZE / 2;
+                int tile_center_y = tile->current_y + TILE_SIZE / 2;
+                int dx = abs(board_x - tile_center_x);
+                int dy = abs(board_y - tile_center_y);
+
+                if (dx > INPUT_TILE_SIZE / 2 || dy > INPUT_TILE_SIZE / 2)
                         continue;
 
-                found_tile = tile;
+                /* If the click is actually on a tile then we’ll use
+                 * it straight away so that it will always use the
+                 * topmost one.
+                 */
+                if (dx <= TILE_SIZE / 2 && dy <= TILE_SIZE / 2)
+                        return tile;
+
+                /* Calculate the distance squared */
+                int distance_2 = dx * dx + dy * dy;
+                /* Pick the closest tile */
+                if (distance_2 < best_distance_2) {
+                        best_distance_2 = distance_2;
+                        best_tile = tile;
+                }
+
         }
 
-        return found_tile;
+        return best_tile;
 }
 
 static bool
