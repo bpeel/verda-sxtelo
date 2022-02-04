@@ -83,7 +83,7 @@ struct vsx_game_painter {
 /* Max distance in mm above which a mouse movement is no longer
  * considered a click.
  */
-#define MAX_CLICK_DISTANCE 3
+#define MAX_CLICK_DISTANCE 1
 
 static void
 redraw_needed_cb(struct vsx_listener *listener,
