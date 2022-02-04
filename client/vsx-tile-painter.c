@@ -81,8 +81,6 @@ struct vsx_tile_painter {
          * topleft of the tile.
          */
         int drag_offset_x, drag_offset_y;
-        /* The event position of the start of the drag. */
-        int drag_start_event_x, drag_start_event_y;
 
         /* Tile that we will move next to if any other tile is
          * clicked, or NULL if no snap position is known. The position
@@ -573,8 +571,6 @@ handle_drag_start(struct vsx_tile_painter *painter,
                 return false;
 
         painter->dragging_tile = tile;
-        painter->drag_start_event_x = event->drag.x;
-        painter->drag_start_event_y = event->drag.y;
         painter->drag_offset_x = tile->current_x - board_x;
         painter->drag_offset_y = tile->current_y - board_y;
         tile->animating = false;
