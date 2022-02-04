@@ -307,11 +307,13 @@ store_drag_start(struct vsx_game_painter *painter)
                 event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
                 event.drag.x = painter->fingers[0].last_x;
                 event.drag.y = painter->fingers[0].last_y;
+                event.drag.maybe_click = painter->maybe_click;
                 break;
         case 2:
                 event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
                 event.drag.x = painter->fingers[1].last_x;
                 event.drag.y = painter->fingers[1].last_y;
+                event.drag.maybe_click = painter->maybe_click;
                 break;
         case 3:
                 event.type = VSX_INPUT_EVENT_TYPE_ZOOM_START;
@@ -375,6 +377,7 @@ handle_drag(struct vsx_game_painter *painter,
                 .drag = {
                         .x = finger->last_x,
                         .y = finger->last_y,
+                        .maybe_click = painter->maybe_click,
                 },
         };
 

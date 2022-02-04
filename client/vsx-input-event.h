@@ -33,6 +33,7 @@ struct vsx_input_event {
         union {
                 struct {
                         int x, y;
+                        bool maybe_click;
                 } drag;
 
                 struct {
