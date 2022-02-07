@@ -31,13 +31,13 @@
 #include "vsx-shader-data.h"
 #include "vsx-map-buffer.h"
 #include "vsx-buffer.h"
-#include "vsx-quad-buffer.h"
 
 struct vsx_layout {
         struct vsx_toolbox *toolbox;
         struct vsx_font *font;
         struct vsx_array_object *vao;
-        GLuint vbo, element_buffer;
+        GLuint vbo;
+        struct vsx_quad_tool_buffer *quad_buffer;
         char *text;
         bool dirty;
         size_t buffer_size;
@@ -337,10 +337,8 @@ free_buffer(struct vsx_layout *layout)
                 layout->vbo = 0;
         }
 
-        if (layout->element_buffer) {
-                gl->glDeleteBuffers(1, &layout->element_buffer);
-                layout->element_buffer = 0;
-        }
+        if (layout->quad_buffer)
+                vsx_quad_tool_unref_buffer(layout->quad_buffer, gl);
 }
 
 static void
@@ -391,10 +389,9 @@ ensure_buffer_size(struct vsx_layout *layout,
                                        layout->vbo,
                                        offsetof(struct vertex, s));
 
-        layout->element_buffer =
-                vsx_quad_buffer_generate(layout->vao,
-                                         gl,
-                                         layout->toolbox->map_buffer,
+        layout->quad_buffer =
+                vsx_quad_tool_get_buffer(layout->toolbox->quad_tool,
+                                         layout->vao,
                                          alloc_size /
                                          sizeof (struct vertex) /
                                          4);
@@ -559,7 +556,7 @@ submit_layout(struct vsx_layout *layout)
                                            start_index,
                                            start_index + n_verts - 1,
                                            draw_calls[i].n_elements,
-                                           GL_UNSIGNED_SHORT,
+                                           layout->quad_buffer->type,
                                            (void *) (intptr_t)
                                            draw_calls[i].offset);
 
