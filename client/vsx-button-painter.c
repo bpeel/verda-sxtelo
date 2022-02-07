@@ -30,7 +30,6 @@
 #include "vsx-mipmap.h"
 #include "vsx-gl.h"
 #include "vsx-array-object.h"
-#include "vsx-quad-buffer.h"
 
 struct vsx_button_painter {
         struct vsx_game_state *game_state;
@@ -39,7 +38,7 @@ struct vsx_button_painter {
 
         struct vsx_array_object *vao;
         GLuint vbo;
-        GLuint element_buffer;
+        struct vsx_quad_tool_buffer *quad_buffer;
 
         bool layout_dirty;
         bool vertices_dirty;
@@ -193,10 +192,9 @@ create_buffer(struct vsx_button_painter *painter)
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 
-        painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao,
-                                         gl,
-                                         painter->toolbox->map_buffer,
+        painter->quad_buffer =
+                vsx_quad_tool_get_buffer(painter->toolbox->quad_tool,
+                                         painter->vao,
                                          TOTAL_N_QUADS);
 }
 
@@ -546,7 +544,7 @@ paint_cb(void *painter_data)
                                    GL_TRIANGLES,
                                    0, TOTAL_N_VERTICES - 1,
                                    TOTAL_N_QUADS * 6,
-                                   GL_UNSIGNED_SHORT,
+                                   painter->quad_buffer->type,
                                    NULL /* indices */);
 }
 
@@ -571,8 +569,8 @@ free_cb(void *painter_data)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
-        if (painter->element_buffer)
-                gl->glDeleteBuffers(1, &painter->element_buffer);
+        if (painter->quad_buffer)
+                vsx_quad_tool_unref_buffer(painter->quad_buffer, gl);
 
         if (painter->image_token)
                 vsx_image_loader_cancel(painter->image_token);
