@@ -50,7 +50,6 @@ client_common_src = [
         'vsx-note-painter.c',
         'vsx-paint-state.c',
         'vsx-qr.c',
-        'vsx-quad-buffer.c',
         'vsx-quad-tool.c',
         'vsx-shader-data.c',
         'vsx-shadow-painter.c',
