@@ -22,6 +22,7 @@
 #include "vsx-gl.h"
 #include "vsx-main-thread.h"
 #include "vsx-map-buffer.h"
+#include "vsx-quad-tool.h"
 #include "vsx-shader-data.h"
 #include "vsx-image-loader.h"
 #include "vsx-font.h"
@@ -33,6 +34,7 @@ struct vsx_toolbox {
         struct vsx_gl *gl;
         struct vsx_main_thread *main_thread;
         struct vsx_map_buffer *map_buffer;
+        struct vsx_quad_tool *quad_tool;
         struct vsx_shader_data shader_data;
         struct vsx_image_loader *image_loader;
         struct vsx_font_library *font_library;

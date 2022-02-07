@@ -143,6 +143,7 @@ init_toolbox(struct vsx_game_painter *painter,
         toolbox->main_thread = main_thread;
 
         toolbox->map_buffer = vsx_map_buffer_new(toolbox->gl);
+        toolbox->quad_tool = vsx_quad_tool_new(gl, toolbox->map_buffer);
 
         if (!vsx_shader_data_init(&toolbox->shader_data,
                                   toolbox->gl,
@@ -189,6 +190,9 @@ destroy_toolbox(struct vsx_game_painter *painter)
                 vsx_shader_data_destroy(&toolbox->shader_data,
                                         toolbox->gl);
         }
+
+        if (toolbox->quad_tool)
+                vsx_quad_tool_free(toolbox->quad_tool);
 
         if (toolbox->map_buffer)
                 vsx_map_buffer_free(toolbox->map_buffer);
