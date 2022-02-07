@@ -29,7 +29,6 @@
 #include "vsx-mipmap.h"
 #include "vsx-gl.h"
 #include "vsx-array-object.h"
-#include "vsx-quad-buffer.h"
 #include "vsx-board.h"
 #include "vsx-layout.h"
 
@@ -57,7 +56,7 @@ struct vsx_board_painter {
 
         struct vsx_array_object *vao;
         GLuint vbo;
-        GLuint element_buffer;
+        struct vsx_quad_tool_buffer *quad_buffer;
 
         GLuint tex;
         struct vsx_image_loader_token *image_token;
@@ -568,10 +567,9 @@ create_buffer(struct vsx_board_painter *painter)
 
         vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
-        painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao,
-                                         gl,
-                                         painter->toolbox->map_buffer,
+        painter->quad_buffer =
+                vsx_quad_tool_get_buffer(painter->toolbox->quad_tool,
+                                         painter->vao,
                                          total_n_quads);
 }
 
@@ -666,7 +664,7 @@ paint_box_cb(int player_num,
                                    style->min_vertex,
                                    style->max_vertex,
                                    player_boxes[player_num].n_quads * 6,
-                                   GL_UNSIGNED_SHORT,
+                                   painter->quad_buffer->type,
                                    (GLvoid *) (intptr_t)
                                    style->offset);
 }
@@ -795,7 +793,7 @@ paint_cb(void *painter_data)
                                    GL_TRIANGLES,
                                    0, N_BOARD_VERTICES - 1,
                                    N_BOARD_QUADS * 6,
-                                   GL_UNSIGNED_SHORT,
+                                   painter->quad_buffer->type,
                                    NULL /* indices */);
 
         vsx_game_state_foreach_player(painter->game_state,
@@ -832,8 +830,8 @@ free_cb(void *painter_data)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
-        if (painter->element_buffer)
-                gl->glDeleteBuffers(1, &painter->element_buffer);
+        if (painter->quad_buffer)
+                vsx_quad_tool_unref_buffer(painter->quad_buffer, gl);
 
         if (painter->image_token)
                 vsx_image_loader_cancel(painter->image_token);
