@@ -29,7 +29,6 @@
 #include <limits.h>
 
 #include "vsx-map-buffer.h"
-#include "vsx-quad-buffer.h"
 #include "vsx-tile-texture.h"
 #include "vsx-mipmap.h"
 #include "vsx-gl.h"
@@ -79,7 +78,7 @@ struct vsx_tile_painter {
 
         struct vsx_array_object *vao;
         GLuint vbo;
-        GLuint element_buffer;
+        struct vsx_quad_tool_buffer *quad_buffer;
 
         GLuint tex;
         struct vsx_image_loader_token *image_token;
@@ -780,9 +779,9 @@ free_buffer(struct vsx_tile_painter *painter)
                 gl->glDeleteBuffers(1, &painter->vbo);
                 painter->vbo = 0;
         }
-        if (painter->element_buffer) {
-                gl->glDeleteBuffers(1, &painter->element_buffer);
-                painter->element_buffer = 0;
+        if (painter->quad_buffer) {
+                vsx_quad_tool_unref_buffer(painter->quad_buffer, gl);
+                painter->quad_buffer = NULL;
         }
 }
 
@@ -879,10 +878,9 @@ ensure_buffer_size(struct vsx_tile_painter *painter,
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 
-        painter->element_buffer =
-                vsx_quad_buffer_generate(painter->vao,
-                                         gl,
-                                         painter->toolbox->map_buffer,
+        painter->quad_buffer =
+                vsx_quad_tool_get_buffer(painter->toolbox->quad_tool,
+                                         painter->vao,
                                          n_tiles);
 
         painter->buffer_n_tiles = n_tiles;
@@ -1026,7 +1024,7 @@ paint_cb(void *painter_data)
                                    GL_TRIANGLES,
                                    0, n_vertices - 1,
                                    n_quads * 6,
-                                   GL_UNSIGNED_SHORT,
+                                   painter->quad_buffer->type,
                                    NULL /* indices */);
 
         gl->glDisable(GL_SCISSOR_TEST);
