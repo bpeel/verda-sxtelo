@@ -27,6 +27,7 @@ enum vsx_dialog {
         VSX_DIALOG_MENU,
         VSX_DIALOG_INVITE_LINK,
         VSX_DIALOG_LANGUAGE,
+        VSX_DIALOG_GUIDE,
 };
 
 enum vsx_dialog
