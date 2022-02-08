@@ -450,7 +450,9 @@ create_cb(struct vsx_game_state *game_state,
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
-        painter->tile_buffer = vsx_tile_tool_create_buffer(toolbox->tile_tool);
+        painter->tile_buffer =
+                vsx_tile_tool_create_buffer(toolbox->tile_tool,
+                                            VSX_BOARD_TILE_SIZE);
 
         painter->event_listener.notify = event_cb;
         vsx_signal_add(vsx_game_state_get_event_signal(game_state),

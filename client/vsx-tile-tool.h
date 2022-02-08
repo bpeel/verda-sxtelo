@@ -49,7 +49,8 @@ vsx_tile_tool_paint(struct vsx_tile_tool_buffer *buf,
                     const GLfloat *translation);
 
 struct vsx_tile_tool_buffer *
-vsx_tile_tool_create_buffer(struct vsx_tile_tool *tool);
+vsx_tile_tool_create_buffer(struct vsx_tile_tool *tool,
+                            int tile_size);
 
 void
 vsx_tile_tool_begin_update(struct vsx_tile_tool_buffer *buf,

@@ -39,6 +39,7 @@ struct vsx_tile_tool_buffer {
 
         int n_tiles;
         int max_tiles;
+        int tile_size;
 };
 
 struct vsx_tile_tool {
@@ -121,11 +122,13 @@ vsx_tile_tool_new(struct vsx_gl *gl,
 }
 
 struct vsx_tile_tool_buffer *
-vsx_tile_tool_create_buffer(struct vsx_tile_tool *tool)
+vsx_tile_tool_create_buffer(struct vsx_tile_tool *tool,
+                            int tile_size)
 {
         struct vsx_tile_tool_buffer *buf = vsx_calloc(sizeof *buf);
 
         buf->tool = tool;
+        buf->tile_size = tile_size;
 
         return buf;
 }
@@ -238,17 +241,17 @@ vsx_tile_tool_add_tile(struct vsx_tile_tool_buffer *buf,
         v->t = letter_data->t1;
         v++;
         v->x = tile_x;
-        v->y = tile_y + VSX_BOARD_TILE_SIZE;
+        v->y = tile_y + buf->tile_size;
         v->s = letter_data->s1;
         v->t = letter_data->t2;
         v++;
-        v->x = tile_x + VSX_BOARD_TILE_SIZE;
+        v->x = tile_x + buf->tile_size;
         v->y = tile_y;
         v->s = letter_data->s2;
         v->t = letter_data->t1;
         v++;
-        v->x = tile_x + VSX_BOARD_TILE_SIZE;
-        v->y = tile_y + VSX_BOARD_TILE_SIZE;
+        v->x = tile_x + buf->tile_size;
+        v->y = tile_y + buf->tile_size;
         v->s = letter_data->s2;
         v->t = letter_data->t2;
         v++;
