@@ -44,6 +44,8 @@ enum vsx_text {
         VSX_TEXT_GAME_FULL,
         VSX_TEXT_PLAYER_JOINED,
         VSX_TEXT_PLAYER_LEFT,
+        VSX_TEXT_GUIDE_EXAMPLE_WORD,
+        VSX_TEXT_GUIDE_MOVE_WORD,
 };
 
 #define VSX_TEXT_N_LANGUAGES 3

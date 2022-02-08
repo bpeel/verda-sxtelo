@@ -56,6 +56,13 @@ english[] = {
         "%s joined the game",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s left the game",
+        [VSX_TEXT_GUIDE_EXAMPLE_WORD] =
+        "HELLO",
+        [VSX_TEXT_GUIDE_MOVE_WORD] =
+        "To move a word:\n"
+        "\n"
+        "• Drag the first letter where you want.\n"
+        "• Click on the other letters and they will jump into place.\n"
 };
 
 static const char *const
@@ -94,6 +101,13 @@ french[] = {
         "%s a rejoint la partie",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s est parti·e",
+        [VSX_TEXT_GUIDE_EXAMPLE_WORD] =
+        "SALUT",
+        [VSX_TEXT_GUIDE_MOVE_WORD] =
+        "Pour déplacer un mot :\n"
+        "\n"
+        "• Faites glisser la première lettre où vous voulez.\n"
+        "• Cliquez sur les autres lettres et ils sauteront au bon endroit.\n"
 };
 
 static const char *const
@@ -128,6 +142,13 @@ esperanto[] = {
         "%s aliĝis al la ludo",
         [VSX_TEXT_PLAYER_LEFT] =
         "%s foriris",
+        [VSX_TEXT_GUIDE_EXAMPLE_WORD] =
+        "STELO",
+        [VSX_TEXT_GUIDE_MOVE_WORD] =
+        "Por movi vorton:\n"
+        "\n"
+        "• Trenu la unuan literon kien vi volas.\n"
+        "• Alklaku la aliajn literojn kaj ili saltos al la ĝusta loko.\n"
 };
 
 static const char *const * const
