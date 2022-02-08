@@ -129,13 +129,11 @@ struct vertex {
         uint16_t s, t;
 };
 
-#define TILE_SIZE 20
-
 /* We’ll pretend the tile is bigger than it is when looking for a tile
  * to process an input event in order to give the player a bigger area
  * to click on.
  */
-#define INPUT_TILE_SIZE (TILE_SIZE * 2)
+#define INPUT_TILE_SIZE (VSX_BOARD_TILE_SIZE * 2)
 
 /* The speed of tile animations measured in board units per second.
  *
@@ -578,8 +576,8 @@ find_tile_at_pos(struct vsx_tile_painter *painter,
         int best_distance_2 = INT_MAX;
 
         vsx_list_for_each_reverse(tile, &painter->tile_list, link) {
-                int tile_center_x = tile->current_x + TILE_SIZE / 2;
-                int tile_center_y = tile->current_y + TILE_SIZE / 2;
+                int tile_center_x = tile->current_x + VSX_BOARD_TILE_SIZE / 2;
+                int tile_center_y = tile->current_y + VSX_BOARD_TILE_SIZE / 2;
                 int dx = abs(board_x - tile_center_x);
                 int dy = abs(board_y - tile_center_y);
 
@@ -590,7 +588,8 @@ find_tile_at_pos(struct vsx_tile_painter *painter,
                  * it straight away so that it will always use the
                  * topmost one.
                  */
-                if (dx <= TILE_SIZE / 2 && dy <= TILE_SIZE / 2)
+                if (dx <= VSX_BOARD_TILE_SIZE / 2 &&
+                    dy <= VSX_BOARD_TILE_SIZE / 2)
                         return tile;
 
                 /* Calculate the distance squared */
@@ -632,8 +631,8 @@ handle_click(struct vsx_tile_painter *painter,
         int snap_y = painter->snap_y;
 
         if (snap_x < 0 || snap_y < 0 ||
-            snap_x + TILE_SIZE > VSX_BOARD_WIDTH ||
-            snap_y + TILE_SIZE > VSX_BOARD_HEIGHT) {
+            snap_x + VSX_BOARD_TILE_SIZE > VSX_BOARD_WIDTH ||
+            snap_y + VSX_BOARD_TILE_SIZE > VSX_BOARD_HEIGHT) {
                 painter->snap_tile = NULL;
                 return false;
         }
@@ -659,7 +658,7 @@ handle_click(struct vsx_tile_painter *painter,
         tile->target_x = painter->snap_x;
         tile->target_y = painter->snap_y;
 
-        painter->snap_x += TILE_SIZE;
+        painter->snap_x += VSX_BOARD_TILE_SIZE;
 
         override_tile(painter, tile);
         start_animation(tile);
@@ -729,7 +728,7 @@ handle_drag(struct vsx_tile_painter *painter,
         tile->current_y = board_y + painter->drag_offset_y;
 
         painter->snap_tile = tile;
-        painter->snap_x = tile->current_x + TILE_SIZE;
+        painter->snap_x = tile->current_x + VSX_BOARD_TILE_SIZE;
         painter->snap_y = tile->current_y;
 
         raise_tile(painter, painter->dragging_tile);
@@ -899,17 +898,17 @@ store_tile_quad(struct vertex *vertices,
         v->t = letter_data->t1;
         v++;
         v->x = tile_x;
-        v->y = tile_y + TILE_SIZE;
+        v->y = tile_y + VSX_BOARD_TILE_SIZE;
         v->s = letter_data->s1;
         v->t = letter_data->t2;
         v++;
-        v->x = tile_x + TILE_SIZE;
+        v->x = tile_x + VSX_BOARD_TILE_SIZE;
         v->y = tile_y;
         v->s = letter_data->s2;
         v->t = letter_data->t1;
         v++;
-        v->x = tile_x + TILE_SIZE;
-        v->y = tile_y + TILE_SIZE;
+        v->x = tile_x + VSX_BOARD_TILE_SIZE;
+        v->y = tile_y + VSX_BOARD_TILE_SIZE;
         v->s = letter_data->s2;
         v->t = letter_data->t2;
         v++;
