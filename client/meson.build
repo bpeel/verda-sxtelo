@@ -224,3 +224,14 @@ test_bsp_src = [
 test_bsp = executable('test-bsp', test_bsp_src,
                       include_directories: inc_dirs)
 test('bsp', test_bsp)
+
+test_tile_texture_src = [
+        'test-tile-texture.c',
+        'vsx-tile-texture.c',
+        'vsx-tile-texture.c',
+        'vsx-tile-texture-letters.c',
+        '../common/vsx-utf8.c',
+]
+test_tile_texture = executable('test-tile-texture', test_tile_texture_src,
+                               include_directories: inc_dirs)
+test('tile-texture', test_tile_texture)
