@@ -27,6 +27,7 @@
 #include "vsx-image-loader.h"
 #include "vsx-font.h"
 #include "vsx-shadow-painter.h"
+#include "vsx-tile-tool.h"
 #include "vsx-paint-state.h"
 #include "vsx-shell-interface.h"
 
@@ -39,6 +40,7 @@ struct vsx_toolbox {
         struct vsx_image_loader *image_loader;
         struct vsx_font_library *font_library;
         struct vsx_shadow_painter *shadow_painter;
+        struct vsx_tile_tool *tile_tool;
         struct vsx_paint_state paint_state;
         struct vsx_shell_interface *shell;
 };
