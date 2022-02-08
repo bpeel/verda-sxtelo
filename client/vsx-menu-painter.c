@@ -32,7 +32,7 @@
 #include "vsx-array-object.h"
 #include "vsx-layout.h"
 
-#define N_BUTTONS 4
+#define N_BUTTONS 5
 
 struct vsx_menu_painter {
         struct vsx_game_state *game_state;
@@ -72,6 +72,7 @@ enum menu_button {
         MENU_BUTTON_LANGUAGE,
         MENU_BUTTON_SHARE,
         MENU_BUTTON_LENGTH,
+        MENU_BUTTON_HELP,
         MENU_BUTTON_LEAVE,
 };
 
@@ -80,6 +81,7 @@ enum menu_image {
         MENU_IMAGE_SHARE,
         MENU_IMAGE_SHORT_GAME,
         MENU_IMAGE_LONG_GAME,
+        MENU_IMAGE_HELP,
         MENU_IMAGE_LEAVE,
 };
 
@@ -205,6 +207,9 @@ update_label_text(struct vsx_menu_painter *painter)
                         text = (is_long_game(painter) ?
                                 VSX_TEXT_LONG_GAME :
                                 VSX_TEXT_SHORT_GAME);
+                        break;
+                case MENU_BUTTON_HELP:
+                        text = VSX_TEXT_HELP_BUTTON;
                         break;
                 case MENU_BUTTON_LEAVE:
                         text = VSX_TEXT_LEAVE_BUTTON;
@@ -497,6 +502,10 @@ handle_click(struct vsx_menu_painter *painter,
         case MENU_BUTTON_LENGTH:
                 handle_toggle_length(painter);
                 break;
+        case MENU_BUTTON_HELP:
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_GUIDE);
+                break;
         case MENU_BUTTON_LEAVE:
                 vsx_game_state_leave(painter->game_state);
                 break;
@@ -588,6 +597,9 @@ ensure_vertices(struct vsx_menu_painter *painter)
                         image = (is_long_game(painter) ?
                                  MENU_IMAGE_LONG_GAME :
                                  MENU_IMAGE_SHORT_GAME);
+                        break;
+                case MENU_BUTTON_HELP:
+                        image = MENU_IMAGE_HELP;
                         break;
                 case MENU_BUTTON_LEAVE:
                         image = MENU_IMAGE_LEAVE;
