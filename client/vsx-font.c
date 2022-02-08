@@ -65,7 +65,7 @@ font_types[] = {
         [VSX_FONT_TYPE_LABEL] = {
                 .filename = "LunaSans-Regular.ttf",
                 .face_index = 0,
-                .size = 10 * 64,
+                .size = 8 * 64,
         },
 };
 
