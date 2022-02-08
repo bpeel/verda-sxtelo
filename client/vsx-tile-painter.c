@@ -28,9 +28,7 @@
 #include <stdalign.h>
 #include <limits.h>
 
-#include "vsx-map-buffer.h"
 #include "vsx-tile-texture.h"
-#include "vsx-mipmap.h"
 #include "vsx-gl.h"
 #include "vsx-board.h"
 #include "vsx-buffer.h"
@@ -76,12 +74,9 @@ struct vsx_tile_painter {
 
         struct vsx_toolbox *toolbox;
 
-        struct vsx_array_object *vao;
-        GLuint vbo;
-        struct vsx_quad_tool_buffer *quad_buffer;
+        struct vsx_listener tile_tool_ready_listener;
 
-        GLuint tex;
-        struct vsx_image_loader_token *image_token;
+        struct vsx_tile_tool_buffer *tile_buffer;
 
         /* Array of tile pointers indexed by tile number */
         struct vsx_buffer tiles_by_index;
@@ -120,13 +115,6 @@ struct vsx_tile_painter {
         int snap_x, snap_y;
 
         struct vsx_signal redraw_needed_signal;
-
-        int buffer_n_tiles;
-};
-
-struct vertex {
-        float x, y;
-        uint16_t s, t;
 };
 
 /* We’ll pretend the tile is bigger than it is when looking for a tile
@@ -444,42 +432,16 @@ modified_cb(struct vsx_listener *listener,
 }
 
 static void
-texture_load_cb(const struct vsx_image *image,
-                struct vsx_error *error,
-                void *data)
+tile_tool_ready_cb(struct vsx_listener *listener,
+                   void *user_data)
 {
-        struct vsx_tile_painter *painter = data;
+        struct vsx_tile_painter *painter =
+                vsx_container_of(listener,
+                                 struct vsx_tile_painter,
+                                 tile_tool_ready_listener);
 
-        painter->image_token = NULL;
-
-        if (error) {
-                fprintf(stderr,
-                        "error loading tiles image: %s\n",
-                        error->message);
-                return;
-        }
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glGenTextures(1, &painter->tex);
-
-        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
-        gl->glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_WRAP_S,
-                            GL_CLAMP_TO_EDGE);
-        gl->glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_WRAP_T,
-                            GL_CLAMP_TO_EDGE);
-        gl->glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_MIN_FILTER,
-                            GL_LINEAR_MIPMAP_NEAREST);
-        gl->glTexParameteri(GL_TEXTURE_2D,
-                            GL_TEXTURE_MAG_FILTER,
-                            GL_LINEAR);
-
-        vsx_mipmap_load_image(image, gl, painter->tex);
-
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (get_n_tiles(painter) > 0)
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static void
@@ -507,10 +469,7 @@ create_cb(struct vsx_game_state *game_state,
 
         vsx_signal_init(&painter->redraw_needed_signal);
 
-        painter->image_token = vsx_image_loader_load(toolbox->image_loader,
-                                                     "tiles.mpng",
-                                                     texture_load_cb,
-                                                     painter);
+        painter->tile_buffer = vsx_tile_tool_create_buffer(toolbox->tile_tool);
 
         painter->event_listener.notify = event_cb;
         vsx_signal_add(vsx_game_state_get_event_signal(game_state),
@@ -519,6 +478,10 @@ create_cb(struct vsx_game_state *game_state,
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
+
+        painter->tile_tool_ready_listener.notify = tile_tool_ready_cb;
+        vsx_signal_add(vsx_tile_tool_get_ready_signal(toolbox->tile_tool),
+                       &painter->tile_tool_ready_listener);
 
         vsx_game_state_foreach_tile(painter->game_state,
                                     init_tiles_cb,
@@ -765,25 +728,6 @@ input_event_cb(void *painter_data,
         return false;
 }
 
-static void
-free_buffer(struct vsx_tile_painter *painter)
-{
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        if (painter->vao) {
-                vsx_array_object_free(painter->vao, gl);
-                painter->vao = 0;
-        }
-        if (painter->vbo) {
-                gl->glDeleteBuffers(1, &painter->vbo);
-                painter->vbo = 0;
-        }
-        if (painter->quad_buffer) {
-                vsx_quad_tool_unref_buffer(painter->quad_buffer, gl);
-                painter->quad_buffer = NULL;
-        }
-}
-
 static int
 interpolate_animation(int start_pos, int end_pos,
                       int64_t start_time, int64_t end_time,
@@ -834,106 +778,31 @@ update_tile_animations(struct vsx_tile_painter *painter)
         return any_tiles_animating;
 }
 
-static void
-ensure_buffer_size(struct vsx_tile_painter *painter,
-                   int n_tiles)
-{
-        if (painter->buffer_n_tiles >= n_tiles)
-                return;
-
-        free_buffer(painter);
-
-        int n_vertices = n_tiles * 4;
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glGenBuffers(1, &painter->vbo);
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-        gl->glBufferData(GL_ARRAY_BUFFER,
-                         n_vertices * sizeof (struct vertex),
-                         NULL, /* data */
-                         GL_DYNAMIC_DRAW);
-
-        painter->vao = vsx_array_object_new(gl);
-
-        vsx_array_object_set_attribute(painter->vao,
-                                       gl,
-                                       VSX_SHADER_DATA_ATTRIB_POSITION,
-                                       2, /* size */
-                                       GL_FLOAT,
-                                       false, /* normalized */
-                                       sizeof (struct vertex),
-                                       0, /* divisor */
-                                       painter->vbo,
-                                       offsetof(struct vertex, x));
-        vsx_array_object_set_attribute(painter->vao,
-                                       gl,
-                                       VSX_SHADER_DATA_ATTRIB_TEX_COORD,
-                                       2, /* size */
-                                       GL_UNSIGNED_SHORT,
-                                       true, /* normalized */
-                                       sizeof (struct vertex),
-                                       0, /* divisor */
-                                       painter->vbo,
-                                       offsetof(struct vertex, s));
-
-        painter->quad_buffer =
-                vsx_quad_tool_get_buffer(painter->toolbox->quad_tool,
-                                         painter->vao,
-                                         n_tiles);
-
-        painter->buffer_n_tiles = n_tiles;
-}
-
-static struct vertex *
-store_tile_quad(struct vertex *vertices,
-                int tile_x, int tile_y,
-                const struct vsx_tile_texture_letter *letter_data)
-{
-        struct vertex *v = vertices;
-
-        v->x = tile_x;
-        v->y = tile_y;
-        v->s = letter_data->s1;
-        v->t = letter_data->t1;
-        v++;
-        v->x = tile_x;
-        v->y = tile_y + VSX_BOARD_TILE_SIZE;
-        v->s = letter_data->s1;
-        v->t = letter_data->t2;
-        v++;
-        v->x = tile_x + VSX_BOARD_TILE_SIZE;
-        v->y = tile_y;
-        v->s = letter_data->s2;
-        v->t = letter_data->t1;
-        v++;
-        v->x = tile_x + VSX_BOARD_TILE_SIZE;
-        v->y = tile_y + VSX_BOARD_TILE_SIZE;
-        v->s = letter_data->s2;
-        v->t = letter_data->t2;
-        v++;
-
-        return v;
-}
-
 static size_t
-generate_tile_vertices(struct vsx_tile_painter *painter,
-                       struct vertex *vertices)
+update_tile_vertices(struct vsx_tile_painter *painter,
+                     size_t max_tiles)
 {
-        struct vertex *v = vertices;
+        size_t n_quads = 0;
+
         struct vsx_tile_painter_tile *tile;
+
+        vsx_tile_tool_begin_update(painter->tile_buffer, max_tiles);
 
         vsx_list_for_each(tile, &painter->tile_list, link) {
                 if (tile->letter_data == NULL)
                         continue;
 
-                v = store_tile_quad(v,
-                                    tile->current_x,
-                                    tile->current_y,
-                                    tile->letter_data);
+                vsx_tile_tool_add_tile(painter->tile_buffer,
+                                       tile->current_x,
+                                       tile->current_y,
+                                       tile->letter_data);
+
+                n_quads++;
         }
 
-        return v - vertices;
+        vsx_tile_tool_end_update(painter->tile_buffer);
+
+        return n_quads;
 }
 
 static void
@@ -941,12 +810,8 @@ paint_cb(void *painter_data)
 {
         struct vsx_tile_painter *painter = painter_data;
 
-        if (painter->tex == 0)
+        if (!vsx_tile_tool_is_ready(painter->toolbox->tile_tool))
                 return;
-
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-
-        vsx_paint_state_ensure_layout(paint_state);
 
         int n_tiles = get_n_tiles(painter);
 
@@ -963,55 +828,20 @@ paint_cb(void *painter_data)
 
         bool any_tiles_animating = update_tile_animations(painter);
 
-        ensure_buffer_size(painter, n_tiles);
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glBindBuffer(GL_ARRAY_BUFFER, painter->vbo);
-
-        struct vertex *vertices =
-                vsx_map_buffer_map(painter->toolbox->map_buffer,
-                                   GL_ARRAY_BUFFER,
-                                   painter->buffer_n_tiles *
-                                   4 * sizeof (struct vertex),
-                                   true, /* flush_explicit */
-                                   GL_DYNAMIC_DRAW);
-
-        size_t n_vertices = generate_tile_vertices(painter, vertices);
-        size_t n_quads = n_vertices / 4;
-
-        assert(n_quads <= n_tiles);
-
-        vsx_map_buffer_flush(painter->toolbox->map_buffer,
-                             0,
-                             n_vertices * sizeof (struct vertex));
-
-        vsx_map_buffer_unmap(painter->toolbox->map_buffer);
+        size_t n_quads = update_tile_vertices(painter, n_tiles);
 
         /* This shouldn’t happen unless for some reason all of the
          * tiles that the server sent had letters that we don’t
          * recognise.
          */
-        if (n_vertices <= 0)
+        if (n_quads <= 0)
                 return;
 
-        const struct vsx_shader_data *shader_data =
-                &painter->toolbox->shader_data;
-        const struct vsx_shader_data_program_data *program =
-                shader_data->programs + VSX_SHADER_DATA_PROGRAM_TEXTURE;
+        struct vsx_gl *gl = painter->toolbox->gl;
 
-        gl->glUseProgram(program->program);
-        vsx_array_object_bind(painter->vao, gl);
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
-        gl->glUniformMatrix2fv(program->matrix_uniform,
-                               1, /* count */
-                               GL_FALSE, /* transpose */
-                               paint_state->board_matrix);
-        gl->glUniform2f(program->translation_uniform,
-                        paint_state->board_translation[0],
-                        paint_state->board_translation[1]);
-
-        gl->glBindTexture(GL_TEXTURE_2D, painter->tex);
+        vsx_paint_state_ensure_layout(paint_state);
 
         gl->glEnable(GL_SCISSOR_TEST);
         gl->glScissor(paint_state->board_scissor_x,
@@ -1019,12 +849,10 @@ paint_cb(void *painter_data)
                       paint_state->board_scissor_width,
                       paint_state->board_scissor_height);
 
-        vsx_gl_draw_range_elements(gl,
-                                   GL_TRIANGLES,
-                                   0, n_vertices - 1,
-                                   n_quads * 6,
-                                   painter->quad_buffer->type,
-                                   NULL /* indices */);
+        vsx_tile_tool_paint(painter->tile_buffer,
+                            &painter->toolbox->shader_data,
+                            paint_state->board_matrix,
+                            paint_state->board_translation);
 
         gl->glDisable(GL_SCISSOR_TEST);
 
@@ -1049,15 +877,9 @@ free_cb(void *painter_data)
 
         vsx_list_remove(&painter->event_listener.link);
         vsx_list_remove(&painter->modified_listener.link);
+        vsx_list_remove(&painter->tile_tool_ready_listener.link);
 
-        free_buffer(painter);
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        if (painter->image_token)
-                vsx_image_loader_cancel(painter->image_token);
-        if (painter->tex)
-                gl->glDeleteTextures(1, &painter->tex);
+        vsx_tile_tool_free_buffer(painter->tile_buffer);
 
         vsx_buffer_destroy(&painter->tiles_by_index);
         vsx_slab_destroy(&painter->tile_allocator);
