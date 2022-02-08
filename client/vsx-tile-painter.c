@@ -199,26 +199,6 @@ get_n_tiles(struct vsx_tile_painter *painter)
                 sizeof (struct vsx_tile_painter_tile *));
 }
 
-static const struct vsx_tile_texture_letter *
-find_letter(uint32_t letter)
-{
-        int min = 0, max = VSX_TILE_TEXTURE_N_LETTERS;
-
-        while (min < max) {
-                int mid = (min + max) / 2;
-                uint32_t mid_letter = vsx_tile_texture_letters[mid].letter;
-
-                if (mid_letter > letter)
-                        max = mid;
-                else if (mid_letter == letter)
-                        return vsx_tile_texture_letters + mid;
-                else
-                        min = mid + 1;
-        }
-
-        return NULL;
-}
-
 static void
 start_animation(struct vsx_tile_painter_tile *tile)
 {
@@ -338,7 +318,8 @@ handle_tile_event(struct vsx_tile_painter *painter,
                 get_tile_by_index(painter, event->tile_changed.num, &is_new);
 
         if (is_new) {
-                tile->letter_data = find_letter(event->tile_changed.letter);
+                uint32_t letter = event->tile_changed.letter;
+                tile->letter_data = vsx_tile_texture_find_letter(letter);
                 tile->current_x = VSX_BOARD_WIDTH;
                 tile->current_y = VSX_BOARD_HEIGHT / 4;
                 tile->overridden = false;

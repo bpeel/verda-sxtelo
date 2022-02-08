@@ -114,7 +114,7 @@ def generate_source_file():
     source_file_name = os.path.join(os.path.dirname(__file__),
                                     "..",
                                     "client",
-                                    "vsx-tile-texture.c")
+                                    "vsx-tile-texture-letters.c")
     x_tiles, y_tiles = get_texture_size()
 
     with open(source_file_name, "wt", encoding="utf-8") as f:

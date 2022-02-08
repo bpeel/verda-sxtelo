@@ -56,6 +56,7 @@ client_common_src = [
         'vsx-text.c',
         'vsx-tile-painter.c',
         'vsx-tile-texture.c',
+        'vsx-tile-texture-letters.c',
         'vsx-tile-tool.c',
         'vsx-worker.c',
 ] + connection_src
