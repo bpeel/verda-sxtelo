@@ -59,26 +59,44 @@ enum animation_click_type {
         ANIMATION_CLICK_TYPE_DRAG,
 };
 
-struct animation {
-        /* In the static array below, this is the offset of the
-         * animation after which this animation should start. When it
-         * is copied into the painter it represents the start time in
-         * microseconds.
-         */
+/* This is a translation of struct animation that is easier to handle
+ * at runtime.
+ */
+struct compiled_animation {
+        /* Start time in microseconds */
         int start;
-        /* In the static array this is the speed of the movement in
-         * mm/s. Otherwise it is the duration in microseconds.
-         */
+        /* Duration in microseconds */
         int duration;
+        /* Thing to move. Either a letter number with the example
+         * word, or MOVE_CURSOR to move the cursor.
+         */
+        int thing;
+        /* Where to move to as an offset in pixels from the topleft of
+         * the image space.
+         */
+        int dest_x, dest_y;
+
+        enum animation_click_type click_type;
+};
+
+struct animation {
+        /* Offset of the animation after which this animation should
+         * start. Ie, -1 is the animation before this one, etc. Zero
+         * means to start immediately.
+         */
+        int start_after;
+        /* The speed of the movement in mm/s, or zero to displace the
+         * thing instantaneously.
+         */
+        int speed;
         /* Thing to move. Either a letter number within the example
          * word, or MOVE_CURSOR to move the cursor.
          */
         int thing;
-        /* Where to move to. In the static array this is an offset in
-         * mm, otherwise it is in pixels.
+        /* Where to move to as an offset in mm from the topleft of
+         * the image space.
          */
-        int dest_x;
-        int dest_y;
+        int dest_x, dest_y;
 
         enum animation_click_type click_type;
 };
@@ -101,93 +119,93 @@ animations[] = {
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 22, .dest_y = 5,
-                .start = 0,
-                .duration = CURSOR_SPEED,
+                .start_after = 0,
+                .speed = CURSOR_SPEED,
         },
         /* Move the cursor and the first letter into position */
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 3, .dest_y = IMAGE_SIZE - TILE_SIZE + 3,
-                .start = -1,
-                .duration = CURSOR_SPEED,
+                .start_after = -1,
+                .speed = CURSOR_SPEED,
                 .click_type = ANIMATION_CLICK_TYPE_DRAG,
         },
         {
                 .thing = 0,
                 .dest_x = 0, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start = -2,
-                .duration = CURSOR_SPEED,
+                .start_after = -2,
+                .speed = CURSOR_SPEED,
         },
 
         /* Move the cursor to the second letter */
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 6, .dest_y = 15,
-                .start = -1,
-                .duration = CURSOR_SPEED,
+                .start_after = -1,
+                .speed = CURSOR_SPEED,
         },
         /* Make the tile jump into place */
         {
                 .thing = 1,
                 .dest_x = TILE_SIZE, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start = -1,
-                .duration = JUMP_SPEED,
+                .start_after = -1,
+                .speed = JUMP_SPEED,
         },
 
         /* Move the cursor to the third letter */
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 20, .dest_y = 13,
-                .start = -2,
-                .duration = CURSOR_SPEED,
+                .start_after = -2,
+                .speed = CURSOR_SPEED,
                 .click_type = ANIMATION_CLICK_TYPE_SHORT,
         },
         /* Third tile jump into place */
         {
                 .thing = 2,
                 .dest_x = TILE_SIZE * 2, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start = -1,
-                .duration = JUMP_SPEED,
+                .start_after = -1,
+                .speed = JUMP_SPEED,
         },
 
         /* Move the cursor to the fourth letter */
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 6, .dest_y = 5,
-                .start = -2,
-                .duration = CURSOR_SPEED,
+                .start_after = -2,
+                .speed = CURSOR_SPEED,
                 .click_type = ANIMATION_CLICK_TYPE_SHORT,
         },
         /* Fourth tile jump into place */
         {
                 .thing = 3,
                 .dest_x = TILE_SIZE * 3, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start = -1,
-                .duration = JUMP_SPEED,
+                .start_after = -1,
+                .speed = JUMP_SPEED,
         },
 
         /* Move the cursor to the fifth letter */
         {
                 .thing = MOVE_CURSOR,
                 .dest_x = 12, .dest_y = 9,
-                .start = -2,
-                .duration = CURSOR_SPEED,
+                .start_after = -2,
+                .speed = CURSOR_SPEED,
                 .click_type = ANIMATION_CLICK_TYPE_SHORT,
         },
         /* Fourth tile jump into place */
         {
                 .thing = 4,
                 .dest_x = TILE_SIZE * 4, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start = -1,
-                .duration = JUMP_SPEED,
+                .start_after = -1,
+                .speed = JUMP_SPEED,
         },
 
         /* Move the cursor back to the center */
         {
                 .thing = MOVE_CURSOR,
-                .start = -2,
+                .start_after = -2,
                 .dest_x = IMAGE_SIZE / 2, .dest_y = IMAGE_SIZE / 2,
-                .duration = CURSOR_SPEED,
+                .speed = CURSOR_SPEED,
                 .click_type = ANIMATION_CLICK_TYPE_SHORT,
         },
 };
@@ -226,10 +244,10 @@ struct vsx_guide_painter {
         const struct vsx_tile_texture_letter *
         example_letters[EXAMPLE_WORD_LENGTH];
 
-        /* Copy of the animations with the destinations converted to
-         * pixel coordinates.
+        /* “Compiled” versions of the animations that are easier to
+         * process at runtime.
          */
-        struct animation animations[N_ANIMATIONS];
+        struct compiled_animation animations[N_ANIMATIONS];
         /* After this time in microseconds the animation will loop */
         int total_animation_duration;
 
@@ -548,28 +566,28 @@ convert_animations(struct vsx_guide_painter *painter)
         int total_duration = 0;
 
         for (int i = 0; i < N_ANIMATIONS; i++) {
-                struct animation *dst = painter->animations + i;
+                struct compiled_animation *dst = painter->animations + i;
                 const struct animation *src = animations + i;
 
                 dst->thing = src->thing;
                 dst->click_type = src->click_type;
 
-                if (src->start == 0) {
+                if (src->start_after == 0) {
                         dst->start = 0;
                 } else {
-                        const struct animation *before =
-                                painter->animations + i + src->start;
+                        const struct compiled_animation *before =
+                                painter->animations + i + src->start_after;
                         dst->start = before->start + before->duration;
                 }
 
-                if (src->duration > 0) {
+                if (src->speed > 0) {
                         float dx = (painter->thing_positions[dst->thing].x -
                                     src->dest_x);
                         float dy = (painter->thing_positions[dst->thing].y -
                                     src->dest_y);
                         float d = sqrtf((dx * dx) + (dy * dy));
 
-                        dst->duration = d * 1e6f / src->duration;
+                        dst->duration = d * 1e6f / src->speed;
                 } else {
                         dst->duration = 0;
                 }
@@ -818,7 +836,8 @@ update_animations(struct vsx_guide_painter *painter)
         painter->clicking = false;
 
         for (int i = 0; i < N_ANIMATIONS; i++) {
-                const struct animation *animation = painter->animations + i;
+                const struct compiled_animation *animation =
+                        painter->animations + i;
 
                 if (elapsed_time < animation->start)
                         break;
