@@ -85,6 +85,9 @@ struct vsx_guide_painter {
         GLuint cursor_vbo;
         struct vsx_array_object *cursor_vao;
 
+        GLuint image_tex;
+        struct vsx_image_loader_token *image_token;
+
         const struct vsx_tile_texture_letter **example_letters;
 
         int example_word_length;
@@ -124,11 +127,7 @@ struct vsx_guide_painter {
 
 struct vertex {
         int16_t x, y;
-};
-
-struct cursor_vertex {
-        int16_t x, y;
-        uint8_t s, t;
+        float s, t;
 };
 
 #define N_QUADS 1
@@ -148,6 +147,99 @@ struct cursor_vertex {
 #define PARAGRAPH_FONT VSX_FONT_TYPE_LABEL
 
 static void
+free_image(struct vsx_guide_painter *painter)
+{
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        if (painter->image_token) {
+                vsx_image_loader_cancel(painter->image_token);
+                painter->image_token = NULL;
+        }
+
+        if (painter->image_tex) {
+                gl->glDeleteTextures(1, &painter->image_tex);
+                painter->image_tex = 0;
+        }
+}
+
+static void
+image_loaded_cb(const struct vsx_image *image,
+                struct vsx_error *error,
+                void *data)
+{
+        struct vsx_guide_painter *painter = data;
+
+        painter->image_token = NULL;
+
+        if (error) {
+                fprintf(stderr,
+                        "error loading guide page image: %s\n",
+                        error->message);
+                return;
+        }
+
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glGenTextures(1, &painter->image_tex);
+
+        gl->glBindTexture(GL_TEXTURE_2D, painter->image_tex);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_S,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_WRAP_T,
+                            GL_CLAMP_TO_EDGE);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_NEAREST);
+        gl->glTexParameteri(GL_TEXTURE_2D,
+                            GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR);
+
+        vsx_mipmap_load_image(image, gl, painter->image_tex);
+
+        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
+start_image_load(struct vsx_guide_painter *painter)
+{
+        const struct vsx_guide_page *page =
+                vsx_guide_pages + vsx_game_state_get_page(painter->game_state);
+
+        if (page->image == NULL)
+                return;
+
+        painter->image_token =
+                vsx_image_loader_load(painter->toolbox->image_loader,
+                                      page->image,
+                                      image_loaded_cb,
+                                      painter);
+}
+
+static void
+handle_page_changed(struct vsx_guide_painter *painter)
+{
+        painter->layout_dirty = true;
+
+        free_image(painter);
+
+        const struct vsx_guide_page *page =
+                vsx_guide_pages + vsx_game_state_get_page(painter->game_state);
+
+        /* If the page has an image then we’ll delay redrawing until
+         * the image has loaded. It doesn’t matter if something else
+         * causes a redraw in the meantime because the dialog will
+         * just be drawn without the image. However this way we can
+         * avoid a little flicker.
+         */
+        if (page->image)
+                start_image_load(painter);
+        else
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+}
+
+static void
 modified_cb(struct vsx_listener *listener,
             void *user_data)
 {
@@ -159,9 +251,11 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
-        case VSX_GAME_STATE_MODIFIED_TYPE_PAGE:
                 painter->layout_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                break;
+        case VSX_GAME_STATE_MODIFIED_TYPE_PAGE:
+                handle_page_changed(painter);
                 break;
         default:
                 break;
@@ -258,17 +352,27 @@ create_shadow(struct vsx_guide_painter *painter)
 }
 
 static void
-update_vertices(struct vsx_guide_painter *painter,
-                int total_width,
-                int total_height)
+update_vertices(struct vsx_guide_painter *painter)
 {
         const struct vsx_paint_state *paint_state =
                 &painter->toolbox->paint_state;
 
-        int x1 = paint_state->pixel_width / 2 - total_width / 2;
-        int y1 = paint_state->pixel_height / 2 - total_height / 2;
-        int x2 = x1 + total_width;
-        int y2 = y1 + total_height;
+        int x1 = (paint_state->pixel_width / 2 -
+                  painter->dialog_width / 2);
+        int y1 = (paint_state->pixel_height / 2 -
+                  painter->dialog_height / 2);
+        int x2 = x1 + painter->dialog_width;
+        int y2 = y1 + painter->dialog_height;
+        float s1 = ((painter->dialog_x - painter->image_x) /
+                    (float) painter->image_size);
+        float t1 = ((painter->dialog_y - painter->image_y) /
+                    (float) painter->image_size);
+        float s2 = ((painter->dialog_width + painter->dialog_x -
+                     painter->image_x) /
+                    (float) painter->image_size);
+        float t2 = ((painter->dialog_height + painter->dialog_y -
+                     painter->image_y) /
+                    (float) painter->image_size);
 
         struct vsx_gl *gl = painter->toolbox->gl;
 
@@ -283,18 +387,26 @@ update_vertices(struct vsx_guide_painter *painter,
 
         v->x = x1;
         v->y = y1;
+        v->s = s1;
+        v->t = t1;
         v++;
 
         v->x = x1;
         v->y = y2;
+        v->s = s1;
+        v->t = t2;
         v++;
 
         v->x = x2;
         v->y = y1;
+        v->s = s2;
+        v->t = t1;
         v++;
 
         v->x = x2;
         v->y = y2;
+        v->s = s2;
+        v->t = t2;
         v++;
 
         vsx_map_buffer_unmap(painter->toolbox->map_buffer);
@@ -324,6 +436,16 @@ create_buffer(struct vsx_guide_painter *painter)
                                        0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
+        vsx_array_object_set_attribute(painter->vao,
+                                       gl,
+                                       VSX_SHADER_DATA_ATTRIB_TEX_COORD,
+                                       2, /* size */
+                                       GL_FLOAT,
+                                       false, /* normalized */
+                                       sizeof (struct vertex),
+                                       0, /* divisor */
+                                       painter->vbo,
+                                       offsetof(struct vertex, s));
 }
 
 static void
@@ -342,7 +464,7 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
 {
         struct vsx_gl *gl = painter->toolbox->gl;
 
-        struct cursor_vertex vertices[N_CURSOR_VERTICES];
+        struct vertex vertices[N_CURSOR_VERTICES];
 
         int dpi = painter->toolbox->paint_state.dpi;
         int cursor_size = CURSOR_SIZE * dpi * 10 / 254;
@@ -350,29 +472,29 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
         int cursor_y = CURSOR_Y(cursor_size);
 
         for (int i = 0; i < N_CURSOR_IMAGES; i++) {
-                struct cursor_vertex *v = vertices + i * 4;
-                uint8_t s1 = i * 255 / N_CURSOR_IMAGES;
-                uint8_t s2 = (i + 1) * 255 / N_CURSOR_IMAGES;
+                struct vertex *v = vertices + i * 4;
+                float s1 = i / (float) N_CURSOR_IMAGES;
+                float s2 = (i + 1.0f) / N_CURSOR_IMAGES;
 
                 v->x = -cursor_x;
                 v->y = -cursor_y;
                 v->s = s1;
-                v->t = 0;
+                v->t = 0.0f;
                 v++;
                 v->x = -cursor_x;
                 v->y = -cursor_y + cursor_size;
                 v->s = s1;
-                v->t = 255;
+                v->t = 1.0f;
                 v++;
                 v->x = -cursor_x + cursor_size;
                 v->y = -cursor_y;
                 v->s = s2;
-                v->t = 0;
+                v->t = 0.0f;
                 v++;
                 v->x = -cursor_x + cursor_size;
                 v->y = -cursor_y + cursor_size;
                 v->s = s2;
-                v->t = 255;
+                v->t = 1.0f;
                 v++;
         }
 
@@ -390,20 +512,20 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
                                        2, /* size */
                                        GL_SHORT,
                                        false, /* normalized */
-                                       sizeof (struct cursor_vertex),
+                                       sizeof (struct vertex),
                                        0, /* divisor */
                                        painter->cursor_vbo,
-                                       offsetof(struct cursor_vertex, x));
+                                       offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->cursor_vao,
                                        gl,
                                        VSX_SHADER_DATA_ATTRIB_TEX_COORD,
                                        2, /* size */
-                                       GL_UNSIGNED_BYTE,
-                                       true, /* normalized */
-                                       sizeof (struct cursor_vertex),
+                                       GL_FLOAT,
+                                       false, /* normalized */
+                                       sizeof (struct vertex),
                                        0, /* divisor */
                                        painter->cursor_vbo,
-                                       offsetof(struct cursor_vertex, s));
+                                       offsetof(struct vertex, s));
 }
 
 static void
@@ -516,6 +638,8 @@ create_cb(struct vsx_game_state *game_state,
         create_cursor_buffer(painter);
 
         create_layout(painter);
+
+        start_image_load(painter);
 
         return painter;
 }
@@ -669,8 +793,6 @@ ensure_layout(struct vsx_guide_painter *painter)
         int total_height = (MAX(paragraph_height, painter->image_size) +
                             painter->border * 2);
 
-        update_vertices(painter, total_width, total_height);
-
         painter->dialog_x = paint_state->pixel_width / 2 - total_width / 2;
         painter->dialog_y = paint_state->pixel_height / 2 - total_height / 2;
         painter->dialog_width = total_width;
@@ -688,6 +810,8 @@ ensure_layout(struct vsx_guide_painter *painter)
                                 painter->dialog_height / 2 -
                                 paragraph_height / 2 +
                                 extents->top);
+
+        update_vertices(painter);
 
         create_shadow(painter);
 
@@ -707,11 +831,21 @@ prepare_cb(void *painter_data)
 }
 
 static void
-set_uniforms(struct vsx_guide_painter *painter,
-             const struct vsx_shader_data_program_data *program)
+paint_background(struct vsx_guide_painter *painter)
 {
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        const struct vsx_shader_data *shader_data =
+                &painter->toolbox->shader_data;
+
+        const struct vsx_shader_data_program_data *program =
+                shader_data->programs + (painter->image_tex ?
+                                         VSX_SHADER_DATA_PROGRAM_TEXTURE :
+                                         VSX_SHADER_DATA_PROGRAM_SOLID);
+
         struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glUseProgram(program->program);
+
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         gl->glUniformMatrix2fv(program->matrix_uniform,
                                1, /* count */
@@ -721,7 +855,14 @@ set_uniforms(struct vsx_guide_painter *painter,
                         paint_state->pixel_translation[0],
                         paint_state->pixel_translation[1]);
 
-        gl->glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
+        vsx_array_object_bind(painter->vao, gl);
+
+        if (painter->image_tex)
+                gl->glBindTexture(GL_TEXTURE_2D, painter->image_tex);
+        else
+                gl->glUniform3f(program->color_uniform, 1.0f, 1.0f, 1.0f);
+
+        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 }
 
 static void
@@ -898,24 +1039,10 @@ paint_cb(void *painter_data)
 
         paint_shadow(painter);
 
-        const struct vsx_shader_data *shader_data =
-                &painter->toolbox->shader_data;
-
-        const struct vsx_shader_data_program_data *program =
-                shader_data->programs + VSX_SHADER_DATA_PROGRAM_SOLID;
-
-        struct vsx_gl *gl = painter->toolbox->gl;
-
-        gl->glUseProgram(program->program);
-
-        set_uniforms(painter, program);
-
-        vsx_array_object_bind(painter->vao, gl);
-
-        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
+        paint_background(painter);
 
         vsx_tile_tool_paint(painter->tile_buffer,
-                            shader_data,
+                            &painter->toolbox->shader_data,
                             painter->toolbox->paint_state.pixel_matrix,
                             painter->toolbox->paint_state.pixel_translation);
 
@@ -1027,6 +1154,7 @@ free_cb(void *painter_data)
         if (painter->cursor_vao)
                 vsx_array_object_free(painter->cursor_vao, gl);
 
+        free_image(painter);
         free_tile_buffer(painter);
         free_letters(painter);
         free_animations(painter);
