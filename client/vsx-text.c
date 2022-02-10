@@ -63,7 +63,12 @@ english[] = {
         "To move a word:\n"
         "\n"
         "• Drag the first letter where you want.\n"
-        "• Click on the other letters and they will jump into place.\n"
+        "• Click on the other letters and they will jump into place.\n",
+        [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
+        "TEARTEARSRATES",
+        [VSX_TEXT_GUIDE_STEAL_WORD] =
+        "The new word has to be a different root and can’t just be a different "
+        "form of the original, like making it plural.",
 };
 
 static const char *const
@@ -109,7 +114,12 @@ french[] = {
         "Pour déplacer un mot :\n"
         "\n"
         "• Faites glisser la première lettre où vous voulez.\n"
-        "• Cliquez sur les autres lettres et ils sauteront au bon endroit.\n"
+        "• Cliquez sur les autres lettres et ils sauteront au bon endroit.\n",
+        [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
+        "DATEDATESSTADE",
+        [VSX_TEXT_GUIDE_STEAL_WORD] =
+        "Le nouveau mot ne doit pas être une autre forme du premier. "
+        "Vous ne pouvez pas juste le rendre pluriel ou changer la conjugaison.",
 };
 
 static const char *const
@@ -151,7 +161,12 @@ esperanto[] = {
         "Por movi vorton:\n"
         "\n"
         "• Trenu la unuan literon kien vi volas.\n"
-        "• Alklaku la aliajn literojn kaj ili saltos al la ĝusta loko.\n"
+        "• Alklaku la aliajn literojn kaj ili saltos al la ĝusta loko.\n",
+        [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
+        "BANKBANKOKNABO",
+        [VSX_TEXT_GUIDE_STEAL_WORD] =
+        "La nova vorto devas esti nova radiko. Oni ne rajtas simple aldoni "
+        "finaĵon al la antaŭa vorto.",
 };
 
 static const char *const * const
