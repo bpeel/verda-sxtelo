@@ -69,6 +69,11 @@ english[] = {
         [VSX_TEXT_GUIDE_STEAL_WORD] =
         "The new word has to be a different root and can’t just be a different "
         "form of the original, like making it plural.",
+        [VSX_TEXT_GUIDE_BOXES] =
+        "Anagrams is a fast-paced word game you can play with your friends.\n"
+        "\n"
+        "Every player has a box on the screen. When your box is green, "
+        "it is your turn.",
 };
 
 static const char *const
@@ -120,6 +125,11 @@ french[] = {
         [VSX_TEXT_GUIDE_STEAL_WORD] =
         "Le nouveau mot ne doit pas être une autre forme du premier. "
         "Vous ne pouvez pas juste le rendre pluriel ou changer la conjugaison.",
+        [VSX_TEXT_GUIDE_BOXES] =
+        "Anagrams est un rapide jeu d’anagrammes entre amis.\n"
+        "\n"
+        "Tous les joueurs ont une boîte sur l’écran. Quand votre box devient "
+        "verte, c’est à vous de jouer.",
 };
 
 static const char *const
@@ -167,6 +177,12 @@ esperanto[] = {
         [VSX_TEXT_GUIDE_STEAL_WORD] =
         "La nova vorto devas esti nova radiko. Oni ne rajtas simple aldoni "
         "finaĵon al la antaŭa vorto.",
+        [VSX_TEXT_GUIDE_BOXES] =
+        "Verda Ŝtelo estas rapida vorta ludo kiun vi povas ludi kun viaj "
+        "amikoj.\n"
+        "\n"
+        "Ĉiu ludanto havas skatolon sur la ekrano. Kiam via skatolo verdiĝas "
+        "estas via vico.",
 };
 
 static const char *const * const

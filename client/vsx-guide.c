@@ -173,6 +173,11 @@ move_word_animations[] = {
 
 const struct vsx_guide_page
 vsx_guide_pages[] = {
+        /* How the boxes work */
+        {
+                .text = VSX_TEXT_GUIDE_BOXES,
+                .image = "boxes-guide.mpng",
+        },
         /* What is allowed as a stolen word */
         {
                 .text = VSX_TEXT_GUIDE_STEAL_WORD,
