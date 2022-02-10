@@ -28,7 +28,7 @@
 #define JUMP_SPEED 40
 
 const struct vsx_guide_animation
-vsx_guide_animations[] = {
+move_word_animations[] = {
         /* Zero-length animations to initialise the positions */
         { .thing = 0, .dest_x = 19, .dest_y = 2 },
         { .thing = 1, .dest_x = 3, .dest_y = 12 },
@@ -143,5 +143,17 @@ vsx_guide_animations[] = {
         },
 };
 
-const int
-vsx_guide_n_animations = VSX_N_ELEMENTS(vsx_guide_animations);
+const struct vsx_guide_page
+vsx_guide_pages[] = {
+        /* Explanation of how to move a word */
+        {
+                .text = VSX_TEXT_GUIDE_MOVE_WORD,
+                .example_word = VSX_TEXT_GUIDE_EXAMPLE_WORD,
+                .n_animations = VSX_N_ELEMENTS(move_word_animations),
+                .animations = move_word_animations,
+        },
+};
+
+_Static_assert(VSX_N_ELEMENTS(vsx_guide_pages) ==
+               VSX_GUIDE_N_PAGES,
+               "Number of element in pages array must match the define");

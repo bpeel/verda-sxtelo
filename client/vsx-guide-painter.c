@@ -414,22 +414,21 @@ free_animations(struct vsx_guide_painter *painter)
 
 static void
 compile_animations(struct vsx_guide_painter *painter,
-                   const struct vsx_guide_animation *animations,
-                   size_t n_animations)
+                   const struct vsx_guide_page *page)
 {
         free_animations(painter);
 
-        painter->animations =
-                vsx_alloc(sizeof (struct compiled_animation) * n_animations);
-        painter->n_animations = n_animations;
+        painter->animations = vsx_alloc(sizeof (struct compiled_animation) *
+                                        page->n_animations);
+        painter->n_animations = page->n_animations;
 
         int dpi = painter->toolbox->paint_state.dpi;
 
         int total_duration = 0;
 
-        for (int i = 0; i < n_animations; i++) {
+        for (int i = 0; i < page->n_animations; i++) {
                 struct compiled_animation *dst = painter->animations + i;
-                const struct vsx_guide_animation *src = animations + i;
+                const struct vsx_guide_animation *src = page->animations + i;
 
                 dst->thing = src->thing;
                 dst->click_type = src->click_type;
@@ -532,7 +531,8 @@ fb_size_changed_cb(void *painter_data)
 }
 
 static void
-update_paragraph(struct vsx_guide_painter *painter)
+update_paragraph(struct vsx_guide_painter *painter,
+                 const struct vsx_guide_page *page)
 {
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
         int paragraph_width = PARAGRAPH_WIDTH * paint_state->dpi * 10 / 254;
@@ -540,8 +540,7 @@ update_paragraph(struct vsx_guide_painter *painter)
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
         vsx_layout_set_text(painter->paragraph.layout,
-                            vsx_text_get(language,
-                                         VSX_TEXT_GUIDE_MOVE_WORD));
+                            vsx_text_get(language, page->text));
 
         vsx_layout_set_width(painter->paragraph.layout, paragraph_width);
 
@@ -608,15 +607,15 @@ create_letters(struct vsx_guide_painter *painter,
 }
 
 static void
-update_letters(struct vsx_guide_painter *painter)
+update_letters(struct vsx_guide_painter *painter,
+               const struct vsx_guide_page *page)
 {
         free_letters(painter);
 
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
 
-        create_letters(painter,
-                       vsx_text_get(language, VSX_TEXT_GUIDE_EXAMPLE_WORD));
+        create_letters(painter, vsx_text_get(language, page->example_word));
 }
 
 static void
@@ -629,7 +628,9 @@ ensure_layout(struct vsx_guide_painter *painter)
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        update_paragraph(painter);
+        const struct vsx_guide_page *page = vsx_guide_pages + 0;
+
+        update_paragraph(painter, page);
 
         const struct vsx_layout_extents *extents =
                 vsx_layout_get_logical_extents(painter->paragraph.layout);
@@ -664,11 +665,9 @@ ensure_layout(struct vsx_guide_painter *painter)
 
         create_shadow(painter);
 
-        update_letters(painter);
+        update_letters(painter, page);
 
-        compile_animations(painter,
-                           vsx_guide_animations,
-                           vsx_guide_n_animations);
+        compile_animations(painter, page);
 
         painter->layout_dirty = false;
 }

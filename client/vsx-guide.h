@@ -21,6 +21,8 @@
 
 #include <limits.h>
 
+#include "vsx-text.h"
+
 #define VSX_GUIDE_MOVE_CURSOR INT_MAX
 
 /* Size of the area reserved for the animations or images size in mm */
@@ -28,6 +30,8 @@
 
 /* Size of a tile in mm */
 #define VSX_GUIDE_TILE_SIZE (VSX_GUIDE_IMAGE_SIZE / 5)
+
+#define VSX_GUIDE_N_PAGES 1
 
 enum vsx_guide_click_type {
         VSX_GUIDE_CLICK_TYPE_NONE,
@@ -59,10 +63,16 @@ struct vsx_guide_animation {
         enum vsx_guide_click_type click_type;
 };
 
-extern const struct vsx_guide_animation
-vsx_guide_animations[];
+struct vsx_guide_page {
+        enum vsx_text example_word;
+        enum vsx_text text;
 
-extern const int
-vsx_guide_n_animations;
+        int n_animations;
+
+        const struct vsx_guide_animation *animations;
+};
+
+extern const struct vsx_guide_page
+vsx_guide_pages[];
 
 #endif /* VSX_GUIDE_H */
