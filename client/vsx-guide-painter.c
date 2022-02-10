@@ -86,8 +86,9 @@ struct vsx_guide_painter {
         GLuint cursor_vbo;
         struct vsx_array_object *cursor_vao;
 
-        const struct vsx_tile_texture_letter *
-        example_letters[VSX_GUIDE_EXAMPLE_WORD_LENGTH];
+        const struct vsx_tile_texture_letter **example_letters;
+
+        int example_word_length;
 
         /* “Compiled” versions of the animations that are easier to
          * process at runtime.
@@ -98,7 +99,7 @@ struct vsx_guide_painter {
         int total_animation_duration;
 
         /* The position of each letter of the example word */
-        struct thing_pos letter_positions[VSX_GUIDE_EXAMPLE_WORD_LENGTH];
+        struct thing_pos *letter_positions;
         /* The position of the cursor */
         struct thing_pos cursor_position;
 
@@ -405,10 +406,19 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
 }
 
 static void
+free_animations(struct vsx_guide_painter *painter)
+{
+        vsx_free(painter->animations);
+        painter->animations = NULL;
+}
+
+static void
 compile_animations(struct vsx_guide_painter *painter,
                    const struct vsx_guide_animation *animations,
                    size_t n_animations)
 {
+        free_animations(painter);
+
         painter->animations =
                 vsx_alloc(sizeof (struct compiled_animation) * n_animations);
         painter->n_animations = n_animations;
@@ -460,19 +470,6 @@ compile_animations(struct vsx_guide_painter *painter,
         painter->total_animation_duration = total_duration + 1000 * 1000;
 }
 
-static void
-init_letter_list(struct vsx_guide_painter *painter)
-{
-        vsx_list_init(&painter->letter_list);
-
-        for (int i = 0; i < VSX_N_ELEMENTS(painter->letter_positions); i++) {
-                struct thing_pos *pos = painter->letter_positions + i;
-
-                pos->num = i;
-                vsx_list_insert(painter->letter_list.prev, &pos->link);
-        }
-}
-
 static void *
 create_cb(struct vsx_game_state *game_state,
           struct vsx_toolbox *toolbox)
@@ -484,17 +481,11 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        init_letter_list(painter);
-
         /* Convert the measurements from mm to pixels */
         int dpi = toolbox->paint_state.dpi;
         painter->border = BORDER * dpi * 10 / 254;
         painter->image_size = VSX_GUIDE_IMAGE_SIZE * dpi * 10 / 254;
         painter->tile_size = VSX_GUIDE_TILE_SIZE * dpi * 10 / 254;
-
-        compile_animations(painter,
-                           vsx_guide_animations,
-                           vsx_guide_n_animations);
 
         painter->layout_dirty = true;
 
@@ -558,24 +549,74 @@ update_paragraph(struct vsx_guide_painter *painter)
 }
 
 static void
-update_example_letters(struct vsx_guide_painter *painter)
+free_letters(struct vsx_guide_painter *painter)
 {
-        enum vsx_text_language language =
-                vsx_game_state_get_language(painter->game_state);
-        const char *p = vsx_text_get(language, VSX_TEXT_GUIDE_EXAMPLE_WORD);
+        vsx_free(painter->example_letters);
+        painter->example_letters = NULL;
+        vsx_free(painter->letter_positions);
+        painter->letter_positions = NULL;
+}
 
-        for (int i = 0;
-             i < VSX_GUIDE_EXAMPLE_WORD_LENGTH;
-             i++, p = vsx_utf8_next(p)) {
+static int
+get_word_length(const char *word)
+{
+        int length = 0;
+
+        while (*word) {
+                length++;
+                word = vsx_utf8_next(word);
+        }
+
+        return length;
+}
+
+static void
+create_letters(struct vsx_guide_painter *painter,
+               const char *word)
+{
+        int length = get_word_length(word);
+
+        painter->example_letters =
+                vsx_alloc(sizeof (const struct vsx_tile_texture_letter *) *
+                          length);
+        painter->letter_positions =
+                vsx_alloc(sizeof *painter->letter_positions * length);
+
+        vsx_list_init(&painter->letter_list);
+
+        const char *p = word;
+
+        for (int i = 0; i < length; i++) {
+                struct thing_pos *pos = painter->letter_positions + i;
+
+                pos->num = i;
+                vsx_list_insert(painter->letter_list.prev, &pos->link);
+
                 assert(*p);
 
                 painter->example_letters[i] =
                         vsx_tile_texture_find_letter(vsx_utf8_get_char(p));
 
                 assert(painter->example_letters[i]);
+
+                p = vsx_utf8_next(p);
         }
 
         assert(*p == '\0');
+
+        painter->example_word_length = length;
+}
+
+static void
+update_letters(struct vsx_guide_painter *painter)
+{
+        free_letters(painter);
+
+        enum vsx_text_language language =
+                vsx_game_state_get_language(painter->game_state);
+
+        create_letters(painter,
+                       vsx_text_get(language, VSX_TEXT_GUIDE_EXAMPLE_WORD));
 }
 
 static void
@@ -623,7 +664,11 @@ ensure_layout(struct vsx_guide_painter *painter)
 
         create_shadow(painter);
 
-        update_example_letters(painter);
+        update_letters(painter);
+
+        compile_animations(painter,
+                           vsx_guide_animations,
+                           vsx_guide_n_animations);
 
         painter->layout_dirty = false;
 }
@@ -746,7 +791,7 @@ static void
 update_tiles(struct vsx_guide_painter *painter)
 {
         vsx_tile_tool_begin_update(painter->tile_buffer,
-                                   VSX_GUIDE_EXAMPLE_WORD_LENGTH);
+                                   painter->example_word_length);
 
         struct thing_pos *pos;
 
@@ -941,9 +986,11 @@ free_cb(void *painter_data)
         if (painter->cursor_vao)
                 vsx_array_object_free(painter->cursor_vao, gl);
 
+
         vsx_tile_tool_free_buffer(painter->tile_buffer);
 
-        vsx_free(painter->animations);
+        free_letters(painter);
+        free_animations(painter);
 
         clear_shadow(painter);
 

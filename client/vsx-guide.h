@@ -21,8 +21,6 @@
 
 #include <limits.h>
 
-#define VSX_GUIDE_EXAMPLE_WORD_LENGTH 5
-
 #define VSX_GUIDE_MOVE_CURSOR INT_MAX
 
 /* Size of the area reserved for the animations or images size in mm */
