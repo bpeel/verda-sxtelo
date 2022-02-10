@@ -553,9 +553,13 @@ compile_animations(struct vsx_guide_painter *painter,
 {
         free_animations(painter);
 
+        painter->n_animations = page->n_animations;
+
+        if (page->n_animations == 0)
+                return;
+
         painter->animations = vsx_alloc(sizeof (struct compiled_animation) *
                                         page->n_animations);
-        painter->n_animations = page->n_animations;
 
         int dpi = painter->toolbox->paint_state.dpi;
 
