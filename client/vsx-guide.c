@@ -177,6 +177,7 @@ vsx_guide_pages[] = {
         {
                 .text = VSX_TEXT_GUIDE_STEAL_WORD,
                 .example_word = VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD,
+                .image = "steal-word-guide.mpng",
                 .tile_size = SMALL_TILE_SIZE,
                 .n_animations = VSX_N_ELEMENTS(steal_word_animations),
                 .animations = steal_word_animations,
