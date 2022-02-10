@@ -159,6 +159,7 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
+        case VSX_GAME_STATE_MODIFIED_TYPE_PAGE:
                 painter->layout_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
@@ -648,7 +649,9 @@ ensure_layout(struct vsx_guide_painter *painter)
 
         vsx_paint_state_ensure_layout(paint_state);
 
-        const struct vsx_guide_page *page = vsx_guide_pages + 0;
+        const struct vsx_guide_page *page =
+                vsx_guide_pages +
+                vsx_game_state_get_page(painter->game_state);
 
         update_paragraph(painter, page);
         update_tile_buffer(painter, page);

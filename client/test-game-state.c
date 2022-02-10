@@ -2871,6 +2871,127 @@ out:
         return ret;
 }
 
+struct test_page_closure {
+        struct harness *harness;
+        bool succeeded;
+        int expected_value;
+        bool had_event;
+        struct vsx_listener listener;
+};
+
+static void
+test_page_cb(struct vsx_listener *listener,
+               void *user_data)
+{
+        struct test_page_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_page_closure,
+                                 listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_PAGE) {
+                fprintf(stderr,
+                        "Received unexpected modified event %i while setting "
+                        "page.\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
+        if (closure->had_event) {
+                fprintf(stderr,
+                        "Received multiple page modified events.\n");
+                closure->succeeded = false;
+                return;
+        }
+
+        int real_value = vsx_game_state_get_page(closure->harness->game_state);
+
+        if (closure->expected_value != real_value) {
+                fprintf(stderr,
+                        "page has wrong value\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        closure->expected_value,
+                        real_value);
+                closure->succeeded = false;
+                return;
+        }
+
+        closure->had_event = true;
+}
+
+static bool
+test_page(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (!harness)
+                return false;
+
+        bool ret = true;
+
+        struct test_page_closure closure = {
+                .harness = harness,
+                .succeeded = true,
+                .expected_value = 1,
+                .had_event = false,
+                .listener = {
+                        .notify = test_page_cb,
+                },
+        };
+
+        struct vsx_signal *signal =
+                vsx_game_state_get_modified_signal(harness->game_state);
+        vsx_signal_add(signal, &closure.listener);
+
+        if (vsx_game_state_get_page(harness->game_state) != 0) {
+                fprintf(stderr,
+                        "page didn’t start off as 0\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_page(harness->game_state, 1);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_event) {
+                fprintf(stderr,
+                        "No modified event received after setting page.\n");
+                ret = false;
+                goto out;
+        }
+
+        /* Set the same value again and ensure no event was triggered */
+
+        closure.had_event = false;
+
+        vsx_game_state_set_page(harness->game_state, 1);
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_event) {
+                fprintf(stderr,
+                        "A modified event was received after setting page "
+                        "to same value.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
 struct test_note_closure {
         bool succeeded;
         bool had_event;
@@ -3873,6 +3994,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_dialog())
+                ret = EXIT_FAILURE;
+
+        if (!test_page())
                 ret = EXIT_FAILURE;
 
         if (!test_n_tiles())

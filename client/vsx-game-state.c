@@ -67,6 +67,9 @@ struct vsx_game_state {
 
         enum vsx_dialog dialog;
 
+        /* The page number within the guide */
+        int page;
+
         int self;
 
         /* Array of tile pointers indexed by tile number */
@@ -1043,6 +1046,32 @@ vsx_game_state_set_dialog(struct vsx_game_state *game_state,
 }
 
 int
+vsx_game_state_get_page(struct vsx_game_state *game_state)
+{
+        return game_state->page;
+}
+
+void
+vsx_game_state_set_page(struct vsx_game_state *game_state,
+                        int page)
+{
+        if (game_state->page == page)
+                return;
+
+        game_state->page = page;
+
+        pthread_mutex_lock(&game_state->mutex);
+        game_state->instance_state.page = page;
+        pthread_mutex_unlock(&game_state->mutex);
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_PAGE,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+int
 vsx_game_state_get_self(struct vsx_game_state *game_state)
 {
         return game_state->self;
@@ -1069,6 +1098,7 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
         bool has_person_id;
         uint64_t person_id;
         enum vsx_dialog dialog;
+        int page;
 
         pthread_mutex_lock(&game_state->mutex);
 
@@ -1076,6 +1106,7 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
         has_person_id = game_state->instance_state.has_person_id;
         person_id = game_state->instance_state.person_id;
         dialog = game_state->instance_state.dialog;
+        page = game_state->instance_state.page;
 
         pthread_mutex_unlock(&game_state->mutex);
 
@@ -1087,6 +1118,8 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
         }
 
         vsx_game_state_set_dialog(game_state, dialog);
+
+        vsx_game_state_set_page(game_state, page);
 }
 
 struct vsx_signal *

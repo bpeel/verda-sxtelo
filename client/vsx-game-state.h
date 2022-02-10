@@ -54,6 +54,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER,
         VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
         VSX_GAME_STATE_MODIFIED_TYPE_DIALOG,
+        VSX_GAME_STATE_MODIFIED_TYPE_PAGE,
         VSX_GAME_STATE_MODIFIED_TYPE_N_TILES,
         VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE,
         VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES,
@@ -140,6 +141,13 @@ vsx_game_state_get_dialog(struct vsx_game_state *game_state);
 void
 vsx_game_state_set_dialog(struct vsx_game_state *game_state,
                           enum vsx_dialog dialog);
+
+int
+vsx_game_state_get_page(struct vsx_game_state *game_state);
+
+void
+vsx_game_state_set_page(struct vsx_game_state *game_state,
+                        int page);
 
 void
 vsx_game_state_update(struct vsx_game_state *game_state);
