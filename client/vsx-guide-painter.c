@@ -955,6 +955,18 @@ handle_click(struct vsx_guide_painter *painter,
                 return true;
         }
 
+        int current_page = vsx_game_state_get_page(painter->game_state);
+
+        if (x >= painter->dialog_x + painter->dialog_width / 2) {
+                if (current_page < VSX_GUIDE_N_PAGES - 1) {
+                        vsx_game_state_set_page(painter->game_state,
+                                                current_page + 1);
+                }
+        } else if (current_page > 0) {
+                vsx_game_state_set_page(painter->game_state,
+                                        current_page - 1);
+        }
+
         return true;
 }
 
