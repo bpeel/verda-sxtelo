@@ -466,6 +466,13 @@ handle_toggle_length(struct vsx_menu_painter *painter)
         }
 }
 
+static void
+handle_help_button(struct vsx_menu_painter *painter)
+{
+        vsx_game_state_set_page(painter->game_state, 0);
+        vsx_game_state_set_dialog(painter->game_state, VSX_DIALOG_GUIDE);
+}
+
 static bool
 handle_click(struct vsx_menu_painter *painter,
              const struct vsx_input_event *event)
@@ -503,8 +510,7 @@ handle_click(struct vsx_menu_painter *painter,
                 handle_toggle_length(painter);
                 break;
         case MENU_BUTTON_HELP:
-                vsx_game_state_set_dialog(painter->game_state,
-                                          VSX_DIALOG_GUIDE);
+                handle_help_button(painter);
                 break;
         case MENU_BUTTON_LEAVE:
                 vsx_game_state_leave(painter->game_state);
