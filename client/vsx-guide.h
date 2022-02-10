@@ -19,9 +19,11 @@
 #ifndef VSX_GUIDE_H
 #define VSX_GUIDE_H
 
+#include <limits.h>
+
 #define VSX_GUIDE_EXAMPLE_WORD_LENGTH 5
 
-#define VSX_GUIDE_MOVE_CURSOR VSX_GUIDE_EXAMPLE_WORD_LENGTH
+#define VSX_GUIDE_MOVE_CURSOR INT_MAX
 
 /* Size of the area reserved for the animations or images size in mm */
 #define VSX_GUIDE_IMAGE_SIZE 25

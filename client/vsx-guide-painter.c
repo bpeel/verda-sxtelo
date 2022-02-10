@@ -97,16 +97,16 @@ struct vsx_guide_painter {
         /* After this time in microseconds the animation will loop */
         int total_animation_duration;
 
-        /* The position of each letter of the example word, plus the
-         * position of the cursor.
-         */
-        struct thing_pos thing_positions[VSX_GUIDE_EXAMPLE_WORD_LENGTH + 1];
+        /* The position of each letter of the example word */
+        struct thing_pos letter_positions[VSX_GUIDE_EXAMPLE_WORD_LENGTH];
+        /* The position of the cursor */
+        struct thing_pos cursor_position;
 
         /* Whether we should currently show the click cursor */
         bool clicking;
 
-        /* List of things in paint order */
-        struct vsx_list thing_list;
+        /* List of letters in paint order */
+        struct vsx_list letter_list;
 
         int64_t start_time;
 
@@ -424,6 +424,11 @@ compile_animations(struct vsx_guide_painter *painter,
                 dst->thing = src->thing;
                 dst->click_type = src->click_type;
 
+                struct thing_pos *pos = (src->thing == VSX_GUIDE_MOVE_CURSOR ?
+                                         &painter->cursor_position :
+                                         painter->letter_positions +
+                                         src->thing);
+
                 if (src->start_after == 0) {
                         dst->start = 0;
                 } else {
@@ -433,10 +438,8 @@ compile_animations(struct vsx_guide_painter *painter,
                 }
 
                 if (src->speed > 0) {
-                        float dx = (painter->thing_positions[dst->thing].x -
-                                    src->dest_x);
-                        float dy = (painter->thing_positions[dst->thing].y -
-                                    src->dest_y);
+                        float dx = pos->x - src->dest_x;
+                        float dy = pos->y - src->dest_y;
                         float d = sqrtf((dx * dx) + (dy * dy));
 
                         dst->duration = d * 1e6f / src->speed;
@@ -447,8 +450,8 @@ compile_animations(struct vsx_guide_painter *painter,
                 if (dst->start + dst->duration > total_duration)
                         total_duration = dst->start + dst->duration;
 
-                painter->thing_positions[dst->thing].x = src->dest_x;
-                painter->thing_positions[dst->thing].y = src->dest_y;
+                pos->x = src->dest_x;
+                pos->y = src->dest_y;
 
                 dst->dest_x = src->dest_x * dpi * 10 / 254;
                 dst->dest_y = src->dest_y * dpi * 10 / 254;
@@ -458,15 +461,15 @@ compile_animations(struct vsx_guide_painter *painter,
 }
 
 static void
-init_positions(struct vsx_guide_painter *painter)
+init_letter_list(struct vsx_guide_painter *painter)
 {
-        vsx_list_init(&painter->thing_list);
+        vsx_list_init(&painter->letter_list);
 
-        for (int i = 0; i < VSX_N_ELEMENTS(painter->thing_positions); i++) {
-                struct thing_pos *pos = painter->thing_positions + i;
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->letter_positions); i++) {
+                struct thing_pos *pos = painter->letter_positions + i;
 
                 pos->num = i;
-                vsx_list_insert(painter->thing_list.prev, &pos->link);
+                vsx_list_insert(painter->letter_list.prev, &pos->link);
         }
 }
 
@@ -481,7 +484,7 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        init_positions(painter);
+        init_letter_list(painter);
 
         /* Convert the measurements from mm to pixels */
         int dpi = toolbox->paint_state.dpi;
@@ -698,8 +701,10 @@ update_animations(struct vsx_guide_painter *painter)
                 if (elapsed_time < animation->start)
                         break;
 
-                struct thing_pos *pos = (painter->thing_positions +
-                                         animation->thing);
+                struct thing_pos *pos =
+                        (animation->thing == VSX_GUIDE_MOVE_CURSOR ?
+                         &painter->cursor_position :
+                         painter->letter_positions + animation->thing);
 
                 if (elapsed_time >= animation->start + animation->duration) {
                         pos->x = animation->dest_x;
@@ -713,9 +718,13 @@ update_animations(struct vsx_guide_painter *painter)
                 pos->y += ((animation->dest_y - pos->y) * t /
                            animation->duration);
 
-                /* Move this thing to the end so that it will be drawn on top */
-                vsx_list_remove(&pos->link);
-                vsx_list_insert(painter->thing_list.prev, &pos->link);
+                if (animation->thing != VSX_GUIDE_MOVE_CURSOR) {
+                        /* Move this letter to the end of the letter
+                         * list so that it will be drawn on top.
+                         */
+                        vsx_list_remove(&pos->link);
+                        vsx_list_insert(painter->letter_list.prev, &pos->link);
+                }
 
                 switch (animation->click_type) {
                 case VSX_GUIDE_CLICK_TYPE_NONE:
@@ -741,10 +750,7 @@ update_tiles(struct vsx_guide_painter *painter)
 
         struct thing_pos *pos;
 
-        vsx_list_for_each(pos, &painter->thing_list, link) {
-                if (pos->num == VSX_GUIDE_MOVE_CURSOR)
-                        continue;
-
+        vsx_list_for_each(pos, &painter->letter_list, link) {
                 const struct vsx_tile_texture_letter *letter =
                         painter->example_letters[pos->num];
 
@@ -843,10 +849,8 @@ paint_cb(void *painter_data)
                             painter->toolbox->paint_state.pixel_translation);
 
         draw_cursor(painter,
-                    painter->thing_positions[VSX_GUIDE_MOVE_CURSOR].x +
-                    painter->image_x,
-                    painter->thing_positions[VSX_GUIDE_MOVE_CURSOR].y +
-                    painter->image_y,
+                    painter->cursor_position.x + painter->image_x,
+                    painter->cursor_position.y + painter->image_y,
                     painter->clicking);
 
         vsx_layout_paint_multiple(&painter->paragraph, 1);
