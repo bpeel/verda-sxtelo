@@ -79,6 +79,7 @@ struct vsx_guide_painter {
         int image_x, image_y;
         int border;
         int image_size;
+        int image_scissor_x, image_scissor_y;
 
         GLuint cursor_tex;
         struct vsx_image_loader_token *cursor_token;
@@ -849,6 +850,20 @@ ensure_layout(struct vsx_guide_painter *painter)
                             painter->dialog_height / 2 -
                             painter->image_size / 2);
 
+        if (paint_state->board_rotated) {
+                painter->image_scissor_x = (paint_state->width -
+                                            painter->image_y -
+                                            painter->image_size);
+                painter->image_scissor_y = (paint_state->height -
+                                            painter->image_x -
+                                            painter->image_size);
+        } else {
+                painter->image_scissor_x = painter->image_x;
+                painter->image_scissor_y = (paint_state->height -
+                                            painter->image_y -
+                                            painter->image_size);
+        }
+
         painter->layouts[1].x = (painter->image_x +
                                  painter->image_size +
                                  painter->border);
@@ -1091,21 +1106,19 @@ paint_layouts(struct vsx_guide_painter *painter)
 }
 
 static void
-paint_cb(void *painter_data)
+paint_things(struct vsx_guide_painter *painter)
 {
-        struct vsx_guide_painter *painter = painter_data;
-
-        if (!vsx_tile_tool_is_ready(painter->toolbox->tile_tool) ||
-            !vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
+        if (painter->n_tiles <= 0 && !painter->show_cursor)
                 return;
 
-        update_animations(painter);
-
-        paint_shadow(painter);
-
-        paint_background(painter);
-
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+        struct vsx_gl *gl = painter->toolbox->gl;
+
+        gl->glEnable(GL_SCISSOR_TEST);
+        gl->glScissor(painter->image_scissor_x,
+                      painter->image_scissor_y,
+                      painter->image_size,
+                      painter->image_size);
 
         if (painter->n_tiles > 0) {
                 update_tiles(painter);
@@ -1121,6 +1134,26 @@ paint_cb(void *painter_data)
                             painter->cursor_position.y + painter->image_y,
                             painter->clicking);
         }
+
+        gl->glDisable(GL_SCISSOR_TEST);
+}
+
+static void
+paint_cb(void *painter_data)
+{
+        struct vsx_guide_painter *painter = painter_data;
+
+        if (!vsx_tile_tool_is_ready(painter->toolbox->tile_tool) ||
+            !vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
+                return;
+
+        update_animations(painter);
+
+        paint_shadow(painter);
+
+        paint_background(painter);
+
+        paint_things(painter);
 
         paint_layouts(painter);
 
