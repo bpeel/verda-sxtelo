@@ -65,6 +65,13 @@ struct vsx_guide_page {
         enum vsx_text example_word;
         enum vsx_text text;
 
+        /* Image to display in the image area behind the tiles. This
+         * will be stretched to fill the image area so it should be a
+         * square image. Its border will be used to fill the dialog so
+         * it should be surrounded by the dialog colour.
+         */
+        const char *image;
+
         /* Size of a tile in mm */
         int tile_size;
 
