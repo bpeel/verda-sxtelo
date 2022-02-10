@@ -74,6 +74,10 @@ english[] = {
         "\n"
         "Every player has a box on the screen. When your box is green, "
         "it is your turn.",
+        [VSX_TEXT_GUIDE_ADD_LETTER] =
+        "During your turn, click on the tile bag to add a letter to the table.",
+        [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
+        "QOZE",
 };
 
 static const char *const
@@ -130,6 +134,11 @@ french[] = {
         "\n"
         "Tous les joueurs ont une boîte sur l’écran. Quand votre box devient "
         "verte, c’est à vous de jouer.",
+        [VSX_TEXT_GUIDE_ADD_LETTER] =
+        "Pendant votre tour, cliquez sur le sac à lettres pour ajouter une "
+        "lettre à la table.",
+        [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
+        "QOZE",
 };
 
 static const char *const
@@ -183,6 +192,10 @@ esperanto[] = {
         "\n"
         "Ĉiu ludanto havas skatolon sur la ekrano. Kiam via skatolo verdiĝas "
         "estas via vico.",
+        [VSX_TEXT_GUIDE_ADD_LETTER] =
+        "Dum via vico, alklaku la literosakon por aldoni literon al la tablo.",
+        [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
+        "ĈOZE",
 };
 
 static const char *const * const

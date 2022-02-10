@@ -31,6 +31,53 @@
 #define SMALL_TILE_SIZE 3
 
 const struct vsx_guide_animation
+add_letter_animations[] = {
+        /* Initialise the position of the tiles */
+
+        { .thing = 0, .dest_x = 3, .dest_y = 8 },
+        { .thing = 1, .dest_x = 10, .dest_y = 7 },
+        { .thing = 2, .dest_x = 11, .dest_y = 12 },
+        /* New letter offscreen */
+        {
+                .thing = 3,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2 - SMALL_TILE_SIZE / 2,
+        },
+
+        /* Cursor in the centre */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+        },
+
+        /* Move the cursor to the button */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 21, .dest_y = 14,
+                .speed = CURSOR_SPEED,
+        },
+
+        /* Click and move the new letter to the table */
+        {
+                .thing = 3,
+                .dest_x = 5, .dest_y = 13,
+                .speed = JUMP_SPEED,
+                .start_after = -1,
+                .click_type = VSX_GUIDE_CLICK_TYPE_SHORT,
+        },
+
+        /* Move the cursor back to the centre */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+                .start_after = -1,
+                .speed = CURSOR_SPEED,
+        },
+};
+
+const struct vsx_guide_animation
 steal_word_animations[] = {
         /* No animations, just set the positions of the tiles */
 
@@ -177,6 +224,17 @@ vsx_guide_pages[] = {
         {
                 .text = VSX_TEXT_GUIDE_BOXES,
                 .image = "boxes-guide.mpng",
+        },
+        /* How to add a letter */
+        {
+                .text = VSX_TEXT_GUIDE_ADD_LETTER,
+                .image = "add-letter-guide.mpng",
+                .has_tiles = true,
+                .example_word = VSX_TEXT_GUIDE_ADD_LETTER_WORD,
+                .show_cursor = true,
+                .n_animations = VSX_N_ELEMENTS(add_letter_animations),
+                .animations = add_letter_animations,
+                .tile_size = SMALL_TILE_SIZE,
         },
         /* What is allowed as a stolen word */
         {
