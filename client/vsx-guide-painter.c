@@ -466,7 +466,10 @@ compile_animations(struct vsx_guide_painter *painter,
                 dst->dest_y = src->dest_y * dpi * 10 / 254;
         }
 
-        painter->total_animation_duration = total_duration + 1000 * 1000;
+        painter->total_animation_duration =
+                total_duration > 0 ?
+                total_duration + 1000 * 1000:
+                0;
 }
 
 static void *
@@ -742,7 +745,8 @@ get_elapsed_time(struct vsx_guide_painter *painter)
 {
         int64_t now = vsx_monotonic_get();
 
-        if (painter->start_time == 0) {
+        if (painter->start_time == 0 ||
+            painter->total_animation_duration == 0) {
                 painter->start_time = now;
                 return 0;
         } else {
@@ -921,7 +925,8 @@ paint_cb(void *painter_data)
 
         vsx_layout_paint_multiple(&painter->paragraph, 1);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (painter->total_animation_duration > 0)
+                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
 static bool
