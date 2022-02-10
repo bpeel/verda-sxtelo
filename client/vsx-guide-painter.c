@@ -114,7 +114,8 @@ struct vsx_guide_painter {
 
         int64_t start_time;
 
-        struct vsx_layout_paint_position paragraph;
+        /* Left arrow symbol, page text, right arrow symbol */
+        struct vsx_layout_paint_position layouts[3];
 
         struct vsx_shadow_painter_shadow *shadow;
         struct vsx_listener shadow_painter_ready_listener;
@@ -139,7 +140,7 @@ struct vertex {
 /* Max width of the explanation text in mm */
 #define PARAGRAPH_WIDTH 40
 /* Border size around the paragraphs in mm */
-#define BORDER 4
+#define BORDER 5
 
 #define CURSOR_X(size) (54 * (size) / 128)
 #define CURSOR_Y(size) (32 * (size) / 128)
@@ -449,14 +450,25 @@ create_buffer(struct vsx_guide_painter *painter)
 }
 
 static void
-create_layout(struct vsx_guide_painter *painter)
+create_layouts(struct vsx_guide_painter *painter)
 {
-        struct vsx_layout *layout =
-                vsx_layout_new(painter->toolbox);
+        /* Left/right arrows */
+        for (int i = 0; i < 3; i += 2) {
+                painter->layouts[i].r = 0.106f;
+                painter->layouts[i].g = 0.561f;
+                painter->layouts[i].b = 0.871f;
 
-        vsx_layout_set_font(layout, PARAGRAPH_FONT);
+                painter->layouts[i].layout = vsx_layout_new(painter->toolbox);
+                vsx_layout_set_text(painter->layouts[i].layout,
+                                    i == 0 ? "<" : ">");
+                vsx_layout_set_font(painter->layouts[i].layout,
+                                    VSX_FONT_TYPE_SYMBOL);
+                vsx_layout_prepare(painter->layouts[i].layout);
+        }
 
-        painter->paragraph.layout = layout;
+        /* Page text */
+        painter->layouts[1].layout = vsx_layout_new(painter->toolbox);
+        vsx_layout_set_font(painter->layouts[1].layout, PARAGRAPH_FONT);
 }
 
 static void
@@ -637,7 +649,7 @@ create_cb(struct vsx_game_state *game_state,
 
         create_cursor_buffer(painter);
 
-        create_layout(painter);
+        create_layouts(painter);
 
         start_image_load(painter);
 
@@ -659,14 +671,15 @@ update_paragraph(struct vsx_guide_painter *painter,
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
         int paragraph_width = PARAGRAPH_WIDTH * paint_state->dpi * 10 / 254;
 
+        struct vsx_layout *layout = painter->layouts[1].layout;
+
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
-        vsx_layout_set_text(painter->paragraph.layout,
-                            vsx_text_get(language, page->text));
+        vsx_layout_set_text(layout, vsx_text_get(language, page->text));
 
-        vsx_layout_set_width(painter->paragraph.layout, paragraph_width);
+        vsx_layout_set_width(layout, paragraph_width);
 
-        vsx_layout_prepare(painter->paragraph.layout);
+        vsx_layout_prepare(layout);
 }
 
 static void
@@ -764,6 +777,29 @@ update_letters(struct vsx_guide_painter *painter,
 }
 
 static void
+update_arrow_positions(struct vsx_guide_painter *painter)
+{
+        for (int i = 0; i < 2; i++) {
+                struct vsx_layout_paint_position *pos =
+                        painter->layouts +
+                        (i == 0 ? 0 : VSX_N_ELEMENTS(painter->layouts) - 1);
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(pos->layout);
+
+                pos->x = (painter->dialog_x +
+                          painter->border / 2 -
+                          extents->right / 2);
+
+                if (i > 0)
+                        pos->x += painter->dialog_width - painter->border;
+
+                pos->y = (painter->dialog_y +
+                          painter->dialog_height / 2 +
+                          extents->top / 2);
+        }
+}
+
+static void
 ensure_layout(struct vsx_guide_painter *painter)
 {
         if (!painter->layout_dirty)
@@ -783,7 +819,7 @@ ensure_layout(struct vsx_guide_painter *painter)
         painter->show_cursor = page->show_cursor;
 
         const struct vsx_layout_extents *extents =
-                vsx_layout_get_logical_extents(painter->paragraph.layout);
+                vsx_layout_get_logical_extents(painter->layouts[1].layout);
 
         int paragraph_height = extents->top + extents->bottom;
 
@@ -803,13 +839,15 @@ ensure_layout(struct vsx_guide_painter *painter)
                             painter->dialog_height / 2 -
                             painter->image_size / 2);
 
-        painter->paragraph.x = (painter->image_x +
-                                painter->image_size +
-                                painter->border);
-        painter->paragraph.y = (painter->dialog_y +
-                                painter->dialog_height / 2 -
-                                paragraph_height / 2 +
-                                extents->top);
+        painter->layouts[1].x = (painter->image_x +
+                                 painter->image_size +
+                                 painter->border);
+        painter->layouts[1].y = (painter->dialog_y +
+                                 painter->dialog_height / 2 -
+                                 paragraph_height / 2 +
+                                 extents->top);
+
+        update_arrow_positions(painter);
 
         update_vertices(painter);
 
@@ -1026,6 +1064,24 @@ draw_cursor(struct vsx_guide_painter *painter,
 }
 
 static void
+paint_layouts(struct vsx_guide_painter *painter)
+{
+        int first_layout = 0, n_layouts = VSX_N_ELEMENTS(painter->layouts);
+
+        int page = vsx_game_state_get_page(painter->game_state);
+
+        if (page <= 0) {
+                first_layout++;
+                n_layouts--;
+        }
+
+        if (page >= VSX_GUIDE_N_PAGES - 1)
+                n_layouts--;
+
+        vsx_layout_paint_multiple(painter->layouts + first_layout, n_layouts);
+}
+
+static void
 paint_cb(void *painter_data)
 {
         struct vsx_guide_painter *painter = painter_data;
@@ -1053,7 +1109,7 @@ paint_cb(void *painter_data)
                             painter->clicking);
         }
 
-        vsx_layout_paint_multiple(&painter->paragraph, 1);
+        paint_layouts(painter);
 
         if (painter->total_animation_duration > 0)
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
@@ -1141,8 +1197,10 @@ free_cb(void *painter_data)
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
 
-        if (painter->paragraph.layout)
-                vsx_layout_free(painter->paragraph.layout);
+        for (int i = 0; i < VSX_N_ELEMENTS(painter->layouts); i++) {
+                if (painter->layouts[i].layout)
+                        vsx_layout_free(painter->layouts[i].layout);
+        }
 
         if (painter->cursor_token)
                 vsx_image_loader_cancel(painter->cursor_token);
