@@ -39,6 +39,7 @@ enum vsx_font_error {
 
 enum vsx_font_type {
         VSX_FONT_TYPE_LABEL,
+        VSX_FONT_TYPE_SYMBOL,
 
         VSX_FONT_N_TYPES,
 };

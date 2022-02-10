@@ -67,6 +67,11 @@ font_types[] = {
                 .face_index = 0,
                 .size = 8 * 64,
         },
+        [VSX_FONT_TYPE_SYMBOL] = {
+                .filename = "symbols.otf",
+                .face_index = 0,
+                .size = 16 * 64,
+        },
 };
 
 _Static_assert(VSX_N_ELEMENTS(font_types) == VSX_FONT_N_TYPES,
