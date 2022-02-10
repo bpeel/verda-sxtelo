@@ -28,9 +28,6 @@
 /* Size of the area reserved for the animations or images size in mm */
 #define VSX_GUIDE_IMAGE_SIZE 25
 
-/* Size of a tile in mm */
-#define VSX_GUIDE_TILE_SIZE (VSX_GUIDE_IMAGE_SIZE / 5)
-
 #define VSX_GUIDE_N_PAGES 1
 
 enum vsx_guide_click_type {
@@ -66,6 +63,9 @@ struct vsx_guide_animation {
 struct vsx_guide_page {
         enum vsx_text example_word;
         enum vsx_text text;
+
+        /* Size of a tile in mm */
+        int tile_size;
 
         int n_animations;
 

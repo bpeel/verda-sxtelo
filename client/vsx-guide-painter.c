@@ -79,7 +79,6 @@ struct vsx_guide_painter {
         int image_x, image_y;
         int border;
         int image_size;
-        int tile_size;
 
         GLuint cursor_tex;
         struct vsx_image_loader_token *cursor_token;
@@ -484,7 +483,6 @@ create_cb(struct vsx_game_state *game_state,
         int dpi = toolbox->paint_state.dpi;
         painter->border = BORDER * dpi * 10 / 254;
         painter->image_size = VSX_GUIDE_IMAGE_SIZE * dpi * 10 / 254;
-        painter->tile_size = VSX_GUIDE_TILE_SIZE * dpi * 10 / 254;
 
         painter->layout_dirty = true;
 
@@ -500,13 +498,8 @@ create_cb(struct vsx_game_state *game_state,
         vsx_signal_add(vsx_shadow_painter_get_ready_signal(shadow_painter),
                        &painter->shadow_painter_ready_listener);
 
-        struct vsx_tile_tool *tile_tool = toolbox->tile_tool;
-
-        painter->tile_buffer =
-                vsx_tile_tool_create_buffer(tile_tool, painter->tile_size);
-
         painter->tile_tool_ready_listener.notify = tile_tool_ready_cb;
-        vsx_signal_add(vsx_tile_tool_get_ready_signal(tile_tool),
+        vsx_signal_add(vsx_tile_tool_get_ready_signal(toolbox->tile_tool),
                        &painter->tile_tool_ready_listener);
 
         painter->cursor_token =
@@ -545,6 +538,29 @@ update_paragraph(struct vsx_guide_painter *painter,
         vsx_layout_set_width(painter->paragraph.layout, paragraph_width);
 
         vsx_layout_prepare(painter->paragraph.layout);
+}
+
+static void
+free_tile_buffer(struct vsx_guide_painter *painter)
+{
+        if (painter->tile_buffer) {
+                vsx_tile_tool_free_buffer(painter->tile_buffer);
+                painter->tile_buffer = NULL;
+        }
+}
+
+static void
+update_tile_buffer(struct vsx_guide_painter *painter,
+                   const struct vsx_guide_page *page)
+{
+        free_tile_buffer(painter);
+
+        int dpi = painter->toolbox->paint_state.dpi;
+        int tile_size = page->tile_size * dpi * 10 / 254;
+
+        painter->tile_buffer =
+                vsx_tile_tool_create_buffer(painter->toolbox->tile_tool,
+                                            tile_size);
 }
 
 static void
@@ -631,6 +647,7 @@ ensure_layout(struct vsx_guide_painter *painter)
         const struct vsx_guide_page *page = vsx_guide_pages + 0;
 
         update_paragraph(painter, page);
+        update_tile_buffer(painter, page);
 
         const struct vsx_layout_extents *extents =
                 vsx_layout_get_logical_extents(painter->paragraph.layout);
@@ -985,9 +1002,7 @@ free_cb(void *painter_data)
         if (painter->cursor_vao)
                 vsx_array_object_free(painter->cursor_vao, gl);
 
-
-        vsx_tile_tool_free_buffer(painter->tile_buffer);
-
+        free_tile_buffer(painter);
         free_letters(painter);
         free_animations(painter);
 

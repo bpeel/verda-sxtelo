@@ -27,6 +27,8 @@
 /* Speed that a tile moves to jump into place when it is clicked on */
 #define JUMP_SPEED 40
 
+#define BIG_TILE_SIZE (VSX_GUIDE_IMAGE_SIZE / 5)
+
 const struct vsx_guide_animation
 move_word_animations[] = {
         /* Zero-length animations to initialise the positions */
@@ -52,7 +54,7 @@ move_word_animations[] = {
         {
                 .thing = VSX_GUIDE_MOVE_CURSOR,
                 .dest_x = 3,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE + 3,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE + 3,
                 .start_after = -1,
                 .speed = CURSOR_SPEED,
                 .click_type = VSX_GUIDE_CLICK_TYPE_DRAG,
@@ -60,7 +62,7 @@ move_word_animations[] = {
         {
                 .thing = 0,
                 .dest_x = 0,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE,
                 .start_after = -2,
                 .speed = CURSOR_SPEED,
         },
@@ -75,8 +77,8 @@ move_word_animations[] = {
         /* Make the tile jump into place */
         {
                 .thing = 1,
-                .dest_x = VSX_GUIDE_TILE_SIZE,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE,
+                .dest_x = BIG_TILE_SIZE,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE,
                 .start_after = -1,
                 .speed = JUMP_SPEED,
         },
@@ -92,8 +94,8 @@ move_word_animations[] = {
         /* Third tile jump into place */
         {
                 .thing = 2,
-                .dest_x = VSX_GUIDE_TILE_SIZE * 2,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE,
+                .dest_x = BIG_TILE_SIZE * 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE,
                 .start_after = -1,
                 .speed = JUMP_SPEED,
         },
@@ -109,8 +111,8 @@ move_word_animations[] = {
         /* Fourth tile jump into place */
         {
                 .thing = 3,
-                .dest_x = VSX_GUIDE_TILE_SIZE * 3,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE,
+                .dest_x = BIG_TILE_SIZE * 3,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE,
                 .start_after = -1,
                 .speed = JUMP_SPEED,
         },
@@ -126,8 +128,8 @@ move_word_animations[] = {
         /* Fourth tile jump into place */
         {
                 .thing = 4,
-                .dest_x = VSX_GUIDE_TILE_SIZE * 4,
-                .dest_y = VSX_GUIDE_IMAGE_SIZE - VSX_GUIDE_TILE_SIZE,
+                .dest_x = BIG_TILE_SIZE * 4,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE - BIG_TILE_SIZE,
                 .start_after = -1,
                 .speed = JUMP_SPEED,
         },
@@ -149,6 +151,7 @@ vsx_guide_pages[] = {
         {
                 .text = VSX_TEXT_GUIDE_MOVE_WORD,
                 .example_word = VSX_TEXT_GUIDE_EXAMPLE_WORD,
+                .tile_size = BIG_TILE_SIZE,
                 .n_animations = VSX_N_ELEMENTS(move_word_animations),
                 .animations = move_word_animations,
         },
