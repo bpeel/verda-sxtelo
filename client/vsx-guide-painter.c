@@ -101,6 +101,7 @@ struct vsx_guide_painter {
         struct thing_pos *letter_positions;
         /* The position of the cursor */
         struct thing_pos cursor_position;
+        bool show_cursor;
 
         /* Whether we should currently show the click cursor */
         bool clicking;
@@ -649,6 +650,8 @@ ensure_layout(struct vsx_guide_painter *painter)
         update_paragraph(painter, page);
         update_tile_buffer(painter, page);
 
+        painter->show_cursor = page->show_cursor;
+
         const struct vsx_layout_extents *extents =
                 vsx_layout_get_logical_extents(painter->paragraph.layout);
 
@@ -909,10 +912,12 @@ paint_cb(void *painter_data)
                             painter->toolbox->paint_state.pixel_matrix,
                             painter->toolbox->paint_state.pixel_translation);
 
-        draw_cursor(painter,
-                    painter->cursor_position.x + painter->image_x,
-                    painter->cursor_position.y + painter->image_y,
-                    painter->clicking);
+        if (painter->show_cursor) {
+                draw_cursor(painter,
+                            painter->cursor_position.x + painter->image_x,
+                            painter->cursor_position.y + painter->image_y,
+                            painter->clicking);
+        }
 
         vsx_layout_paint_multiple(&painter->paragraph, 1);
 

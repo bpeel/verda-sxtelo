@@ -19,6 +19,7 @@
 #ifndef VSX_GUIDE_H
 #define VSX_GUIDE_H
 
+#include <stdbool.h>
 #include <limits.h>
 
 #include "vsx-text.h"
@@ -66,6 +67,8 @@ struct vsx_guide_page {
 
         /* Size of a tile in mm */
         int tile_size;
+
+        bool show_cursor;
 
         int n_animations;
 

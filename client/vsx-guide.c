@@ -152,6 +152,7 @@ vsx_guide_pages[] = {
                 .text = VSX_TEXT_GUIDE_MOVE_WORD,
                 .example_word = VSX_TEXT_GUIDE_EXAMPLE_WORD,
                 .tile_size = BIG_TILE_SIZE,
+                .show_cursor = true,
                 .n_animations = VSX_N_ELEMENTS(move_word_animations),
                 .animations = move_word_animations,
         },
