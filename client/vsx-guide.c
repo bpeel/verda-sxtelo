@@ -176,6 +176,7 @@ vsx_guide_pages[] = {
         /* What is allowed as a stolen word */
         {
                 .text = VSX_TEXT_GUIDE_STEAL_WORD,
+                .has_tiles = true,
                 .example_word = VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD,
                 .image = "steal-word-guide.mpng",
                 .tile_size = SMALL_TILE_SIZE,
@@ -185,6 +186,7 @@ vsx_guide_pages[] = {
         /* Explanation of how to move a word */
         {
                 .text = VSX_TEXT_GUIDE_MOVE_WORD,
+                .has_tiles = true,
                 .example_word = VSX_TEXT_GUIDE_EXAMPLE_WORD,
                 .tile_size = BIG_TILE_SIZE,
                 .show_cursor = true,

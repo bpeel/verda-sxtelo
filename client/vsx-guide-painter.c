@@ -90,7 +90,7 @@ struct vsx_guide_painter {
 
         const struct vsx_tile_texture_letter **example_letters;
 
-        int example_word_length;
+        int n_tiles;
 
         /* “Compiled” versions of the animations that are easier to
          * process at runtime.
@@ -761,7 +761,7 @@ create_letters(struct vsx_guide_painter *painter,
 
         assert(*p == '\0');
 
-        painter->example_word_length = length;
+        painter->n_tiles = length;
 }
 
 static void
@@ -769,6 +769,12 @@ update_letters(struct vsx_guide_painter *painter,
                const struct vsx_guide_page *page)
 {
         free_letters(painter);
+
+        if (!page->has_tiles) {
+                vsx_list_init(&painter->letter_list);
+                painter->n_tiles = 0;
+                return;
+        }
 
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
@@ -995,8 +1001,7 @@ update_animations(struct vsx_guide_painter *painter)
 static void
 update_tiles(struct vsx_guide_painter *painter)
 {
-        vsx_tile_tool_begin_update(painter->tile_buffer,
-                                   painter->example_word_length);
+        vsx_tile_tool_begin_update(painter->tile_buffer, painter->n_tiles);
 
         struct thing_pos *pos;
 
@@ -1091,16 +1096,20 @@ paint_cb(void *painter_data)
                 return;
 
         update_animations(painter);
-        update_tiles(painter);
 
         paint_shadow(painter);
 
         paint_background(painter);
 
-        vsx_tile_tool_paint(painter->tile_buffer,
-                            &painter->toolbox->shader_data,
-                            painter->toolbox->paint_state.pixel_matrix,
-                            painter->toolbox->paint_state.pixel_translation);
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        if (painter->n_tiles > 0) {
+                update_tiles(painter);
+                vsx_tile_tool_paint(painter->tile_buffer,
+                                    &painter->toolbox->shader_data,
+                                    paint_state->pixel_matrix,
+                                    paint_state->pixel_translation);
+        }
 
         if (painter->show_cursor) {
                 draw_cursor(painter,

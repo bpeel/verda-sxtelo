@@ -62,6 +62,7 @@ struct vsx_guide_animation {
 };
 
 struct vsx_guide_page {
+        bool has_tiles;
         enum vsx_text example_word;
         enum vsx_text text;
 
