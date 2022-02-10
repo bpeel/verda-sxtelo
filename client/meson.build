@@ -33,6 +33,7 @@ client_common_src = [
         'vsx-game-state.c',
         'vsx-gl.c',
         'vsx-glyph-hash.c',
+        'vsx-guide.c',
         'vsx-guide-painter.c',
         '../common/vsx-hash-table.c',
         'vsx-id-url.c',

@@ -30,37 +30,15 @@
 #include "vsx-monotonic.h"
 #include "vsx-utf8.h"
 #include "vsx-mipmap.h"
-
-/* Size of the area reserved for the animations or images size in mm */
-#define IMAGE_SIZE 25
-
-#define MOVE_CURSOR EXAMPLE_WORD_LENGTH
-
-#define EXAMPLE_WORD_LENGTH 5
-
-/* Speed the cursor is moved at in mm/s */
-#define CURSOR_SPEED 20
-/* Speed that a tile moves to jump into place when it is clicked on */
-#define JUMP_SPEED 40
-
-/* Size of a tile in mm */
-#define TILE_SIZE (IMAGE_SIZE / 5)
+#include "vsx-guide.h"
 
 #define CURSOR_SIZE 8
 
 /* Time in microseconds to show the click cursor after a click */
 #define CLICK_TIME (100 * 1000)
 
-enum animation_click_type {
-        ANIMATION_CLICK_TYPE_NONE,
-        /* Show a short click at the start of the animation */
-        ANIMATION_CLICK_TYPE_SHORT,
-        /* Show the click icon for the duration of the animation */
-        ANIMATION_CLICK_TYPE_DRAG,
-};
-
-/* This is a translation of struct animation that is easier to handle
- * at runtime.
+/* This is a translation of vsx_guide_animation that is easier to
+ * handle at runtime.
  */
 struct compiled_animation {
         /* Start time in microseconds */
@@ -76,141 +54,8 @@ struct compiled_animation {
          */
         int dest_x, dest_y;
 
-        enum animation_click_type click_type;
+        enum vsx_guide_click_type click_type;
 };
-
-struct animation {
-        /* Offset of the animation after which this animation should
-         * start. Ie, -1 is the animation before this one, etc. Zero
-         * means to start immediately.
-         */
-        int start_after;
-        /* The speed of the movement in mm/s, or zero to displace the
-         * thing instantaneously.
-         */
-        int speed;
-        /* Thing to move. Either a letter number within the example
-         * word, or MOVE_CURSOR to move the cursor.
-         */
-        int thing;
-        /* Where to move to as an offset in mm from the topleft of
-         * the image space.
-         */
-        int dest_x, dest_y;
-
-        enum animation_click_type click_type;
-};
-
-static const struct animation
-animations[] = {
-        /* Zero-length animations to initialise the positions */
-        { .thing = 0, .dest_x = 19, .dest_y = 2 },
-        { .thing = 1, .dest_x = 3, .dest_y = 12 },
-        { .thing = 2, .dest_x = 17, .dest_y = 10 },
-        { .thing = 3, .dest_x = 3, .dest_y = 2 },
-        { .thing = 4, .dest_x = 9, .dest_y = 6 },
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = IMAGE_SIZE / 2,
-                .dest_y = IMAGE_SIZE / 2,
-        },
-
-        /* Move the cursor to the first letter */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 22, .dest_y = 5,
-                .start_after = 0,
-                .speed = CURSOR_SPEED,
-        },
-        /* Move the cursor and the first letter into position */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 3, .dest_y = IMAGE_SIZE - TILE_SIZE + 3,
-                .start_after = -1,
-                .speed = CURSOR_SPEED,
-                .click_type = ANIMATION_CLICK_TYPE_DRAG,
-        },
-        {
-                .thing = 0,
-                .dest_x = 0, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start_after = -2,
-                .speed = CURSOR_SPEED,
-        },
-
-        /* Move the cursor to the second letter */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 6, .dest_y = 15,
-                .start_after = -1,
-                .speed = CURSOR_SPEED,
-        },
-        /* Make the tile jump into place */
-        {
-                .thing = 1,
-                .dest_x = TILE_SIZE, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start_after = -1,
-                .speed = JUMP_SPEED,
-        },
-
-        /* Move the cursor to the third letter */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 20, .dest_y = 13,
-                .start_after = -2,
-                .speed = CURSOR_SPEED,
-                .click_type = ANIMATION_CLICK_TYPE_SHORT,
-        },
-        /* Third tile jump into place */
-        {
-                .thing = 2,
-                .dest_x = TILE_SIZE * 2, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start_after = -1,
-                .speed = JUMP_SPEED,
-        },
-
-        /* Move the cursor to the fourth letter */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 6, .dest_y = 5,
-                .start_after = -2,
-                .speed = CURSOR_SPEED,
-                .click_type = ANIMATION_CLICK_TYPE_SHORT,
-        },
-        /* Fourth tile jump into place */
-        {
-                .thing = 3,
-                .dest_x = TILE_SIZE * 3, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start_after = -1,
-                .speed = JUMP_SPEED,
-        },
-
-        /* Move the cursor to the fifth letter */
-        {
-                .thing = MOVE_CURSOR,
-                .dest_x = 12, .dest_y = 9,
-                .start_after = -2,
-                .speed = CURSOR_SPEED,
-                .click_type = ANIMATION_CLICK_TYPE_SHORT,
-        },
-        /* Fourth tile jump into place */
-        {
-                .thing = 4,
-                .dest_x = TILE_SIZE * 4, .dest_y = IMAGE_SIZE - TILE_SIZE,
-                .start_after = -1,
-                .speed = JUMP_SPEED,
-        },
-
-        /* Move the cursor back to the center */
-        {
-                .thing = MOVE_CURSOR,
-                .start_after = -2,
-                .dest_x = IMAGE_SIZE / 2, .dest_y = IMAGE_SIZE / 2,
-                .speed = CURSOR_SPEED,
-                .click_type = ANIMATION_CLICK_TYPE_SHORT,
-        },
-};
-
-#define N_ANIMATIONS VSX_N_ELEMENTS(animations)
 
 struct thing_pos {
         int num;
@@ -242,19 +87,20 @@ struct vsx_guide_painter {
         struct vsx_array_object *cursor_vao;
 
         const struct vsx_tile_texture_letter *
-        example_letters[EXAMPLE_WORD_LENGTH];
+        example_letters[VSX_GUIDE_EXAMPLE_WORD_LENGTH];
 
         /* “Compiled” versions of the animations that are easier to
          * process at runtime.
          */
-        struct compiled_animation animations[N_ANIMATIONS];
+        struct compiled_animation *animations;
+        int n_animations;
         /* After this time in microseconds the animation will loop */
         int total_animation_duration;
 
         /* The position of each letter of the example word, plus the
          * position of the cursor.
          */
-        struct thing_pos thing_positions[EXAMPLE_WORD_LENGTH + 1];
+        struct thing_pos thing_positions[VSX_GUIDE_EXAMPLE_WORD_LENGTH + 1];
 
         /* Whether we should currently show the click cursor */
         bool clicking;
@@ -559,15 +405,21 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
 }
 
 static void
-convert_animations(struct vsx_guide_painter *painter)
+compile_animations(struct vsx_guide_painter *painter,
+                   const struct vsx_guide_animation *animations,
+                   size_t n_animations)
 {
+        painter->animations =
+                vsx_alloc(sizeof (struct compiled_animation) * n_animations);
+        painter->n_animations = n_animations;
+
         int dpi = painter->toolbox->paint_state.dpi;
 
         int total_duration = 0;
 
-        for (int i = 0; i < N_ANIMATIONS; i++) {
+        for (int i = 0; i < n_animations; i++) {
                 struct compiled_animation *dst = painter->animations + i;
-                const struct animation *src = animations + i;
+                const struct vsx_guide_animation *src = animations + i;
 
                 dst->thing = src->thing;
                 dst->click_type = src->click_type;
@@ -634,10 +486,12 @@ create_cb(struct vsx_game_state *game_state,
         /* Convert the measurements from mm to pixels */
         int dpi = toolbox->paint_state.dpi;
         painter->border = BORDER * dpi * 10 / 254;
-        painter->image_size = IMAGE_SIZE * dpi * 10 / 254;
-        painter->tile_size = TILE_SIZE * dpi * 10 / 254;
+        painter->image_size = VSX_GUIDE_IMAGE_SIZE * dpi * 10 / 254;
+        painter->tile_size = VSX_GUIDE_TILE_SIZE * dpi * 10 / 254;
 
-        convert_animations(painter);
+        compile_animations(painter,
+                           vsx_guide_animations,
+                           vsx_guide_n_animations);
 
         painter->layout_dirty = true;
 
@@ -707,7 +561,9 @@ update_example_letters(struct vsx_guide_painter *painter)
                 vsx_game_state_get_language(painter->game_state);
         const char *p = vsx_text_get(language, VSX_TEXT_GUIDE_EXAMPLE_WORD);
 
-        for (int i = 0; i < EXAMPLE_WORD_LENGTH; i++, p = vsx_utf8_next(p)) {
+        for (int i = 0;
+             i < VSX_GUIDE_EXAMPLE_WORD_LENGTH;
+             i++, p = vsx_utf8_next(p)) {
                 assert(*p);
 
                 painter->example_letters[i] =
@@ -835,7 +691,7 @@ update_animations(struct vsx_guide_painter *painter)
 
         painter->clicking = false;
 
-        for (int i = 0; i < N_ANIMATIONS; i++) {
+        for (int i = 0; i < painter->n_animations; i++) {
                 const struct compiled_animation *animation =
                         painter->animations + i;
 
@@ -862,15 +718,15 @@ update_animations(struct vsx_guide_painter *painter)
                 vsx_list_insert(painter->thing_list.prev, &pos->link);
 
                 switch (animation->click_type) {
-                case ANIMATION_CLICK_TYPE_NONE:
+                case VSX_GUIDE_CLICK_TYPE_NONE:
                         break;
 
-                case ANIMATION_CLICK_TYPE_SHORT:
+                case VSX_GUIDE_CLICK_TYPE_SHORT:
                         if (t < CLICK_TIME)
                                 painter->clicking = true;
                         break;
 
-                case ANIMATION_CLICK_TYPE_DRAG:
+                case VSX_GUIDE_CLICK_TYPE_DRAG:
                         painter->clicking = true;
                         break;
                 }
@@ -880,12 +736,13 @@ update_animations(struct vsx_guide_painter *painter)
 static void
 update_tiles(struct vsx_guide_painter *painter)
 {
-        vsx_tile_tool_begin_update(painter->tile_buffer, EXAMPLE_WORD_LENGTH);
+        vsx_tile_tool_begin_update(painter->tile_buffer,
+                                   VSX_GUIDE_EXAMPLE_WORD_LENGTH);
 
         struct thing_pos *pos;
 
         vsx_list_for_each(pos, &painter->thing_list, link) {
-                if (pos->num == MOVE_CURSOR)
+                if (pos->num == VSX_GUIDE_MOVE_CURSOR)
                         continue;
 
                 const struct vsx_tile_texture_letter *letter =
@@ -986,8 +843,10 @@ paint_cb(void *painter_data)
                             painter->toolbox->paint_state.pixel_translation);
 
         draw_cursor(painter,
-                    painter->thing_positions[MOVE_CURSOR].x + painter->image_x,
-                    painter->thing_positions[MOVE_CURSOR].y + painter->image_y,
+                    painter->thing_positions[VSX_GUIDE_MOVE_CURSOR].x +
+                    painter->image_x,
+                    painter->thing_positions[VSX_GUIDE_MOVE_CURSOR].y +
+                    painter->image_y,
                     painter->clicking);
 
         vsx_layout_paint_multiple(&painter->paragraph, 1);
@@ -1079,6 +938,8 @@ free_cb(void *painter_data)
                 vsx_array_object_free(painter->cursor_vao, gl);
 
         vsx_tile_tool_free_buffer(painter->tile_buffer);
+
+        vsx_free(painter->animations);
 
         clear_shadow(painter);
 
