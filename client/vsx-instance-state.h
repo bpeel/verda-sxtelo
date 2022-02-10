@@ -35,6 +35,9 @@ struct vsx_instance_state {
         uint64_t person_id;
 
         enum vsx_dialog dialog;
+
+        /* The current page number in the guide */
+        int page;
 };
 
 void

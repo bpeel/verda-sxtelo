@@ -26,6 +26,7 @@
 
 #include "vsx-util.h"
 #include "vsx-buffer.h"
+#include "vsx-guide.h"
 
 typedef bool
 (* vsx_instance_state_check_property_func)(const struct vsx_instance_state *s);
@@ -104,6 +105,44 @@ load_dialog_cb(struct vsx_instance_state *state,
         state->dialog = vsx_dialog_from_name(value, value_length);
 }
 
+static bool
+check_page_cb(const struct vsx_instance_state *state)
+{
+        return state->dialog == VSX_DIALOG_GUIDE;
+}
+
+static void
+save_page_cb(const struct vsx_instance_state *state,
+             struct vsx_buffer *buf)
+{
+        vsx_buffer_append_printf(buf, "%i", state->page);
+}
+
+static void
+load_page_cb(struct vsx_instance_state *state,
+             const char *value,
+             size_t value_length)
+{
+        if (value_length <= 0 || value_length > 3)
+                return;
+
+        int page = 0;
+
+        for (unsigned i = 0; i < value_length; i++) {
+                if (*value >= '0' && *value <= '9')
+                        page = page * 10 + *value - '0';
+                else
+                        return;
+
+                value++;
+        }
+
+        if (page >= VSX_GUIDE_N_PAGES)
+                return;
+
+        state->page = page;
+}
+
 static const struct vsx_instance_state_property
 properties[] = {
         {
@@ -117,6 +156,12 @@ properties[] = {
                 .save = save_dialog_cb,
                 .load = load_dialog_cb,
         },
+        {
+                .name = "page",
+                .check = check_page_cb,
+                .save = save_page_cb,
+                .load = load_page_cb,
+        },
 };
 
 void
@@ -124,6 +169,7 @@ vsx_instance_state_init(struct vsx_instance_state *state)
 {
         state->has_person_id = false;
         state->dialog = VSX_DIALOG_NONE;
+        state->page = 0;
 }
 
 char *

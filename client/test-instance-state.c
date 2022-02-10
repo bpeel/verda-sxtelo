@@ -27,6 +27,7 @@
 #include <inttypes.h>
 
 #include "vsx-util.h"
+#include "vsx-guide.h"
 
 static bool
 check_is_id(const struct vsx_instance_state *state,
@@ -314,6 +315,82 @@ test_dialog_invalid_value(const char *value)
         return true;
 }
 
+static bool
+test_page_value(int page_value)
+{
+        struct vsx_instance_state state;
+        bool ret = true;
+
+        vsx_instance_state_init(&state);
+
+        if (state.page != 0) {
+                fprintf(stderr, "Initial page value not zero.\n");
+                ret = false;
+        }
+
+        state.page = page_value;
+        state.dialog = VSX_DIALOG_GUIDE;
+
+        char *str = vsx_instance_state_save(&state);
+
+        struct vsx_instance_state loaded_state;
+
+        memset(&loaded_state, 0, sizeof loaded_state);
+
+        vsx_instance_state_load(&loaded_state, str);
+
+        vsx_free(str);
+
+        if (loaded_state.page != page_value) {
+                fprintf(stderr,
+                        "page has wrong value after load.\n"
+                        " Expected: %i\n"
+                        " Received: %i\n",
+                        page_value,
+                        loaded_state.page);
+                ret = false;
+        }
+
+        return ret;
+}
+
+static bool
+test_pages(void)
+{
+        bool ret = true;
+
+        for (int i = 0; i < VSX_GUIDE_N_PAGES; i++) {
+                if (!test_page_value(i))
+                        ret = false;
+        }
+
+        return ret;
+}
+
+static bool
+test_page_invalid_value(const char *value)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        int old_value = state.page;
+
+        char *str = vsx_strconcat("page=", value, NULL);
+        vsx_instance_state_load(&state, str);
+        vsx_free(str);
+
+        if (state.page != old_value) {
+                fprintf(stderr,
+                        "page changed after setting "
+                        "the invalid value “%s”\n",
+                        value);
+                return false;
+        }
+
+        return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -361,6 +438,9 @@ main(int argc, char **argv)
         if (!test_dialog(VSX_DIALOG_INVITE_LINK))
                 ret = EXIT_FAILURE;
 
+        if (!test_pages())
+                ret = EXIT_FAILURE;
+
         if (!test_dialog_invalid_value(""))
                 ret = EXIT_FAILURE;
 
@@ -371,6 +451,21 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_dialog_invalid_value("InVite"))
+                ret = EXIT_FAILURE;
+
+        if (!test_page_invalid_value(""))
+                ret = EXIT_FAILURE;
+
+        if (!test_page_invalid_value("1111"))
+                ret = EXIT_FAILURE;
+
+        if (!test_page_invalid_value("999"))
+                ret = EXIT_FAILURE;
+
+        if (!test_page_invalid_value("a"))
+                ret = EXIT_FAILURE;
+
+        if (!test_page_invalid_value(" "))
                 ret = EXIT_FAILURE;
 
         return ret;
