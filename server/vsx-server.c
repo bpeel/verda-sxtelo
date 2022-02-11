@@ -104,10 +104,6 @@ typedef struct
      is enabled */
   char *peer_address_string;
 
-  /* Time since the response queue became empty. The connection will
-   * be removed if this stays empty for too long */
-  int64_t no_response_age;
-
   SSL *ssl;
 } VsxServerConnection;
 
@@ -717,8 +713,6 @@ vsx_server_pending_connection_cb (VsxMainContextSource *source,
     }
   else
     connection->peer_address_string = NULL;
-
-  connection->no_response_age = vsx_main_context_get_monotonic_clock (NULL);
 
   if (ssocket->ssl_ctx
       && !init_connection_ssl (connection, ssocket->ssl_ctx, &error))
