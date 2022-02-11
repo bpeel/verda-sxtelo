@@ -117,31 +117,6 @@ shout_animations[] = {
 };
 
 const struct vsx_guide_animation
-steal_word_animations[] = {
-        /* No animations, just set the positions of the tiles */
-
-        /* TEAR */
-        { .thing = 0, .dest_x = 6, .dest_y = 2 },
-        { .thing = 1, .dest_x = 9, .dest_y = 2 },
-        { .thing = 2, .dest_x = 12, .dest_y = 2 },
-        { .thing = 3, .dest_x = 15, .dest_y = 2 },
-
-        /* TEARS */
-        { .thing = 4, .dest_x = 1, .dest_y = 11 },
-        { .thing = 5, .dest_x = 4, .dest_y = 11 },
-        { .thing = 6, .dest_x = 7, .dest_y = 11 },
-        { .thing = 7, .dest_x = 10, .dest_y = 11 },
-        { .thing = 8, .dest_x = 13, .dest_y = 11 },
-
-        /* RATES */
-        { .thing = 9, .dest_x = 9, .dest_y = 17 },
-        { .thing = 10, .dest_x = 12, .dest_y = 17 },
-        { .thing = 11, .dest_x = 15, .dest_y = 17 },
-        { .thing = 12, .dest_x = 18, .dest_y = 17 },
-        { .thing = 13, .dest_x = 21, .dest_y = 17 },
-};
-
-const struct vsx_guide_animation
 move_word_animations[] = {
         /* Zero-length animations to initialise the positions */
         { .thing = 0, .dest_x = 19, .dest_y = 2 },
@@ -257,6 +232,31 @@ move_word_animations[] = {
         },
 };
 
+const struct vsx_guide_animation
+steal_word_animations[] = {
+        /* No animations, just set the positions of the tiles */
+
+        /* TEAR */
+        { .thing = 0, .dest_x = 6, .dest_y = 2 },
+        { .thing = 1, .dest_x = 9, .dest_y = 2 },
+        { .thing = 2, .dest_x = 12, .dest_y = 2 },
+        { .thing = 3, .dest_x = 15, .dest_y = 2 },
+
+        /* TEARS */
+        { .thing = 4, .dest_x = 1, .dest_y = 11 },
+        { .thing = 5, .dest_x = 4, .dest_y = 11 },
+        { .thing = 6, .dest_x = 7, .dest_y = 11 },
+        { .thing = 7, .dest_x = 10, .dest_y = 11 },
+        { .thing = 8, .dest_x = 13, .dest_y = 11 },
+
+        /* RATES */
+        { .thing = 9, .dest_x = 9, .dest_y = 17 },
+        { .thing = 10, .dest_x = 12, .dest_y = 17 },
+        { .thing = 11, .dest_x = 15, .dest_y = 17 },
+        { .thing = 12, .dest_x = 18, .dest_y = 17 },
+        { .thing = 13, .dest_x = 21, .dest_y = 17 },
+};
+
 const struct vsx_guide_page
 vsx_guide_pages[] = {
         /* How the boxes work */
@@ -286,16 +286,6 @@ vsx_guide_pages[] = {
                 .animations = shout_animations,
                 .tile_size = SMALL_TILE_SIZE,
         },
-        /* What is allowed as a stolen word */
-        {
-                .text = VSX_TEXT_GUIDE_STEAL_WORD,
-                .has_tiles = true,
-                .example_word = VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD,
-                .image = "steal-word-guide.mpng",
-                .tile_size = SMALL_TILE_SIZE,
-                .n_animations = VSX_N_ELEMENTS(steal_word_animations),
-                .animations = steal_word_animations,
-        },
         /* Explanation of how to move a word */
         {
                 .text = VSX_TEXT_GUIDE_MOVE_WORD,
@@ -305,6 +295,16 @@ vsx_guide_pages[] = {
                 .show_cursor = true,
                 .n_animations = VSX_N_ELEMENTS(move_word_animations),
                 .animations = move_word_animations,
+        },
+        /* What is allowed as a stolen word */
+        {
+                .text = VSX_TEXT_GUIDE_STEAL_WORD,
+                .has_tiles = true,
+                .example_word = VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD,
+                .image = "steal-word-guide.mpng",
+                .tile_size = SMALL_TILE_SIZE,
+                .n_animations = VSX_N_ELEMENTS(steal_word_animations),
+                .animations = steal_word_animations,
         },
 };
 
