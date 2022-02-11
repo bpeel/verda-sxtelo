@@ -229,6 +229,11 @@ handle_page_changed(struct vsx_guide_painter *painter)
         const struct vsx_guide_page *page =
                 vsx_guide_pages + vsx_game_state_get_page(painter->game_state);
 
+        /* Reset the start time so that the animation on the new page
+         * will start from zero.
+         */
+        painter->start_time = 0;
+
         /* If the page has an image then we’ll delay redrawing until
          * the image has loaded. It doesn’t matter if something else
          * causes a redraw in the meantime because the dialog will
