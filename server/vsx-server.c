@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2011, 2013  Neil Roberts
+ * Copyright (C) 2011, 2013, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -267,6 +267,26 @@ is_would_block_error (int err)
   return err == EAGAIN || err == EWOULDBLOCK;
 }
 
+static bool
+should_shutdown (VsxServerConnection *connection)
+{
+  if (connection->output_length > 0)
+    return false;
+
+  if (connection->had_bad_input)
+    {
+      /* Let the connection finish writing anything that it has queued
+       * up in response to messages sent by the client before it
+       * received the bad input.
+       */
+      return !vsx_connection_has_data (connection->ws_connection);
+    }
+
+  /* Otherwise shutdown after a graceful shutdown from the client */
+  return (connection->read_finished
+          && vsx_connection_is_finished (connection->ws_connection));
+}
+
 static void
 update_poll (VsxServerConnection *connection)
 {
@@ -278,11 +298,7 @@ update_poll (VsxServerConnection *connection)
     flags |= VSX_MAIN_CONTEXT_POLL_IN;
 
   /* Shutdown the socket if we've finished writing */
-  if (!connection->write_finished
-      && connection->output_length == 0
-      && (connection->had_bad_input
-          || (connection->read_finished
-              && vsx_connection_is_finished (connection->ws_connection))))
+  if (!connection->write_finished && should_shutdown (connection))
     {
       if (connection->ssl)
         {
