@@ -310,10 +310,10 @@ configure_connection(struct data *data)
         if (data->has_conversation_id) {
                 vsx_connection_set_conversation_id(data->connection,
                                                    data->conversation_id);
-        } else if (data->game_language_code[0]) {
-                vsx_connection_set_language(data->connection,
-                                            data->game_language_code);
         }
+
+        vsx_connection_set_default_language(data->connection,
+                                            data->game_language_code);
 }
 
 static void
