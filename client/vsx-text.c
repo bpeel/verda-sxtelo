@@ -130,7 +130,7 @@ french[] = {
         "Le nouveau mot ne doit pas être une autre forme du premier. "
         "Vous ne pouvez pas juste le rendre pluriel ou changer la conjugaison.",
         [VSX_TEXT_GUIDE_BOXES] =
-        "Anagrams est un rapide jeu d’anagrammes entre amis.\n"
+        "Anagrams est un rapide jeu d’anagrammes entre ami·es.\n"
         "\n"
         "Tous les joueurs ont une boîte sur l’écran. Quand votre box devient "
         "verte, c’est à vous de jouer.",
