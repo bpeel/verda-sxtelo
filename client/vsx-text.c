@@ -135,7 +135,7 @@ french[] = {
         "Pour déplacer un mot :\n"
         "\n"
         "• Faites glisser la première lettre où vous voulez.\n"
-        "• Cliquez sur les autres lettres et ils sauteront au bon endroit.\n",
+        "• Cliquez sur les autres lettres et elles sauteront au bon endroit.\n",
         [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
         "DATEDATESSTADE",
         [VSX_TEXT_GUIDE_STEAL_WORD] =
