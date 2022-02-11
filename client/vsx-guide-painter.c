@@ -74,6 +74,7 @@ struct vsx_guide_painter {
         GLuint vbo;
 
         bool layout_dirty;
+        int paragraph_width;
         int dialog_x, dialog_y;
         int dialog_width, dialog_height;
         int image_x, image_y;
@@ -630,6 +631,7 @@ create_cb(struct vsx_game_state *game_state,
 
         /* Convert the measurements from mm to pixels */
         int dpi = toolbox->paint_state.dpi;
+        painter->paragraph_width = PARAGRAPH_WIDTH * dpi * 10 / 254;
         painter->border = BORDER * dpi * 10 / 254;
         painter->image_size = VSX_GUIDE_IMAGE_SIZE * dpi * 10 / 254;
 
@@ -678,16 +680,13 @@ static void
 update_paragraph(struct vsx_guide_painter *painter,
                  const struct vsx_guide_page *page)
 {
-        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
-        int paragraph_width = PARAGRAPH_WIDTH * paint_state->dpi * 10 / 254;
-
         struct vsx_layout *layout = painter->layouts[1].layout;
 
         enum vsx_text_language language =
                 vsx_game_state_get_language(painter->game_state);
         vsx_layout_set_text(layout, vsx_text_get(language, page->text));
 
-        vsx_layout_set_width(layout, paragraph_width);
+        vsx_layout_set_width(layout, painter->paragraph_width);
 
         vsx_layout_prepare(layout);
 }
@@ -839,7 +838,7 @@ ensure_layout(struct vsx_guide_painter *painter)
 
         int paragraph_height = extents->top + extents->bottom;
 
-        int total_width = (extents->right +
+        int total_width = (painter->paragraph_width +
                            painter->border * 3 +
                            painter->image_size);
         int total_height = (MAX(paragraph_height, painter->image_size) +
