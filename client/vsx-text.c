@@ -98,6 +98,11 @@ english[] = {
         "anagram.\n",
         [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
         "FORG",
+        [VSX_TEXT_GUIDE_END] =
+        "When there are no more tiles left in the bag you can keep stealing "
+        "words until everyone gives up. The player with the most words wins!\n"
+        "\n"
+        "If there is a draw, the player with the most letters wins.\n",
 };
 
 static const char *const
@@ -179,6 +184,12 @@ french[] = {
         "fin de faire une anagramme\n",
         [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
         "CARN",
+        [VSX_TEXT_GUIDE_END] =
+        "Quand il n’y a plus de lettres dans le sac vous pouvez continuer à "
+        "voler des mots jusqu’à ce que tout le monde abandonne. "
+        "Le joueur avec le plus de mots remporte la partie !\n"
+        "\n"
+        "En cas d’égalité, le joueur avec le plus de lettres gagne.\n",
 };
 
 static const char *const
@@ -255,6 +266,13 @@ esperanto[] = {
         "almenaŭ unu literon el la mezo por fari anagramon.\n",
         [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
         "PERT",
+        [VSX_TEXT_GUIDE_END] =
+        "Kiam ne plu estas literoj en la sakoj vi povas daŭre ŝteli vortojn "
+        "ĝis ĉiu rezignas. La ludanto kiu havas la plej multajn vortojn "
+        "venkas!\n"
+        "\n"
+        "Okaze de egaleco, la ludanto kiu havas la plej multajn literojn "
+        "venkas.\n",
 };
 
 static const char *const * const

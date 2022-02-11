@@ -57,6 +57,7 @@ enum vsx_text {
         VSX_TEXT_GUIDE_VALID_WORDS_WORD,
         VSX_TEXT_GUIDE_HOW_STEAL,
         VSX_TEXT_GUIDE_HOW_STEAL_WORD,
+        VSX_TEXT_GUIDE_END,
 };
 
 #define VSX_TEXT_N_LANGUAGES 3

@@ -29,7 +29,7 @@
 /* Size of the area reserved for the animations or images size in mm */
 #define VSX_GUIDE_IMAGE_SIZE 25
 
-#define VSX_GUIDE_N_PAGES 7
+#define VSX_GUIDE_N_PAGES 8
 
 enum vsx_guide_click_type {
         VSX_GUIDE_CLICK_TYPE_NONE,

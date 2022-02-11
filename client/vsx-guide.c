@@ -447,6 +447,11 @@ vsx_guide_pages[] = {
                 .n_animations = VSX_N_ELEMENTS(steal_word_animations),
                 .animations = steal_word_animations,
         },
+        /* End of the game */
+        {
+                .text = VSX_TEXT_GUIDE_END,
+                .image = "end-guide.mpng",
+        },
 };
 
 _Static_assert(VSX_N_ELEMENTS(vsx_guide_pages) ==
