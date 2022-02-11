@@ -90,6 +90,14 @@ english[] = {
         "and conjugated verbs.\n",
         [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
         "MILKSATTRAINS",
+        [VSX_TEXT_GUIDE_HOW_STEAL] =
+        "You can also steal a word from another player!\n"
+        "\n"
+        "You have to steal one whole word from another player or yourself and "
+        "add at least one letter from the letters in the middle to make an "
+        "anagram.\n",
+        [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
+        "FORG",
 };
 
 static const char *const
@@ -163,6 +171,14 @@ french[] = {
         "des pluriels et des verbes conjugués.",
         [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
         "LAITFUSCHIENS",
+        [VSX_TEXT_GUIDE_HOW_STEAL] =
+        "Vous pouvez également voler un mot d’un autre joueur !\n"
+        "\n"
+        "Il faut prendre tout un mot d’un autre joueur ou de vous même et "
+        "ajouter au moins une lettre des lettres au milieu de la table à "
+        "fin de faire une anagramme\n",
+        [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
+        "CARN",
 };
 
 static const char *const
@@ -232,6 +248,13 @@ esperanto[] = {
         "aŭ havi finaĵojn.",
         [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
         "LAKTŜIAMALOJN",
+        [VSX_TEXT_GUIDE_HOW_STEAL] =
+        "Vi ankaŭ povus ŝteli vorton de alia ludanto!\n"
+        "\n"
+        "Necesas preni tutan vorton de alia ludanto aŭ de vi mem kaj aldoni "
+        "almenaŭ unu literon el la mezo por fari anagramon.\n",
+        [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
+        "PERT",
 };
 
 static const char *const * const

@@ -255,6 +255,104 @@ valid_word_animations[] = {
 };
 
 const struct vsx_guide_animation
+how_steal_animations[] = {
+        /* Initial tile positions */
+
+        /* FOR */
+        { .thing = 0, .dest_x = 8, .dest_y = 4 },
+        { .thing = 1, .dest_x = 11, .dest_y = 4 },
+        { .thing = 2, .dest_x = 14, .dest_y = 4 },
+
+        /* G */
+        { .thing = 3, .dest_x = 11, .dest_y = 10 },
+
+        /* Cursor starts at the center */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+        },
+
+        /* Move the cursor to the first letter */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 9, .dest_y = 5,
+                .speed = CURSOR_SPEED,
+        },
+        /* Move the cursor with the letter to the first position */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 7, .dest_y = 19,
+                .speed = CURSOR_SPEED,
+                .click_type = VSX_GUIDE_CLICK_TYPE_DRAG,
+                .start_after = -1,
+        },
+        {
+                .thing = 0,
+                .dest_x = 6, .dest_y = 18,
+                .speed = CURSOR_SPEED,
+                .start_after = -2,
+        },
+
+        /* Move the cursor to the third letter */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 15, .dest_y = 5,
+                .speed = CURSOR_SPEED,
+                .start_after = -2,
+        },
+        /* Click and move third tile to second position */
+        {
+                .thing = 2,
+                .dest_x = 9, .dest_y = 18,
+                .speed = JUMP_SPEED,
+                .start_after = -1,
+                .click_type = VSX_GUIDE_CLICK_TYPE_SHORT,
+        },
+
+        /* Move the cursor to the second letter */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 12, .dest_y = 5,
+                .speed = CURSOR_SPEED,
+                .start_after = -2,
+        },
+        /* Click and move second tile to third position */
+        {
+                .thing = 1,
+                .dest_x = 12, .dest_y = 18,
+                .speed = JUMP_SPEED,
+                .start_after = -1,
+                .click_type = VSX_GUIDE_CLICK_TYPE_SHORT,
+        },
+
+        /* Move cursor down to the letter in the middle */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 12, .dest_y = 11,
+                .speed = CURSOR_SPEED,
+                .start_after = -2,
+        },
+        /* Click and move the middle tile to the fourth position */
+        {
+                .thing = 3,
+                .dest_x = 15, .dest_y = 18,
+                .speed = JUMP_SPEED,
+                .start_after = -1,
+                .click_type = VSX_GUIDE_CLICK_TYPE_SHORT,
+        },
+
+        /* Move the cursor back to the center */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+                .speed = CURSOR_SPEED,
+                .start_after = -2,
+        },
+};
+
+const struct vsx_guide_animation
 steal_word_animations[] = {
         /* No animations, just set the positions of the tiles */
 
@@ -327,6 +425,17 @@ vsx_guide_pages[] = {
                 .tile_size = SMALL_TILE_SIZE,
                 .n_animations = VSX_N_ELEMENTS(valid_word_animations),
                 .animations = valid_word_animations,
+        },
+        /* How to steal a word */
+        {
+                .text = VSX_TEXT_GUIDE_HOW_STEAL,
+                .has_tiles = true,
+                .example_word = VSX_TEXT_GUIDE_HOW_STEAL_WORD,
+                .image = "how-steal-guide.mpng",
+                .tile_size = SMALL_TILE_SIZE,
+                .show_cursor = true,
+                .n_animations = VSX_N_ELEMENTS(how_steal_animations),
+                .animations = how_steal_animations,
         },
         /* What is allowed as a stolen word */
         {
