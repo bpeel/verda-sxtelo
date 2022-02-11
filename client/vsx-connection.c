@@ -283,13 +283,21 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
 }
 
 void
-vsx_connection_set_language(struct vsx_connection *connection,
-                            const char *language_code)
+vsx_connection_set_default_language(struct vsx_connection *connection,
+                                    const char *language_code)
 {
         size_t max_len = VSX_N_ELEMENTS(connection->language_to_send) - 1;
 
         strncpy(connection->language_to_send, language_code, max_len);
         connection->language_to_send[max_len] = '\0';
+}
+
+void
+vsx_connection_set_language(struct vsx_connection *connection,
+                            const char *language_code)
+{
+        vsx_connection_set_default_language(connection, language_code);
+
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LANGUAGE;
 
         update_poll(connection);

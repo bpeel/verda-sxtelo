@@ -215,6 +215,14 @@ void
 vsx_connection_set_language(struct vsx_connection *connection,
                             const char *language);
 
+/* Sets a language code that will only be used if the connection
+ * creates a new private game. It will be replaced if something later
+ * calls the regular set_language.
+ */
+void
+vsx_connection_set_default_language(struct vsx_connection *connection,
+                                    const char *language);
+
 void
 vsx_connection_send_message(struct vsx_connection *connection,
                             const char *message);
