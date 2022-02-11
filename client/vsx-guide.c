@@ -233,6 +233,28 @@ move_word_animations[] = {
 };
 
 const struct vsx_guide_animation
+valid_word_animations[] = {
+        /* No animations, just set the positions of the tiles */
+
+        /* LAKT */
+        { .thing = 0, .dest_x = 3, .dest_y = 5 },
+        { .thing = 1, .dest_x = 6, .dest_y = 5 },
+        { .thing = 2, .dest_x = 9, .dest_y = 5 },
+        { .thing = 3, .dest_x = 12, .dest_y = 5 },
+        /* ŜIA */
+        { .thing = 4, .dest_x = 3, .dest_y = 11 },
+        { .thing = 5, .dest_x = 6, .dest_y = 11 },
+        { .thing = 6, .dest_x = 9, .dest_y = 11 },
+        /* MALOJN */
+        { .thing = 7, .dest_x = 3, .dest_y = 17 },
+        { .thing = 8, .dest_x = 6, .dest_y = 17 },
+        { .thing = 9, .dest_x = 9, .dest_y = 17 },
+        { .thing = 10, .dest_x = 12, .dest_y = 17 },
+        { .thing = 11, .dest_x = 15, .dest_y = 17 },
+        { .thing = 12, .dest_x = 18, .dest_y = 17 },
+};
+
+const struct vsx_guide_animation
 steal_word_animations[] = {
         /* No animations, just set the positions of the tiles */
 
@@ -295,6 +317,16 @@ vsx_guide_pages[] = {
                 .show_cursor = true,
                 .n_animations = VSX_N_ELEMENTS(move_word_animations),
                 .animations = move_word_animations,
+        },
+        /* Valid words */
+        {
+                .text = VSX_TEXT_GUIDE_VALID_WORDS,
+                .has_tiles = true,
+                .example_word = VSX_TEXT_GUIDE_VALID_WORDS_WORD,
+                .image = "valid-words-guide.mpng",
+                .tile_size = SMALL_TILE_SIZE,
+                .n_animations = VSX_N_ELEMENTS(valid_word_animations),
+                .animations = valid_word_animations,
         },
         /* What is allowed as a stolen word */
         {

@@ -85,6 +85,11 @@ english[] = {
         "Click on the picture of the shouting man to let the other players "
         "know you found a word. If you were the first one to click, your box "
         "will turn red.",
+        [VSX_TEXT_GUIDE_VALID_WORDS] =
+        "The word has to be at least three letters long. You can use plurals "
+        "and conjugated verbs.\n",
+        [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
+        "MILKSATTRAINS",
 };
 
 static const char *const
@@ -153,6 +158,11 @@ french[] = {
         "Cliquez sur l’image de la personne qui crie pour informer les autres "
         "joueurs que vous avez trouver un mot. Se vous êtes le premier à "
         "cliquer, votre boîte deviendra rouge.",
+        [VSX_TEXT_GUIDE_VALID_WORDS] =
+        "Le mot doit avoir au moins trois lettres. Vous pouvez utiliser "
+        "des pluriels et des verbes conjugués.",
+        [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
+        "LAITFUSCHIENS",
 };
 
 static const char *const
@@ -217,6 +227,11 @@ esperanto[] = {
         "Alklaku la bildon de la krianta homo por sciigi la aliajn ludantojn "
         "ke vi trovis vorton. Se vi estas la unua kiu klakis, via skatolo "
         "ruĝiĝos.",
+        [VSX_TEXT_GUIDE_VALID_WORDS] =
+        "La vorto devas longi almenaŭ tri literojn. Ĝi povas esti nuda radiko "
+        "aŭ havi finaĵojn.",
+        [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
+        "LAKTŜIAMALOJN",
 };
 
 static const char *const * const
