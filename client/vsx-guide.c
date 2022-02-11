@@ -78,6 +78,45 @@ add_letter_animations[] = {
 };
 
 const struct vsx_guide_animation
+shout_animations[] = {
+        /* Zero-length animations to initialise the positions */
+        { .thing = 0, .dest_x = 11, .dest_y = 7 },
+        { .thing = 1, .dest_x = 4, .dest_y = 15 },
+        { .thing = 2, .dest_x = 13, .dest_y = 14 },
+        { .thing = 3, .dest_x = 2, .dest_y = 7 },
+        { .thing = 4, .dest_x = 7, .dest_y = 10 },
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+        },
+
+        /* Cursor in the centre */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+        },
+
+        /* Move the cursor to the button */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = 21, .dest_y = 14,
+                .speed = CURSOR_SPEED,
+        },
+
+        /* Click Move the cursor back to the centre */
+        {
+                .thing = VSX_GUIDE_MOVE_CURSOR,
+                .dest_x = VSX_GUIDE_IMAGE_SIZE / 2,
+                .dest_y = VSX_GUIDE_IMAGE_SIZE / 2,
+                .start_after = -1,
+                .speed = CURSOR_SPEED,
+                .click_type = VSX_GUIDE_CLICK_TYPE_SHORT,
+        },
+};
+
+const struct vsx_guide_animation
 steal_word_animations[] = {
         /* No animations, just set the positions of the tiles */
 
@@ -234,6 +273,17 @@ vsx_guide_pages[] = {
                 .show_cursor = true,
                 .n_animations = VSX_N_ELEMENTS(add_letter_animations),
                 .animations = add_letter_animations,
+                .tile_size = SMALL_TILE_SIZE,
+        },
+        /* Shout to steal a word */
+        {
+                .text = VSX_TEXT_GUIDE_SHOUT,
+                .image = "shout-guide.mpng",
+                .has_tiles = true,
+                .example_word = VSX_TEXT_GUIDE_EXAMPLE_WORD,
+                .show_cursor = true,
+                .n_animations = VSX_N_ELEMENTS(shout_animations),
+                .animations = shout_animations,
                 .tile_size = SMALL_TILE_SIZE,
         },
         /* What is allowed as a stolen word */

@@ -52,6 +52,7 @@ enum vsx_text {
         VSX_TEXT_GUIDE_BOXES,
         VSX_TEXT_GUIDE_ADD_LETTER,
         VSX_TEXT_GUIDE_ADD_LETTER_WORD,
+        VSX_TEXT_GUIDE_SHOUT,
 };
 
 #define VSX_TEXT_N_LANGUAGES 3

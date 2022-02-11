@@ -78,6 +78,13 @@ english[] = {
         "During your turn, click on the tile bag to add a letter to the table.",
         [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
         "QOZE",
+        [VSX_TEXT_GUIDE_SHOUT] =
+        "When you see a word in the jumble of letters you can take it! You "
+        "don’t have to wait for your turn.\n"
+        "\n"
+        "Click on the picture of the shouting man to let the other players "
+        "know you found a word. If you were the first one to click, your box "
+        "will turn red.",
 };
 
 static const char *const
@@ -139,6 +146,13 @@ french[] = {
         "lettre à la table.",
         [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
         "QOZE",
+        [VSX_TEXT_GUIDE_SHOUT] =
+        "Quand vous voyez un mot dans le tas de lettres, vous pouvez le "
+        "prendre ! Nul besoin d’attendre son tour.\n"
+        "\n"
+        "Cliquez sur l’image de la personne qui crie pour informer les autres "
+        "joueurs que vous avez trouver un mot. Se vous êtes le premier à "
+        "cliquer, votre boîte deviendra rouge.",
 };
 
 static const char *const
@@ -196,6 +210,13 @@ esperanto[] = {
         "Dum via vico, alklaku la literosakon por aldoni literon al la tablo.",
         [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
         "ĈOZE",
+        [VSX_TEXT_GUIDE_SHOUT] =
+        "Kiam vi vidas vorton en la amaso de literoj, vi povas preni ĝin! "
+        "Ne necesas atendi sian vicon.\n"
+        "\n"
+        "Alklaku la bildon de la krianta homo por sciigi la aliajn ludantojn "
+        "ke vi trovis vorton. Se vi estas la unua kiu klakis, via skatolo "
+        "ruĝiĝos.",
 };
 
 static const char *const * const
