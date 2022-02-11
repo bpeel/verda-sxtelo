@@ -157,8 +157,8 @@ french[] = {
         [VSX_TEXT_GUIDE_BOXES] =
         "Anagrams est un rapide jeu d’anagrammes entre ami·es.\n"
         "\n"
-        "Tous les joueurs ont une boîte sur l’écran. Quand votre box devient "
-        "verte, c’est à vous de jouer.",
+        "Tous les joueurs ont un rectangle sur l’écran. Quand votre rectangle "
+        "devient verte, c’est à vous de jouer.",
         [VSX_TEXT_GUIDE_ADD_LETTER] =
         "Pendant votre tour, cliquez sur le sac à lettres pour ajouter une "
         "lettre à la table.",
@@ -170,7 +170,7 @@ french[] = {
         "\n"
         "Cliquez sur l’image de la personne qui crie pour informer les autres "
         "joueurs que vous avez trouver un mot. Se vous êtes le premier à "
-        "cliquer, votre boîte deviendra rouge.",
+        "cliquer, votre rectangle deviendra rouge.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
         "Le mot doit avoir au moins trois lettres. Vous pouvez utiliser "
         "des pluriels et des verbes conjugués.",
@@ -241,8 +241,8 @@ esperanto[] = {
         "Verda Ŝtelo estas rapida vorta ludo kiun vi povas ludi kun viaj "
         "amikoj.\n"
         "\n"
-        "Ĉiu ludanto havas skatolon sur la ekrano. Kiam via skatolo verdiĝas "
-        "estas via vico.",
+        "Ĉiu ludanto havas rektangulon sur la ekrano. Kiam via rektangulo "
+        "verdiĝas estas via vico.",
         [VSX_TEXT_GUIDE_ADD_LETTER] =
         "Dum via vico, alklaku la literosakon por aldoni literon al la tablo.",
         [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
@@ -252,7 +252,7 @@ esperanto[] = {
         "Ne necesas atendi sian vicon.\n"
         "\n"
         "Alklaku la bildon de la krianta homo por sciigi la aliajn ludantojn "
-        "ke vi trovis vorton. Se vi estas la unua kiu klakis, via skatolo "
+        "ke vi trovis vorton. Se vi estas la unua kiu klakis, via rektangulo "
         "ruĝiĝos.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
         "La vorto devas longi almenaŭ tri literojn. Ĝi povas esti nuda radiko "
