@@ -507,6 +507,9 @@ VSX_JNI_RENDERER_PREFIX(setInviteUrl)(JNIEnv *env,
         if (ret) {
                 data->has_conversation_id = true;
                 data->conversation_id = id;
+
+                if (data->game_state)
+                        set_join_game(data);
         }
 }
 
