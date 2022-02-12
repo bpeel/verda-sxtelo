@@ -305,18 +305,6 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 }
 
 static void
-configure_connection(struct data *data)
-{
-        if (data->has_conversation_id) {
-                vsx_connection_set_conversation_id(data->connection,
-                                                   data->conversation_id);
-        }
-
-        vsx_connection_set_default_language(data->connection,
-                                            data->game_language_code);
-}
-
-static void
 free_instance_state(struct data *data)
 {
         vsx_free(data->instance_state);
@@ -353,13 +341,21 @@ modified_cb(struct vsx_listener *listener,
         }
 }
 
+static void
+set_join_game(struct data *data)
+{
+        vsx_game_state_reset_for_conversation_id(data->game_state,
+                                                 data->conversation_id);
+}
+
 static bool
 ensure_game_state(struct data *data)
 {
         if (data->connection == NULL) {
                 data->connection = vsx_connection_new();
 
-                configure_connection(data);
+                vsx_connection_set_default_language(data->connection,
+                                                    data->game_language_code);
         }
 
         if (data->worker == NULL) {
@@ -384,11 +380,8 @@ ensure_game_state(struct data *data)
                                                       data->connection,
                                                       data->game_language_code);
 
-                if (data->has_conversation_id) {
-                        enum vsx_game_state_start_type type =
-                                VSX_GAME_STATE_START_TYPE_JOIN_GAME;
-                        vsx_game_state_set_start_type(data->game_state, type);
-                }
+                if (data->has_conversation_id)
+                        set_join_game(data);
 
                 struct vsx_signal *signal =
                         vsx_game_state_get_modified_signal(data->game_state);
