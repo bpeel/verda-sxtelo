@@ -961,9 +961,11 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
 {
         vsx_worker_lock(game_state->worker);
         vsx_connection_reset(game_state->connection);
-        vsx_connection_set_language(game_state->connection,
-                                    vsx_text_get(game_state->language,
-                                                 VSX_TEXT_LANGUAGE_CODE));
+        const char *language_code =
+                vsx_text_get(game_state->language,
+                             VSX_TEXT_LANGUAGE_CODE);
+        vsx_connection_set_default_language(game_state->connection,
+                                            language_code);
         vsx_connection_set_running(game_state->connection, true);
         vsx_worker_unlock(game_state->worker);
 
