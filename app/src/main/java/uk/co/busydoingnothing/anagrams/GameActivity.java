@@ -90,6 +90,13 @@ public class GameActivity extends AppCompatActivity
   }
 
   @Override
+  public void onNewIntent(Intent intent)
+  {
+    setIntent(intent);
+    handleIntent();
+  }
+
+  @Override
   protected void onStart()
   {
     super.onStart();
