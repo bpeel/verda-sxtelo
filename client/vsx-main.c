@@ -443,11 +443,6 @@ create_connection(void)
         if (option_room)
                 vsx_connection_set_room(connection, option_room);
 
-        if (option_conversation_id_specified) {
-                vsx_connection_set_conversation_id(connection,
-                                                   option_conversation_id);
-        }
-
         return connection;
 }
 
@@ -491,7 +486,11 @@ init_restartable_data(struct vsx_main_data *main_data)
                                                    main_data->connection,
                                                    "en");
 
-        if (option_conversation_id_specified || option_room) {
+        if (option_conversation_id_specified) {
+                uint64_t conversation_id = option_conversation_id;
+                vsx_game_state_reset_for_conversation_id(main_data->game_state,
+                                                         conversation_id);
+        } else if (option_room) {
                 enum vsx_game_state_start_type type =
                         VSX_GAME_STATE_START_TYPE_JOIN_GAME;
                 vsx_game_state_set_start_type(main_data->game_state, type);
