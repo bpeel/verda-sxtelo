@@ -95,6 +95,13 @@ vsx_game_state_new(struct vsx_main_thread *main_thread,
 void
 vsx_game_state_reset(struct vsx_game_state *game_state);
 
+/* Resets the connection as vsx_game_state_reset but also configures
+ * the connection to connect to the given conversation ID.
+ */
+void
+vsx_game_state_reset_for_conversation_id(struct vsx_game_state *game_state,
+                                         uint64_t conversation_id);
+
 /* Gets the number of tiles in the game, as reported by the server.
  * This includes the tiles that are still in the bag so it is just
  * used to determine the length of the game.

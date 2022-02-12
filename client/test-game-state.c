@@ -419,12 +419,8 @@ check_started_running_cb(struct harness *harness,
 }
 
 static bool
-start_harness(struct harness *harness)
+accept_connection(struct harness *harness)
 {
-        vsx_worker_lock(harness->worker);
-        vsx_connection_set_running(harness->connection, true);
-        vsx_worker_unlock(harness->worker);
-
         harness->server_fd = accept(harness->server_sock,
                                     NULL, /* addr */
                                     NULL /* addrlen */);
@@ -435,6 +431,19 @@ start_harness(struct harness *harness)
                         strerror(errno));
                 return false;
         }
+
+        return true;
+}
+
+static bool
+start_harness(struct harness *harness)
+{
+        vsx_worker_lock(harness->worker);
+        vsx_connection_set_running(harness->connection, true);
+        vsx_worker_unlock(harness->worker);
+
+        if (!accept_connection(harness))
+                return false;
 
         if (!check_event(harness,
                          VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED,
@@ -2450,6 +2459,62 @@ out:
 }
 
 static bool
+test_reset_for_conversation_id(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        uint64_t conversation_id = 0xfedcba9876543210;
+
+        vsx_game_state_reset_for_conversation_id(harness->game_state,
+                                                 conversation_id);
+
+        if (vsx_game_state_get_start_type(harness->game_state) !=
+            VSX_GAME_STATE_START_TYPE_JOIN_GAME) {
+                fprintf(stderr,
+                        "Start type is not join after resetting for "
+                        "conversation ID\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_player_name(harness->game_state, "bob");
+
+        int old_fd = harness->server_fd;
+        bool accept_ret = accept_connection(harness);
+        vsx_close(old_fd);
+
+        if (!accept_ret) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_data(harness, (const uint8_t *) "\r\n\r\n", 4)) {
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t join_request[] =
+                "\x82\x0d\x8d\x10\x32\x54\x76\x98\xba\xdc\xfe" "bob\x0";
+
+        if (!expect_data(harness,
+                         join_request,
+                         sizeof join_request - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_connected(void)
 {
         struct harness *harness = create_harness();
@@ -3935,6 +4000,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_reset())
+                ret = EXIT_FAILURE;
+
+        if (!test_reset_for_conversation_id())
                 ret = EXIT_FAILURE;
 
         if (!test_connected())

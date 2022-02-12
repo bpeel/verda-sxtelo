@@ -956,8 +956,10 @@ reset_tiles(struct vsx_game_state *game_state)
         }
 }
 
-void
-vsx_game_state_reset(struct vsx_game_state *game_state)
+static void
+reset_full(struct vsx_game_state *game_state,
+           bool has_conversation_id,
+           uint64_t conversation_id)
 {
         vsx_worker_lock(game_state->worker);
         vsx_connection_reset(game_state->connection);
@@ -966,6 +968,9 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
                              VSX_TEXT_LANGUAGE_CODE);
         vsx_connection_set_default_language(game_state->connection,
                                             language_code);
+        if (has_conversation_id)
+                vsx_connection_set_conversation_id(game_state->connection,
+                                                   conversation_id);
         vsx_connection_set_running(game_state->connection, true);
         vsx_worker_unlock(game_state->worker);
 
@@ -990,7 +995,9 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
         reset_player_flags(game_state);
         vsx_game_state_set_dialog(game_state, VSX_DIALOG_NAME);
         vsx_game_state_set_start_type(game_state,
-                                     VSX_GAME_STATE_START_TYPE_NEW_GAME);
+                                      has_conversation_id ?
+                                      VSX_GAME_STATE_START_TYPE_JOIN_GAME :
+                                      VSX_GAME_STATE_START_TYPE_NEW_GAME);
 
         reset_tiles(game_state);
 
@@ -1001,6 +1008,23 @@ vsx_game_state_reset(struct vsx_game_state *game_state)
         };
 
         vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+void
+vsx_game_state_reset(struct vsx_game_state *game_state)
+{
+        reset_full(game_state,
+                   false, /* has_conversation_id */
+                   0 /* conversation_id */);
+}
+
+void
+vsx_game_state_reset_for_conversation_id(struct vsx_game_state *game_state,
+                                         uint64_t conversation_id)
+{
+        reset_full(game_state,
+                   true, /* has_conversation_id */
+                   conversation_id);
 }
 
 int
