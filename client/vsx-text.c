@@ -158,7 +158,7 @@ french[] = {
         "Anagrams est un rapide jeu d’anagrammes entre ami·es.\n"
         "\n"
         "Tous les joueurs ont un rectangle sur l’écran. Quand votre rectangle "
-        "devient verte, c’est à vous de jouer.",
+        "devient vert, c’est à vous de jouer.",
         [VSX_TEXT_GUIDE_ADD_LETTER] =
         "Pendant votre tour, cliquez sur le sac à lettres pour ajouter une "
         "lettre à la table.",
@@ -169,7 +169,7 @@ french[] = {
         "prendre ! Nul besoin d’attendre son tour.\n"
         "\n"
         "Cliquez sur l’image de la personne qui crie pour informer les autres "
-        "joueurs que vous avez trouver un mot. Se vous êtes le premier à "
+        "joueurs que vous avez trouvé un mot. Se vous êtes le premier à "
         "cliquer, votre rectangle deviendra rouge.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
         "Le mot doit avoir au moins trois lettres. Vous pouvez utiliser "
