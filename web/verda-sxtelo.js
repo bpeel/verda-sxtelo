@@ -493,7 +493,17 @@ ChatSession.prototype.inputCb = function (event)
 
 ChatSession.prototype.errorButtonClickCb = function ()
 {
-  window.location.reload ();
+  if (this.conversationId != null)
+  {
+    /* Remove the search part */
+    window.location = (window.location.protocol + "//" +
+                       window.location.host +
+                       window.location.pathname);
+  }
+  else
+  {
+    window.location.reload ();
+  }
 };
 
 ChatSession.prototype.focusCb = function ()
@@ -1259,6 +1269,11 @@ ChatSession.prototype.handleBadPlayerId = function (mr)
   this.setError ();
 };
 
+ChatSession.prototype.handleBadConversationId = function (mr)
+{
+  this.setError ();
+};
+
 ChatSession.prototype.handleConversationId = function (mr)
 {
   var id = mr.getUint64 ();
@@ -1296,6 +1311,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleBadPlayerId (mr);
   else if (msgType == 0x0a)
     this.handleConversationId (mr);
+  else if (msgType == 0x0b)
+    this.handleBadConversationId (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
