@@ -82,7 +82,7 @@ english[] = {
         "When you see a word in the jumble of letters you can take it! You "
         "don’t have to wait for your turn.\n"
         "\n"
-        "Click on the picture of the shouting man to let the other players "
+        "Click on the megaphone to let the other players "
         "know you found a word. If you were the first one to click, your box "
         "will turn red.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
@@ -168,7 +168,7 @@ french[] = {
         "Quand vous voyez un mot dans le tas de lettres, vous pouvez le "
         "prendre ! Nul besoin d’attendre son tour.\n"
         "\n"
-        "Cliquez sur l’image de la personne qui crie pour informer les autres "
+        "Cliquez sur le haut-parleur pour informer les autres "
         "joueurs que vous avez trouvé un mot. Se vous êtes le premier à "
         "cliquer, votre rectangle deviendra rouge.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
@@ -251,7 +251,7 @@ esperanto[] = {
         "Kiam vi vidas vorton en la amaso de literoj, vi povas preni ĝin! "
         "Ne necesas atendi sian vicon.\n"
         "\n"
-        "Alklaku la bildon de la krianta homo por sciigi la aliajn ludantojn "
+        "Alklaku la laŭtparolilon por sciigi la aliajn ludantojn "
         "ke vi trovis vorton. Se vi estas la unua kiu klakis, via rektangulo "
         "ruĝiĝos.",
         [VSX_TEXT_GUIDE_VALID_WORDS] =
