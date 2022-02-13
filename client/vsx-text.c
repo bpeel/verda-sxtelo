@@ -70,7 +70,7 @@ english[] = {
         "The new word has to be a different root and can’t just be a different "
         "form of the original, like making it plural.",
         [VSX_TEXT_GUIDE_BOXES] =
-        "Anagrams is a fast-paced word game you can play with your friends.\n"
+        "Grabagram is a fast-paced word game you can play with your friends.\n"
         "\n"
         "Every player has a box on the screen. When your box is green, "
         "it is your turn.",
@@ -155,7 +155,7 @@ french[] = {
         "Le nouveau mot ne doit pas être une autre forme du premier. "
         "Vous ne pouvez pas juste le rendre pluriel ou changer la conjugaison.",
         [VSX_TEXT_GUIDE_BOXES] =
-        "Anagrams est un rapide jeu d’anagrammes entre ami·es.\n"
+        "Grabagram est un rapide jeu d’anagrammes entre ami·es.\n"
         "\n"
         "Tous les joueurs ont un rectangle sur l’écran. Quand votre rectangle "
         "devient vert, c’est à vous de jouer.",

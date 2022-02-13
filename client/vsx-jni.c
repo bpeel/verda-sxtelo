@@ -35,7 +35,7 @@
 #include "vsx-worker.h"
 #include "vsx-id-url.h"
 
-#define TAG "Anagrams"
+#define TAG "Grabagram"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 

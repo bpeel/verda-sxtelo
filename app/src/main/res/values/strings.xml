@@ -19,7 +19,7 @@
 -->
 
 <resources>
-  <string name="app_name">Anagrams</string>
+  <string name="app_name">Grabagram</string>
   <string name="game_language_code">en</string>
   <string name="name_hint">Enter your name</string>
 </resources>
