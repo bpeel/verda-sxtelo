@@ -9,8 +9,8 @@ android {
         applicationId "uk.co.busydoingnothing.anagrams"
         minSdk 21
         targetSdk 30
-        versionCode 6
-        versionName "6"
+        versionCode 7
+        versionName "7"
     }
 
     buildTypes {
