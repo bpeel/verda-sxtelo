@@ -113,10 +113,20 @@ function ChatSession (playerName)
   this.playerName = playerName || "ludanto";
 
   var search = window.location.search;
+
+  this.roomName = "@LANG_CODE@:default";
+  this.conversationId = null;
+
   if (search && search.match (/^\?.+$/))
-    this.roomName = "@LANG_CODE@:" + decodeURIComponent (search.substring (1));
-  else
-    this.roomName = "@LANG_CODE@:default";
+  {
+    var joinPart = search.substring (1);
+    var id = this.decodeId(joinPart);
+
+    if (id == null)
+      this.roomName = ("@LANG_CODE@:" + decodeURIComponent (joinPart));
+    else
+      this.conversationId = id;
+  }
 
   this.handleResize ();
   $(window).resize (this.handleResize.bind (this));
@@ -1093,6 +1103,8 @@ ChatSession.prototype.sockOpenCb = function (e)
 
   if (this.personId != null)
     this.sendMessage (0x81, "BW", this.personId, this.numMessagesReceived);
+  else if (this.conversationId != null)
+    this.sendMessage (0x8d, "Bs", this.conversationId, this.playerName);
   else
     this.sendMessage (0x80, "ss", this.roomName, this.playerName);
 };
@@ -1247,6 +1259,16 @@ ChatSession.prototype.handleBadPlayerId = function (mr)
   this.setError ();
 };
 
+ChatSession.prototype.handleConversationId = function (mr)
+{
+  var id = mr.getUint64 ();
+  console.log ("Invite URL: " +
+               window.location.protocol + "//" +
+               window.location.host +
+               window.location.pathname +
+               "?" + this.encodeId (id));
+};
+
 ChatSession.prototype.messageCb = function (e)
 {
   var mr = new MessageReader (new DataView (e.data));
@@ -1272,6 +1294,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleEnd (mr);
   else if (msgType == 0x09)
     this.handleBadPlayerId (mr);
+  else if (msgType == 0x0a)
+    this.handleConversationId (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()
@@ -1306,6 +1330,55 @@ ChatSession.prototype.getPlayer = function (playerNum)
 
   return player;
 };
+
+ChatSession.prototype.encodeId = function (id)
+{
+  var str = "";
+  var i;
+
+  /* Change the order of the bytes in the ID to big-endian and convert
+   * it to a “binary string”.
+   */
+  for (i = 7; i >= 1; i--)
+    str += String.fromCharCode (id[i]);
+  /* Add 2 bits of zeroes before the last 4 bits so that the last 4
+   * bits will be in the lower bits of the second-to-last character.
+   */
+  str += (String.fromCharCode ((id[0] & 0xf0) | ((id[0] & 0x0c) >> 2)) +
+          String.fromCharCode ((id[0] & 0x03) << 6));
+
+  /* base64 encode it */
+  var b64 = btoa (str);
+
+  /* Replace the + and / with URL-friendly versions */
+  var urlFriendly = b64.replace (/[+/]/g,
+                                function (ch) {
+                                  return ch == "+" ? "-" : "_";
+                                });
+  /* Remove the last character */
+  return urlFriendly.slice (0, -1);
+};
+
+ChatSession.prototype.decodeId = function (encoded)
+{
+  if (encoded.length != 11)
+    return null;
+  if (encoded.match (/[^a-zA-Z0-9_-]/) != null)
+    return null;
+
+  var bstr = atob (encoded + "A");
+  var id = new Uint8Array (8);
+
+  for (var i = 0; i < 7; i++)
+    id[7 - i] = bstr.charCodeAt (i);
+
+  var a = bstr.charCodeAt (7);
+  var b = bstr.charCodeAt (8);
+
+  id[0] = (a & 0xf0) | ((a & 3) << 2) | (b >> 6);
+
+  return id;
+}
 
 /* .bind is only implemented in recent browsers so this provides a
  * fallback if it's not available. Verda Ŝtelo only ever uses it bind the
