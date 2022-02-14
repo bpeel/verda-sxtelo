@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.opengl.GLSurfaceView;
 import android.util.Log;
@@ -47,6 +48,15 @@ public class GameActivity extends AppCompatActivity
 
     surface = (GameView) findViewById(R.id.gl_view);
 
+    EditText nameEdit = (EditText) findViewById(R.id.player_name);
+
+    SharedPreferences prefs =
+      getSharedPreferences (Prefs.FILE_NAME, MODE_PRIVATE);
+    String playerName = prefs.getString (Prefs.PLAYER_NAME, null /* default */);
+
+    if (playerName != null)
+      nameEdit.setText (playerName);
+
     if (savedInstanceState != null) {
       String instanceState = savedInstanceState.getString(INSTANCE_STATE_KEY);
       if (instanceState != null)
@@ -55,7 +65,6 @@ public class GameActivity extends AppCompatActivity
 
     handleIntent();
 
-    EditText nameEdit = (EditText) findViewById(R.id.player_name);
     nameEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
         @Override
         public boolean onEditorAction(TextView v,

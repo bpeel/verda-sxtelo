@@ -20,6 +20,7 @@ package uk.co.busydoingnothing.anagrams;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.opengl.GLES20;
@@ -273,10 +274,18 @@ public class GameView extends GLSurfaceView
     if (!stringContainsNonWhitespace(name))
       return;
 
+    String nameString = name.toString ();
+
+    SharedPreferences prefs =
+      context.getSharedPreferences (Prefs.FILE_NAME, context.MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit ();
+    editor.putString (Prefs.PLAYER_NAME, nameString);
+    editor.commit ();
+
     queueEvent(new Runnable() {
         @Override
         public void run() {
-          renderer.setPlayerName(nativeData, name.toString());
+          renderer.setPlayerName(nativeData, nameString);
         }
       });
   }
