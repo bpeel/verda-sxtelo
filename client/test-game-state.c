@@ -442,7 +442,20 @@ start_harness(struct harness *harness)
         vsx_connection_set_running(harness->connection, true);
         vsx_worker_unlock(harness->worker);
 
+        if (vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state has a player name before one was set.\n");
+                return false;
+        }
+
         vsx_game_state_set_player_name(harness->game_state, "test_player");
+
+        if (!vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state doesn’t have a player name after "
+                        "one was set.\n");
+                return false;
+        }
 
         if (!accept_connection(harness))
                 return false;
@@ -2375,7 +2388,8 @@ test_reset(void)
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID) |
                  (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES) |
-                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED));
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED) |
+                 (UINT64_C(1) << VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME));
 
         if (closure.modifieds_triggered != expected_modifieds) {
                 fprintf(stderr,
@@ -2411,6 +2425,13 @@ test_reset(void)
         if (vsx_game_state_get_connected(harness->game_state)) {
                 fprintf(stderr,
                         "The game state is connected after a reset.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "The game state has a player name after a reset.\n");
                 ret = false;
                 goto out;
         }
@@ -2484,6 +2505,14 @@ test_reset_for_conversation_id(void)
         }
 
         vsx_game_state_set_player_name(harness->game_state, "bob");
+
+        if (!vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "The game state doesn’t have a player name setting "
+                        "one.\n");
+                ret = false;
+                goto out;
+        }
 
         int old_fd = harness->server_fd;
         bool accept_ret = accept_connection(harness);
@@ -3181,6 +3210,110 @@ test_started(void)
                 goto out;
         }
 out:
+        free_harness(harness);
+
+        return ret;
+}
+
+struct test_has_player_name_closure {
+        bool succeeded;
+        bool had_event;
+        struct harness *harness;
+        struct vsx_listener listener;
+};
+
+static void
+test_has_player_name_cb(struct vsx_listener *listener,
+                        void *user_data)
+{
+        struct test_has_player_name_closure *closure =
+                vsx_container_of(listener,
+                                 struct test_has_player_name_closure,
+                                 listener);
+        const struct vsx_game_state_modified_event *event = user_data;
+
+        if (event->type != VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME) {
+                fprintf(stderr,
+                        "Received unexpected modified event %i\n",
+                        event->type);
+                closure->succeeded = false;
+                return;
+        }
+
+        if (closure->had_event) {
+                fprintf(stderr,
+                        "Received multiple has_player_name modified events.\n");
+                closure->succeeded = false;
+                return;
+        }
+
+        closure->had_event = true;
+}
+
+static bool
+test_has_player_name(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        struct test_has_player_name_closure closure = {
+                .succeeded = true,
+                .had_event = false,
+                .harness = harness,
+                .listener = {
+                        .notify = test_has_player_name_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.listener);
+
+        bool ret = true;
+
+        if (vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state has a player name before one was set.\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_player_name(harness->game_state, "test_player");
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (!closure.had_event) {
+                fprintf(stderr,
+                        "No has_player modified event was received after "
+                        "setting the name.\n");
+                ret = false;
+                goto out;
+        }
+
+        closure.had_event = false;
+
+        /* Try setting the name again. This shouldn’t emit the event. */
+        vsx_game_state_set_player_name(harness->game_state, "bob");
+
+        if (!closure.succeeded) {
+                ret = false;
+                goto out;
+        }
+
+        if (closure.had_event) {
+                fprintf(stderr,
+                        "Got unexpected event after setting the player name "
+                        "a second time.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.listener.link);
         free_harness(harness);
 
         return ret;
@@ -4078,6 +4211,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_started())
+                ret = EXIT_FAILURE;
+
+        if (!test_has_player_name())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

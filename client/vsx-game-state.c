@@ -72,6 +72,11 @@ struct vsx_game_state {
 
         int self;
 
+        /* True if a player name has already been given to the
+         * vsx_connection, ie, it is ready to start the game.
+         */
+        bool has_player_name;
+
         /* Array of tile pointers indexed by tile number */
         struct vsx_buffer tiles_by_index;
         /* List of tiles in reverse order of last updated */
@@ -748,6 +753,28 @@ vsx_game_state_set_language(struct vsx_game_state *game_state,
         vsx_worker_unlock(game_state->worker);
 }
 
+bool
+vsx_game_state_get_has_player_name(struct vsx_game_state *game_state)
+{
+        return game_state->has_player_name;
+}
+
+static void
+set_has_player_name(struct vsx_game_state *game_state,
+                    bool value)
+{
+        if (game_state->has_player_name == value)
+                return;
+
+        game_state->has_player_name = value;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
 void
 vsx_game_state_set_player_name(struct vsx_game_state *game_state,
                                const char *name)
@@ -755,6 +782,8 @@ vsx_game_state_set_player_name(struct vsx_game_state *game_state,
         vsx_worker_lock(game_state->worker);
         vsx_connection_set_player_name(game_state->connection, name);
         vsx_worker_unlock(game_state->worker);
+
+        set_has_player_name(game_state, true);
 }
 
 void
@@ -989,6 +1018,7 @@ reset_full(struct vsx_game_state *game_state,
 
         remove_reset_on_idle(game_state);
 
+        set_has_player_name(game_state, false);
         remove_shout(game_state);
         remove_conversation_id(game_state);
         reset_player_names(game_state);

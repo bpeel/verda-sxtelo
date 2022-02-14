@@ -62,6 +62,7 @@ enum vsx_game_state_modified_type {
         VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE,
         VSX_GAME_STATE_MODIFIED_TYPE_RESET,
         VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED,
+        VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME,
 };
 
 struct vsx_game_state_modified_event {
@@ -175,6 +176,9 @@ vsx_game_state_get_remaining_tiles(struct vsx_game_state *game_state);
 void
 vsx_game_state_set_language(struct vsx_game_state *game_state,
                             const char *language_code);
+
+bool
+vsx_game_state_get_has_player_name(struct vsx_game_state *game_state);
 
 void
 vsx_game_state_set_player_name(struct vsx_game_state *game_state,
