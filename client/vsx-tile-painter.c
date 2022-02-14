@@ -670,8 +670,21 @@ handle_drag(struct vsx_tile_painter *painter,
             board_y < 0 || board_y >= VSX_BOARD_HEIGHT)
                 return true;
 
-        tile->current_x = board_x + painter->drag_offset_x;
-        tile->current_y = board_y + painter->drag_offset_y;
+        int new_x = board_x + painter->drag_offset_x;
+        int new_y = board_y + painter->drag_offset_y;
+
+        if (new_x < 0)
+                new_x = 0;
+        else if (new_x + VSX_BOARD_TILE_SIZE > VSX_BOARD_WIDTH)
+                new_x = VSX_BOARD_WIDTH - VSX_BOARD_TILE_SIZE;
+
+        if (new_y < 0)
+                new_y = 0;
+        else if (new_y + VSX_BOARD_TILE_SIZE > VSX_BOARD_HEIGHT)
+                new_y = VSX_BOARD_HEIGHT - VSX_BOARD_TILE_SIZE;
+
+        tile->current_x = new_x;
+        tile->current_y = new_y;
 
         painter->snap_tile = tile;
         painter->snap_x = tile->current_x + VSX_BOARD_TILE_SIZE;
