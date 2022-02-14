@@ -151,20 +151,14 @@ set_visible_cb(void *user_data)
 static void
 update_error_visible(struct vsx_error_painter *painter)
 {
-        enum vsx_dialog dialog =
-                vsx_game_state_get_dialog(painter->game_state);
+        /* If the game state doesn’t have a name yet then we
+         * haven’t tried to connect yet so there’s no need to
+         * show the error.
+         */
 
-        bool visible;
-
-        if (dialog == VSX_DIALOG_NAME) {
-                /* If the name dialog is visible then we haven’t tried
-                 * to connect yet so there’s no need to show the
-                 * error.
-                 */
-                visible = false;
-        } else {
-                visible = !vsx_game_state_get_connected(painter->game_state);
-        }
+        bool visible =
+                vsx_game_state_get_has_player_name(painter->game_state) &&
+                !vsx_game_state_get_connected(painter->game_state);
 
         if (visible) {
                 /* Set a short delay before displaying the icon in case it’s
@@ -222,7 +216,7 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_CONNECTED:
-        case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
+        case VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME:
                 update_error_visible(painter);
                 break;
 
