@@ -690,6 +690,7 @@ handle_drag(struct vsx_tile_painter *painter,
         painter->snap_x = tile->current_x + VSX_BOARD_TILE_SIZE;
         painter->snap_y = tile->current_y;
 
+        override_tile(painter, tile);
         raise_tile(painter, painter->dragging_tile);
 
         vsx_game_state_move_tile(painter->game_state,
