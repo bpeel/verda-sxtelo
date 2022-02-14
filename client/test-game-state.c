@@ -442,6 +442,8 @@ start_harness(struct harness *harness)
         vsx_connection_set_running(harness->connection, true);
         vsx_worker_unlock(harness->worker);
 
+        vsx_game_state_set_player_name(harness->game_state, "test_player");
+
         if (!accept_connection(harness))
                 return false;
 
@@ -511,7 +513,6 @@ create_harness_no_start(void)
 
         harness->connection = vsx_connection_new();
         vsx_connection_set_room(harness->connection, "test_room");
-        vsx_connection_set_player_name(harness->connection, "test_player");
         vsx_connection_set_address(harness->connection, &local_address);
 
         struct vsx_error *error = NULL;
