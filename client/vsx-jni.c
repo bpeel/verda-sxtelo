@@ -58,6 +58,8 @@ struct data {
         bool has_conversation_id;
         uint64_t conversation_id;
 
+        bool is_first_run;
+
         char game_language_code[8];
 
         /* Instance state that is queued to be set on the
@@ -380,6 +382,11 @@ ensure_game_state(struct data *data)
                                                       data->connection,
                                                       data->game_language_code);
 
+                if (data->is_first_run) {
+                        vsx_game_state_set_dialog(data->game_state,
+                                                  VSX_DIALOG_GUIDE);
+                }
+
                 if (data->has_conversation_id)
                         set_join_game(data);
 
@@ -534,6 +541,16 @@ VSX_JNI_RENDERER_PREFIX(setGameLanguageCode)(JNIEnv *env,
                 '\0';
 
         (*env)->ReleaseStringUTFChars(env, language_code_str, language_code);
+}
+
+JNIEXPORT void JNICALL
+VSX_JNI_RENDERER_PREFIX(setFirstRun)(JNIEnv *env,
+                                     jobject this,
+                                     jlong native_data)
+{
+        struct data *data = GET_DATA(native_data);
+
+        data->is_first_run = true;
 }
 
 JNIEXPORT void JNICALL

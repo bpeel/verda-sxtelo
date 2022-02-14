@@ -54,7 +54,9 @@ public class GameActivity extends AppCompatActivity
       getSharedPreferences (Prefs.FILE_NAME, MODE_PRIVATE);
     String playerName = prefs.getString (Prefs.PLAYER_NAME, null /* default */);
 
-    if (playerName != null)
+    if (playerName == null)
+      surface.setFirstRun();
+    else
       nameEdit.setText (playerName);
 
     if (savedInstanceState != null) {

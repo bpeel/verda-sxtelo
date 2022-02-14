@@ -192,6 +192,15 @@ public class GameView extends GLSurfaceView
       });
   }
 
+  public void setFirstRun()
+  {
+    queueEvent(new Runnable() {
+        public void run() {
+          renderer.setFirstRun(nativeData);
+        }
+      });
+  }
+
   public void setNameProperties(boolean visible,
                                 int yPos,
                                 int width)
@@ -384,6 +393,7 @@ public class GameView extends GLSurfaceView
     private native void setInviteUrl(long nativeData, String inviteUrl);
     private native void setGameLanguageCode(long nativeData,
                                             String languageCode);
+    private native void setFirstRun(long nativeData);
     private native void setNameHeight(long nativeData, int height);
     private native void setPlayerName(long nativeData, String name);
     private native boolean initContext(long nativeData);
