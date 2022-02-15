@@ -24,6 +24,7 @@ client_common_src = [
         'vsx-board-painter.c',
         'vsx-bsp.c',
         'vsx-button-painter.c',
+        'vsx-copyright-painter.c',
         'vsx-dialog.c',
         'vsx-dialog-painter.c',
         'vsx-error-painter.c',

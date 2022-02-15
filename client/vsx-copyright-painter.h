@@ -16,25 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VSX_DIALOG_H
-#define VSX_DIALOG_H
+#ifndef VSX_COPYRIGHT_PAINTER_H
+#define VSX_COPYRIGHT_PAINTER_H
 
-#include <stdlib.h>
+#include "vsx-painter.h"
 
-enum vsx_dialog {
-        VSX_DIALOG_NONE,
-        VSX_DIALOG_NAME,
-        VSX_DIALOG_MENU,
-        VSX_DIALOG_INVITE_LINK,
-        VSX_DIALOG_LANGUAGE,
-        VSX_DIALOG_GUIDE,
-        VSX_DIALOG_COPYRIGHT,
-};
+extern const struct vsx_painter
+vsx_copyright_painter;
 
-enum vsx_dialog
-vsx_dialog_from_name(const char *name, size_t name_length);
-
-const char *
-vsx_dialog_to_name(enum vsx_dialog dialog);
-
-#endif /* VSX_DIALOG_H */
+#endif /* VSX_COPYRIGHT_PAINTER_H */

@@ -32,6 +32,7 @@ names[] = {
         [VSX_DIALOG_INVITE_LINK] = "invite",
         [VSX_DIALOG_LANGUAGE] = "language",
         [VSX_DIALOG_GUIDE] = "guide",
+        [VSX_DIALOG_COPYRIGHT] = "copyright",
 };
 
 enum vsx_dialog
