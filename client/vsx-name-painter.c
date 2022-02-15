@@ -37,13 +37,21 @@ struct vsx_name_painter {
 
         struct vsx_array_object *vao;
         GLuint vbo;
+        struct vsx_quad_tool_buffer *quad_buffer;
 
         bool layout_dirty;
 
-        struct vsx_layout_paint_position layouts[2];
+        struct vsx_layout_paint_position layouts[3];
+
+        int dialog_gap;
 
         int dialog_x, dialog_y;
         int dialog_width, dialog_height;
+
+        int copyright_x, copyright_y;
+        int copyright_width, copyright_height;
+
+        int button_border;
 
         int button_x, button_y;
         int button_width, button_height;
@@ -55,7 +63,7 @@ struct vsx_name_painter {
          */
         GLfloat matrix[4];
 
-        struct vsx_shadow_painter_shadow *shadow;
+        struct vsx_shadow_painter_shadow *dialog_shadow, *copyright_shadow;
         struct vsx_listener shadow_painter_ready_listener;
 
         struct vsx_signal redraw_needed_signal;
@@ -65,7 +73,7 @@ struct vertex {
         float x, y;
 };
 
-#define N_QUADS 2
+#define N_QUADS 3
 #define N_VERTICES (N_QUADS * 4)
 
 /* Gap in MM around the dialog */
@@ -124,20 +132,20 @@ shadow_painter_ready_cb(struct vsx_listener *listener,
 }
 
 static void
-clear_shadow(struct vsx_name_painter *painter)
+clear_dialog_shadow(struct vsx_name_painter *painter)
 {
-        if (painter->shadow == NULL)
+        if (painter->dialog_shadow == NULL)
                 return;
 
         vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
-                                       painter->shadow);
-        painter->shadow = NULL;
+                                       painter->dialog_shadow);
+        painter->dialog_shadow = NULL;
 }
 
 static void
-create_shadow(struct vsx_name_painter *painter)
+create_dialog_shadow(struct vsx_name_painter *painter)
 {
-        clear_shadow(painter);
+        clear_dialog_shadow(painter);
 
         struct vsx_shadow_painter *shadow_painter =
                 painter->toolbox->shadow_painter;
@@ -145,7 +153,7 @@ create_shadow(struct vsx_name_painter *painter)
         int w = painter->dialog_width;
         int h = painter->dialog_height;
 
-        painter->shadow =
+        painter->dialog_shadow =
                 vsx_shadow_painter_create_shadow(shadow_painter, w, h);
 }
 
@@ -183,6 +191,12 @@ update_vertices(struct vsx_name_painter *painter)
                    painter->dialog_height);
 
         store_quad(vertices + 4,
+                   painter->copyright_x,
+                   painter->copyright_y,
+                   painter->copyright_width,
+                   painter->copyright_height);
+
+        store_quad(vertices + 8,
                    painter->button_x,
                    painter->button_y,
                    painter->button_width,
@@ -221,6 +235,40 @@ create_buffer(struct vsx_name_painter *painter)
                                        0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
+
+        painter->quad_buffer =
+                vsx_quad_tool_get_buffer(painter->toolbox->quad_tool,
+                                         painter->vao,
+                                         N_QUADS);
+}
+
+static void
+set_copyright_layout(struct vsx_name_painter *painter)
+{
+        struct vsx_layout_paint_position *pos = painter->layouts + 2;
+
+        vsx_layout_set_text(pos->layout, "Copyright © 2022 Neil Roberts");
+        pos->r = 0.106f;
+        pos->g = 0.561f;
+        pos->b = 0.871f;
+
+        vsx_layout_prepare(pos->layout);
+
+        const struct vsx_layout_extents *extents =
+                vsx_layout_get_logical_extents(pos->layout);
+
+        painter->copyright_width = extents->right + painter->button_border * 2;
+        painter->copyright_height = (extents->top +
+                                     extents->bottom +
+                                     painter->button_border * 2);
+
+        struct vsx_shadow_painter *shadow_painter =
+                painter->toolbox->shadow_painter;
+
+        painter->copyright_shadow =
+                vsx_shadow_painter_create_shadow(shadow_painter,
+                                                 painter->copyright_width,
+                                                 painter->copyright_height);
 }
 
 static void *
@@ -230,6 +278,11 @@ create_cb(struct vsx_game_state *game_state,
         struct vsx_name_painter *painter = vsx_calloc(sizeof *painter);
 
         vsx_signal_init(&painter->redraw_needed_signal);
+
+        /* Convert the measurements from mm to pixels */
+        int dpi = toolbox->paint_state.dpi;
+        painter->dialog_gap = DIALOG_GAP * dpi * 10 / 254;
+        painter->button_border = BUTTON_BORDER * dpi * 10 / 254;
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
@@ -246,6 +299,8 @@ create_cb(struct vsx_game_state *game_state,
         painter->layouts[1].r = 1.0f;
         painter->layouts[1].g = 1.0f;
         painter->layouts[1].b = 1.0f;
+
+        set_copyright_layout(painter);
 
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
@@ -318,6 +373,27 @@ found:
 }
 
 static void
+update_copyright(struct vsx_name_painter *painter)
+{
+        struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
+
+        painter->copyright_x = (paint_state->width -
+                                painter->copyright_width -
+                                painter->dialog_gap);
+        painter->copyright_y = (paint_state->height -
+                                painter->copyright_height -
+                                painter->dialog_gap);
+
+        struct vsx_layout_paint_position *pos = painter->layouts + 2;
+
+        const struct vsx_layout_extents *extents =
+                vsx_layout_get_logical_extents(pos->layout);
+
+        pos->x = painter->copyright_x + painter->button_border;
+        pos->y = painter->copyright_y + extents->top + painter->button_border;
+}
+
+static void
 prepare_cb(void *painter_data)
 {
         struct vsx_name_painter *painter = painter_data;
@@ -330,12 +406,11 @@ prepare_cb(void *painter_data)
         vsx_paint_state_ensure_layout(paint_state);
 
         /* Convert the measurements from mm to pixels */
-        int dialog_gap = DIALOG_GAP * paint_state->dpi * 10 / 254;
         int inner_border = INNER_BORDER * paint_state->dpi * 10 / 254;
 
-        painter->dialog_x = dialog_gap;
-        painter->dialog_y = dialog_gap;
-        painter->dialog_width = paint_state->width - dialog_gap * 2;
+        painter->dialog_x = painter->dialog_gap;
+        painter->dialog_y = painter->dialog_gap;
+        painter->dialog_width = paint_state->width - painter->dialog_gap * 2;
 
         int inner_width = painter->dialog_width - inner_border * 2;
 
@@ -371,8 +446,6 @@ prepare_cb(void *painter_data)
                                     painter->dialog_width -
                                     inner_border * 2);
 
-        int button_border = BUTTON_BORDER * paint_state->dpi * 10 / 254;
-
         const struct vsx_layout_extents *button_extents =
                 vsx_layout_get_logical_extents(painter->layouts[1].layout);
 
@@ -381,15 +454,17 @@ prepare_cb(void *painter_data)
         painter->button_x = (painter->dialog_x +
                              painter->dialog_width / 2 -
                              button_extents->right / 2 -
-                             button_border);
+                             painter->button_border);
         painter->button_y = (name_y_pos + name_height +
                              font_metrics.height / 2);
-        painter->button_width = button_extents->right + button_border * 2;
-        painter->button_height = font_metrics.height + button_border * 2;
+        painter->button_width = (button_extents->right +
+                                 painter->button_border * 2);
+        painter->button_height = (font_metrics.height +
+                                  painter->button_border * 2);
 
-        painter->layouts[1].x = painter->button_x + button_border;
+        painter->layouts[1].x = painter->button_x + painter->button_border;
         painter->layouts[1].y = (painter->button_y +
-                                 button_border +
+                                 painter->button_border +
                                  font_metrics.ascender);
 
         painter->dialog_height = (painter->button_y +
@@ -397,11 +472,13 @@ prepare_cb(void *painter_data)
                                   inner_border -
                                   painter->dialog_y);
 
+        update_copyright(painter);
+
         update_transform(painter, paint_state);
 
         update_vertices(painter);
 
-        create_shadow(painter);
+        create_dialog_shadow(painter);
 
         painter->layout_dirty = false;
 }
@@ -422,21 +499,32 @@ set_uniforms(struct vsx_name_painter *painter,
 }
 
 static void
-paint_shadow(struct vsx_name_painter *painter)
+paint_shadows(struct vsx_name_painter *painter)
 {
         const struct vsx_paint_state *paint_state =
                 &painter->toolbox->paint_state;
 
-        GLfloat translation[] = {
+        GLfloat dialog_translation[] = {
                 painter->dialog_x * 2.0f / paint_state->width - 1.0f,
                 -painter->dialog_y * 2.0f / paint_state->height + 1.0f,
         };
 
         vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
-                                 painter->shadow,
+                                 painter->dialog_shadow,
                                  &painter->toolbox->shader_data,
                                  painter->matrix,
-                                 translation);
+                                 dialog_translation);
+
+        GLfloat copyright_translation[] = {
+                painter->copyright_x * 2.0f / paint_state->width - 1.0f,
+                -painter->copyright_y * 2.0f / paint_state->height + 1.0f,
+        };
+
+        vsx_shadow_painter_paint(painter->toolbox->shadow_painter,
+                                 painter->copyright_shadow,
+                                 &painter->toolbox->shader_data,
+                                 painter->matrix,
+                                 copyright_translation);
 }
 
 static void
@@ -447,7 +535,7 @@ paint_cb(void *painter_data)
         if (!vsx_shadow_painter_is_ready(painter->toolbox->shadow_painter))
                 return;
 
-        paint_shadow(painter);
+        paint_shadows(painter);
 
         const struct vsx_shader_data *shader_data =
                 &painter->toolbox->shader_data;
@@ -462,15 +550,20 @@ paint_cb(void *painter_data)
 
         vsx_array_object_bind(painter->vao, gl);
 
-        gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        vsx_gl_draw_range_elements(gl,
+                                   GL_TRIANGLES,
+                                   0, 2 * 4 - 1,
+                                   2 * 6,
+                                   painter->quad_buffer->type,
+                                   NULL /* offset */);
 
         gl->glUniform3f(program->color_uniform, 0.498f, 0.523f, 0.781f);
 
-        gl->glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+        gl->glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
 
         struct vsx_layout_paint_params params = {
                 .layouts = painter->layouts,
-                .n_layouts = 2,
+                .n_layouts = VSX_N_ELEMENTS(painter->layouts),
                 .matrix = painter->matrix,
                 .translation_x = -1.0f,
                 .translation_y = 1.0f,
@@ -491,13 +584,22 @@ static void
 handle_click(struct vsx_name_painter *painter,
              const struct vsx_input_event *event)
 {
-        if (event->click.x < painter->button_x ||
-            event->click.x >= painter->button_x + painter->button_width ||
-            event->click.y < painter->button_y ||
-            event->click.y >= painter->button_y + painter->button_height)
-                return;
+        if (event->click.x >= painter->button_x &&
+            event->click.x < painter->button_x + painter->button_width &&
+            event->click.y >= painter->button_y &&
+            event->click.y < painter->button_y + painter->button_height) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
 
-        painter->toolbox->shell->request_name_cb(painter->toolbox->shell);
+                shell->request_name_cb(shell);
+        } else if (event->click.x >= painter->copyright_x &&
+                   event->click.x < (painter->copyright_x +
+                                     painter->copyright_width) &&
+                   event->click.y >= painter->copyright_y &&
+                   event->click.y < (painter->copyright_y +
+                                     painter->copyright_height)) {
+                vsx_game_state_set_dialog(painter->game_state,
+                                          VSX_DIALOG_COPYRIGHT);
+        }
 }
 
 static bool
@@ -537,13 +639,20 @@ free_cb(void *painter_data)
                 vsx_array_object_free(painter->vao, gl);
         if (painter->vbo)
                 gl->glDeleteBuffers(1, &painter->vbo);
+        if (painter->quad_buffer)
+                vsx_quad_tool_unref_buffer(painter->quad_buffer, gl);
 
         for (int i = 0; i < VSX_N_ELEMENTS(painter->layouts); i++) {
                 if (painter->layouts[i].layout)
                         vsx_layout_free(painter->layouts[i].layout);
         }
 
-        clear_shadow(painter);
+        clear_dialog_shadow(painter);
+
+        if (painter->copyright_shadow) {
+                vsx_shadow_painter_free_shadow(painter->toolbox->shadow_painter,
+                                               painter->copyright_shadow);
+        }
 
         vsx_free(painter);
 }
