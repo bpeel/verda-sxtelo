@@ -150,6 +150,9 @@ void
 vsx_game_state_set_dialog(struct vsx_game_state *game_state,
                           enum vsx_dialog dialog);
 
+void
+vsx_game_state_close_dialog(struct vsx_game_state *game_state);
+
 int
 vsx_game_state_get_page(struct vsx_game_state *game_state);
 

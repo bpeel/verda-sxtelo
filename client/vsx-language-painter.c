@@ -234,8 +234,7 @@ handle_click(struct vsx_language_painter *painter,
 
         if (x < 0 || x >= painter->total_width ||
             y < 0 || y >= painter->total_height) {
-                vsx_game_state_set_dialog(painter->game_state,
-                                          VSX_DIALOG_NONE);
+                vsx_game_state_close_dialog(painter->game_state);
                 return true;
         }
 

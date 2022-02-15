@@ -587,8 +587,7 @@ handle_click(struct vsx_invite_painter *painter,
             x >= painter->dialog_x + painter->dialog_width ||
             y < painter->dialog_y ||
             y >= painter->dialog_y + painter->dialog_height) {
-                vsx_game_state_set_dialog(painter->game_state,
-                                          VSX_DIALOG_NONE);
+                vsx_game_state_close_dialog(painter->game_state);
                 return true;
         }
 

@@ -1165,17 +1165,6 @@ paint_cb(void *painter_data)
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
 }
 
-static void
-close_dialog(struct vsx_guide_painter *painter)
-{
-        enum vsx_dialog dialog =
-                vsx_game_state_get_has_player_name(painter->game_state) ?
-                VSX_DIALOG_NONE :
-                VSX_DIALOG_NAME;
-
-        vsx_game_state_set_dialog(painter->game_state, dialog);
-}
-
 static bool
 handle_click(struct vsx_guide_painter *painter,
              const struct vsx_input_event *event)
@@ -1194,7 +1183,7 @@ handle_click(struct vsx_guide_painter *painter,
             x >= painter->dialog_x + painter->dialog_width ||
             y < painter->dialog_y ||
             y >= painter->dialog_y + painter->dialog_height) {
-                close_dialog(painter);
+                vsx_game_state_close_dialog(painter->game_state);
                 return true;
         }
 

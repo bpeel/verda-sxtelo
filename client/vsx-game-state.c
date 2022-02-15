@@ -1101,6 +1101,21 @@ vsx_game_state_set_dialog(struct vsx_game_state *game_state,
         vsx_signal_emit(&game_state->modified_signal, &event);
 }
 
+void
+vsx_game_state_close_dialog(struct vsx_game_state *game_state)
+{
+        /* If the game state doesn’t have a player name yet then we
+         * want to show the name dialog instead because the game can’t
+         * start without the name.
+         */
+        enum vsx_dialog new_dialog =
+                vsx_game_state_get_has_player_name(game_state) ?
+                VSX_DIALOG_NONE :
+                VSX_DIALOG_NAME;
+
+        vsx_game_state_set_dialog(game_state, new_dialog);
+}
+
 int
 vsx_game_state_get_page(struct vsx_game_state *game_state)
 {

@@ -4125,6 +4125,59 @@ out:
         return ret;
 }
 
+static bool
+test_close_dialog(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_GUIDE);
+
+        vsx_game_state_close_dialog(harness->game_state);
+
+        enum vsx_dialog without_name_dialog =
+                vsx_game_state_get_dialog(harness->game_state);
+
+        if (without_name_dialog != VSX_DIALOG_NAME) {
+                fprintf(stderr,
+                        "When closing dialog with no name, the dialog switched "
+                        "to %i (%s)\n",
+                        without_name_dialog,
+                        vsx_dialog_to_name(without_name_dialog));
+                ret = false;
+        }
+
+        if (!start_harness(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_GUIDE);
+
+        vsx_game_state_close_dialog(harness->game_state);
+
+        enum vsx_dialog with_name_dialog =
+                vsx_game_state_get_dialog(harness->game_state);
+
+        if (with_name_dialog != VSX_DIALOG_NONE) {
+                fprintf(stderr,
+                        "When closing dialog with a name, the dialog switched "
+                        "to %i (%s)\n",
+                        with_name_dialog,
+                        vsx_dialog_to_name(with_name_dialog));
+                ret = false;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -4214,6 +4267,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_has_player_name())
+                ret = EXIT_FAILURE;
+
+        if (!test_close_dialog())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())
