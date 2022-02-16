@@ -84,12 +84,8 @@ VSX_GL_FUNC(void,
             glEnableVertexAttribArray, (GLuint index))
 VSX_GL_FUNC(void,
             glGenBuffers, (GLsizei n, GLuint *buffers))
-VSX_GL_FUNC(GLint,
-            glGetAttribLocation, (GLuint program, const GLchar *name))
 VSX_GL_FUNC(void,
             glGetFloatv, (GLenum pname, GLfloat *data))
-VSX_GL_FUNC(void,
-            glGetIntegerv, (GLenum pname, GLint *params))
 VSX_GL_FUNC(void,
             glGenTextures, (GLsizei n, GLuint *textures))
 VSX_GL_FUNC(void,
@@ -133,12 +129,6 @@ VSX_GL_FUNC(void,
             glUniform2f, (GLint location, GLfloat v0, GLfloat v1))
 VSX_GL_FUNC(void,
             glUniform3f, (GLint location, GLfloat v0, GLfloat v1, GLfloat v2))
-VSX_GL_FUNC(void,
-            glUniformMatrix4fv, (GLint location, GLsizei count,
-                                 GLboolean transpose, const GLfloat *value))
-VSX_GL_FUNC(void,
-            glUniformMatrix3fv, (GLint location, GLsizei count,
-                                 GLboolean transpose, const GLfloat *value))
 VSX_GL_FUNC(void,
             glUniformMatrix2fv, (GLint location, GLsizei count,
                                  GLboolean transpose, const GLfloat *value))
@@ -190,44 +180,6 @@ VSX_GL_FUNC(void,
             glGenVertexArrays, (GLsizei n, GLuint *arrays))
 VSX_GL_FUNC(GLboolean,
             glIsVertexArray, (GLuint buffer))
-VSX_GL_END_GROUP()
-
-/* Instanced arrays */
-VSX_GL_BEGIN_GROUP(30,
-                   "GL_ANGLE_instanced_arrays",
-                   "ANGLE")
-VSX_GL_FUNC(void,
-            glDrawElementsInstanced, (GLenum mode, GLsizei count, GLenum type,
-                                      const void *indices,
-                                      GLsizei instancecount))
-VSX_GL_FUNC(void,
-            glVertexAttribDivisor, (GLuint index, GLuint divisor))
-VSX_GL_END_GROUP()
-
-/* FBOs. This is only used for generating mipmaps */
-VSX_GL_BEGIN_GROUP(0, NULL, NULL)
-VSX_GL_FUNC(void,
-            glGenerateMipmap, (GLenum target))
-VSX_GL_END_GROUP()
-
-/* 3D textures (used for 2D array textures) */
-VSX_GL_BEGIN_GROUP(30,
-                   "GL_OES_texture_3D",
-                   "OES")
-VSX_GL_FUNC(void,
-            glTexImage3D, (GLenum target, GLint level,
-                           GLint internalFormat,
-                           GLsizei width, GLsizei height,
-                           GLsizei depth, GLint border,
-                           GLenum format, GLenum type,
-                           const GLvoid *pixels ))
-VSX_GL_FUNC(void,
-            glTexSubImage3D, (GLenum target, GLint level,
-                              GLint xoffset, GLint yoffset,
-                              GLint zoffset, GLsizei width,
-                              GLsizei height, GLsizei depth,
-                              GLenum format,
-                              GLenum type, const GLvoid *pixels))
 VSX_GL_END_GROUP()
 
 /* Draw range elements is not available in GLES 2 */
