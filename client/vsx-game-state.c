@@ -1194,6 +1194,11 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                 vsx_connection_set_person_id(game_state->connection,
                                              person_id);
                 vsx_worker_unlock(game_state->worker);
+
+                /* If there is a person ID then the server must have a
+                 * player name that it will send us.
+                 */
+                set_has_player_name(game_state, true);
         }
 
         vsx_game_state_set_dialog(game_state, dialog);

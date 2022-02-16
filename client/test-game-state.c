@@ -442,12 +442,6 @@ start_harness(struct harness *harness)
         vsx_connection_set_running(harness->connection, true);
         vsx_worker_unlock(harness->worker);
 
-        if (vsx_game_state_get_has_player_name(harness->game_state)) {
-                fprintf(stderr,
-                        "Game state has a player name before one was set.\n");
-                return false;
-        }
-
         vsx_game_state_set_player_name(harness->game_state, "test_player");
 
         if (!vsx_game_state_get_has_player_name(harness->game_state)) {
@@ -544,6 +538,12 @@ create_harness_no_start(void)
                                                  harness->worker,
                                                  harness->connection,
                                                  "en");
+
+        if (vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state has a player name before one was set.\n");
+                return false;
+        }
 
         return harness;
 
@@ -2671,6 +2671,14 @@ test_load_instance_state(void)
                 goto out;
         }
 
+        if (!vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "Game state doesn’t have a player name after loading "
+                        "instance state with a person ID.\n");
+                ret = false;
+                goto out;
+        }
+
         if (!start_harness(harness)) {
                 ret = false;
                 goto out;
@@ -2712,10 +2720,21 @@ test_load_empty_instance_state(void)
 
         vsx_game_state_load_instance_state(harness->game_state, "");
 
+        /* No person ID was specified so the game state shouldn’t have
+         * a player name.
+         */
+        if (vsx_game_state_get_has_player_name(harness->game_state)) {
+                fprintf(stderr,
+                        "After loading an empty instance state the game state "
+                        "has a player name.\n");
+                ret = false;
+        }
+
         /* The string is empty so the connection should start a
          * regular new player request.
          */
-        ret = start_harness(harness) && negotiate_harness(harness);
+        if (!start_harness(harness) || !negotiate_harness(harness))
+                ret = false;
 
         free_harness(harness);
 
