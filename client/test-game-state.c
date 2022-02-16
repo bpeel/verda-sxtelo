@@ -4178,6 +4178,111 @@ out:
         return ret;
 }
 
+static bool
+test_first_tile_close_dialog(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        struct event_flags_closure closure = {
+                .event_listener = {
+                        .notify = event_flags_event_cb,
+                },
+                .modified_listener = {
+                        .notify = event_flags_modified_cb,
+                },
+        };
+
+        vsx_signal_add(vsx_game_state_get_event_signal(harness->game_state),
+                       &closure.event_listener);
+        vsx_signal_add(vsx_game_state_get_modified_signal(harness->game_state),
+                       &closure.modified_listener);
+
+        bool ret = true;
+
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_INVITE_LINK);
+
+        closure.modifieds_triggered = 0;
+
+        const uint8_t tile_command[] = {
+                0x82, 0x09, 0x03, 0x00, 0x01, 0x00, 0x02, 0x00, 'A', 0x00, 0x00,
+        };
+
+        if (!write_data(harness, tile_command, sizeof tile_command) ||
+            !wait_for_idle_queue(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if ((closure.modifieds_triggered &
+             (1 << VSX_GAME_STATE_MODIFIED_TYPE_DIALOG)) == 0) {
+                fprintf(stderr,
+                        "Didn’t get dialog changed event after revealing first "
+                        "tile.\n");
+                ret = false;
+                goto out;
+        }
+
+        enum vsx_dialog after_reveal_dialog =
+                vsx_game_state_get_dialog(harness->game_state);
+
+        if (after_reveal_dialog != VSX_DIALOG_NONE) {
+                fprintf(stderr,
+                        "After revealing first tile, dialog is not NONE but "
+                        "%i (%s)\n",
+                        after_reveal_dialog,
+                        vsx_dialog_to_name(after_reveal_dialog));
+                ret = false;
+                goto out;
+        }
+
+        vsx_game_state_set_dialog(harness->game_state, VSX_DIALOG_INVITE_LINK);
+
+        closure.modifieds_triggered = 0;
+
+        if (!send_tile(harness,
+                       1, /* num */
+                       30, 12, /* x/y */
+                       'B',
+                       0, /* player */
+                       -2 /* remaining_tiles */)) {
+
+                ret = false;
+                goto out;
+        }
+
+        if ((closure.modifieds_triggered &
+             (1 << VSX_GAME_STATE_MODIFIED_TYPE_DIALOG)) != 0) {
+                fprintf(stderr,
+                        "Got another dialog modified event after revealing "
+                        "another tile.\n");
+                ret = false;
+                goto out;
+        }
+
+        enum vsx_dialog after_second_dialog =
+                vsx_game_state_get_dialog(harness->game_state);
+
+        if (after_second_dialog != VSX_DIALOG_INVITE_LINK) {
+                fprintf(stderr,
+                        "After revealing second tile, dialog is not "
+                        "INVITE_LINK but %i (%s)\n",
+                        after_second_dialog,
+                        vsx_dialog_to_name(after_second_dialog));
+                ret = false;
+                goto out;
+        }
+
+out:
+        vsx_list_remove(&closure.event_listener.link);
+        vsx_list_remove(&closure.modified_listener.link);
+        free_harness(harness);
+
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -4270,6 +4375,9 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_close_dialog())
+                ret = EXIT_FAILURE;
+
+        if (!test_first_tile_close_dialog())
                 ret = EXIT_FAILURE;
 
         if (!test_dangling_events())

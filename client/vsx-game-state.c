@@ -475,6 +475,14 @@ handle_tile_changed(struct vsx_game_state *game_state,
         vsx_list_remove(&tile->link);
         vsx_list_insert(game_state->tile_list.prev, &tile->link);
 
+        /* When the game starts the invite dialog will be displayed.
+         * Let’s close this when the first tile is drawn because
+         * otherwise it’s kind of difficult to notice that the tile
+         * was placed.
+         */
+        if (old_length == 0 && game_state->dialog == VSX_DIALOG_INVITE_LINK)
+                vsx_game_state_close_dialog(game_state);
+
         /* If this is a new tile then the number of tiles remaining
          * will have changed.
          */
