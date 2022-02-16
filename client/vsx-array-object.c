@@ -34,7 +34,6 @@ struct vsx_array_object_attribute {
         GLenum type;
         GLboolean normalized;
         GLsizei stride;
-        GLuint divisor;
         GLuint buffer;
         size_t buffer_offset;
 };
@@ -78,7 +77,6 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
                                GLenum type,
                                GLboolean normalized,
                                GLsizei stride,
-                               GLuint divisor,
                                GLuint buffer,
                                size_t buffer_offset)
 {
@@ -94,8 +92,6 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
                                           normalized,
                                           stride,
                                           (void *) (intptr_t) buffer_offset);
-                if (divisor)
-                        gl->glVertexAttribDivisor(index, divisor);
                 gl->glEnableVertexAttribArray(index);
         } else {
                 array->enabled_attribs |= 1 << index;
@@ -104,7 +100,6 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
                 array->attributes[index].type = type;
                 array->attributes[index].normalized = normalized;
                 array->attributes[index].stride = stride;
-                array->attributes[index].divisor = divisor;
                 array->attributes[index].buffer = buffer;
                 array->attributes[index].buffer_offset = buffer_offset;
         }

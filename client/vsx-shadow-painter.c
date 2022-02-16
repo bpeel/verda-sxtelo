@@ -317,7 +317,6 @@ vsx_shadow_painter_create_shadow(struct vsx_shadow_painter *painter,
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        shadow->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(shadow->vao,
@@ -327,7 +326,6 @@ vsx_shadow_painter_create_shadow(struct vsx_shadow_painter *painter,
                                        GL_UNSIGNED_BYTE,
                                        true, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        shadow->vbo,
                                        offsetof(struct vertex, s));
 

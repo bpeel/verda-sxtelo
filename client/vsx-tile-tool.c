@@ -181,7 +181,6 @@ ensure_buffer_size(struct vsx_tile_tool_buffer *buf,
                                        GL_FLOAT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        buf->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(buf->vao,
@@ -191,7 +190,6 @@ ensure_buffer_size(struct vsx_tile_tool_buffer *buf,
                                        GL_UNSIGNED_SHORT,
                                        true, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        buf->vbo,
                                        offsetof(struct vertex, s));
 

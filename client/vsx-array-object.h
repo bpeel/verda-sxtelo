@@ -36,7 +36,6 @@ vsx_array_object_set_attribute(struct vsx_array_object *array,
                                GLenum type,
                                GLboolean normalized,
                                GLsizei stride,
-                               GLuint divisor,
                                GLuint buffer,
                                size_t buffer_offset);
 

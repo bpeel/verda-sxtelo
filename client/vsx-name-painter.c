@@ -232,7 +232,6 @@ create_buffer(struct vsx_name_painter *painter)
                                        GL_FLOAT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
 

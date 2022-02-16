@@ -375,7 +375,6 @@ ensure_buffer_size(struct vsx_layout *layout,
                                        GL_SHORT,
                                        GL_FALSE, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        layout->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(layout->vao,
@@ -385,7 +384,6 @@ ensure_buffer_size(struct vsx_layout *layout,
                                        GL_UNSIGNED_SHORT,
                                        GL_TRUE, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        layout->vbo,
                                        offsetof(struct vertex, s));
 

@@ -278,7 +278,6 @@ create_buffer(struct vsx_error_painter *painter)
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->vao,
@@ -288,7 +287,6 @@ create_buffer(struct vsx_error_painter *painter)
                                        GL_UNSIGNED_BYTE,
                                        true, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 }

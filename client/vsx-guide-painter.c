@@ -441,7 +441,6 @@ create_buffer(struct vsx_guide_painter *painter)
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->vao,
@@ -451,7 +450,6 @@ create_buffer(struct vsx_guide_painter *painter)
                                        GL_FLOAT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 }
@@ -532,7 +530,6 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->cursor_vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->cursor_vao,
@@ -542,7 +539,6 @@ create_cursor_buffer(struct vsx_guide_painter *painter)
                                        GL_FLOAT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->cursor_vbo,
                                        offsetof(struct vertex, s));
 }

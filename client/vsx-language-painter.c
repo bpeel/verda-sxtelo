@@ -165,7 +165,6 @@ create_buffer(struct vsx_language_painter *painter)
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
 }

@@ -178,7 +178,6 @@ create_buffer(struct vsx_button_painter *painter)
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(painter->vao,
@@ -188,7 +187,6 @@ create_buffer(struct vsx_button_painter *painter)
                                        GL_FLOAT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        painter->vbo,
                                        offsetof(struct vertex, s));
 

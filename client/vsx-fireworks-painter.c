@@ -292,7 +292,6 @@ create_buffer(struct vsx_fireworks_painter *painter,
                                        GL_SHORT,
                                        false, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        buffer->vbo,
                                        offsetof(struct vertex, x));
         vsx_array_object_set_attribute(buffer->vao,
@@ -302,7 +301,6 @@ create_buffer(struct vsx_fireworks_painter *painter,
                                        GL_UNSIGNED_BYTE,
                                        true, /* normalized */
                                        sizeof (struct vertex),
-                                       0, /* divisor */
                                        buffer->vbo,
                                        offsetof(struct vertex, color));
 }
