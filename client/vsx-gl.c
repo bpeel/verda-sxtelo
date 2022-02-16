@@ -217,15 +217,6 @@ vsx_gl_new(vsx_gl_get_proc_address_func get_proc_address_func,
         data.gl->have_map_buffer_range = data.gl->glMapBufferRange != NULL;
         data.gl->have_vertex_array_objects = data.gl->glGenVertexArrays != NULL;
 
-        int max_vertex_attribs;
-
-        data.gl->glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &max_vertex_attribs);
-
-        data.gl->have_instanced_arrays =
-                data.gl->glVertexAttribDivisor != NULL &&
-                data.gl->glDrawElementsInstanced != NULL &&
-                max_vertex_attribs >= 11;
-
         vsx_buffer_destroy(&data.extensions);
 
         return data.gl;

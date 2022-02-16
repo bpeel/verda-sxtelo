@@ -38,7 +38,6 @@ struct vsx_gl {
 
         bool have_map_buffer_range;
         bool have_vertex_array_objects;
-        bool have_instanced_arrays;
 
         /* Bitmask of vertex attributes that are currently enabled.
          * This is used to implement the fallback if vertex attribute

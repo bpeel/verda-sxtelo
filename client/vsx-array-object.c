@@ -161,9 +161,6 @@ vsx_array_object_bind(struct vsx_array_object *array,
                                           attrib->stride,
                                           (GLvoid *) (intptr_t)
                                           attrib->buffer_offset);
-
-                if (gl->have_instanced_arrays)
-                        gl->glVertexAttribDivisor(index, attrib->divisor);
         }
 
         attribs = array->enabled_attribs ^ gl->enabled_attribs;
