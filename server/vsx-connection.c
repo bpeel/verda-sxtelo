@@ -251,9 +251,7 @@ handle_new_private_game (VsxConnection *conn,
 
       vsx_object_unref (conversation);
 
-      vsx_log ("New player “%s” created private game %i",
-               player_name,
-               conversation->log_id);
+      vsx_log ("New player created private game %i", conversation->log_id);
 
       start_following_person (conn);
     }
@@ -330,8 +328,8 @@ handle_join_game (VsxConnection *conn,
                                                      &conn->socket_address,
                                                      conversation);
 
-      vsx_log ("New player “%s” joined game %i",
-               player_name,
+      vsx_log ("New player %i joined game %i",
+               conn->person->player->num,
                conversation->log_id);
 
       start_following_person (conn);
@@ -414,15 +412,15 @@ handle_new_player (VsxConnection *conn,
 
       if (conversation->n_players == 1)
         {
-          vsx_log ("New player “%s” created game %i in “%s”",
-                   player_name,
+          vsx_log ("New player %i created game %i in “%s”",
+                   conn->person->player->num,
                    conversation->log_id,
                    room_name);
         }
       else
         {
-          vsx_log ("New player “%s” joined game %i",
-                   player_name,
+          vsx_log ("New player %i joined game %i",
+                   conn->person->player->num,
                    conversation->log_id);
         }
 

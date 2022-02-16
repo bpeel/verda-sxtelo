@@ -260,8 +260,8 @@ vsx_conversation_player_left (VsxConversation *conversation,
   if (!vsx_player_is_connected (player))
     return;
 
-  vsx_log ("Player “%s” left game %i",
-           player->name,
+  vsx_log ("Player %i left game %i",
+           player->num,
            conversation->log_id);
 
   had_next_turn = vsx_player_has_next_turn (player);
