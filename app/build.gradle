@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+ext {
+    appVersion = 8
+}
+
 android {
     compileSdk 30
 
@@ -9,8 +13,13 @@ android {
         applicationId "uk.co.busydoingnothing.anagrams"
         minSdk 21
         targetSdk 30
-        versionCode 8
-        versionName "8"
+        versionCode "$appVersion".toInteger()
+        versionName "$appVersion"
+        externalNativeBuild {
+          cmake {
+            cFlags "-DAPP_VERSION=\\\"$appVersion\\\""
+          }
+        }
     }
 
     buildTypes {

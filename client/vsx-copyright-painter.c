@@ -21,6 +21,7 @@
 #include "vsx-copyright-painter.h"
 
 #include "vsx-layout.h"
+#include "vsx-util.h"
 
 struct vsx_copyright_painter {
         struct vsx_game_state *game_state;
@@ -122,7 +123,19 @@ create_layout(struct vsx_copyright_painter *painter)
                      10 / 254);
 
         painter->layout.layout = vsx_layout_new(painter->toolbox);
-        vsx_layout_set_text(painter->layout.layout, copyright_text);
+
+        char *text = vsx_strconcat(copyright_text,
+#ifdef APP_VERSION
+                                   "\n"
+                                   "\n"
+                                   "Version " APP_VERSION,
+#endif
+                                   NULL);
+
+        vsx_layout_set_text(painter->layout.layout, text);
+
+        vsx_free(text);
+
         vsx_layout_set_font(painter->layout.layout, VSX_FONT_TYPE_LABEL);
         vsx_layout_set_width(painter->layout.layout, width);
         vsx_layout_prepare(painter->layout.layout);
