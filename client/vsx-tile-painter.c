@@ -618,8 +618,10 @@ static bool
 handle_drag_start(struct vsx_tile_painter *painter,
                   const struct vsx_input_event *event)
 {
-        if (is_other_shouting(painter))
+        if (is_other_shouting(painter)) {
+                painter->dragging_tile = NULL;
                 return false;
+        }
 
         int board_x, board_y;
 
@@ -630,8 +632,10 @@ handle_drag_start(struct vsx_tile_painter *painter,
         struct vsx_tile_painter_tile *tile =
                 find_tile_at_pos(painter, board_x, board_y);
 
-        if (tile == NULL)
+        if (tile == NULL) {
+                painter->dragging_tile = NULL;
                 return false;
+        }
 
         override_tile(painter, tile);
 
