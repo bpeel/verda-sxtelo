@@ -272,7 +272,7 @@ input_event_cb(void *painter_data,
         case VSX_INPUT_EVENT_TYPE_DRAG:
         case VSX_INPUT_EVENT_TYPE_ZOOM_START:
         case VSX_INPUT_EVENT_TYPE_ZOOM:
-                return false;
+                return true;
 
         case VSX_INPUT_EVENT_TYPE_CLICK:
                 return handle_click(painter, event);
