@@ -149,6 +149,8 @@ call_void_surface_method(struct data *data,
         (*env)->CallVoidMethodV(env, surface, method, ap);
 
         va_end(ap);
+
+        (*env)->DeleteLocalRef(env, surface);
 }
 
 static void
@@ -200,6 +202,8 @@ share_link_cb(struct vsx_shell_interface *shell,
         call_void_surface_method(data,
                                  data->share_link_method_id,
                                  link_string);
+
+        (*env)->DeleteLocalRef(env, link_string);
 }
 
 static void
