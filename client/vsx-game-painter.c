@@ -34,6 +34,7 @@
 #include "vsx-error-painter.h"
 #include "vsx-gl.h"
 #include "vsx-board.h"
+#include "vsx-monotonic.h"
 
 static const struct vsx_painter * const
 painters[] = {
@@ -77,13 +78,22 @@ struct vsx_game_painter {
         /* Bitmask of pressed fingers */
         int fingers_pressed;
 
-        bool maybe_click;
+        /* Timeout that is triggered after the finger has been held
+         * down for too long to be considered a click. If this is NULL
+         * then the current gesture can’t be considered a click.
+         */
+        struct vsx_main_thread_token *maybe_click_timeout;
 };
 
 /* Max distance in mm above which a mouse movement is no longer
  * considered a click.
  */
-#define MAX_CLICK_DISTANCE 1
+#define MAX_CLICK_DISTANCE 3
+/* Maximum time in microseconds for a finger to be held above which it
+ * will no longer consider it a click, even if it doesn’t move very
+ * much.
+ */
+#define MAX_CLICK_TIME (750 * 1000)
 
 static void
 redraw_needed_cb(struct vsx_listener *listener,
@@ -259,6 +269,17 @@ vsx_game_painter_set_fb_size(struct vsx_game_painter *painter,
         }
 }
 
+static void
+clear_maybe_click_timeout(struct vsx_game_painter *painter)
+{
+        if (painter->maybe_click_timeout == NULL)
+                return;
+
+        vsx_main_thread_cancel_idle(painter->maybe_click_timeout);
+
+        painter->maybe_click_timeout = NULL;
+}
+
 static bool
 send_input_event(struct vsx_game_painter *painter,
                  const struct vsx_input_event *event)
@@ -297,6 +318,22 @@ handle_click(struct vsx_game_painter *painter,
 }
 
 static void
+handle_drag(struct vsx_game_painter *painter,
+            const struct finger *finger)
+{
+        struct vsx_input_event event = {
+                .type = VSX_INPUT_EVENT_TYPE_DRAG,
+                .drag = {
+                        .x = finger->last_x,
+                        .y = finger->last_y,
+                        .maybe_click = painter->maybe_click_timeout != NULL,
+                },
+        };
+
+        send_input_event(painter, &event);
+}
+
+static void
 set_finger_start(struct vsx_game_painter *painter,
                  int finger_num)
 {
@@ -319,13 +356,13 @@ store_drag_start(struct vsx_game_painter *painter)
                 event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
                 event.drag.x = painter->fingers[0].last_x;
                 event.drag.y = painter->fingers[0].last_y;
-                event.drag.maybe_click = painter->maybe_click;
+                event.drag.maybe_click = painter->maybe_click_timeout != NULL;
                 break;
         case 2:
                 event.type = VSX_INPUT_EVENT_TYPE_DRAG_START;
                 event.drag.x = painter->fingers[1].last_x;
                 event.drag.y = painter->fingers[1].last_y;
-                event.drag.maybe_click = painter->maybe_click;
+                event.drag.maybe_click = painter->maybe_click_timeout != NULL;
                 break;
         case 3:
                 event.type = VSX_INPUT_EVENT_TYPE_ZOOM_START;
@@ -341,6 +378,16 @@ store_drag_start(struct vsx_game_painter *painter)
         send_input_event(painter, &event);
 }
 
+static void
+click_timeout_cb(void *user_data)
+{
+        struct vsx_game_painter *painter = user_data;
+
+        painter->maybe_click_timeout = NULL;
+
+        handle_drag(painter, painter->fingers + 0);
+}
+
 void
 vsx_game_painter_press_finger(struct vsx_game_painter *painter,
                               int finger,
@@ -350,8 +397,17 @@ vsx_game_painter_press_finger(struct vsx_game_painter *painter,
         if (finger < 0 || finger > 1)
                 return;
 
-        painter->maybe_click = (painter->fingers_pressed == 0 &&
-                                finger == 0);
+        clear_maybe_click_timeout(painter);
+
+        if (painter->fingers_pressed == 0 && finger == 0) {
+                struct vsx_main_thread *main_thread =
+                        painter->toolbox.main_thread;
+                painter->maybe_click_timeout =
+                        vsx_main_thread_queue_timeout(main_thread,
+                                                      MAX_CLICK_TIME,
+                                                      click_timeout_cb,
+                                                      painter);
+        }
 
         painter->fingers[finger].last_x = x;
         painter->fingers[finger].last_y = y;
@@ -371,29 +427,13 @@ vsx_game_painter_release_finger(struct vsx_game_painter *painter,
 
         store_drag_start(painter);
 
-        if (painter->fingers_pressed == 0 && painter->maybe_click) {
+        if (painter->fingers_pressed == 0 && painter->maybe_click_timeout) {
                 handle_click(painter,
                              painter->fingers[0].last_x,
                              painter->fingers[0].last_y);
         }
 
-        painter->maybe_click = false;
-}
-
-static void
-handle_drag(struct vsx_game_painter *painter,
-            const struct finger *finger)
-{
-        struct vsx_input_event event = {
-                .type = VSX_INPUT_EVENT_TYPE_DRAG,
-                .drag = {
-                        .x = finger->last_x,
-                        .y = finger->last_y,
-                        .maybe_click = painter->maybe_click,
-                },
-        };
-
-        send_input_event(painter, &event);
+        clear_maybe_click_timeout(painter);
 }
 
 static void
@@ -424,7 +464,7 @@ vsx_game_painter_move_finger(struct vsx_game_painter *painter,
         painter->fingers[finger].last_x = x;
         painter->fingers[finger].last_y = y;
 
-        if (painter->maybe_click && finger == 0) {
+        if (painter->maybe_click_timeout && finger == 0) {
                 int dx_pixels = (painter->fingers[0].last_x -
                                  painter->fingers[0].start_x);
                 int dy_pixels = (painter->fingers[0].last_y -
@@ -435,7 +475,7 @@ vsx_game_painter_move_finger(struct vsx_game_painter *painter,
 
                 if (dx_mm * dx_mm + dy_mm * dy_mm >=
                     MAX_CLICK_DISTANCE * MAX_CLICK_DISTANCE)
-                        painter->maybe_click = false;
+                        clear_maybe_click_timeout(painter);
         }
 
         switch (painter->fingers_pressed) {
@@ -455,7 +495,7 @@ void
 vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter)
 {
         painter->fingers_pressed = 0;
-        painter->maybe_click = false;
+        clear_maybe_click_timeout(painter);
 }
 
 void
@@ -514,6 +554,8 @@ free_painters(struct vsx_game_painter *painter)
 void
 vsx_game_painter_free(struct vsx_game_painter *painter)
 {
+        clear_maybe_click_timeout(painter);
+
         free_painters(painter);
 
         destroy_toolbox(painter);
