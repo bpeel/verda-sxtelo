@@ -687,6 +687,9 @@ handle_drag(struct vsx_tile_painter *painter,
         else if (new_y + VSX_BOARD_TILE_SIZE > VSX_BOARD_HEIGHT)
                 new_y = VSX_BOARD_HEIGHT - VSX_BOARD_TILE_SIZE;
 
+        if (tile->current_x == new_x && tile->current_y == new_y)
+                return true;
+
         tile->current_x = new_x;
         tile->current_y = new_y;
 
