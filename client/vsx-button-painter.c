@@ -48,6 +48,8 @@ struct vsx_button_painter {
         int area_width, area_height;
         int button_size;
 
+        int n_quads;
+
         GLuint tex;
         struct vsx_image_loader_token *image_token;
 
@@ -109,6 +111,7 @@ modified_cb(struct vsx_listener *listener,
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_REMAINING_TILES:
+        case VSX_GAME_STATE_MODIFIED_TYPE_HAS_PLAYER_NAME:
                 painter->vertices_dirty = true;
                 vsx_signal_emit(&painter->redraw_needed_signal, NULL);
                 break;
@@ -265,6 +268,9 @@ static bool
 handle_click(struct vsx_button_painter *painter,
              const struct vsx_input_event *event)
 {
+        if (!vsx_game_state_get_has_player_name(painter->game_state))
+                return false;
+
         struct vsx_paint_state *paint_state = &painter->toolbox->paint_state;
 
         ensure_layout(painter);
@@ -429,7 +435,7 @@ get_n_digits(int num)
         return n_digits;
 }
 
-static void
+static int
 generate_n_tiles_vertices(struct vsx_button_painter *painter,
                           struct vertex *vertices)
 {
@@ -440,7 +446,7 @@ generate_n_tiles_vertices(struct vsx_button_painter *painter,
 
         if (painter->button_size <= 0) {
                 /* This shouldn’t happen */
-                return;
+                return 0;
         }
 
         int area_width = painter->area_width;
@@ -479,6 +485,8 @@ generate_n_tiles_vertices(struct vsx_button_painter *painter,
         memset(vertices + n_digits * 4,
                0,
                (MAX_DIGITS - n_digits) * 4 * sizeof (struct vertex));
+
+        return n_digits;
 }
 
 static void
@@ -498,8 +506,21 @@ ensure_vertices(struct vsx_button_painter *painter)
                                    false, /* flush explicit */
                                    GL_DYNAMIC_DRAW);
 
-        generate_button_vertices(painter, vertices);
-        generate_n_tiles_vertices(painter, vertices + N_BUTTON_VERTICES);
+        if (vsx_game_state_get_has_player_name(painter->game_state)) {
+                generate_button_vertices(painter, vertices);
+                int n_quads_for_n_tiles =
+                        generate_n_tiles_vertices(painter,
+                                                  vertices + N_BUTTON_VERTICES);
+                painter->n_quads = n_quads_for_n_tiles + N_BUTTON_QUADS;
+        } else {
+                /* Draw an empty grey square instead of the buttons */
+                store_quad(vertices,
+                           0, 0,
+                           painter->area_width,
+                           painter->area_height,
+                           0.0f, 0.0f, 0.0f, 0.0f);
+                painter->n_quads = 1;
+        }
 
         vsx_map_buffer_unmap(painter->toolbox->map_buffer);
 
@@ -540,8 +561,8 @@ paint_cb(void *painter_data)
 
         vsx_gl_draw_range_elements(gl,
                                    GL_TRIANGLES,
-                                   0, TOTAL_N_VERTICES - 1,
-                                   TOTAL_N_QUADS * 6,
+                                   0, painter->n_quads * 4 - 1,
+                                   painter->n_quads * 6,
                                    painter->quad_buffer->type,
                                    NULL /* indices */);
 }
