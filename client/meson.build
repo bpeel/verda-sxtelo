@@ -115,6 +115,17 @@ if get_option('jni')
                           install: true)
 endif
 
+if get_option('clientlib')
+        clientlib_src = [
+                'vsx-thread-linux.c',
+        ] + client_common_src
+
+        clientlib_lib = static_library('anagrams', clientlib_src,
+                          dependencies: [m_dep, freetype],
+                          include_directories: inc_dirs,
+                          install: true)
+endif
+
 test_client_connection_src = [
         'test-client-connection.c',
 ] + connection_src
