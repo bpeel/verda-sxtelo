@@ -19,9 +19,17 @@
 #ifndef VSX_GL_H
 #define VSX_GL_H
 
+#ifdef __APPLE__
+#include <OpenGLES/ES3/gl.h>
+#else
 #include <GLES3/gl3.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
+
+#ifndef GL_APIENTRYP
+#define GL_APIENTRYP GL_APIENTRY *
+#endif
 
 struct vsx_gl {
 #define VSX_GL_BEGIN_GROUP(a, b, c)
