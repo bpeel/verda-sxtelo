@@ -106,6 +106,39 @@ flush_ready_timeout_events_locked(struct vsx_main_thread *mt)
                 mt->wakeup_func(mt->wakeup_user_data);
 }
 
+static void
+wait_until_timeout(struct vsx_main_thread *mt, int64_t wakeup_time)
+{
+#ifdef __APPLE__
+    
+    int64_t sleep_time = wakeup_time - vsx_monotonic_get();
+    
+    if (sleep_time <= 0)
+        return;
+
+    struct timespec wait_timespec = {
+            .tv_sec = sleep_time / 1000000,
+            .tv_nsec = sleep_time % 1000000 * 1000,
+    };
+    
+    pthread_cond_timedwait_relative_np(&mt->cond,
+                                       &mt->mutex,
+                                       &wait_timespec);
+
+#else
+
+    struct timespec wait_timespec = {
+            .tv_sec = wakeup_time / 1000000,
+            .tv_nsec = wakeup_time % 1000000 * 1000,
+    };
+
+    pthread_cond_timedwait(&mt->cond,
+                           &mt->mutex,
+                           &wait_timespec);
+
+#endif
+}
+
 static void *
 timeout_thread_func(void *user_data)
 {
@@ -118,18 +151,7 @@ timeout_thread_func(void *user_data)
                         /* Wait forever */
                         pthread_cond_wait(&mt->cond, &mt->mutex);
                 } else {
-                        int64_t wakeup_time = mt->timeout_queue->wakeup_time;
-
-                        struct timespec wait_timespec = {
-                                .tv_sec = wakeup_time / 1000000,
-                                .tv_nsec = wakeup_time % 1000000 * 1000,
-                        };
-
-                        pthread_cond_timedwait(&mt->cond,
-                                               &mt->mutex,
-                                               &wait_timespec);
-
-
+                        wait_until_timeout(mt, mt->timeout_queue->wakeup_time);
                 }
 
                 if (mt->timeout_thread_should_quit)
@@ -176,7 +198,10 @@ create_cond_locked(struct vsx_main_thread *mt)
         if (pthread_condattr_init(&attr))
                 return false;
 
-        if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0 &&
+        if (
+#ifndef __APPLE__
+            pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0 &&
+#endif
             pthread_cond_init(&mt->cond, &attr) == 0)
                 mt->have_cond = true;
 
