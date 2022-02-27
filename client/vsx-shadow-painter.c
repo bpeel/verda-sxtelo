@@ -21,7 +21,6 @@
 #include "vsx-shadow-painter.h"
 
 #include <stdint.h>
-#include <stdio.h>
 #include <assert.h>
 
 #include "vsx-map-buffer.h"
@@ -37,6 +36,7 @@ struct vsx_shadow_painter {
         struct vsx_map_buffer *map_buffer;
 
         GLuint tex;
+        struct vsx_shell_interface *shell;
         struct vsx_image_loader_token *image_token;
         GLuint element_buffer;
 
@@ -82,9 +82,12 @@ texture_load_cb(const struct vsx_image *image,
         painter->image_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading shadow image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = painter->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading shadow image: %s",
+                                    error->message);
+
                 return;
         }
 
@@ -113,6 +116,7 @@ texture_load_cb(const struct vsx_image *image,
 
 struct vsx_shadow_painter *
 vsx_shadow_painter_new(struct vsx_gl *gl,
+                       struct vsx_shell_interface *shell,
                        struct vsx_image_loader *image_loader,
                        struct vsx_map_buffer *map_buffer,
                        int dpi)
@@ -122,6 +126,7 @@ vsx_shadow_painter_new(struct vsx_gl *gl,
         vsx_signal_init(&painter->ready_signal);
 
         painter->gl = gl;
+        painter->shell = shell;
         painter->image_loader = image_loader;
         painter->map_buffer = map_buffer;
 

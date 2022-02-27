@@ -26,12 +26,14 @@
 #include "vsx-map-buffer.h"
 #include "vsx-shader-data.h"
 #include "vsx-signal.h"
+#include "vsx-shell-interface.h"
 
 struct vsx_shadow_painter;
 struct vsx_shadow_painter_shadow;
 
 struct vsx_shadow_painter *
 vsx_shadow_painter_new(struct vsx_gl *gl,
+                       struct vsx_shell_interface *shell,
                        struct vsx_image_loader *image_loader,
                        struct vsx_map_buffer *map_buffer,
                        int dpi);

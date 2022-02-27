@@ -136,6 +136,7 @@ init_toolbox(struct vsx_game_painter *painter,
                                                      asset_manager);
 
         toolbox->shadow_painter = vsx_shadow_painter_new(toolbox->gl,
+                                                         shell,
                                                          toolbox->image_loader,
                                                          toolbox->map_buffer,
                                                          dpi);
