@@ -36,9 +36,6 @@ struct vsx_dialog_painter {
 
         const struct vsx_painter *child_painter;
         void *child_data;
-        struct vsx_listener redraw_needed_listener;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 static const struct vsx_painter * const
@@ -56,9 +53,6 @@ static void
 free_child(struct vsx_dialog_painter *painter)
 {
         if (painter->child_painter) {
-                if (painter->child_painter->get_redraw_needed_signal_cb)
-                        vsx_list_remove(&painter->redraw_needed_listener.link);
-
                 painter->child_painter->free_cb(painter->child_data);
 
                 painter->child_painter = NULL;
@@ -84,15 +78,6 @@ update_child(struct vsx_dialog_painter *painter)
         painter->child_data =
                 child_painter->create_cb(painter->game_state,
                                          painter->toolbox);
-
-        if (child_painter->get_redraw_needed_signal_cb) {
-                void *data = painter->child_data;
-
-                struct vsx_signal *signal =
-                        child_painter->get_redraw_needed_signal_cb(data);
-
-                vsx_signal_add(signal, &painter->redraw_needed_listener);
-        }
 }
 
 static void
@@ -105,25 +90,15 @@ modified_cb(struct vsx_listener *listener,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
 
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
+
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_DIALOG:
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                shell->queue_redraw_cb(shell);
                 break;
         default:
                 break;
         }
-}
-
-static void
-child_redraw_needed_cb(struct vsx_listener *listener,
-                       void *user_data)
-{
-        struct vsx_dialog_painter *painter =
-                vsx_container_of(listener,
-                                 struct vsx_dialog_painter,
-                                 redraw_needed_listener);
-
-        vsx_signal_emit(&painter->redraw_needed_signal, user_data);
 }
 
 static void *
@@ -134,10 +109,6 @@ create_cb(struct vsx_game_state *game_state,
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
-
-        vsx_signal_init(&painter->redraw_needed_signal);
-
-        painter->redraw_needed_listener.notify = child_redraw_needed_cb;
 
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
@@ -198,14 +169,6 @@ input_event_cb(void *painter_data,
                                                       event);
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_dialog_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 free_cb(void *painter_data)
 {
@@ -225,6 +188,5 @@ vsx_dialog_painter = {
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

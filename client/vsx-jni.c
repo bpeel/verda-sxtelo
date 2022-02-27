@@ -95,7 +95,6 @@ struct data {
         int dpi;
 
         struct vsx_game_painter *game_painter;
-        struct vsx_listener redraw_needed_listener;
 
         struct vsx_shell_interface shell;
 };
@@ -154,8 +153,10 @@ call_void_surface_method(struct data *data,
 }
 
 static void
-queue_redraw(struct data *data)
+queue_redraw_cb(struct vsx_shell_interface *shell)
 {
+        struct data *data = vsx_container_of(shell, struct data, shell);
+
         if (data->redraw_queued)
                 return;
 
@@ -166,17 +167,6 @@ queue_redraw(struct data *data)
         call_void_surface_method(data, data->request_render_method_id);
 
         data->redraw_queued = true;
-}
-
-static void
-redraw_needed_cb(struct vsx_listener *listener,
-                 void *signal_data)
-{
-        struct data *data = vsx_container_of(listener,
-                                             struct data,
-                                             redraw_needed_listener);
-
-        queue_redraw(data);
 }
 
 static void
@@ -294,6 +284,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
 
         vsx_signal_init(&data->shell.name_size_signal);
 
+        data->shell.queue_redraw_cb = queue_redraw_cb;
         data->shell.share_link_cb = share_link_cb;
         data->shell.set_name_position_cb = set_name_position_cb;
         data->shell.get_name_height_cb = get_name_height_cb;
@@ -447,11 +438,6 @@ VSX_JNI_RENDERER_PREFIX(initContext)(JNIEnv *env,
                 vsx_error_free(error);
                 return JNI_FALSE;
         }
-
-        struct vsx_signal *redraw_needed_signal =
-                vsx_game_painter_get_redraw_needed_signal(data->game_painter);
-        data->redraw_needed_listener.notify = redraw_needed_cb;
-        vsx_signal_add(redraw_needed_signal, &data->redraw_needed_listener);
 
         vsx_game_painter_set_fb_size(data->game_painter,
                                      data->fb_width,

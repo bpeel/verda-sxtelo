@@ -65,8 +65,6 @@ struct vsx_language_painter {
 
         struct vsx_shadow_painter_shadow *shadow;
         struct vsx_listener shadow_painter_ready_listener;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -90,7 +88,7 @@ shadow_painter_ready_cb(struct vsx_listener *listener,
                                  struct vsx_language_painter,
                                  shadow_painter_ready_listener);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -175,8 +173,6 @@ create_cb(struct vsx_game_state *game_state,
 {
         struct vsx_language_painter *painter = vsx_calloc(sizeof *painter);
 
-        vsx_signal_init(&painter->redraw_needed_signal);
-
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
@@ -251,14 +247,6 @@ handle_click(struct vsx_language_painter *painter,
                                   VSX_DIALOG_MENU);
 
         return true;
-}
-
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_language_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
 }
 
 static bool
@@ -406,6 +394,5 @@ vsx_language_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

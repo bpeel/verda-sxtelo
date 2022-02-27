@@ -48,8 +48,6 @@ struct vsx_error_painter {
 
         struct vsx_shadow_painter_shadow *shadow;
         struct vsx_listener shadow_painter_ready_listener;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -109,8 +107,10 @@ texture_load_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
-        if (can_paint(painter))
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (can_paint(painter)) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -144,7 +144,8 @@ set_visible_cb(void *user_data)
                                                       painter);
                 }
         } else if (can_paint(painter)) {
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
         }
 }
 
@@ -184,8 +185,9 @@ update_error_visible(struct vsx_error_painter *painter)
                         painter->error_visible = false;
 
                         if (could_paint) {
-                                vsx_signal_emit(&painter->redraw_needed_signal,
-                                                NULL);
+                                struct vsx_shell_interface *shell =
+                                        painter->toolbox->shell;
+                                shell->queue_redraw_cb(shell);
                         }
                 }
         }
@@ -200,8 +202,10 @@ shadow_painter_ready_cb(struct vsx_listener *listener,
                                  struct vsx_error_painter,
                                  shadow_painter_ready_listener);
 
-        if (can_paint(painter))
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (can_paint(painter)) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -300,8 +304,6 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        vsx_signal_init(&painter->redraw_needed_signal);
-
         painter->modified_listener.notify = modified_cb;
         vsx_signal_add(vsx_game_state_get_modified_signal(game_state),
                        &painter->modified_listener);
@@ -392,14 +394,6 @@ paint_cb(void *painter_data)
         gl->glDrawArrays(GL_TRIANGLE_STRIP, 0, N_VERTICES);
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_error_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 free_cb(void *painter_data)
 {
@@ -434,6 +428,5 @@ const struct vsx_painter
 vsx_error_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

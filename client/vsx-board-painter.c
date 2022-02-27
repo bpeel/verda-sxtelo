@@ -60,8 +60,6 @@ struct vsx_board_painter {
 
         GLuint tex;
         struct vsx_image_loader_token *image_token;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -388,6 +386,7 @@ modified_cb(struct vsx_listener *listener,
                                  struct vsx_board_painter,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_NAME:
@@ -395,11 +394,11 @@ modified_cb(struct vsx_listener *listener,
                                    event->player_name.player_num,
                                    event->player_name.name);
                 painter->name_label_positions_dirty = true;
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                shell->queue_redraw_cb(shell);
                 break;
         case VSX_GAME_STATE_MODIFIED_TYPE_SHOUTING_PLAYER:
         case VSX_GAME_STATE_MODIFIED_TYPE_PLAYER_FLAGS:
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                shell->queue_redraw_cb(shell);
                 break;
         default:
                 break;
@@ -442,7 +441,7 @@ texture_load_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -588,8 +587,6 @@ create_cb(struct vsx_game_state *game_state,
           struct vsx_toolbox *toolbox)
 {
         struct vsx_board_painter *painter = vsx_calloc(sizeof *painter);
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
@@ -802,14 +799,6 @@ paint_cb(void *painter_data)
                                   VSX_N_ELEMENTS(painter->name_labels));
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_board_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 free_cb(void *painter_data)
 {
@@ -845,6 +834,5 @@ vsx_board_painter = {
         .fb_size_changed_cb = fb_size_changed_cb,
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

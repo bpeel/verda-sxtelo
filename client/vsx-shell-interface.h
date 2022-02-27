@@ -26,6 +26,10 @@
  */
 
 struct vsx_shell_interface {
+        /* Queue a redraw of the entire interface */
+        void
+        (* queue_redraw_cb)(struct vsx_shell_interface *shell);
+
         /* Ask the upper layers to share a link */
         void
         (* share_link_cb)(struct vsx_shell_interface *shell,

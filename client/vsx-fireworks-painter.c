@@ -57,8 +57,6 @@ struct vsx_fireworks_painter {
 
         GLint elapsed_time_uniform;
         GLint start_point_uniform;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -183,8 +181,10 @@ texture_load_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->tex);
 
-        if (get_elapsed_time(painter) != -1)
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (get_elapsed_time(painter) != -1) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -194,8 +194,10 @@ start_fireworks(struct vsx_fireworks_painter *painter,
         painter->fireworks_start_time = vsx_monotonic_get();
         painter->shouting_player = player_num;
 
-        if (get_elapsed_time(painter) != -1)
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (get_elapsed_time(painter) != -1) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -347,8 +349,6 @@ create_cb(struct vsx_game_state *game_state,
         painter->game_state = game_state;
         painter->toolbox = toolbox;
 
-        vsx_signal_init(&painter->redraw_needed_signal);
-
         painter->event_listener.notify = event_cb;
         vsx_signal_add(vsx_game_state_get_event_signal(game_state),
                        &painter->event_listener);
@@ -433,15 +433,7 @@ paint_cb(void *painter_data)
         gl->glDisable(GL_BLEND);
 
         /* Queue a redraw immediately to animate the effect */
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-}
-
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_fireworks_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -474,6 +466,5 @@ const struct vsx_painter
 vsx_fireworks_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

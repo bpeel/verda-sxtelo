@@ -70,9 +70,6 @@ vsx_game_painter_move_finger(struct vsx_game_painter *painter,
 void
 vsx_game_painter_cancel_gesture(struct vsx_game_painter *painter);
 
-struct vsx_signal *
-vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter);
-
 void
 vsx_game_painter_free(struct vsx_game_painter *painter);
 

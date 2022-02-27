@@ -65,8 +65,6 @@ struct vsx_name_painter {
 
         struct vsx_shadow_painter_shadow *dialog_shadow, *copyright_shadow;
         struct vsx_listener shadow_painter_ready_listener;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -96,7 +94,7 @@ name_size_cb(struct vsx_listener *listener,
                                  name_size_listener);
 
         painter->layout_dirty = true;
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -108,11 +106,12 @@ modified_cb(struct vsx_listener *listener,
                                  struct vsx_name_painter,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
                 painter->layout_dirty = true;
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                shell->queue_redraw_cb(shell);
                 break;
         default:
                 break;
@@ -128,7 +127,7 @@ shadow_painter_ready_cb(struct vsx_listener *listener,
                                  struct vsx_name_painter,
                                  shadow_painter_ready_listener);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -275,8 +274,6 @@ create_cb(struct vsx_game_state *game_state,
           struct vsx_toolbox *toolbox)
 {
         struct vsx_name_painter *painter = vsx_calloc(sizeof *painter);
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         /* Convert the measurements from mm to pixels */
         int dpi = toolbox->paint_state.dpi;
@@ -571,14 +568,6 @@ paint_cb(void *painter_data)
         vsx_layout_paint_params(&params);
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_name_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 handle_click(struct vsx_name_painter *painter,
              const struct vsx_input_event *event)
@@ -663,6 +652,5 @@ vsx_name_painter = {
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

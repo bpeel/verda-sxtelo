@@ -83,7 +83,6 @@ struct vsx_main_data {
         Uint32 button_pressed_device;
 
         struct vsx_game_painter *game_painter;
-        struct vsx_listener redraw_needed_listener;
 
         SDL_Event wakeup_event;
 
@@ -226,7 +225,6 @@ static void
 finish_restartable_data(struct vsx_main_data *main_data)
 {
         if (main_data->game_painter) {
-                vsx_list_remove(&main_data->redraw_needed_listener.link);
                 vsx_game_painter_free(main_data->game_painter);
                 main_data->game_painter = NULL;
         }
@@ -345,13 +343,10 @@ init_sdl_window(struct vsx_main_data *main_data)
 }
 
 static void
-redraw_needed_cb(struct vsx_listener *listener,
-                 void *signal_data)
+queue_redraw_cb(struct vsx_shell_interface *shell)
 {
         struct vsx_main_data *main_data =
-                vsx_container_of(listener,
-                                 struct vsx_main_data,
-                                 redraw_needed_listener);
+                vsx_container_of(shell, struct vsx_main_data, shell);
 
         main_data->redraw_queued = true;
 }
@@ -424,13 +419,6 @@ init_painter(struct vsx_main_data *main_data)
         }
 
         main_data->game_painter = game_painter;
-
-        main_data->redraw_needed_listener.notify = redraw_needed_cb;
-
-        struct vsx_signal *redraw_needed_signal =
-                vsx_game_painter_get_redraw_needed_signal(game_painter);
-        vsx_signal_add(redraw_needed_signal,
-                       &main_data->redraw_needed_listener);
 
         return true;
 }
@@ -764,6 +752,7 @@ create_main_data(void)
 
         vsx_signal_init(&main_data->shell.name_size_signal);
 
+        main_data->shell.queue_redraw_cb = queue_redraw_cb;
         main_data->shell.share_link_cb = share_link_cb;
         main_data->shell.set_name_position_cb = set_name_position_cb;
         main_data->shell.get_name_height_cb = get_name_height_cb;

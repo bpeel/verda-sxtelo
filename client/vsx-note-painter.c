@@ -43,8 +43,6 @@ struct vsx_note_painter {
         struct vsx_layout *layout;
         bool layout_dirty;
 
-        struct vsx_signal redraw_needed_signal;
-
         char *text;
         struct vsx_main_thread_token *remove_note_timeout;
 };
@@ -78,7 +76,7 @@ remove_note(struct vsx_note_painter *painter)
         vsx_free(painter->text);
         painter->text = NULL;
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -108,7 +106,7 @@ set_note_text(struct vsx_note_painter *painter,
                                               remove_note_cb,
                                               painter);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -160,8 +158,6 @@ create_cb(struct vsx_game_state *game_state,
           struct vsx_toolbox *toolbox)
 {
         struct vsx_note_painter *painter = vsx_calloc(sizeof *painter);
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
@@ -305,14 +301,6 @@ input_event_cb(void *painter_data,
         return false;
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_note_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 free_cb(void *painter_data)
 {
@@ -343,6 +331,5 @@ vsx_note_painter = {
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

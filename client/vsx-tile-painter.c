@@ -113,8 +113,6 @@ struct vsx_tile_painter {
          */
         struct vsx_tile_painter_tile *snap_tile;
         int snap_x, snap_y;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 /* We’ll pretend the tile is bigger than it is when looking for a tile
@@ -269,7 +267,9 @@ cancel_overrides_cb(void *user_data)
 
         if (!vsx_list_empty(&painter->overrides)) {
                 cancel_all_overrides(painter);
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
         }
 }
 
@@ -356,7 +356,7 @@ handle_tile_event(struct vsx_tile_painter *painter,
 
         raise_tile(painter, tile);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -390,7 +390,7 @@ clear_tiles(struct vsx_tile_painter *painter)
         vsx_slab_destroy(&painter->tile_allocator);
         vsx_slab_init(&painter->tile_allocator);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -421,8 +421,10 @@ tile_tool_ready_cb(struct vsx_listener *listener,
                                  struct vsx_tile_painter,
                                  tile_tool_ready_listener);
 
-        if (get_n_tiles(painter) > 0)
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (get_n_tiles(painter) > 0) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -447,8 +449,6 @@ create_cb(struct vsx_game_state *game_state,
         vsx_slab_init(&painter->tile_allocator);
         vsx_list_init(&painter->tile_list);
         vsx_list_init(&painter->overrides);
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         painter->tile_buffer =
                 vsx_tile_tool_create_buffer(toolbox->tile_tool,
@@ -609,7 +609,7 @@ handle_click(struct vsx_tile_painter *painter,
         override_tile(painter, tile);
         start_animation(tile);
         raise_tile(painter, tile);
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 
         return true;
 }
@@ -644,7 +644,7 @@ handle_drag_start(struct vsx_tile_painter *painter,
         painter->drag_offset_y = tile->current_y - board_y;
         tile->animating = false;
         raise_tile(painter, tile);
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 
         return true;
 }
@@ -705,7 +705,7 @@ handle_drag(struct vsx_tile_painter *painter,
                                  tile->current_x,
                                  tile->current_y);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 
         return true;
 }
@@ -860,16 +860,10 @@ paint_cb(void *painter_data)
 
         gl->glDisable(GL_SCISSOR_TEST);
 
-        if (any_tiles_animating)
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
-}
-
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_tile_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
+        if (any_tiles_animating) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -896,6 +890,5 @@ vsx_tile_painter = {
         .create_cb = create_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

@@ -124,8 +124,6 @@ struct vsx_guide_painter {
 
         struct vsx_tile_tool_buffer *tile_buffer;
         struct vsx_listener tile_tool_ready_listener;
-
-        struct vsx_signal redraw_needed_signal;
 };
 
 struct vertex {
@@ -201,7 +199,7 @@ image_loaded_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->image_tex);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -241,10 +239,12 @@ handle_page_changed(struct vsx_guide_painter *painter)
          * just be drawn without the image. However this way we can
          * avoid a little flicker.
          */
-        if (page->image)
+        if (page->image) {
                 start_image_load(painter);
-        else
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        } else {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static void
@@ -256,11 +256,12 @@ modified_cb(struct vsx_listener *listener,
                                  struct vsx_guide_painter,
                                  modified_listener);
         const struct vsx_game_state_modified_event *event = user_data;
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
 
         switch (event->type) {
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
                 painter->layout_dirty = true;
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+                shell->queue_redraw_cb(shell);
                 break;
         case VSX_GAME_STATE_MODIFIED_TYPE_PAGE:
                 handle_page_changed(painter);
@@ -279,7 +280,7 @@ shadow_painter_ready_cb(struct vsx_listener *listener,
                                  struct vsx_guide_painter,
                                  shadow_painter_ready_listener);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -291,7 +292,7 @@ tile_tool_ready_cb(struct vsx_listener *listener,
                                  struct vsx_guide_painter,
                                  tile_tool_ready_listener);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -330,7 +331,7 @@ cursor_loaded_cb(const struct vsx_image *image,
 
         vsx_mipmap_load_image(image, gl, painter->cursor_tex);
 
-        vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        painter->toolbox->shell->queue_redraw_cb(painter->toolbox->shell);
 }
 
 static void
@@ -619,8 +620,6 @@ create_cb(struct vsx_game_state *game_state,
           struct vsx_toolbox *toolbox)
 {
         struct vsx_guide_painter *painter = vsx_calloc(sizeof *painter);
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         painter->game_state = game_state;
         painter->toolbox = toolbox;
@@ -1157,8 +1156,10 @@ paint_cb(void *painter_data)
 
         paint_layouts(painter);
 
-        if (painter->total_animation_duration > 0)
-                vsx_signal_emit(&painter->redraw_needed_signal, NULL);
+        if (painter->total_animation_duration > 0) {
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+                shell->queue_redraw_cb(shell);
+        }
 }
 
 static bool
@@ -1218,14 +1219,6 @@ input_event_cb(void *painter_data,
         return false;
 }
 
-static struct vsx_signal *
-get_redraw_needed_signal_cb(void *painter_data)
-{
-        struct vsx_guide_painter *painter = painter_data;
-
-        return &painter->redraw_needed_signal;
-}
-
 static void
 free_cb(void *painter_data)
 {
@@ -1274,6 +1267,5 @@ vsx_guide_painter = {
         .prepare_cb = prepare_cb,
         .paint_cb = paint_cb,
         .input_event_cb = input_event_cb,
-        .get_redraw_needed_signal_cb = get_redraw_needed_signal_cb,
         .free_cb = free_cb,
 };

@@ -44,9 +44,6 @@ struct vsx_painter {
         (* input_event_cb)(void *painter,
                            const struct vsx_input_event *event);
 
-        struct vsx_signal *
-        (* get_redraw_needed_signal_cb)(void *painter);
-
         void
         (* free_cb)(void *painter);
 };

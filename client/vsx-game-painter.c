@@ -58,7 +58,6 @@ struct finger {
 
 struct painter_data {
         void *data;
-        struct vsx_listener listener;
         struct vsx_game_painter *game_painter;
 };
 
@@ -71,8 +70,6 @@ struct vsx_game_painter {
         bool viewport_dirty;
 
         struct painter_data painters[N_PAINTERS];
-
-        struct vsx_signal redraw_needed_signal;
 
         struct finger fingers[2];
         /* Bitmask of pressed fingers */
@@ -96,30 +93,6 @@ struct vsx_game_painter {
 #define MAX_CLICK_TIME (750 * 1000)
 
 static void
-redraw_needed_cb(struct vsx_listener *listener,
-                 void *signal_data)
-{
-        struct painter_data *painter_data =
-                vsx_container_of(listener, struct painter_data, listener);
-        struct vsx_game_painter *painter = painter_data->game_painter;
-
-        vsx_signal_emit(&painter->redraw_needed_signal, painter);
-}
-
-static void
-init_redraw_needed_listener(struct vsx_game_painter *painter,
-                            struct painter_data *painter_data,
-                            const struct vsx_painter *callbacks)
-{
-        struct vsx_signal *signal =
-                callbacks->get_redraw_needed_signal_cb(painter_data->data);
-
-        painter_data->listener.notify = redraw_needed_cb;
-
-        vsx_signal_add(signal, &painter_data->listener);
-}
-
-static void
 init_painters(struct vsx_game_painter *painter)
 {
         for (unsigned i = 0; i < N_PAINTERS; i++) {
@@ -130,12 +103,6 @@ init_painters(struct vsx_game_painter *painter)
                                                           &painter->toolbox);
 
                 painter_data->game_painter = painter;
-
-                if (callbacks->get_redraw_needed_signal_cb) {
-                        init_redraw_needed_listener(painter,
-                                                    painter_data,
-                                                    callbacks);
-                }
         }
 }
 
@@ -233,8 +200,6 @@ vsx_game_painter_new(struct vsx_gl *gl,
         painter->toolbox.paint_state.height = 1;
         painter->toolbox.paint_state.dpi = dpi;
         painter->viewport_dirty = true;
-
-        vsx_signal_init(&painter->redraw_needed_signal);
 
         if (!init_toolbox(painter, gl, main_thread, asset_manager, dpi, error))
                 goto error;
@@ -530,12 +495,6 @@ vsx_game_painter_paint(struct vsx_game_painter *painter)
 
                 painters[i]->paint_cb(painter->painters[i].data);
         }
-}
-
-struct vsx_signal *
-vsx_game_painter_get_redraw_needed_signal(struct vsx_game_painter *painter)
-{
-        return &painter->redraw_needed_signal;
 }
 
 static void
