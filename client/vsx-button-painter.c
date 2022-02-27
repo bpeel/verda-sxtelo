@@ -22,7 +22,6 @@
 
 #include <stdbool.h>
 #include <math.h>
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
@@ -130,9 +129,12 @@ texture_load_cb(const struct vsx_image *image,
         painter->image_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading button image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading button image: %s",
+                                    error->message);
+
                 return;
         }
 

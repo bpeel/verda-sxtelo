@@ -24,7 +24,6 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
-#include <stdio.h>
 
 #include "vsx-layout.h"
 #include "vsx-monotonic.h"
@@ -173,9 +172,12 @@ image_loaded_cb(const struct vsx_image *image,
         painter->image_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading guide page image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading guide page image: %s",
+                                    error->message);
+
                 return;
         }
 
@@ -305,9 +307,12 @@ cursor_loaded_cb(const struct vsx_image *image,
         painter->cursor_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading cursor image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading cursor image: %s",
+                                    error->message);
+
                 return;
         }
 

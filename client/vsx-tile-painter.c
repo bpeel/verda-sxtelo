@@ -22,7 +22,6 @@
 
 #include <stdbool.h>
 #include <math.h>
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <stdalign.h>

@@ -21,7 +21,6 @@
 #include "vsx-error-painter.h"
 
 #include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "vsx-mipmap.h"
@@ -81,9 +80,12 @@ texture_load_cb(const struct vsx_image *image,
         painter->image_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading error image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = painter->toolbox->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading error image: %s",
+                                    error->message);
+
                 return;
         }
 
