@@ -352,6 +352,22 @@ queue_redraw_cb(struct vsx_shell_interface *shell)
 }
 
 static void
+log_error_cb(struct vsx_shell_interface *shell,
+             const char *format,
+             ...)
+{
+        va_list ap;
+
+        va_start(ap, format);
+
+        vfprintf(stderr, format, ap);
+
+        va_end(ap);
+
+        fputc('\n', stderr);
+}
+
+static void
 share_link_cb(struct vsx_shell_interface *shell,
               const char *link)
 {
@@ -753,6 +769,7 @@ create_main_data(void)
         vsx_signal_init(&main_data->shell.name_size_signal);
 
         main_data->shell.queue_redraw_cb = queue_redraw_cb;
+        main_data->shell.log_error_cb = log_error_cb;
         main_data->shell.share_link_cb = share_link_cb;
         main_data->shell.set_name_position_cb = set_name_position_cb;
         main_data->shell.get_name_height_cb = get_name_height_cb;

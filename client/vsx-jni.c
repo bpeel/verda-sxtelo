@@ -170,6 +170,23 @@ queue_redraw_cb(struct vsx_shell_interface *shell)
 }
 
 static void
+log_error_cb(struct vsx_shell_interface *shell,
+             const char *format,
+             ...)
+{
+        va_list ap;
+
+        va_start(ap, format);
+
+        __android_log_vprint(ANDROID_LOG_ERROR,
+                             TAG,
+                             format,
+                             ap);
+
+        va_end(ap);
+}
+
+static void
 wakeup_cb(void *user_data)
 {
         struct data *data = user_data;
@@ -285,6 +302,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
         vsx_signal_init(&data->shell.name_size_signal);
 
         data->shell.queue_redraw_cb = queue_redraw_cb;
+        data->shell.log_error_cb = log_error_cb;
         data->shell.share_link_cb = share_link_cb;
         data->shell.set_name_position_cb = set_name_position_cb;
         data->shell.get_name_height_cb = get_name_height_cb;

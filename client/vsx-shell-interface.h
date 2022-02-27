@@ -30,6 +30,13 @@ struct vsx_shell_interface {
         void
         (* queue_redraw_cb)(struct vsx_shell_interface *shell);
 
+        /* Ask the shell to log an error somewhere */
+        VSX_PRINTF_FORMAT(2, 3)
+        void
+        (* log_error_cb)(struct vsx_shell_interface *shell,
+                         const char *format,
+                         ...);
+
         /* Ask the upper layers to share a link */
         void
         (* share_link_cb)(struct vsx_shell_interface *shell,
