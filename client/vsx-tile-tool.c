@@ -20,7 +20,6 @@
 
 #include "vsx-tile-tool.h"
 
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
@@ -44,6 +43,7 @@ struct vsx_tile_tool_buffer {
 
 struct vsx_tile_tool {
         struct vsx_gl *gl;
+        struct vsx_shell_interface *shell;
         struct vsx_image_loader *image_loader;
         struct vsx_map_buffer *map_buffer;
         struct vsx_quad_tool *quad_tool;
@@ -69,9 +69,12 @@ texture_load_cb(const struct vsx_image *image,
         tool->image_token = NULL;
 
         if (error) {
-                fprintf(stderr,
-                        "error loading tiles image: %s\n",
-                        error->message);
+                struct vsx_shell_interface *shell = tool->shell;
+
+                shell->log_error_cb(shell,
+                                    "error loading tiles image: %s",
+                                    error->message);
+
                 return;
         }
 
@@ -100,6 +103,7 @@ texture_load_cb(const struct vsx_image *image,
 
 struct vsx_tile_tool *
 vsx_tile_tool_new(struct vsx_gl *gl,
+                  struct vsx_shell_interface *shell,
                   struct vsx_image_loader *image_loader,
                   struct vsx_map_buffer *map_buffer,
                   struct vsx_quad_tool *quad_tool)
@@ -109,6 +113,7 @@ vsx_tile_tool_new(struct vsx_gl *gl,
         vsx_signal_init(&tool->ready_signal);
 
         tool->gl = gl;
+        tool->shell = shell;
         tool->image_loader = image_loader;
         tool->map_buffer = map_buffer;
         tool->quad_tool = quad_tool;

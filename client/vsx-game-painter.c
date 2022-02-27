@@ -142,6 +142,7 @@ init_toolbox(struct vsx_game_painter *painter,
                                                          dpi);
 
         toolbox->tile_tool = vsx_tile_tool_new(toolbox->gl,
+                                               shell,
                                                toolbox->image_loader,
                                                toolbox->map_buffer,
                                                toolbox->quad_tool);

@@ -21,6 +21,7 @@
 
 #include "vsx-gl.h"
 #include "vsx-image-loader.h"
+#include "vsx-shell-interface.h"
 #include "vsx-map-buffer.h"
 #include "vsx-quad-tool.h"
 #include "vsx-shader-data.h"
@@ -32,6 +33,7 @@ struct vsx_tile_tool_buffer;
 
 struct vsx_tile_tool *
 vsx_tile_tool_new(struct vsx_gl *gl,
+                  struct vsx_shell_interface *shell,
                   struct vsx_image_loader *image_loader,
                   struct vsx_map_buffer *map_buffer,
                   struct vsx_quad_tool *quad_tool);
