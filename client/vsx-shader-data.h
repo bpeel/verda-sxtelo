@@ -24,6 +24,7 @@
 #include "vsx-asset.h"
 #include "vsx-error.h"
 #include "vsx-gl.h"
+#include "vsx-shell-interface.h"
 
 extern struct vsx_error_domain
 vsx_shader_data_error;
@@ -65,6 +66,7 @@ struct vsx_shader_data {
 bool
 vsx_shader_data_init(struct vsx_shader_data *data,
                      struct vsx_gl *gl,
+                     struct vsx_shell_interface *shell,
                      struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error);
 

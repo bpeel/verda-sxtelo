@@ -108,6 +108,7 @@ init_painters(struct vsx_game_painter *painter)
 
 static bool
 init_toolbox(struct vsx_game_painter *painter,
+             struct vsx_shell_interface *shell,
              struct vsx_gl *gl,
              struct vsx_main_thread *main_thread,
              struct vsx_asset_manager *asset_manager,
@@ -124,6 +125,7 @@ init_toolbox(struct vsx_game_painter *painter,
 
         if (!vsx_shader_data_init(&toolbox->shader_data,
                                   toolbox->gl,
+                                  shell,
                                   asset_manager,
                                   error))
                 return false;
@@ -201,7 +203,13 @@ vsx_game_painter_new(struct vsx_gl *gl,
         painter->toolbox.paint_state.dpi = dpi;
         painter->viewport_dirty = true;
 
-        if (!init_toolbox(painter, gl, main_thread, asset_manager, dpi, error))
+        if (!init_toolbox(painter,
+                          shell,
+                          gl,
+                          main_thread,
+                          asset_manager,
+                          dpi,
+                          error))
                 goto error;
 
         painter->toolbox.shell = shell;

@@ -22,7 +22,6 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "vsx-util.h"
 #include "vsx-buffer.h"
@@ -84,6 +83,7 @@ vsx_shader_data_shaders[] = {
 
 static GLuint
 create_shader(struct vsx_gl *gl,
+              struct vsx_shell_interface *shell,
               const char *name,
               GLenum type,
               const char *source,
@@ -117,9 +117,10 @@ create_shader(struct vsx_gl *gl,
                                        &actual_length,
                                        info_log);
                 if (*info_log) {
-                        fprintf(stderr,
-                                "Info log for %s:\n%s\n",
-                                name, info_log);
+                        shell->log_error_cb(shell,
+                                            "Info log for %s:\n%s",
+                                            name,
+                                            info_log);
                 }
                 free(info_log);
         }
@@ -141,6 +142,7 @@ create_shader(struct vsx_gl *gl,
 
 static GLuint
 create_shader_from_files(struct vsx_gl *gl,
+                         struct vsx_shell_interface *shell,
                          struct vsx_asset_manager *asset_manager,
                          GLenum shader_type,
                          const char **filenames,
@@ -198,6 +200,7 @@ create_shader_from_files(struct vsx_gl *gl,
         source[total_length] = '\0';
 
         shader = create_shader(gl,
+                               shell,
                                filenames[n_files - 1],
                                shader_type,
                                source,
@@ -284,6 +287,7 @@ get_uniforms(struct vsx_shader_data_program_data *program,
 static bool
 link_program(struct vsx_shader_data *data,
              struct vsx_gl *gl,
+             struct vsx_shell_interface *shell,
              enum vsx_shader_data_program program_num,
              struct vsx_error **error)
 {
@@ -319,9 +323,10 @@ link_program(struct vsx_shader_data *data,
                                         info_log);
                 if (*info_log) {
                         program_name = get_program_name(program_num);
-                        fprintf(stderr, "Link info log for %s:\n%s\n",
-                                program_name,
-                                info_log);
+                        shell->log_error_cb(shell,
+                                            "Link info log for %s:\n%s",
+                                            program_name,
+                                            info_log);
                         vsx_free(program_name);
                 }
                 free(info_log);
@@ -348,12 +353,13 @@ link_program(struct vsx_shader_data *data,
 static bool
 link_programs(struct vsx_shader_data *data,
               struct vsx_gl *gl,
+              struct vsx_shell_interface *shell,
               struct vsx_error **error)
 {
         int i;
 
         for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++) {
-                if (!link_program(data, gl, i, error))
+                if (!link_program(data, gl, shell, i, error))
                         return false;
         }
 
@@ -363,6 +369,7 @@ link_programs(struct vsx_shader_data *data,
 bool
 vsx_shader_data_init(struct vsx_shader_data *data,
                      struct vsx_gl *gl,
+                     struct vsx_shell_interface *shell,
                      struct vsx_asset_manager *asset_manager,
                      struct vsx_error **error)
 {
@@ -377,6 +384,7 @@ vsx_shader_data_init(struct vsx_shader_data *data,
                 shader = vsx_shader_data_shaders + n_shaders;
                 shaders[n_shaders] =
                         create_shader_from_files(gl,
+                                                 shell,
                                                  asset_manager,
                                                  shader->type,
                                                  shader->filenames,
@@ -398,7 +406,7 @@ vsx_shader_data_init(struct vsx_shader_data *data,
                 }
         }
 
-        if (!link_programs(data, gl, error)) {
+        if (!link_programs(data, gl, shell, error)) {
                 for (i = 0; i < VSX_SHADER_DATA_N_PROGRAMS; i++)
                         gl->glDeleteProgram(data->programs[i].program);
                 result = false;
