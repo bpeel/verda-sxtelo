@@ -214,7 +214,8 @@ vsx_gl_new(vsx_gl_get_proc_address_func get_proc_address_func,
         for (int i = 0; i < VSX_N_ELEMENTS(gl_groups); i++)
                 init_group(&data, gl_groups + i);
 
-        data.gl->have_map_buffer_range = data.gl->glMapBufferRange != NULL;
+        data.gl->have_map_buffer_range = (data.gl->glMapBufferRange != NULL &&
+                                          data.gl->glUnmapBuffer != NULL);
         data.gl->have_vertex_array_objects = data.gl->glGenVertexArrays != NULL;
 
         vsx_buffer_destroy(&data.extensions);

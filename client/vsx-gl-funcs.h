@@ -164,8 +164,14 @@ VSX_GL_FUNC(void,
 VSX_GL_FUNC(void *,
            glMapBufferRange, (GLenum target, GLintptr offset,
                               GLsizeiptr length, GLbitfield access))
+VSX_GL_END_GROUP()
+
+/* Regular map buffer (only used to access glUnmapBuffer) */
+VSX_GL_BEGIN_GROUP(30,
+                   "GL_OES_mapbuffer",
+                   "OES")
 VSX_GL_FUNC(GLboolean,
-           glUnmapBuffer, (GLenum target))
+            glUnmapBuffer, (GLenum target))
 VSX_GL_END_GROUP()
 
 /* Vertex array objects */
