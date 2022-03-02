@@ -49,6 +49,8 @@ controller_for_shell(struct vsx_shell_interface *shell)
 
 @implementation ViewController {
         bool initialized;
+        
+        GLKView *glView;
 
         struct vsx_main_thread *main_thread;
         struct vsx_asset_manager *asset_manager;
@@ -369,8 +371,10 @@ modified_cb(struct vsx_listener *listener,
         wakeup_dispatch = [^{
                 ViewController *controller = closure;
 
-                if (controller != nil)
+                if (controller != nil) {
+                        [EAGLContext setCurrentContext:controller->glView.context];
                         vsx_main_thread_flush_idle_events(controller->main_thread);
+                }
         } copy];
         
         main_thread = vsx_main_thread_new(wakeup_cb, (__bridge void *) self);
@@ -427,10 +431,10 @@ modified_cb(struct vsx_listener *listener,
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-        CGFloat scale = self.view.contentScaleFactor;
+        CGFloat scale = self->glView.contentScaleFactor;
 
         for (UITouch *touch in touches) {
-                if (touch.view != self.view)
+                if (touch.view != self->glView)
                         continue;
                 
                 for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
@@ -440,7 +444,7 @@ modified_cb(struct vsx_listener *listener,
                         self->touches[i] = touch;
                         
                         if (self->game_painter) {
-                                CGPoint point = [touch locationInView:self.view];
+                                CGPoint point = [touch locationInView:self->glView];
                                 vsx_game_painter_press_finger(self->game_painter,
                                                               i, /* finger */
                                                               point.x * scale,
@@ -455,17 +459,17 @@ modified_cb(struct vsx_listener *listener,
         if (self->game_painter == NULL)
                 return;
 
-        CGFloat scale = self.view.contentScaleFactor;
+        CGFloat scale = self->glView.contentScaleFactor;
 
         for (UITouch *touch in touches) {
-                if (touch.view != self.view)
+                if (touch.view != self->glView)
                         continue;
                 
                 for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
                         if (self->touches[i] != touch)
                                 continue;
 
-                        CGPoint point = [touch locationInView:self.view];
+                        CGPoint point = [touch locationInView:self->glView];
                         vsx_game_painter_move_finger(self->game_painter,
                                                      i, /* finger */
                                                      point.x * scale,
@@ -492,7 +496,7 @@ modified_cb(struct vsx_listener *listener,
                 return;
 
         for (UITouch *touch in touches) {
-                if (touch.view != self.view)
+                if (touch.view != self->glView)
                         continue;
                 
                 for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
@@ -513,7 +517,7 @@ modified_cb(struct vsx_listener *listener,
         
         [self doInit];
         
-        GLKView *glView = (GLKView *) self.view;
+        glView = (GLKView *) self.view;
         
         dpi = glView.contentScaleFactor * 160;
 
