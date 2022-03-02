@@ -54,30 +54,35 @@ vsx_asset_manager_open(struct vsx_asset_manager *manager,
                        const char *filename,
                        struct vsx_error **error)
 {
-        struct vsx_asset *asset = vsx_calloc(sizeof *asset);
-
-        asset->filename = vsx_strdup(filename);
-        
-        strip_extension(asset->filename);
-        
-        NSString *filenameString = [NSString stringWithUTF8String:asset->filename];
-        
-        NSDataAsset *asset_ns = [[NSDataAsset alloc] initWithName:filenameString];
-        
-        if (asset_ns == nil) {
-                vsx_set_error(error,
-                              &vsx_asset_error,
-                              VSX_ASSET_ERROR_FILE,
-                              "Error loading: %s",
-                              filename);
-                vsx_asset_close(asset);
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                struct vsx_asset *asset = vsx_calloc(sizeof *asset);
                 
-                return NULL;
+                asset->filename = vsx_strdup(filename);
+                
+                strip_extension(asset->filename);
+                
+                NSString *filenameString = [NSString stringWithUTF8String:asset->filename];
+                
+                NSDataAsset *asset_ns = [[NSDataAsset alloc] initWithName:filenameString];
+                
+                if (asset_ns == nil) {
+                        vsx_set_error(error,
+                                      &vsx_asset_error,
+                                      VSX_ASSET_ERROR_FILE,
+                                      "Error loading: %s",
+                                      filename);
+                        vsx_asset_close(asset);
+                        
+                        return NULL;
+                }
+                
+                asset->asset_ptr = (void *) CFBridgingRetain(asset_ns);
+                
+                return asset;
         }
-        
-        asset->asset_ptr = (void *) CFBridgingRetain(asset_ns);
-        
-        return asset;
 }
 
 bool
@@ -86,12 +91,17 @@ vsx_asset_read(struct vsx_asset *asset,
                size_t amount,
                struct vsx_error **error)
 {
-        NSDataAsset *asset_ns = (__bridge NSDataAsset *) asset->asset_ptr;
-
-        [asset_ns.data getBytes:buf range:NSMakeRange(asset->offset, amount)];
-        asset->offset += amount;
-
-        return true;
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                NSDataAsset *asset_ns = (__bridge NSDataAsset *) asset->asset_ptr;
+                
+                [asset_ns.data getBytes:buf range:NSMakeRange(asset->offset, amount)];
+                asset->offset += amount;
+                
+                return true;
+        }
 }
 
 bool
@@ -99,22 +109,32 @@ vsx_asset_remaining(struct vsx_asset *asset,
                     size_t *amount,
                     struct vsx_error **error)
 {
-        NSDataAsset *asset_ns = (__bridge NSDataAsset *) asset->asset_ptr;
-
-        *amount = [asset_ns.data length] - asset->offset;
-
-        return true;
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                NSDataAsset *asset_ns = (__bridge NSDataAsset *) asset->asset_ptr;
+                
+                *amount = [asset_ns.data length] - asset->offset;
+                
+                return true;
+        }
 }
 
 void
 vsx_asset_close(struct vsx_asset *asset)
 {
-        vsx_free(asset->filename);
-        
-        if (asset->asset_ptr == NULL)
-                CFBridgingRelease(asset->asset_ptr);
-
-        vsx_free(asset);
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                vsx_free(asset->filename);
+                
+                if (asset->asset_ptr == NULL)
+                        CFBridgingRelease(asset->asset_ptr);
+                
+                vsx_free(asset);
+        }
 }
 
 void
