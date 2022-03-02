@@ -185,6 +185,9 @@ get_name_height_cb(struct vsx_shell_interface *shell)
 static void
 request_name_cb(struct vsx_shell_interface *shell)
 {
+        ViewController *self = controller_for_shell(shell);
+        vsx_game_state_set_player_name(self->game_state, "Test");
+        vsx_game_state_set_dialog(self->game_state, VSX_DIALOG_INVITE_LINK);
 }
 
 static void
