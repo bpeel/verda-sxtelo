@@ -57,7 +57,7 @@ struct vsx_worker {
 
         int64_t wakeup_timestamp;
 
-        struct pollfd poll_fds[2];
+        struct pollfd poll_fd;
 
         struct vsx_listener event_listener;
 
@@ -89,8 +89,8 @@ event_cb(struct vsx_listener *listener,
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
                 worker->wakeup_timestamp = event->poll_changed.wakeup_time;
-                worker->poll_fds[1].fd = event->poll_changed.fd;
-                worker->poll_fds[1].events = event->poll_changed.events;
+                worker->poll_fd.fd = event->poll_changed.fd;
+                worker->poll_fd.events = event->poll_changed.events;
                 wake_up_thread_locked(worker);
                 break;
         default:
@@ -194,14 +194,14 @@ thread_func(void *user_data)
 
         worker->wakeup_timestamp = INT64_MAX;
 
-        worker->poll_fds[0].fd = worker->wakeup_fds[0];
-        worker->poll_fds[0].events = POLLIN;
-
-        worker->poll_fds[1].fd = -1;
-
         while (!worker->quit) {
-                for (int i = 0; i < VSX_N_ELEMENTS(worker->poll_fds); i++)
-                        worker->poll_fds[i].revents = 0;
+                struct pollfd poll_fds[2] = {
+                        {
+                                .fd = worker->wakeup_fds[0],
+                                .events = POLLIN,
+                        },
+                        [1] = worker->poll_fd,
+                };
 
                 int64_t wakeup_timestamp = worker->wakeup_timestamp;
 
@@ -229,8 +229,8 @@ thread_func(void *user_data)
 
                 vsx_worker_unlock(worker);
 
-                int poll_ret = poll(worker->poll_fds,
-                                    worker->poll_fds[1].fd == -1 ? 1 : 2,
+                int poll_ret = poll(poll_fds,
+                                    poll_fds[1].fd == -1 ? 1 : 2,
                                     timeout);
 
                 vsx_worker_lock(worker);
@@ -250,7 +250,7 @@ thread_func(void *user_data)
                     vsx_monotonic_get())
                         resolve_address_locked(worker);
 
-                if (worker->poll_fds[0].revents) {
+                if (poll_fds[0].revents) {
                         uint8_t byte;
 
                         int got = read(worker->wakeup_fds[0], &byte, 1);
@@ -266,7 +266,7 @@ thread_func(void *user_data)
                 }
 
                 vsx_connection_wake_up(worker->connection,
-                                       worker->poll_fds[1].revents);
+                                       poll_fds[1].revents);
         }
 
         vsx_list_remove(&worker->event_listener.link);
