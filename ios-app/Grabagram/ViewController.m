@@ -74,6 +74,13 @@ controller_for_shell(struct vsx_shell_interface *shell)
          */
         char *instance_state;
         
+        /* Marks whether we are currently handling a redraw. This is used to avoid
+         * starting the draw loop until after the redraw finished.
+         */
+        bool in_redraw;
+        /* Set to true when a redraw is queued while we are in the process of redrawing.
+         * In that case we don’t need to stop the redraw loop.
+         */
         bool redraw_queued;
         
         /* Graphics data that needs to be recreated when the context changes */
@@ -117,11 +124,11 @@ static void
 queue_redraw_cb(struct vsx_shell_interface *shell)
 {
         ViewController *self = controller_for_shell(shell);
-
-        if (self->redraw_queued)
-                return;
-
-        self->redraw_queued = true;
+        
+        if (self->in_redraw)
+                self->redraw_queued = true;
+        else
+                self.paused = NO;
 }
 
 static void
@@ -392,6 +399,7 @@ modified_cb(struct vsx_listener *listener,
         if (![self ensureGraphics])
                 return;
         
+        in_redraw = true;
         redraw_queued = false;
         
         int width = (int) view.drawableWidth;
@@ -404,6 +412,11 @@ modified_cb(struct vsx_listener *listener,
         }
         
         vsx_game_painter_paint(game_painter);
+        
+        in_redraw = false;
+        
+        if (!redraw_queued)
+                self.paused = YES;
 }
 
 - (void)viewDidLoad {
