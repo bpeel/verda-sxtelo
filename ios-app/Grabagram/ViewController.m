@@ -403,6 +403,8 @@ modified_cb(struct vsx_listener *listener,
         
         GLKView *glView = (GLKView *) self.view;
         
+        dpi = glView.contentScaleFactor * 160;
+
         glView.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 }
 
