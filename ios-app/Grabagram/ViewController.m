@@ -67,6 +67,13 @@ controller_for_shell(struct vsx_shell_interface *shell)
         
         char game_language_code[8];
         
+        /* An array of touches that are currently being held. The index in the array is
+         * is used as a finger number to pass to the game painter. nil will be used if
+         * there is no touch for this slot. If there are more touches than the size of
+         * the array then the other touches are ignored.
+         */
+        UITouch *touches[2];
+        
         /* Instance state that is queued to be set on the
          * vsx_game_state when it is created. It will be freed after
          * being used. This shouldn’t be used for reading the game
@@ -417,6 +424,88 @@ modified_cb(struct vsx_listener *listener,
         
         if (!redraw_queued)
                 self.paused = YES;
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+        CGFloat scale = self.view.contentScaleFactor;
+
+        for (UITouch *touch in touches) {
+                if (touch.view != self.view)
+                        continue;
+                
+                for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
+                        if (self->touches[i] != nil)
+                                continue;
+
+                        self->touches[i] = touch;
+                        
+                        if (self->game_painter) {
+                                CGPoint point = [touch locationInView:self.view];
+                                vsx_game_painter_press_finger(self->game_painter,
+                                                              i, /* finger */
+                                                              point.x * scale,
+                                                              point.y * scale);
+                        }
+                        break;
+                }
+        }
+}
+
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+        if (self->game_painter == NULL)
+                return;
+
+        CGFloat scale = self.view.contentScaleFactor;
+
+        for (UITouch *touch in touches) {
+                if (touch.view != self.view)
+                        continue;
+                
+                for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
+                        if (self->touches[i] != touch)
+                                continue;
+
+                        CGPoint point = [touch locationInView:self.view];
+                        vsx_game_painter_move_finger(self->game_painter,
+                                                     i, /* finger */
+                                                     point.x * scale,
+                                                     point.y * scale);
+                        break;
+                }
+        }
+
+}
+
+- (void)touchesEstimatedPropertiesUpdated:(NSSet<UITouch *> *)touches {
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+        for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++)
+                self->touches[i] = nil;
+
+        if (self->game_painter)
+                vsx_game_painter_cancel_gesture(self->game_painter);
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+        if (self->game_painter == NULL)
+                return;
+
+        for (UITouch *touch in touches) {
+                if (touch.view != self.view)
+                        continue;
+                
+                for (int i = 0; i < VSX_N_ELEMENTS(self->touches); i++) {
+                        if (self->touches[i] != touch)
+                                continue;
+                        
+                        self->touches[i] = nil;
+
+                        vsx_game_painter_release_finger(self->game_painter,
+                                                        i /* finger */);
+                        break;
+                }
+        }
 }
 
 - (void)viewDidLoad {
