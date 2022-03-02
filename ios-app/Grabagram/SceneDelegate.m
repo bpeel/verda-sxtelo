@@ -7,12 +7,32 @@
 
 #import "SceneDelegate.h"
 
+#import "ViewController.h"
+
 @interface SceneDelegate ()
 
 @end
 
 @implementation SceneDelegate
 
+- (ViewController *)findViewController:(UIScene *)scene {
+        if (![scene isKindOfClass:[UIWindowScene class]])
+                return nil;
+        
+        UIWindowScene *windowScene = (UIWindowScene *) scene;
+        
+        for (UIWindow *window in windowScene.windows) {
+                UIViewController *viewController = window.rootViewController;
+                
+                if (viewController == nil)
+                        continue;
+                
+                if ([viewController isKindOfClass:[ViewController class]])
+                        return (ViewController *) viewController;
+        }
+        
+        return nil;
+}
 
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
@@ -44,6 +64,11 @@
 - (void)sceneWillEnterForeground:(UIScene *)scene {
         // Called as the scene transitions from the background to the foreground.
         // Use this method to undo the changes made on entering the background.
+
+        ViewController *controller = [self findViewController:scene];
+        
+        if (controller != nil)
+                [controller enterForeground];
 }
 
 
@@ -51,6 +76,11 @@
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
+
+        ViewController *controller = [self findViewController:scene];
+        
+        if (controller != nil)
+                [controller enterBackground];
 }
 
 

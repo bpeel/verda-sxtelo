@@ -11,6 +11,8 @@
 
 @interface ViewController : GLKViewController <GLKViewDelegate>
 
+-(void)enterBackground;
+-(void)enterForeground;
 
 @end
 

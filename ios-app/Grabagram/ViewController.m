@@ -49,6 +49,7 @@ controller_for_shell(struct vsx_shell_interface *shell)
 
 @implementation ViewController {
         bool initialized;
+        bool in_background;
         
         GLKView *glView;
 
@@ -136,7 +137,7 @@ queue_redraw_cb(struct vsx_shell_interface *shell)
         
         if (self->in_redraw)
                 self->redraw_queued = true;
-        else
+        else if (!self->in_background)
                 self.paused = NO;
 }
 
@@ -353,6 +354,8 @@ modified_cb(struct vsx_listener *listener,
 - (void) doInit {
         if (initialized)
                 return;
+        
+        in_background = false;
 
         struct vsx_shell_interface *shell = &callback_wrapper.shell;
 
@@ -525,6 +528,17 @@ modified_cb(struct vsx_listener *listener,
         dpi = glView.contentScaleFactor * 160;
 
         glView.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+}
+
+-(void)enterBackground {
+        [self destroyGraphics];
+        in_background = true;
+        self.paused = YES;
+}
+
+-(void)enterForeground {
+        in_background = false;
+        self.paused = NO;
 }
 
 @end
