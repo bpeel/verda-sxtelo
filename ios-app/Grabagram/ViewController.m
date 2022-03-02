@@ -129,15 +129,20 @@ log_error_cb(struct vsx_shell_interface *shell,
              const char *format,
              ...)
 {
-        va_list ap;
-        
-        va_start(ap, format);
-        
-        NSString *format_str = [[NSString alloc] initWithUTF8String:format];
-        
-        NSLogv(format_str, ap);
-        
-        va_end(ap);
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                va_list ap;
+                
+                va_start(ap, format);
+                
+                NSString *format_str = [[NSString alloc] initWithUTF8String:format];
+                
+                NSLogv(format_str, ap);
+                
+                va_end(ap);
+        }
 }
 
 static void
@@ -169,9 +174,14 @@ request_name_cb(struct vsx_shell_interface *shell)
 static void
 wakeup_cb(void *user_data)
 {
-        ViewController *self = (__bridge ViewController *) user_data;
-
-        dispatch_async(self->main_queue, self->wakeup_dispatch);
+        /* This will likely get called from another thread that won’t have an autorelease pool,
+         * so let’s wrap it here.
+         */
+        @autoreleasepool {
+                ViewController *self = (__bridge ViewController *) user_data;
+                
+                dispatch_async(self->main_queue, self->wakeup_dispatch);
+        }
 }
 
 static void *
