@@ -541,4 +541,23 @@ modified_cb(struct vsx_listener *listener,
         self.paused = NO;
 }
 
+-(NSString *)getInstanceState {
+        if (self->game_state == NULL)
+                return @"";
+        
+        char *instance_state = vsx_game_state_save_instance_state(self->game_state);
+        
+        NSString *ret = [[NSString alloc] initWithUTF8String:instance_state];
+        
+        vsx_free(instance_state);
+        
+        return ret;
+}
+
+-(void)setInstanceState:(NSString *)state {
+        [self freeInstanceState];
+        
+        self->instance_state = vsx_strdup([state UTF8String]);
+}
+
 @end

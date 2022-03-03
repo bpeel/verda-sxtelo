@@ -38,6 +38,8 @@
         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
         // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
+        
+        [self loadInstanceState:session forScene:scene];
 }
 
 
@@ -83,5 +85,80 @@
                 [controller enterBackground];
 }
 
+static NSString *
+get_instance_state_activity_type(void)
+{
+        NSBundle *bundle = [NSBundle mainBundle];
+        
+        if (bundle == nil)
+                return nil;
+        
+        NSDictionary<NSString *, id> *info = [bundle infoDictionary];
+        
+        if (info == nil)
+                return nil;
+        
+        id activities = info[@"NSUserActivityTypes"];
+        
+        if (activities == nil || ![activities isKindOfClass:[NSArray class]])
+                return nil;
+        
+        NSArray *activitiesArray = (NSArray *) activities;
+        
+        if ([activitiesArray count] < 1)
+                return nil;
+        
+        return activitiesArray[0];
+}
+
+- (NSUserActivity *)stateRestorationActivityForScene:(UIScene *)scene {
+        NSString *activityType = get_instance_state_activity_type();
+        
+        if (activityType == nil)
+                return nil;
+
+        ViewController *controller = [self findViewController:scene];
+        
+        if (controller == nil)
+                return nil;
+        
+        NSString *instanceState = [controller getInstanceState];
+        
+        NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:activityType];
+        
+        [activity addUserInfoEntriesFromDictionary:@{ @"instanceState": instanceState }];
+        
+        return activity;
+}
+
+- (void)loadInstanceState:(UISceneSession *)session forScene:(UIScene *)scene {
+        if (session == nil)
+                return;
+        
+        NSUserActivity *activity = session.stateRestorationActivity;
+        
+        if (activity == nil)
+                return;
+        
+        NSString *activityType = get_instance_state_activity_type();
+        
+        if (activityType == nil)
+                return;
+        
+        if (![activityType isEqualToString:activity.activityType])
+                return;
+        
+        id instanceState = [activity.userInfo objectForKey:@"instanceState"];
+        
+        if (instanceState == nil || ![instanceState isKindOfClass:[NSString class]])
+                return;
+        
+        ViewController *controller = [self findViewController:scene];
+        
+        if (controller == nil)
+                return;
+        
+        [controller setInstanceState:instanceState];
+}
 
 @end

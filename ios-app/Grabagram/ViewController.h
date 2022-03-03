@@ -13,6 +13,8 @@
 
 -(void)enterBackground;
 -(void)enterForeground;
+-(NSString *)getInstanceState;
+-(void)setInstanceState:(NSString *)state;
 
 @end
 
