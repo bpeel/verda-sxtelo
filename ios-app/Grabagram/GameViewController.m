@@ -131,15 +131,17 @@ controller_for_shell(struct vsx_shell_interface *shell)
         instance_state = NULL;
 }
 
-static void
-queue_redraw_cb(struct vsx_shell_interface *shell)
-{
-        GameViewController *self = controller_for_shell(shell);
-        
+-(void) queueRedraw {
         if (self->in_redraw)
                 self->redraw_queued = true;
         else if (!self->in_background)
                 self.paused = NO;
+}
+
+static void
+queue_redraw_cb(struct vsx_shell_interface *shell)
+{
+        [controller_for_shell(shell) queueRedraw];
 }
 
 static void
@@ -558,6 +560,11 @@ modified_cb(struct vsx_listener *listener,
         dpi = glView.contentScaleFactor * 160;
 
         glView.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+}
+
+-(void)viewDidLayoutSubviews {
+        [super viewDidLayoutSubviews];
+        [self queueRedraw];
 }
 
 -(void)enterBackground {
