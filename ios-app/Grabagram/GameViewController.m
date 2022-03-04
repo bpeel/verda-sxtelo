@@ -1,11 +1,11 @@
 //
-//  ViewController.m
+//  GameViewController.m
 //  Grabagram
 //
-//  Created by demo on 02/03/2022.
+//  Created by demo on 04/03/2022.
 //
 
-#import "ViewController.h"
+#import "GameViewController.h"
 
 #import <GLKit/GLKit.h>
 
@@ -24,7 +24,7 @@
 #include "vsx-game-painter.h"
 #include "vsx-id-url.h"
 
-@interface ViewController ()
+@interface GameViewController ()
 
 - (void) deinit;
 
@@ -36,19 +36,19 @@ struct callback_wrapper {
         void *controller;
 };
 
-static ViewController *
+static GameViewController *
 controller_for_shell(struct vsx_shell_interface *shell)
 {
         struct callback_wrapper *wrapper = vsx_container_of(shell,
                                                             struct callback_wrapper,
                                                             shell);
         
-        return (__bridge ViewController *) wrapper->controller;
+        return (__bridge GameViewController *) wrapper->controller;
 }
 
 #define GL_LIB_NAME "/System/Library/Frameworks/OpenGLES.framework/OpenGLES"
 
-@implementation ViewController {
+@implementation GameViewController {
         bool initialized;
         bool in_background;
         
@@ -134,7 +134,7 @@ controller_for_shell(struct vsx_shell_interface *shell)
 static void
 queue_redraw_cb(struct vsx_shell_interface *shell)
 {
-        ViewController *self = controller_for_shell(shell);
+        GameViewController *self = controller_for_shell(shell);
         
         if (self->in_redraw)
                 self->redraw_queued = true;
@@ -169,7 +169,7 @@ share_link_cb(struct vsx_shell_interface *shell,
               int link_x, int link_y,
               int link_width, int link_height)
 {
-        ViewController *self = controller_for_shell(shell);
+        GameViewController *self = controller_for_shell(shell);
         NSString *linkString = [[NSString alloc] initWithUTF8String:link];
         NSURL *url = [[NSURL alloc] initWithString:linkString];
         
@@ -216,7 +216,7 @@ get_name_height_cb(struct vsx_shell_interface *shell)
 static void
 request_name_cb(struct vsx_shell_interface *shell)
 {
-        ViewController *self = controller_for_shell(shell);
+        GameViewController *self = controller_for_shell(shell);
         vsx_game_state_set_player_name(self->game_state, "Test");
         vsx_game_state_set_dialog(self->game_state, VSX_DIALOG_INVITE_LINK);
 }
@@ -228,7 +228,7 @@ wakeup_cb(void *user_data)
          * so let’s wrap it here.
          */
         @autoreleasepool {
-                ViewController *self = (__bridge ViewController *) user_data;
+                GameViewController *self = (__bridge GameViewController *) user_data;
                 
                 dispatch_async(self->main_queue, self->wakeup_dispatch);
         }
@@ -238,7 +238,7 @@ static void *
 get_proc_address_func(const char *procname,
                       void *user_data)
 {
-        ViewController *self = (__bridge ViewController *) user_data;
+        GameViewController *self = (__bridge GameViewController *) user_data;
         
         return dlsym(self->gl_lib, procname);
 }
@@ -258,7 +258,7 @@ modified_cb(struct vsx_listener *listener,
         struct callback_wrapper *wrapper = vsx_container_of(listener,
                                                             struct callback_wrapper,
                                                             modified_listener);
-        ViewController *self = (__bridge ViewController *) wrapper->controller;
+        GameViewController *self = (__bridge GameViewController *) wrapper->controller;
         const struct vsx_game_state_modified_event *event = user_data;
 
         switch (event->type) {
@@ -402,10 +402,10 @@ modified_cb(struct vsx_listener *listener,
         
         main_queue = dispatch_get_main_queue();
         
-        ViewController * __weak __block closure = self;
+        GameViewController * __weak __block closure = self;
 
         wakeup_dispatch = [^{
-                ViewController *controller = closure;
+                GameViewController *controller = closure;
 
                 if (controller != nil) {
                         [EAGLContext setCurrentContext:controller->glView.context];

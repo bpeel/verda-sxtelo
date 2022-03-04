@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B404D4FA27D22EDC003C92C0 /* GameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B404D4F927D22EDC003C92C0 /* GameViewController.m */; };
 		B411AA3E27C8E1A20070CB8F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3C27C8E1A20070CB8F /* Main.storyboard */; };
 		B411AA4027C8E1A60070CB8F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3F27C8E1A60070CB8F /* Assets.xcassets */; };
 		B411AA4327C8E1A60070CB8F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA4127C8E1A60070CB8F /* LaunchScreen.storyboard */; };
@@ -15,12 +16,13 @@
 		B496819927CD383500A2E9C8 /* vsx-asset-ios.m in Sources */ = {isa = PBXBuildFile; fileRef = B496819827CD383500A2E9C8 /* vsx-asset-ios.m */; };
 		B49681C627CF4A5A00A2E9C8 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681C527CF4A5A00A2E9C8 /* AppDelegate.m */; };
 		B49681C927CF4AD700A2E9C8 /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681C827CF4AD700A2E9C8 /* SceneDelegate.m */; };
-		B49681CC27CF4B1D00A2E9C8 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681CB27CF4B1D00A2E9C8 /* ViewController.m */; };
 		B49681CF27CF6D4A00A2E9C8 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681CE27CF6D4A00A2E9C8 /* main.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		B404D4F827D120BE003C92C0 /* Grabagram.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Grabagram.entitlements; sourceTree = "<group>"; };
+		B404D4F927D22EDC003C92C0 /* GameViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GameViewController.m; sourceTree = "<group>"; };
+		B404D4FB27D22F07003C92C0 /* GameViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameViewController.h; sourceTree = "<group>"; };
 		B411AA3327C8E1A20070CB8F /* Grabagram.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grabagram.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B411AA3D27C8E1A20070CB8F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		B411AA3F27C8E1A60070CB8F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -34,8 +36,6 @@
 		B49681C727CF4A8A00A2E9C8 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		B49681C827CF4AD700A2E9C8 /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
 		B49681CA27CF4AF700A2E9C8 /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
-		B49681CB27CF4B1D00A2E9C8 /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
-		B49681CD27CF4B3F00A2E9C8 /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		B49681CE27CF6D4A00A2E9C8 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -83,8 +83,8 @@
 				B411AA3F27C8E1A60070CB8F /* Assets.xcassets */,
 				B411AA4127C8E1A60070CB8F /* LaunchScreen.storyboard */,
 				B411AA4427C8E1A60070CB8F /* Info.plist */,
-				B49681CB27CF4B1D00A2E9C8 /* ViewController.m */,
-				B49681CD27CF4B3F00A2E9C8 /* ViewController.h */,
+				B404D4F927D22EDC003C92C0 /* GameViewController.m */,
+				B404D4FB27D22F07003C92C0 /* GameViewController.h */,
 				B49681CE27CF6D4A00A2E9C8 /* main.m */,
 			);
 			path = Grabagram;
@@ -173,8 +173,8 @@
 			files = (
 				B49681CF27CF6D4A00A2E9C8 /* main.m in Sources */,
 				B496819927CD383500A2E9C8 /* vsx-asset-ios.m in Sources */,
-				B49681CC27CF4B1D00A2E9C8 /* ViewController.m in Sources */,
 				B49681C627CF4A5A00A2E9C8 /* AppDelegate.m in Sources */,
+				B404D4FA27D22EDC003C92C0 /* GameViewController.m in Sources */,
 				B49681C927CF4AD700A2E9C8 /* SceneDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

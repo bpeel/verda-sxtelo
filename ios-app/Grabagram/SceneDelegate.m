@@ -7,7 +7,7 @@
 
 #import "SceneDelegate.h"
 
-#import "ViewController.h"
+#import "GameViewController.h"
 
 @interface SceneDelegate ()
 
@@ -15,7 +15,7 @@
 
 @implementation SceneDelegate
 
-- (ViewController *)findViewController:(UIScene *)scene {
+- (GameViewController *)findViewController:(UIScene *)scene {
         if (![scene isKindOfClass:[UIWindowScene class]])
                 return nil;
         
@@ -27,8 +27,8 @@
                 if (viewController == nil)
                         continue;
                 
-                if ([viewController isKindOfClass:[ViewController class]])
-                        return (ViewController *) viewController;
+                if ([viewController isKindOfClass:[GameViewController class]])
+                        return (GameViewController *) viewController;
         }
         
         return nil;
@@ -71,7 +71,7 @@
         // Called as the scene transitions from the background to the foreground.
         // Use this method to undo the changes made on entering the background.
 
-        ViewController *controller = [self findViewController:scene];
+        GameViewController *controller = [self findViewController:scene];
         
         if (controller != nil)
                 [controller enterForeground];
@@ -83,7 +83,7 @@
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
 
-        ViewController *controller = [self findViewController:scene];
+        GameViewController *controller = [self findViewController:scene];
         
         if (controller != nil)
                 [controller enterBackground];
@@ -121,7 +121,7 @@ get_instance_state_activity_type(void)
         if (activityType == nil)
                 return nil;
 
-        ViewController *controller = [self findViewController:scene];
+        GameViewController *controller = [self findViewController:scene];
         
         if (controller == nil)
                 return nil;
@@ -157,7 +157,7 @@ get_instance_state_activity_type(void)
         if (instanceState == nil || ![instanceState isKindOfClass:[NSString class]])
                 return;
         
-        ViewController *controller = [self findViewController:scene];
+        GameViewController *controller = [self findViewController:scene];
         
         if (controller == nil)
                 return;
@@ -179,7 +179,7 @@ get_instance_state_activity_type(void)
         if (![NSUserActivityTypeBrowsingWeb isEqualToString:activity.activityType])
                 return NO;
         
-        ViewController *controller = [self findViewController:scene];
+        GameViewController *controller = [self findViewController:scene];
         
         if (controller == nil)
                 return YES;

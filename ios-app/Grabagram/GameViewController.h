@@ -1,15 +1,14 @@
-
 //
-//  ViewController.h
+//  GameViewController.h
 //  Grabagram
 //
-//  Created by demo on 02/03/2022.
+//  Created by demo on 04/03/2022.
 //
 
 #import <UIKit/UIKit.h>
 #import <GLKit/GLKit.h>
 
-@interface ViewController : GLKViewController <GLKViewDelegate>
+@interface GameViewController : GLKViewController <GLKViewDelegate>
 
 -(void)enterBackground;
 -(void)enterForeground;
@@ -18,4 +17,3 @@
 -(void)setInviteUrl:(NSString *)url;
 
 @end
-

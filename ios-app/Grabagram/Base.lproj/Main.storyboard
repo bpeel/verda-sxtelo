@@ -10,7 +10,7 @@
         <!--GLKit View Controller-->
         <scene sceneID="YbM-m6-Rj6">
             <objects>
-                <glkViewController preferredFramesPerSecond="30" id="FVq-nP-n8k" customClass="ViewController" sceneMemberID="viewController">
+                <glkViewController preferredFramesPerSecond="30" id="FVq-nP-n8k" customClass="GameViewController" sceneMemberID="viewController">
                     <glkView key="view" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" id="6er-oB-MIW">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
