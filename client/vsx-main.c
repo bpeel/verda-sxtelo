@@ -369,7 +369,9 @@ log_error_cb(struct vsx_shell_interface *shell,
 
 static void
 share_link_cb(struct vsx_shell_interface *shell,
-              const char *link)
+              const char *link,
+              int link_x, int link_y,
+              int link_width, int link_height)
 {
         struct vsx_main_data *main_data =
                 vsx_container_of(shell, struct vsx_main_data, shell);

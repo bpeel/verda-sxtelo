@@ -599,7 +599,12 @@ handle_click(struct vsx_invite_painter *painter,
                 char url[VSX_ID_URL_ENCODED_SIZE + 1];
 
                 vsx_id_url_encode(painter->id_in_texture, url);
-                toolbox->shell->share_link_cb(toolbox->shell, url);
+                toolbox->shell->share_link_cb(toolbox->shell,
+                                              url,
+                                              link->x - extents->left,
+                                              link->y - extents->top,
+                                              link->x + extents->right,
+                                              link->y + extents->bottom);
 
                 return true;
         }

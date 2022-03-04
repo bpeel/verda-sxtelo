@@ -196,7 +196,9 @@ wakeup_cb(void *user_data)
 
 static void
 share_link_cb(struct vsx_shell_interface *shell,
-              const char *link)
+              const char *link,
+              int link_x, int link_y,
+              int link_width, int link_height)
 {
         struct data *data = vsx_container_of(shell, struct data, shell);
 
