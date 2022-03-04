@@ -169,6 +169,35 @@ share_link_cb(struct vsx_shell_interface *shell,
               int link_x, int link_y,
               int link_width, int link_height)
 {
+        ViewController *self = controller_for_shell(shell);
+        NSString *linkString = [[NSString alloc] initWithUTF8String:link];
+        NSURL *url = [[NSURL alloc] initWithString:linkString];
+        
+        UIActivityViewController *activityViewController =
+        [[UIActivityViewController alloc] initWithActivityItems:@[url]
+                                          applicationActivities:nil];
+    
+        /* Popover for iPad */
+        UIPopoverPresentationController *popover = activityViewController.popoverPresentationController;
+        if (popover != nil) {
+                popover.sourceView = self->glView;
+                CGFloat scale = self->glView.contentScaleFactor;
+                CGRect rect = {
+                        .origin = {
+                                link_x / scale,
+                                link_y / scale,
+                        },
+                        .size = {
+                                link_width / scale,
+                                link_height / scale,
+                        },
+                };
+                popover.sourceRect = rect;
+        }
+
+        activityViewController.modalInPresentation = YES;
+        
+        [self presentViewController:activityViewController animated:YES completion:nil];
 }
 
 static void
