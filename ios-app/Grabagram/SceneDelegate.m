@@ -40,8 +40,12 @@
         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
         
         [self loadInstanceState:session forScene:scene];
+        [self loadInviteUrl:connectionOptions forScene:scene];
 }
 
+- (void)scene:(UIScene *)scene continueUserActivity:(NSUserActivity *)userActivity {
+        [self loadInviteUrlFromActivity:userActivity forScene:scene];
+}
 
 - (void)sceneDidDisconnect:(UIScene *)scene {
         // Called as the scene is being released by the system.
@@ -159,6 +163,30 @@ get_instance_state_activity_type(void)
                 return;
         
         [controller setInstanceState:instanceState];
+}
+
+- (void)loadInviteUrl:(UISceneConnectionOptions *)connectionOptions forScene:(UIScene *)scene {
+        if (connectionOptions == nil)
+                return;
+        
+        for (NSUserActivity *activity in connectionOptions.userActivities) {
+                if ([self loadInviteUrlFromActivity:activity forScene:scene])
+                        break;
+        }
+}
+
+-(BOOL)loadInviteUrlFromActivity:(NSUserActivity *)activity forScene:(UIScene *)scene {
+        if (![NSUserActivityTypeBrowsingWeb isEqualToString:activity.activityType])
+                return NO;
+        
+        ViewController *controller = [self findViewController:scene];
+        
+        if (controller == nil)
+                return YES;
+
+        [controller setInviteUrl:[activity.webpageURL absoluteString]];
+        
+        return YES;
 }
 
 @end

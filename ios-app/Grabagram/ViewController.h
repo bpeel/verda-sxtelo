@@ -15,6 +15,7 @@
 -(void)enterForeground;
 -(NSString *)getInstanceState;
 -(void)setInstanceState:(NSString *)state;
+-(void)setInviteUrl:(NSString *)url;
 
 @end
 

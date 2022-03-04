@@ -22,6 +22,7 @@
 #include "vsx-gl.h"
 #include "vsx-shell-interface.h"
 #include "vsx-game-painter.h"
+#include "vsx-id-url.h"
 
 @interface ViewController ()
 
@@ -558,6 +559,19 @@ modified_cb(struct vsx_listener *listener,
         [self freeInstanceState];
         
         self->instance_state = vsx_strdup([state UTF8String]);
+}
+
+-(void)setInviteUrl:(NSString *)url {
+        uint64_t id;
+        bool ret = vsx_id_url_decode([url UTF8String], &id);
+
+        if (ret) {
+                self->has_conversation_id = true;
+                self->conversation_id = id;
+
+                if (self->game_state)
+                        [self setJoinGame];
+        }
 }
 
 @end

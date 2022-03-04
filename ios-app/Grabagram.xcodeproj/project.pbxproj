@@ -20,6 +20,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B404D4F827D120BE003C92C0 /* Grabagram.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Grabagram.entitlements; sourceTree = "<group>"; };
 		B411AA3327C8E1A20070CB8F /* Grabagram.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grabagram.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B411AA3D27C8E1A20070CB8F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		B411AA3F27C8E1A60070CB8F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -71,6 +72,7 @@
 		B411AA3527C8E1A20070CB8F /* Grabagram */ = {
 			isa = PBXGroup;
 			children = (
+				B404D4F827D120BE003C92C0 /* Grabagram.entitlements */,
 				B49681C527CF4A5A00A2E9C8 /* AppDelegate.m */,
 				B49681C727CF4A8A00A2E9C8 /* AppDelegate.h */,
 				B49681C827CF4AD700A2E9C8 /* SceneDelegate.m */,
@@ -321,8 +323,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Grabagram/Grabagram.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UJ87YGRKCD;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					$SRCROOT/../common,
@@ -356,8 +360,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Grabagram/Grabagram.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UJ87YGRKCD;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					$SRCROOT/../common,
