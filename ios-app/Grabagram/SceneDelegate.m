@@ -7,13 +7,19 @@
 
 #import "SceneDelegate.h"
 
-#import "GameViewController.h"
+#import "MainViewController.h"
 
 @interface SceneDelegate ()
 
 @end
 
-@implementation SceneDelegate
+@implementation SceneDelegate {
+        /* Queued activities received from the connect method we will use later
+         * one the scene is first activated and all of the views are set up.
+         */
+        NSUserActivity *stateRestorationActivity;
+        NSUserActivity *inviteActivity;
+}
 
 - (GameViewController *)findViewController:(UIScene *)scene {
         if (![scene isKindOfClass:[UIWindowScene class]])
@@ -27,11 +33,17 @@
                 if (viewController == nil)
                         continue;
                 
-                if ([viewController isKindOfClass:[GameViewController class]])
-                        return (GameViewController *) viewController;
+                if ([viewController isKindOfClass:[MainViewController class]])
+                        return ((MainViewController *) viewController).gameViewController;
         }
         
         return nil;
+}
+
+static bool
+is_invite_activity(NSUserActivity *activity)
+{
+        return [NSUserActivityTypeBrowsingWeb isEqualToString:activity.activityType];
 }
 
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
@@ -39,12 +51,20 @@
         // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
         
-        [self loadInstanceState:session forScene:scene];
-        [self loadInviteUrl:connectionOptions forScene:scene];
+        if (connectionOptions != nil) {
+                for (NSUserActivity *activity in connectionOptions.userActivities) {
+                        if (is_invite_activity(activity))
+                                self->inviteActivity = activity;
+                        break;
+                }
+        }
+        
+        if (self->inviteActivity == nil && session != nil)
+                self->stateRestorationActivity = session.stateRestorationActivity;
 }
 
 - (void)scene:(UIScene *)scene continueUserActivity:(NSUserActivity *)userActivity {
-        [self loadInviteUrlFromActivity:userActivity forScene:scene];
+        [self loadInviteUrl:userActivity forScene:scene];
 }
 
 - (void)sceneDidDisconnect:(UIScene *)scene {
@@ -70,6 +90,16 @@
 - (void)sceneWillEnterForeground:(UIScene *)scene {
         // Called as the scene transitions from the background to the foreground.
         // Use this method to undo the changes made on entering the background.
+
+        if (self->stateRestorationActivity) {
+                [self loadInstanceState:self->stateRestorationActivity forScene:scene];
+                self->stateRestorationActivity = nil;
+        }
+        
+        if (self->inviteActivity) {
+                [self loadInviteUrl:self->inviteActivity forScene:scene];
+                self->inviteActivity = nil;
+        }
 
         GameViewController *controller = [self findViewController:scene];
         
@@ -135,15 +165,7 @@ get_instance_state_activity_type(void)
         return activity;
 }
 
-- (void)loadInstanceState:(UISceneSession *)session forScene:(UIScene *)scene {
-        if (session == nil)
-                return;
-        
-        NSUserActivity *activity = session.stateRestorationActivity;
-        
-        if (activity == nil)
-                return;
-        
+- (void)loadInstanceState:(NSUserActivity *)activity forScene:(UIScene *)scene {
         NSString *activityType = get_instance_state_activity_type();
         
         if (activityType == nil)
@@ -165,19 +187,8 @@ get_instance_state_activity_type(void)
         [controller setInstanceState:instanceState];
 }
 
-- (void)loadInviteUrl:(UISceneConnectionOptions *)connectionOptions forScene:(UIScene *)scene {
-        if (connectionOptions == nil)
-                return;
-        
-        for (NSUserActivity *activity in connectionOptions.userActivities) {
-                if ([self loadInviteUrlFromActivity:activity forScene:scene])
-                        break;
-        }
-}
+-(BOOL)loadInviteUrl:(NSUserActivity *)activity forScene:(UIScene *)scene {
 
--(BOOL)loadInviteUrlFromActivity:(NSUserActivity *)activity forScene:(UIScene *)scene {
-        if (![NSUserActivityTypeBrowsingWeb isEqualToString:activity.activityType])
-                return NO;
         
         GameViewController *controller = [self findViewController:scene];
         

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B404D4FA27D22EDC003C92C0 /* GameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B404D4F927D22EDC003C92C0 /* GameViewController.m */; };
+		B404D4FE27D232CF003C92C0 /* MainViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B404D4FD27D232CF003C92C0 /* MainViewController.m */; };
 		B411AA3E27C8E1A20070CB8F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3C27C8E1A20070CB8F /* Main.storyboard */; };
 		B411AA4027C8E1A60070CB8F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3F27C8E1A60070CB8F /* Assets.xcassets */; };
 		B411AA4327C8E1A60070CB8F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA4127C8E1A60070CB8F /* LaunchScreen.storyboard */; };
@@ -23,6 +24,8 @@
 		B404D4F827D120BE003C92C0 /* Grabagram.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Grabagram.entitlements; sourceTree = "<group>"; };
 		B404D4F927D22EDC003C92C0 /* GameViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GameViewController.m; sourceTree = "<group>"; };
 		B404D4FB27D22F07003C92C0 /* GameViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameViewController.h; sourceTree = "<group>"; };
+		B404D4FC27D2327F003C92C0 /* MainViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MainViewController.h; sourceTree = "<group>"; };
+		B404D4FD27D232CF003C92C0 /* MainViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MainViewController.m; sourceTree = "<group>"; };
 		B411AA3327C8E1A20070CB8F /* Grabagram.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grabagram.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B411AA3D27C8E1A20070CB8F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		B411AA3F27C8E1A60070CB8F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -86,6 +89,8 @@
 				B404D4F927D22EDC003C92C0 /* GameViewController.m */,
 				B404D4FB27D22F07003C92C0 /* GameViewController.h */,
 				B49681CE27CF6D4A00A2E9C8 /* main.m */,
+				B404D4FC27D2327F003C92C0 /* MainViewController.h */,
+				B404D4FD27D232CF003C92C0 /* MainViewController.m */,
 			);
 			path = Grabagram;
 			sourceTree = "<group>";
@@ -172,6 +177,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B49681CF27CF6D4A00A2E9C8 /* main.m in Sources */,
+				B404D4FE27D232CF003C92C0 /* MainViewController.m in Sources */,
 				B496819927CD383500A2E9C8 /* vsx-asset-ios.m in Sources */,
 				B49681C627CF4A5A00A2E9C8 /* AppDelegate.m in Sources */,
 				B404D4FA27D22EDC003C92C0 /* GameViewController.m in Sources */,
