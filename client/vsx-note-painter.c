@@ -73,6 +73,9 @@ cancel_timeout(struct vsx_note_painter *painter)
 static void
 remove_note(struct vsx_note_painter *painter)
 {
+        if (painter->text == NULL)
+                return;
+
         vsx_free(painter->text);
         painter->text = NULL;
 
