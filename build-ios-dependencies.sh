@@ -79,7 +79,8 @@ function build_freetype {
                 -Dzlib=disabled \
                 -Dprefix="$prefix$suffix" \
                 -Ddefault_library=static \
-                -Dbuildtype=release
+                -Dbuildtype=release \
+                "$@"
 
         meson install -C "$freetype_dir/build$suffix"
 }
@@ -94,7 +95,8 @@ function build_lib {
                 --cross-file="$cross_file" \
                 -Dclient=false -Dclientlib=true -Dserver=false \
                 -Dprefix="$prefix$suffix" \
-                -Dbuildtype="$build_type"
+                -Dbuildtype="$build_type" \
+                "$@"
 
         meson install -C "$srcdir/client-ios-build$suffix"
 }
@@ -106,15 +108,15 @@ function build_all {
 
         export PKG_CONFIG_PATH="$prefix$suffix/lib/pkgconfig"
 
-        build_freetype "$suffix" "$cross_file"
-        build_lib "$suffix" "$cross_file" "$build_type"
+        build_freetype "$suffix" "$cross_file" "$@"
+        build_lib "$suffix" "$cross_file" "$build_type" "$@"
 }
 
 generate_cross_file "$debug_cross_file" "iPhoneSimulator" "x86_64" "x86_64"
 generate_cross_file "$release_cross_file" "iPhoneOS" "arm" "arm64"
 
 build_all "" "$debug_cross_file" "debug"
-build_all "-release" "$release_cross_file" "release"
+build_all "-release" "$release_cross_file" "release" "-Db_bitcode=true"
 
 for file in "$android_assets/"*; do
     if echo "$file" | grep -q '~$'; then
