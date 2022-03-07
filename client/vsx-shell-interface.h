@@ -37,6 +37,12 @@ struct vsx_shell_interface {
                          const char *format,
                          ...);
 
+        /* Ask the shell what the version of the app is. The returned
+         * string should be freed with vsx_free.
+         */
+        char *
+        (* get_app_version_cb)(struct vsx_shell_interface *shell);
+
         /* Ask the upper layers to share a link. The link rectangle is
          * the rectangle where the link is drawn. The shell can
          * optionally use this information to draw a popup in the

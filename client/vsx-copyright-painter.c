@@ -122,17 +122,19 @@ create_layout(struct vsx_copyright_painter *painter)
 
         painter->layout.layout = vsx_layout_new(painter->toolbox);
 
+        struct vsx_shell_interface *shell = painter->toolbox->shell;
+        char *version = shell->get_app_version_cb(shell);
         char *text = vsx_strconcat(copyright_text,
-#ifdef APP_VERSION
                                    "\n"
                                    "\n"
-                                   "Version " APP_VERSION,
-#endif
+                                   "Version ",
+                                   version,
                                    NULL);
 
         vsx_layout_set_text(painter->layout.layout, text);
 
         vsx_free(text);
+        vsx_free(version);
 
         vsx_layout_set_font(painter->layout.layout, VSX_FONT_TYPE_LABEL);
         vsx_layout_set_width(painter->layout.layout, width);

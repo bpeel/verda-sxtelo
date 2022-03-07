@@ -187,6 +187,32 @@ log_error_cb(struct vsx_shell_interface *shell,
         }
 }
 
+static char *
+get_app_version_cb(struct vsx_shell_interface *shell)
+{
+        NSBundle *bundle = [NSBundle mainBundle];
+        NSDictionary<NSString *, id> *info = nil;
+        id version = nil;
+        
+        if (bundle == nil)
+                goto error;
+        
+        info = [bundle infoDictionary];
+        
+        if (info == nil)
+                goto error;
+        
+        version = info[@"CFBundleShortVersionString"];
+        
+        if (version == nil || ![version isKindOfClass:[NSString class]])
+                goto error;
+        
+        return vsx_strdup([(NSString *) version UTF8String]);
+        
+error:
+        return vsx_strdup("?");
+}
+
 static void
 share_link_cb(struct vsx_shell_interface *shell,
               const char *link,
@@ -506,6 +532,7 @@ modified_cb(struct vsx_listener *listener,
 
         shell->queue_redraw_cb = queue_redraw_cb;
         shell->log_error_cb = log_error_cb;
+        shell->get_app_version_cb = get_app_version_cb;
         shell->share_link_cb = share_link_cb;
         shell->set_name_position_cb = set_name_position_cb;
         shell->get_name_height_cb = get_name_height_cb;

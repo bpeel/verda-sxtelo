@@ -367,6 +367,12 @@ log_error_cb(struct vsx_shell_interface *shell,
         fputc('\n', stderr);
 }
 
+static char *
+get_app_version_cb(struct vsx_shell_interface *shell)
+{
+        return vsx_strdup("TEST");
+}
+
 static void
 share_link_cb(struct vsx_shell_interface *shell,
               const char *link,
@@ -772,6 +778,7 @@ create_main_data(void)
 
         main_data->shell.queue_redraw_cb = queue_redraw_cb;
         main_data->shell.log_error_cb = log_error_cb;
+        main_data->shell.get_app_version_cb = get_app_version_cb;
         main_data->shell.share_link_cb = share_link_cb;
         main_data->shell.set_name_position_cb = set_name_position_cb;
         main_data->shell.get_name_height_cb = get_name_height_cb;
