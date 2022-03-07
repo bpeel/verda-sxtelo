@@ -421,7 +421,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Grabagram/external/lib",
+					"$(PROJECT_DIR)/Grabagram/external-release/lib",
 				);
 				MARKETING_VERSION = 1;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
