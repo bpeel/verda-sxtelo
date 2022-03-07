@@ -24,4 +24,12 @@
         return NO;
 }
 
+- (BOOL)textField:(UITextField *)textField
+shouldChangeCharactersInRange:(NSRange)range
+replacementString:(NSString *)string {
+        NSUInteger originalLength = textField.text.length;
+        
+        return originalLength - range.length + string.length <= 30;
+}
+
 @end
