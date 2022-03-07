@@ -385,7 +385,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Grabagram/external/lib",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.busydoingnothing.Grabagram;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -423,7 +423,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Grabagram/external/lib",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.busydoingnothing.Grabagram;
 				PRODUCT_NAME = "$(TARGET_NAME)";
