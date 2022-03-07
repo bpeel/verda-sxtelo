@@ -70,8 +70,6 @@ controller_for_shell(struct vsx_shell_interface *shell)
         
         bool is_first_run;
         
-        char game_language_code[8];
-        
         /* An array of touches that are currently being held. The index in the array is
          * is used as a finger number to pass to the game painter. nil will be used if
          * there is no touch for this slot. If there are more touches than the size of
@@ -388,11 +386,19 @@ modified_cb(struct vsx_listener *listener,
 }
 
 - (bool) ensureGameState {
+        if (game_state != NULL)
+                return true;
+        
+        NSString *language_code_str =
+        NSLocalizedString(@"language_code",
+                          "The language code that will be sent to the server.");
+        const char *language_code = [language_code_str UTF8String];
+
         if (connection == NULL) {
                 connection = vsx_connection_new();
 
                 vsx_connection_set_default_language(connection,
-                                                    game_language_code);
+                                                    language_code);
         }
 
         if (worker == NULL) {
@@ -417,7 +423,7 @@ modified_cb(struct vsx_listener *listener,
                 game_state = vsx_game_state_new(main_thread,
                                                       worker,
                                                       connection,
-                                                      game_language_code);
+                                                      language_code);
 
                 if (is_first_run) {
                         vsx_game_state_set_dialog(game_state,
