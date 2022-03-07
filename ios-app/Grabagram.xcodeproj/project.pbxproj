@@ -13,8 +13,6 @@
 		B411AA3E27C8E1A20070CB8F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3C27C8E1A20070CB8F /* Main.storyboard */; };
 		B411AA4027C8E1A60070CB8F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B411AA3F27C8E1A60070CB8F /* Assets.xcassets */; };
 		B411AA4327C8E1A60070CB8F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B411AA4127C8E1A60070CB8F /* LaunchScreen.storyboard */; };
-		B496818F27CA173600A2E9C8 /* libanagrams.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B496818D27CA173600A2E9C8 /* libanagrams.a */; };
-		B496819027CA173600A2E9C8 /* libfreetype.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B496818E27CA173600A2E9C8 /* libfreetype.a */; };
 		B496819927CD383500A2E9C8 /* vsx-asset-ios.m in Sources */ = {isa = PBXBuildFile; fileRef = B496819827CD383500A2E9C8 /* vsx-asset-ios.m */; };
 		B49681C627CF4A5A00A2E9C8 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681C527CF4A5A00A2E9C8 /* AppDelegate.m */; };
 		B49681C927CF4AD700A2E9C8 /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B49681C827CF4AD700A2E9C8 /* SceneDelegate.m */; };
@@ -57,8 +55,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B496818F27CA173600A2E9C8 /* libanagrams.a in Frameworks */,
-				B496819027CA173600A2E9C8 /* libfreetype.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +383,10 @@
 				);
 				MARKETING_VERSION = 1;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
+				OTHER_LDFLAGS = (
+					"-lfreetype",
+					"-lanagrams",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.busydoingnothing.Grabagram;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -425,6 +425,10 @@
 				);
 				MARKETING_VERSION = 1;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
+				OTHER_LDFLAGS = (
+					"-lfreetype",
+					"-lanagrams",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = uk.co.busydoingnothing.Grabagram;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";
