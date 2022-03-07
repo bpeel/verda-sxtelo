@@ -112,6 +112,8 @@ controller_for_shell(struct vsx_shell_interface *shell)
         struct callback_wrapper callback_wrapper;
 }
 
+static NSString *defaultNameKey = @"playerName";
+
 -(UITextField *) findNameEdit {
         UIViewController *mainViewController = self.parentViewController;
         
@@ -267,13 +269,17 @@ name_contains_non_whitespace(const char *name)
         if (nameEdit == nil)
                 return;
         
-        const char *name = [nameEdit.text UTF8String];
+        NSString *nameString = nameEdit.text;
+        const char *name = [nameString UTF8String];
         
         if (name_contains_non_whitespace(name)) {
                 [nameEdit endEditing:YES];
                 vsx_game_state_set_player_name(self->game_state, name);
                 vsx_game_state_set_dialog(self->game_state,
                                           VSX_DIALOG_INVITE_LINK);
+                
+                NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+                [userDefaults setObject:nameString forKey:defaultNameKey];
         }
 }
 
@@ -649,6 +655,21 @@ modified_cb(struct vsx_listener *listener,
         }
 }
 
+- (void)setDefaultName {
+        NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+        NSString *defaultName = [userDefaults stringForKey:defaultNameKey];
+        
+        self->is_first_run = (defaultName == nil ||
+                              !name_contains_non_whitespace([defaultName UTF8String]));
+
+        if (!self->is_first_run) {
+                UITextField *nameEdit = [self findNameEdit];
+        
+                if (nameEdit != nil)
+                        nameEdit.text = defaultName;
+        }
+}
+
 - (void)viewDidLoad {
         [super viewDidLoad];
         
@@ -659,6 +680,12 @@ modified_cb(struct vsx_listener *listener,
         dpi = glView.contentScaleFactor * 160;
 
         glView.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+}
+
+- (void)didMoveToParentViewController:(UIViewController *)parent {
+        [super didMoveToParentViewController:parent];
+        
+        [self setDefaultName];
 }
 
 -(void)viewDidLayoutSubviews {
