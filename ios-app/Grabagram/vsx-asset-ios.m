@@ -130,7 +130,7 @@ vsx_asset_close(struct vsx_asset *asset)
         @autoreleasepool {
                 vsx_free(asset->filename);
                 
-                if (asset->asset_ptr == NULL)
+                if (asset->asset_ptr != NULL)
                         CFBridgingRelease(asset->asset_ptr);
                 
                 vsx_free(asset);
