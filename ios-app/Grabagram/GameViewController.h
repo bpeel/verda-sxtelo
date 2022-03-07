@@ -15,5 +15,6 @@
 -(NSString *)getInstanceState;
 -(void)setInstanceState:(NSString *)state;
 -(void)setInviteUrl:(NSString *)url;
+-(void)enterName;
 
 @end

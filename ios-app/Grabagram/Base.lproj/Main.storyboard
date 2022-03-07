@@ -22,12 +22,26 @@
                                     <segue destination="xI9-zZ-lsg" kind="embed" id="0rc-xS-6sW"/>
                                 </connections>
                             </containerView>
+                            <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" textAlignment="natural" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="qKA-DH-RN2">
+                                <rect key="frame" x="157" y="305" width="100" height="34"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" relation="lessThanOrEqual" constant="100" identifier="NameEditMaxWidth" id="C6w-mT-jaI"/>
+                                    <constraint firstAttribute="width" priority="750" constant="250" id="YhI-Qm-Pu5"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits" textContentType="name"/>
+                                <connections>
+                                    <outlet property="delegate" destination="QW2-aA-pBU" id="CR6-UP-g0l"/>
+                                </connections>
+                            </textField>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="MAY-1A-sUV"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                         <constraints>
+                            <constraint firstItem="qKA-DH-RN2" firstAttribute="centerX" secondItem="KvN-8G-wRu" secondAttribute="centerX" id="HEZ-0j-jmJ"/>
                             <constraint firstItem="KvN-8G-wRu" firstAttribute="bottom" secondItem="MAY-1A-sUV" secondAttribute="bottom" id="HKE-sH-gPk"/>
                             <constraint firstItem="KvN-8G-wRu" firstAttribute="top" secondItem="MAY-1A-sUV" secondAttribute="top" id="NTp-yq-yVa"/>
+                            <constraint firstItem="qKA-DH-RN2" firstAttribute="top" secondItem="KvN-8G-wRu" secondAttribute="top" constant="261" identifier="NameEditTop" id="PGZ-74-ZLH"/>
                             <constraint firstItem="KvN-8G-wRu" firstAttribute="leading" secondItem="MAY-1A-sUV" secondAttribute="leading" id="hPO-LF-PnY"/>
                             <constraint firstItem="KvN-8G-wRu" firstAttribute="trailing" secondItem="MAY-1A-sUV" secondAttribute="trailing" id="oIw-U5-qUr"/>
                         </constraints>

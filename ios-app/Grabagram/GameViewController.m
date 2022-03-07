@@ -23,6 +23,7 @@
 #include "vsx-shell-interface.h"
 #include "vsx-game-painter.h"
 #include "vsx-id-url.h"
+#include "vsx-utf8.h"
 
 @interface GameViewController ()
 
@@ -103,10 +104,31 @@ controller_for_shell(struct vsx_shell_interface *shell)
         int fb_width, fb_height;
         int dpi;
         
+        int name_y, name_width, name_height;
+        
         struct vsx_game_painter *game_painter;
         struct vsx_listener redraw_needed_listener;
         
         struct callback_wrapper callback_wrapper;
+}
+
+-(UITextField *) findNameEdit {
+        UIViewController *mainViewController = self.parentViewController;
+        
+        if (mainViewController == nil)
+                return nil;
+        
+        UIView *mainView = mainViewController.view;
+        
+        if (mainView == nil)
+                return nil;
+        
+        for (UIView *child in mainView.subviews) {
+                if ([child isKindOfClass:[UITextField class]])
+                        return (UITextField *) child;
+        }
+        
+        return nil;
 }
 
 - (void) destroyGraphics {
@@ -207,20 +229,60 @@ set_name_position_cb(struct vsx_shell_interface *shell,
                      int y_pos,
                      int max_width)
 {
+        GameViewController *self = controller_for_shell(shell);
+
+        if (y_pos == self->name_y && max_width == self->name_width)
+                return;
+
+        self->name_y = y_pos;
+        self->name_width = max_width;
+
+        [self updateNameProperties];
 }
 
 static int
 get_name_height_cb(struct vsx_shell_interface *shell)
 {
-        return 0;
+        GameViewController *self = controller_for_shell(shell);
+
+        return self->name_height;
+}
+
+static bool
+name_contains_non_whitespace(const char *name)
+{
+        NSCharacterSet *whitespaceCharacterSet = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+
+        for (const char *p = name; *p; p = vsx_utf8_next(p)) {
+                if (![whitespaceCharacterSet longCharacterIsMember:vsx_utf8_get_char(p)])
+                        return true;
+        }
+
+        return false;
+}
+
+-(void)enterName {
+        UITextField *nameEdit = [self findNameEdit];
+        
+        if (nameEdit == nil)
+                return;
+        
+        const char *name = [nameEdit.text UTF8String];
+        
+        if (name_contains_non_whitespace(name)) {
+                [nameEdit endEditing:YES];
+                vsx_game_state_set_player_name(self->game_state, name);
+                vsx_game_state_set_dialog(self->game_state,
+                                          VSX_DIALOG_INVITE_LINK);
+        }
 }
 
 static void
 request_name_cb(struct vsx_shell_interface *shell)
 {
         GameViewController *self = controller_for_shell(shell);
-        vsx_game_state_set_player_name(self->game_state, "Test");
-        vsx_game_state_set_dialog(self->game_state, VSX_DIALOG_INVITE_LINK);
+        
+        [self enterName];
 }
 
 static void
@@ -246,6 +308,43 @@ get_proc_address_func(const char *procname,
 }
 
 - (void) updateNameProperties {
+        UIView *nameEdit = [self findNameEdit];
+        
+        if (nameEdit == nil)
+                return;
+        
+        nameEdit.hidden = vsx_game_state_get_dialog(self->game_state) != VSX_DIALOG_NAME;
+        
+        float scale = self->glView.contentScaleFactor;
+        
+        for (NSLayoutConstraint *constraint in nameEdit.constraints) {
+                NSString *identifier = constraint.identifier;
+
+                if (identifier == nil)
+                        continue;
+                
+                if ([identifier isEqualToString:@"NameEditMaxWidth"]) {
+                        constraint.constant = self->name_width / scale;
+                        break;
+                }
+        }
+        
+        UIViewController *parentViewController = self.parentViewController;
+        
+        if (parentViewController == nil || parentViewController.view == nil)
+                return;
+
+        for (NSLayoutConstraint *constraint in parentViewController.view.constraints) {
+                NSString *identifier = constraint.identifier;
+                
+                if (identifier == nil)
+                        continue;
+                
+                if ([identifier isEqualToString:@"NameEditTop"]) {
+                        constraint.constant = self->name_y / scale;
+                        break;
+                }
+        }
 }
 
 - (void) setJoinGame {
@@ -565,6 +664,17 @@ modified_cb(struct vsx_listener *listener,
 -(void)viewDidLayoutSubviews {
         [super viewDidLayoutSubviews];
         [self queueRedraw];
+        
+        UIView *nameEdit = [self findNameEdit];
+        
+        if (nameEdit != nil) {
+                int height = nameEdit.frame.size.height * glView.contentScaleFactor;
+                
+                if (self->name_height != height) {
+                        self->name_height = height;
+                        vsx_signal_emit(&self->callback_wrapper.shell.name_size_signal, NULL);
+                }
+        }
 }
 
 -(void)enterBackground {

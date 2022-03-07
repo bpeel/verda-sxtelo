@@ -18,4 +18,10 @@
                 self->_gameViewController = (GameViewController *) dest;
 }
 
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+        if (self->_gameViewController)
+                [self->_gameViewController enterName];
+        return NO;
+}
+
 @end
