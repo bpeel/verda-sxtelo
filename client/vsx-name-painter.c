@@ -109,6 +109,7 @@ modified_cb(struct vsx_listener *listener,
         struct vsx_shell_interface *shell = painter->toolbox->shell;
 
         switch (event->type) {
+        case VSX_GAME_STATE_MODIFIED_TYPE_START_TYPE:
         case VSX_GAME_STATE_MODIFIED_TYPE_LANGUAGE:
                 painter->layout_dirty = true;
                 shell->queue_redraw_cb(shell);
