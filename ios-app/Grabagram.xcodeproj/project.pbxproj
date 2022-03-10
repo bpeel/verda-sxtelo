@@ -381,7 +381,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Grabagram/external/lib",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 2;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
 				OTHER_LDFLAGS = (
 					"-lfreetype",
@@ -423,7 +423,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Grabagram/external-release/lib",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 2;
 				OTHER_CFLAGS = "-DHAVE_LITTLE_ENDIAN";
 				OTHER_LDFLAGS = (
 					"-lfreetype",
