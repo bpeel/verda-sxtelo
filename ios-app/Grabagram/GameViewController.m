@@ -193,6 +193,7 @@ get_app_version_cb(struct vsx_shell_interface *shell)
         NSBundle *bundle = [NSBundle mainBundle];
         NSDictionary<NSString *, id> *info = nil;
         id version = nil;
+        id build = nil;
         
         if (bundle == nil)
                 goto error;
@@ -207,7 +208,14 @@ get_app_version_cb(struct vsx_shell_interface *shell)
         if (version == nil || ![version isKindOfClass:[NSString class]])
                 goto error;
         
-        return vsx_strdup([(NSString *) version UTF8String]);
+        build = info[@"CFBundleVersion"];
+        
+        if (build == nil || ![build isKindOfClass:[NSString class]])
+                goto error;
+        
+        return vsx_strdup([[NSString stringWithFormat:@"%@ (%@)",
+                            version,
+                            build] UTF8String]);
         
 error:
         return vsx_strdup("?");
