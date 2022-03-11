@@ -79,6 +79,8 @@ struct data {
 
         jmethodID share_link_method_id;
 
+        jmethodID open_link_method_id;
+
         jmethodID set_name_properties_method_id;
 
         jmethodID request_name_method_id;
@@ -201,6 +203,22 @@ wakeup_cb(void *user_data)
 }
 
 static void
+call_handle_link_method(struct data *data,
+                        const char *link,
+                        jmethodID method_id)
+{
+        JNIEnv *env;
+
+        (*data->jvm)->GetEnv(data->jvm, (void **) &env, JNI_VERSION_1_6);
+
+        jstring link_string = (*env)->NewStringUTF(env, link);
+
+        call_void_surface_method(data, method_id, link_string);
+
+        (*env)->DeleteLocalRef(env, link_string);
+}
+
+static void
 share_link_cb(struct vsx_shell_interface *shell,
               const char *link,
               int link_x, int link_y,
@@ -208,17 +226,18 @@ share_link_cb(struct vsx_shell_interface *shell,
 {
         struct data *data = vsx_container_of(shell, struct data, shell);
 
-        JNIEnv *env;
+        call_handle_link_method(data, link, data->share_link_method_id);
+}
 
-        (*data->jvm)->GetEnv(data->jvm, (void **) &env, JNI_VERSION_1_6);
+static void
+open_link_cb(struct vsx_shell_interface *shell,
+              const char *link,
+              int link_x, int link_y,
+              int link_width, int link_height)
+{
+        struct data *data = vsx_container_of(shell, struct data, shell);
 
-        jstring link_string = (*env)->NewStringUTF(env, link);
-
-        call_void_surface_method(data,
-                                 data->share_link_method_id,
-                                 link_string);
-
-        (*env)->DeleteLocalRef(env, link_string);
+        call_handle_link_method(data, link, data->open_link_method_id);
 }
 
 static void
@@ -295,6 +314,12 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
                                     "shareLink",
                                     "(Ljava/lang/String;)V");
 
+        data->open_link_method_id =
+                (*env)->GetMethodID(env,
+                                    data->surface_class,
+                                    "openLink",
+                                    "(Ljava/lang/String;)V");
+
         data->set_name_properties_method_id =
                 (*env)->GetMethodID(env,
                                     data->surface_class,
@@ -313,6 +338,7 @@ VSX_JNI_RENDERER_PREFIX(createNativeData)(JNIEnv *env,
         data->shell.log_error_cb = log_error_cb;
         data->shell.get_app_version_cb = get_app_version_cb;
         data->shell.share_link_cb = share_link_cb;
+        data->shell.open_link_cb = open_link_cb;
         data->shell.set_name_position_cb = set_name_position_cb;
         data->shell.get_name_height_cb = get_name_height_cb;
         data->shell.request_name_cb = request_name_cb;

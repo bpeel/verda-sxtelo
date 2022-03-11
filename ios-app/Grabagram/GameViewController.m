@@ -259,6 +259,20 @@ share_link_cb(struct vsx_shell_interface *shell,
 }
 
 static void
+open_link_cb(struct vsx_shell_interface *shell,
+             const char *link,
+             int link_x, int link_y,
+             int link_width, int link_height)
+{
+        NSString *linkString = [[NSString alloc] initWithUTF8String:link];
+        NSURL *url = [[NSURL alloc] initWithString:linkString];
+        
+        [[UIApplication sharedApplication] openURL:url
+                                           options:@{}
+                                 completionHandler:nil];
+}
+
+static void
 set_name_position_cb(struct vsx_shell_interface *shell,
                      int y_pos,
                      int max_width)
@@ -542,6 +556,7 @@ modified_cb(struct vsx_listener *listener,
         shell->log_error_cb = log_error_cb;
         shell->get_app_version_cb = get_app_version_cb;
         shell->share_link_cb = share_link_cb;
+        shell->open_link_cb = open_link_cb;
         shell->set_name_position_cb = set_name_position_cb;
         shell->get_name_height_cb = get_name_height_cb;
         shell->request_name_cb = request_name_cb;

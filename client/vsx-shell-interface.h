@@ -54,6 +54,17 @@ struct vsx_shell_interface {
                           int link_x, int link_y,
                           int link_width, int link_height);
 
+        /* Ask the upper layers to open a link in the browser. The
+         * link rectangle is the rectangle where the link is drawn.
+         * The shell can optionally use this information to draw a
+         * popup in the right place.
+         */
+        void
+        (* open_link_cb)(struct vsx_shell_interface *shell,
+                          const char *link,
+                          int link_x, int link_y,
+                          int link_width, int link_height);
+
         /* Tell the upper layers about the y-position that we want the
          * name entry to appear at.
          */

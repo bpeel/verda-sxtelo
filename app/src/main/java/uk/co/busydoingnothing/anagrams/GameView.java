@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
@@ -165,6 +166,22 @@ public class GameView extends GLSurfaceView
 
           Intent shareIntent = Intent.createChooser(sendIntent, null);
           context.startActivity(shareIntent);
+        }
+      });
+  }
+
+  public void openLink(String link)
+  {
+    Handler mainHandler = new Handler(context.getMainLooper());
+
+    mainHandler.post(new Runnable() {
+        @Override
+        public void run()
+        {
+          Intent viewIntent = new Intent();
+          viewIntent.setAction(Intent.ACTION_VIEW);
+          viewIntent.setData(Uri.parse(link));
+          context.startActivity(viewIntent);
         }
       });
   }

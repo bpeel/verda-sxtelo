@@ -373,10 +373,10 @@ get_app_version_cb(struct vsx_shell_interface *shell)
 }
 
 static void
-share_link_cb(struct vsx_shell_interface *shell,
-              const char *link,
-              int link_x, int link_y,
-              int link_width, int link_height)
+share_or_open_link_cb(struct vsx_shell_interface *shell,
+                      const char *link,
+                      int link_x, int link_y,
+                      int link_width, int link_height)
 {
         struct vsx_main_data *main_data =
                 vsx_container_of(shell, struct vsx_main_data, shell);
@@ -778,7 +778,8 @@ create_main_data(void)
         main_data->shell.queue_redraw_cb = queue_redraw_cb;
         main_data->shell.log_error_cb = log_error_cb;
         main_data->shell.get_app_version_cb = get_app_version_cb;
-        main_data->shell.share_link_cb = share_link_cb;
+        main_data->shell.share_link_cb = share_or_open_link_cb;
+        main_data->shell.open_link_cb = share_or_open_link_cb;
         main_data->shell.set_name_position_cb = set_name_position_cb;
         main_data->shell.get_name_height_cb = get_name_height_cb;
         main_data->shell.request_name_cb = request_name_cb;
