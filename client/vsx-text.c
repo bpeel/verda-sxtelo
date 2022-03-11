@@ -103,6 +103,8 @@ english[] = {
         "words until everyone gives up. The player with the most words wins!\n"
         "\n"
         "If there is a draw, the player with the most letters wins.\n",
+        [VSX_TEXT_PRIVACY_POLICY] =
+        "Privacy policy",
 };
 
 static const char *const
@@ -190,6 +192,8 @@ french[] = {
         "Le joueur avec le plus de mots remporte la partie !\n"
         "\n"
         "En cas d’égalité, le joueur avec le plus de lettres gagne.\n",
+        [VSX_TEXT_PRIVACY_POLICY] =
+        "Politique de confidentialité",
 };
 
 static const char *const
@@ -273,6 +277,8 @@ esperanto[] = {
         "\n"
         "Okaze de egaleco, la ludanto kiu havas la plej multajn literojn "
         "venkas.\n",
+        [VSX_TEXT_PRIVACY_POLICY] =
+        "Privateca politiko",
 };
 
 static const char *const * const

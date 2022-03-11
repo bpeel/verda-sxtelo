@@ -41,7 +41,7 @@ struct vsx_name_painter {
 
         bool layout_dirty;
 
-        struct vsx_layout_paint_position layouts[3];
+        struct vsx_layout_paint_position layouts[4];
 
         int dialog_gap;
 
@@ -69,6 +69,13 @@ struct vsx_name_painter {
 
 struct vertex {
         float x, y;
+};
+
+enum layout {
+        LAYOUT_NOTE,
+        LAYOUT_LINK,
+        LAYOUT_PRIVACY_POLICY,
+        LAYOUT_COPYRIGHT,
 };
 
 #define N_QUADS 3

@@ -202,9 +202,8 @@ check_gl_leaks(struct vsx_gl *gl)
 static void
 finish_sdl_window(struct vsx_main_data *main_data)
 {
-        check_gl_leaks(main_data->gl);
-
         if (main_data->gl) {
+                check_gl_leaks(main_data->gl);
                 vsx_gl_free(main_data->gl);
                 main_data->gl = NULL;
         }
