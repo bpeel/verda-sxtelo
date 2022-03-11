@@ -259,7 +259,7 @@ check_gl_version(struct vsx_gl *gl)
         if (gl->major_version < 0 ||
             gl->minor_version < 0) {
                 fprintf(stderr,
-                        "Invalid GL version string encountered: %s",
+                        "Invalid GL version string encountered: %s\n",
                         (const char *)
                         gl->glGetString(GL_VERSION));
 
@@ -274,7 +274,7 @@ check_gl_version(struct vsx_gl *gl)
                         "is reporting:\n"
                         "Version: %s\n"
                         "Vendor: %s\n"
-                        "Renderer: %s",
+                        "Renderer: %s\n",
                         MIN_GL_MAJOR_VERSION,
                         MIN_GL_MINOR_VERSION,
                         (const char *)
@@ -317,7 +317,7 @@ init_sdl_window(struct vsx_main_data *main_data)
 
         if (main_data->window == NULL) {
                 fprintf(stderr,
-                        "Failed to create SDL window: %s",
+                        "Failed to create SDL window: %s\n",
                         SDL_GetError());
                 return false;
         }
@@ -326,7 +326,7 @@ init_sdl_window(struct vsx_main_data *main_data)
 
         if (main_data->gl_context == NULL) {
                 fprintf(stderr,
-                        "Failed to create GL context: %s",
+                        "Failed to create GL context: %s\n",
                         SDL_GetError());
                 return false;
         }
