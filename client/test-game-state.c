@@ -2742,6 +2742,57 @@ test_load_empty_instance_state(void)
 }
 
 static bool
+test_load_conversation_instance_state(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_load_instance_state(harness->game_state,
+                                           "conversation_id=5");
+
+        if (vsx_game_state_get_start_type(harness->game_state) !=
+            VSX_GAME_STATE_START_TYPE_JOIN_GAME) {
+                fprintf(stderr,
+                        "Start type is not join after loading instance state "
+                        "with a conversation ID.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!start_harness(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_data(harness, (const uint8_t *) "\r\n\r\n", 4)) {
+                ret = false;
+                goto out;
+        }
+
+        static const uint8_t join_request[] =
+                "\x82\x15\x8d\x05\x00\x00\x00\x00\x00\x00\x00test_player\x00";
+
+        /* Check that we get a join message with the conversation ID
+         * that we loaded from the instance state.
+         */
+        if (!expect_data(harness,
+                         join_request,
+                         sizeof join_request - 1)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
 test_save_instance_state(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2755,6 +2806,28 @@ test_save_instance_state(void)
 
         if (!check_instance_state(harness,
                                   "person_id=6e6d6c6b6a696867,dialog=none"))
+                ret = false;
+
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
+test_save_instance_state_conversation(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_game_state_reset_for_conversation_id(harness->game_state, 5);
+
+        if (!check_instance_state(harness,
+                                  "conversation_id=0000000000000005,"
+                                  "dialog=name"))
                 ret = false;
 
         free_harness(harness);
@@ -4348,7 +4421,13 @@ main(int argc, char **argv)
         if (!test_load_empty_instance_state())
                 ret = EXIT_FAILURE;
 
+        if (!test_load_conversation_instance_state())
+                ret = EXIT_FAILURE;
+
         if (!test_save_instance_state())
+                ret = EXIT_FAILURE;
+
+        if (!test_save_instance_state_conversation())
                 ret = EXIT_FAILURE;
 
         if (!test_typing_modified())

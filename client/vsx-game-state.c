@@ -1022,7 +1022,14 @@ reset_full(struct vsx_game_state *game_state,
                 game_state->flush_queue_token = NULL;
         }
 
-        game_state->instance_state.id_type = VSX_INSTANCE_STATE_ID_TYPE_NONE;
+        if (has_conversation_id) {
+                game_state->instance_state.id_type =
+                        VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION;
+                game_state->instance_state.id = conversation_id;
+        } else {
+                game_state->instance_state.id_type =
+                        VSX_INSTANCE_STATE_ID_TYPE_NONE;
+        }
 
         pthread_mutex_unlock(&game_state->mutex);
 
@@ -1193,7 +1200,17 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
 
         pthread_mutex_unlock(&game_state->mutex);
 
-        if (id_type == VSX_INSTANCE_STATE_ID_TYPE_PERSON) {
+        switch (id_type) {
+        case VSX_INSTANCE_STATE_ID_TYPE_NONE:
+                break;
+
+        case VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION:
+                vsx_worker_lock(game_state->worker);
+                vsx_connection_set_conversation_id(game_state->connection, id);
+                vsx_worker_unlock(game_state->worker);
+                break;
+
+        case VSX_INSTANCE_STATE_ID_TYPE_PERSON:
                 vsx_worker_lock(game_state->worker);
                 vsx_connection_set_person_id(game_state->connection, id);
                 vsx_worker_unlock(game_state->worker);
@@ -1202,7 +1219,14 @@ vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                  * player name that it will send us.
                  */
                 set_has_player_name(game_state, true);
+                break;
         }
+
+        vsx_game_state_set_start_type(game_state,
+                                      id_type ==
+                                      VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION ?
+                                      VSX_GAME_STATE_START_TYPE_JOIN_GAME :
+                                      VSX_GAME_STATE_START_TYPE_NEW_GAME);
 
         vsx_game_state_set_dialog(game_state, dialog);
 
