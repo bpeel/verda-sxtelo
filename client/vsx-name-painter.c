@@ -30,6 +30,8 @@
 #include "vsx-layout.h"
 #include "vsx-buffer.h"
 
+#define N_LINKS 2
+
 struct vsx_name_painter_rect {
         int x, y;
         int w, h;
@@ -47,12 +49,13 @@ struct vsx_name_painter {
 
         bool layout_dirty;
 
-        struct vsx_layout_paint_position layouts[4];
+        struct vsx_layout_paint_position layouts[5];
 
         int dialog_gap;
 
         struct vsx_name_painter_rect dialog_rect;
         struct vsx_name_painter_rect links_rect;
+        struct vsx_name_painter_rect link_rects[N_LINKS];
 
         int button_border;
 
@@ -78,10 +81,11 @@ enum layout {
         LAYOUT_BUTTON,
         LAYOUT_PRIVACY_POLICY,
         LAYOUT_COPYRIGHT,
+        LAYOUT_LINK_SEPARATOR,
 };
 
 static const enum layout
-link_layouts[] = {
+link_layouts[N_LINKS] = {
         LAYOUT_PRIVACY_POLICY,
         LAYOUT_COPYRIGHT,
 };
@@ -187,14 +191,87 @@ clear_links_shadow(struct vsx_name_painter *painter)
 }
 
 static void
-update_link_layouts(struct vsx_name_painter *painter)
+layout_links_horizontally(struct vsx_name_painter *painter)
+{
+        struct vsx_layout_paint_position *separator_pos =
+                painter->layouts + LAYOUT_LINK_SEPARATOR;
+        const struct vsx_layout_extents *separator_extents =
+                vsx_layout_get_logical_extents(separator_pos->layout);
+
+        int width = 0;
+
+        for (int i = 0; i < N_LINKS; i++) {
+                struct vsx_layout_paint_position *pos =
+                        painter->layouts + link_layouts[i];
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(pos->layout);
+
+                if (i > 0)
+                        width += separator_extents->right;
+
+                width += extents->right;
+        }
+
+        struct vsx_font_library *font_library = painter->toolbox->font_library;
+        struct vsx_font *font = vsx_font_library_get_font(font_library, FONT);
+
+        struct vsx_font_metrics font_metrics;
+        vsx_font_get_metrics(font, &font_metrics);
+
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        painter->links_rect.w = width + painter->button_border * 2;
+        painter->links_rect.h = (font_metrics.height +
+                                 painter->button_border * 2);
+        painter->links_rect.x = (paint_state->width -
+                                 painter->links_rect.w -
+                                 painter->dialog_gap);
+        painter->links_rect.y = (paint_state->height -
+                                 painter->links_rect.h -
+                                 painter->dialog_gap);
+
+        int x = painter->links_rect.x + painter->button_border;
+        int y = (painter->links_rect.y +
+                 painter->button_border +
+                 font_metrics.ascender);
+
+        for (int i = 0; i < N_LINKS; i++) {
+                struct vsx_layout_paint_position *pos =
+                        painter->layouts + link_layouts[i];
+                const struct vsx_layout_extents *extents =
+                        vsx_layout_get_logical_extents(pos->layout);
+
+                if (i > 0) {
+                        separator_pos->x = x;
+                        separator_pos->y = y;
+                        x += separator_extents->right;
+                }
+
+                pos->x = x;
+                pos->y = y;
+
+                struct vsx_name_painter_rect *rect =
+                        painter->link_rects + i;
+
+                rect->x = x - painter->button_border;
+                rect->y = painter->links_rect.y;
+                rect->w = extents->right + painter->button_border * 2;
+                rect->h = painter->links_rect.h;
+
+                x += extents->right;
+        }
+}
+
+static void
+layout_links_vertically(struct vsx_name_painter *painter)
 {
         /* Add a line for each blank */
-        int n_lines = VSX_N_ELEMENTS(link_layouts) - 1;
+        int n_lines = N_LINKS - 1;
 
         int rightmost = 0;
 
-        for (int i = 0; i < VSX_N_ELEMENTS(link_layouts); i++) {
+        for (int i = 0; i < N_LINKS; i++) {
                 struct vsx_layout_paint_position *pos =
                         painter->layouts + link_layouts[i];
                 const struct vsx_layout_extents *extents =
@@ -227,7 +304,7 @@ update_link_layouts(struct vsx_name_painter *painter)
 
         int y = painter->links_rect.y + painter->button_border;
 
-        for (int i = 0; i < VSX_N_ELEMENTS(link_layouts); i++) {
+        for (int i = 0; i < N_LINKS; i++) {
                 struct vsx_layout_paint_position *pos =
                         painter->layouts + link_layouts[i];
                 const struct vsx_layout_extents *extents =
@@ -236,8 +313,28 @@ update_link_layouts(struct vsx_name_painter *painter)
                 pos->x = painter->links_rect.x + painter->button_border;
                 pos->y = y + extents->top;
 
+                struct vsx_name_painter_rect *rect =
+                        painter->link_rects + i;
+
+                rect->x = painter->links_rect.x;
+                rect->y = y - painter->button_border;
+                rect->w = extents->right + painter->button_border * 2;
+                rect->h = font_metrics.height + painter->button_border * 2;
+
                 y += (extents->n_lines + 1) * font_metrics.height;
         }
+}
+
+static void
+update_link_layouts(struct vsx_name_painter *painter)
+{
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+
+        if (paint_state->width > paint_state->height)
+                layout_links_horizontally(painter);
+        else
+                layout_links_vertically(painter);
 
         clear_links_shadow(painter);
 
@@ -344,7 +441,7 @@ create_cb(struct vsx_game_state *game_state,
         painter->layouts[LAYOUT_BUTTON].g = 1.0f;
         painter->layouts[LAYOUT_BUTTON].b = 1.0f;
 
-        for (int i = 0; i < VSX_N_ELEMENTS(link_layouts); i++) {
+        for (int i = 0; i < N_LINKS; i++) {
                 struct vsx_layout_paint_position *pos =
                         painter->layouts + link_layouts[i];
                 pos->r = 0.106f;
@@ -405,6 +502,16 @@ update_layout_text(struct vsx_name_painter *painter)
 
         vsx_layout_set_text(painter->layouts[LAYOUT_PRIVACY_POLICY].layout,
                             vsx_text_get(language, VSX_TEXT_PRIVACY_POLICY));
+
+
+        const struct vsx_paint_state *paint_state =
+                &painter->toolbox->paint_state;
+        const char *separator_text =
+                paint_state->width > paint_state->height ?
+                "   |   " :
+                "";
+        vsx_layout_set_text(painter->layouts[LAYOUT_LINK_SEPARATOR].layout,
+                            separator_text);
 
         switch (vsx_game_state_get_start_type(painter->game_state)) {
         case VSX_GAME_STATE_START_TYPE_NEW_GAME:
@@ -654,13 +761,25 @@ handle_click(struct vsx_name_painter *painter,
                 struct vsx_shell_interface *shell = painter->toolbox->shell;
 
                 shell->request_name_cb(shell);
-        } else if (click_event_in_rect(event, &painter->links_rect)) {
-                if (event->click.y - painter->links_rect.y >
-                    painter->links_rect.h / 2) {
-                        vsx_game_state_set_dialog(painter->game_state,
-                                                  VSX_DIALOG_COPYRIGHT);
-                } else {
-                        open_privacy_policy(painter);
+
+                return;
+        }
+
+        for (int i = 0; i < N_LINKS; i++) {
+                if (click_event_in_rect(event, painter->link_rects + i)) {
+                        switch (link_layouts[i]) {
+                        case LAYOUT_COPYRIGHT:
+                                vsx_game_state_set_dialog(painter->game_state,
+                                                          VSX_DIALOG_COPYRIGHT);
+                                break;
+                        case LAYOUT_PRIVACY_POLICY:
+                                open_privacy_policy(painter);
+                                break;
+                        default:
+                                assert(!"unknown layout clicked");
+                        }
+
+                        break;
                 }
         }
 }
