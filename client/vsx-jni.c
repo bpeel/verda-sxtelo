@@ -435,8 +435,6 @@ ensure_game_state(struct data *data)
                                                   VSX_DIALOG_GUIDE);
                 }
 
-                if (data->has_conversation_id)
-                        set_join_game(data);
 
                 struct vsx_signal *signal =
                         vsx_game_state_get_modified_signal(data->game_state);
@@ -444,6 +442,9 @@ ensure_game_state(struct data *data)
                 vsx_signal_add(signal, &data->modified_listener);
 
                 load_instance_state(data);
+
+                if (data->has_conversation_id)
+                        set_join_game(data);
 
                 vsx_worker_lock(data->worker);
 

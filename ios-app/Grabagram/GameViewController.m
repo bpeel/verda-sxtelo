@@ -478,9 +478,6 @@ modified_cb(struct vsx_listener *listener,
                                                   VSX_DIALOG_GUIDE);
                 }
 
-                if (has_conversation_id)
-                        [self setJoinGame];
-
                 struct vsx_signal *signal =
                         vsx_game_state_get_modified_signal(game_state);
                 callback_wrapper.modified_listener.notify = modified_cb;
@@ -488,6 +485,9 @@ modified_cb(struct vsx_listener *listener,
 
                 [self loadInstanceState];
                 
+                if (has_conversation_id)
+                        [self setJoinGame];
+
                 vsx_worker_lock(worker);
 
                 vsx_connection_set_running(connection, true);
