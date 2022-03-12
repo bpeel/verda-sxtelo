@@ -250,21 +250,6 @@ remove_shout_cb(void *data)
 }
 
 static void
-remove_conversation_id(struct vsx_game_state *game_state)
-{
-        if (!game_state->has_conversation_id)
-                return;
-
-        game_state->has_conversation_id = false;
-
-        struct vsx_game_state_modified_event event = {
-                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
-        };
-
-        vsx_signal_emit(&game_state->modified_signal, &event);
-}
-
-static void
 reset_on_idle_cb(void *user_data)
 {
         struct vsx_game_state *game_state = user_data;
@@ -314,6 +299,32 @@ set_connected(struct vsx_game_state *game_state,
 }
 
 static void
+set_conversation_id(struct vsx_game_state *game_state,
+                    bool has_conversation_id,
+                    uint64_t value)
+{
+        if (has_conversation_id) {
+                if (game_state->has_conversation_id &&
+                    game_state->conversation_id == value)
+                        return;
+        } else {
+                if (!game_state->has_conversation_id)
+                        return;
+
+                value = 0;
+        }
+
+        game_state->has_conversation_id = has_conversation_id;
+        game_state->conversation_id = value;
+
+        struct vsx_game_state_modified_event event = {
+                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
+        };
+
+        vsx_signal_emit(&game_state->modified_signal, &event);
+}
+
+static void
 handle_header(struct vsx_game_state *game_state,
               const struct vsx_connection_event *event)
 {
@@ -329,18 +340,9 @@ static void
 handle_conversation_id(struct vsx_game_state *game_state,
                        const struct vsx_connection_event *event)
 {
-        if (game_state->has_conversation_id &&
-            game_state->conversation_id == event->conversation_id.id)
-                return;
-
-        game_state->has_conversation_id = true;
-        game_state->conversation_id = event->conversation_id.id;
-
-        struct vsx_game_state_modified_event m_event = {
-                .type = VSX_GAME_STATE_MODIFIED_TYPE_CONVERSATION_ID,
-        };
-
-        vsx_signal_emit(&game_state->modified_signal, &m_event);
+        set_conversation_id(game_state,
+                            true, /* has_conversation_id */
+                            event->conversation_id.id);
 }
 
 static void
@@ -1028,7 +1030,9 @@ reset_full(struct vsx_game_state *game_state,
 
         set_has_player_name(game_state, false);
         remove_shout(game_state);
-        remove_conversation_id(game_state);
+        set_conversation_id(game_state,
+                            has_conversation_id,
+                            conversation_id);
         reset_player_names(game_state);
         reset_player_flags(game_state);
         vsx_game_state_set_dialog(game_state, VSX_DIALOG_NAME);
