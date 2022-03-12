@@ -36,6 +36,13 @@ public class GameActivity extends AppCompatActivity
 {
   private static String TAG = "GameActivity";
   private static String INSTANCE_STATE_KEY = "VsxState";
+  /* The invite URL is saved in the instance state only to check
+   * whether the intent we receive in onCreate is the same as the one
+   * we used for the instance state. The lower layers handle storing
+   * the actual conversation ID themselves so we don’t want to pass
+   * this invite URL down.
+   */
+  private static String INVITE_URL_KEY = "VsxInviteUrl";
 
   private GameView surface;
 
@@ -59,13 +66,29 @@ public class GameActivity extends AppCompatActivity
     else
       nameEdit.setText (playerName);
 
+    String inviteUrl = getInviteUrlFromIntent();
+
     if (savedInstanceState != null) {
-      String instanceState = savedInstanceState.getString(INSTANCE_STATE_KEY);
-      if (instanceState != null)
-        surface.setInstanceState(instanceState);
+      String previousInviteUrl = savedInstanceState.getString(INVITE_URL_KEY);
+
+      /* We only want to use one of either the instance state or the
+       * invite URL. If the invite URL is the same as the one we last
+       * used in the instance state then we’ll assume the instance
+       * state is more up-to-date and use that instead.
+       */
+      if (inviteUrl == null ||
+          (previousInviteUrl != null && inviteUrl.equals(previousInviteUrl))) {
+        String instanceState = savedInstanceState.getString(INSTANCE_STATE_KEY);
+
+        if (instanceState != null)
+          surface.setInstanceState(instanceState);
+
+        inviteUrl = null;
+      }
     }
 
-    handleIntent();
+    if (inviteUrl != null)
+      surface.setInviteUrl(inviteUrl);
 
     nameEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
         @Override
@@ -80,31 +103,30 @@ public class GameActivity extends AppCompatActivity
       });
   }
 
-  private void handleIntent()
+  private String getInviteUrlFromIntent()
   {
     Intent intent = getIntent();
 
     if (intent == null)
-      return;
+      return null;
 
     String action = intent.getAction();
 
     if (action == null || !action.equals(Intent.ACTION_VIEW))
-      return;
+      return null;
 
-    String uri = intent.getDataString();
-
-    if (uri == null)
-      return;
-
-    surface.setInviteUrl(uri);
+    return intent.getDataString();
   }
 
   @Override
   public void onNewIntent(Intent intent)
   {
     setIntent(intent);
-    handleIntent();
+
+    String inviteUrl = getInviteUrlFromIntent();
+
+    if (inviteUrl != null)
+      surface.setInviteUrl(inviteUrl);
   }
 
   @Override
@@ -132,5 +154,10 @@ public class GameActivity extends AppCompatActivity
 
     if (instanceState != null)
       outState.putString(INSTANCE_STATE_KEY, instanceState);
+
+    String inviteUrl = getInviteUrlFromIntent();
+
+    if (inviteUrl != null)
+      outState.putString(INVITE_URL_KEY, inviteUrl);
   }
 }
