@@ -661,8 +661,8 @@ handle_instance_state_event_locked(struct vsx_instance_state *instance_state,
 {
         switch (event->type) {
         case VSX_CONNECTION_EVENT_TYPE_HEADER:
-                instance_state->has_person_id = true;
-                instance_state->person_id = event->header.person_id;
+                instance_state->id_type = VSX_INSTANCE_STATE_ID_TYPE_PERSON;
+                instance_state->id = event->header.person_id;
                 break;
 
         default:
@@ -1022,7 +1022,7 @@ reset_full(struct vsx_game_state *game_state,
                 game_state->flush_queue_token = NULL;
         }
 
-        game_state->instance_state.has_person_id = false;
+        game_state->instance_state.id_type = VSX_INSTANCE_STATE_ID_TYPE_NONE;
 
         pthread_mutex_unlock(&game_state->mutex);
 
@@ -1178,25 +1178,24 @@ void
 vsx_game_state_load_instance_state(struct vsx_game_state *game_state,
                                    const char *str)
 {
-        bool has_person_id;
-        uint64_t person_id;
+        enum vsx_instance_state_id_type id_type;
+        uint64_t id;
         enum vsx_dialog dialog;
         int page;
 
         pthread_mutex_lock(&game_state->mutex);
 
         vsx_instance_state_load(&game_state->instance_state, str);
-        has_person_id = game_state->instance_state.has_person_id;
-        person_id = game_state->instance_state.person_id;
+        id_type = game_state->instance_state.id_type;
+        id = game_state->instance_state.id;
         dialog = game_state->instance_state.dialog;
         page = game_state->instance_state.page;
 
         pthread_mutex_unlock(&game_state->mutex);
 
-        if (has_person_id) {
+        if (id_type == VSX_INSTANCE_STATE_ID_TYPE_PERSON) {
                 vsx_worker_lock(game_state->worker);
-                vsx_connection_set_person_id(game_state->connection,
-                                             person_id);
+                vsx_connection_set_person_id(game_state->connection, id);
                 vsx_worker_unlock(game_state->worker);
 
                 /* If there is a person ID then the server must have a

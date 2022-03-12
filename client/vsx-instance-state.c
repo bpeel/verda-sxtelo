@@ -47,27 +47,13 @@ struct vsx_instance_state_property {
         vsx_instance_state_load_property_func load;
 };
 
-
 static bool
-check_person_id_cb(const struct vsx_instance_state *state)
-{
-        return state->has_person_id;
-}
-
-static void
-save_person_id_cb(const struct vsx_instance_state *state,
-                  struct vsx_buffer *buf)
-{
-        vsx_buffer_append_printf(buf, "%016" PRIx64, state->person_id);
-}
-
-static void
-load_person_id_cb(struct vsx_instance_state *state,
-                  const char *value,
-                  size_t value_length)
+load_id(const char *value,
+        size_t value_length,
+        uint64_t *id_out)
 {
         if (value_length <= 0 || value_length > 16)
-                return;
+                return false;
 
         uint64_t id = 0;
 
@@ -79,15 +65,75 @@ load_person_id_cb(struct vsx_instance_state *state,
                 else if (*value >= '0' && *value <= '9')
                         digit = *value - '0';
                 else
-                        return;
+                        return false;
 
                 id = (id << 4) | digit;
 
                 value++;
         }
 
-        state->has_person_id = true;
-        state->person_id = id;
+        *id_out = id;
+
+        return true;
+}
+
+static bool
+check_person_id_cb(const struct vsx_instance_state *state)
+{
+        return state->id_type == VSX_INSTANCE_STATE_ID_TYPE_PERSON;
+}
+
+static void
+save_id_cb(const struct vsx_instance_state *state,
+                  struct vsx_buffer *buf)
+{
+        vsx_buffer_append_printf(buf, "%016" PRIx64, state->id);
+}
+
+static void
+load_person_id_cb(struct vsx_instance_state *state,
+                  const char *value,
+                  size_t value_length)
+{
+        switch (state->id_type) {
+        case VSX_INSTANCE_STATE_ID_TYPE_NONE:
+        case VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION:
+                if (load_id(value,
+                            value_length,
+                            &state->id))
+                        state->id_type = VSX_INSTANCE_STATE_ID_TYPE_PERSON;
+                break;
+
+        case VSX_INSTANCE_STATE_ID_TYPE_PERSON:
+                break;
+        }
+}
+
+static bool
+check_conversation_id_cb(const struct vsx_instance_state *state)
+{
+        return state->id_type == VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION;
+}
+
+static void
+load_conversation_id_cb(struct vsx_instance_state *state,
+                        const char *value,
+                        size_t value_length)
+{
+        switch (state->id_type) {
+        case VSX_INSTANCE_STATE_ID_TYPE_NONE:
+                if (load_id(value,
+                            value_length,
+                            &state->id)) {
+                        state->id_type =
+                                VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION;
+                }
+                break;
+
+        case VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION:
+        case VSX_INSTANCE_STATE_ID_TYPE_PERSON:
+                break;
+        }
 }
 
 static void
@@ -148,8 +194,14 @@ properties[] = {
         {
                 .name = "person_id",
                 .check = check_person_id_cb,
-                .save = save_person_id_cb,
+                .save = save_id_cb,
                 .load = load_person_id_cb,
+        },
+        {
+                .name = "conversation_id",
+                .check = check_conversation_id_cb,
+                .save = save_id_cb,
+                .load = load_conversation_id_cb,
         },
         {
                 .name = "dialog",
@@ -167,7 +219,8 @@ properties[] = {
 void
 vsx_instance_state_init(struct vsx_instance_state *state)
 {
-        state->has_person_id = false;
+        state->id_type = VSX_INSTANCE_STATE_ID_TYPE_NONE;
+        state->id = 0;
         state->dialog = VSX_DIALOG_NONE;
         state->page = 0;
 }

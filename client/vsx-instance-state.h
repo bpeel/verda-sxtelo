@@ -30,9 +30,24 @@
  * serialised into a string.
  */
 
+enum vsx_instance_state_id_type {
+        /* This is a fresh start of the app and we don’t have any ID
+         * to reconnect to.
+         */
+        VSX_INSTANCE_STATE_ID_TYPE_NONE,
+        /* The app has been given an invite URL to connect to but it
+         * hasn’t yet been used to connect and get a person ID.
+         */
+        VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION,
+        /* The app has successfully connected to the server and has a
+         * player in a game to reconnect to.
+         */
+        VSX_INSTANCE_STATE_ID_TYPE_PERSON,
+};
+
 struct vsx_instance_state {
-        bool has_person_id;
-        uint64_t person_id;
+        enum vsx_instance_state_id_type id_type;
+        uint64_t id;
 
         enum vsx_dialog dialog;
 

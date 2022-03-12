@@ -33,18 +33,18 @@ static bool
 check_is_id(const struct vsx_instance_state *state,
             uint64_t test_id)
 {
-        if (!state->has_person_id) {
+        if (state->id_type != VSX_INSTANCE_STATE_ID_TYPE_PERSON) {
                 fprintf(stderr, "Loaded state doesn’t have a person ID\n");
                 return false;
         }
 
-        if (state->person_id != test_id) {
+        if (state->id != test_id) {
                 fprintf(stderr,
                         "Person ID in loaded state does not match.\n"
                         " Expected: 0x%" PRIx64 "\n"
                         " Received: 0x%" PRIx64 "\n",
                         test_id,
-                        state->person_id);
+                        state->id);
                 return false;
         }
 
@@ -58,8 +58,8 @@ test_person_id(uint64_t test_id)
 
         vsx_instance_state_init(&state);
 
-        state.has_person_id = true;
-        state.person_id = test_id;
+        state.id_type = VSX_INSTANCE_STATE_ID_TYPE_PERSON;
+        state.id = test_id;
 
         char *str = vsx_instance_state_save(&state);
 
@@ -83,7 +83,7 @@ test_long_person_id(void)
 
         vsx_instance_state_load(&state, "person_id=0123456789abcdeff");
 
-        if (state.has_person_id) {
+        if (state.id_type != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
                 fprintf(stderr,
                         "State has a person ID set from a state that is too "
                         "long\n");
@@ -102,19 +102,19 @@ test_short_person_id(void)
 
         vsx_instance_state_load(&state, "person_id=5");
 
-        if (!state.has_person_id) {
+        if (state.id_type != VSX_INSTANCE_STATE_ID_TYPE_PERSON) {
                 fprintf(stderr,
                         "State doesn’t have a person ID after load\n");
                 return false;
         }
 
-        if (state.person_id != 5) {
+        if (state.id != 5) {
                 fprintf(stderr,
                         "Person ID does not match.\n"
                         " Expected: 0x%" PRIx64 "\n"
                         " Received: 0x%" PRIx64 "\n",
                         UINT64_C(5),
-                        state.person_id);
+                        state.id);
                 return false;
         }
 
@@ -139,9 +139,9 @@ test_invalid_char_in_person_id(void)
 
                 vsx_instance_state_load(&state, str);
 
-                if (state.has_person_id) {
+                if (state.id_type != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
                         fprintf(stderr,
-                                "State doesn’t have a person ID after invalid "
+                                "State has a person ID after invalid "
                                 "load of data “%s”\n",
                                 str);
                         ret = false;
@@ -176,6 +176,18 @@ test_person_id_second_prop(void)
 }
 
 static bool
+test_load_two_person_ids(void)
+{
+        struct vsx_instance_state loaded_state;
+
+        memset(&loaded_state, 0, sizeof loaded_state);
+
+        vsx_instance_state_load(&loaded_state, "person_id=5,person_id=6");
+
+        return check_is_id(&loaded_state, 5);
+}
+
+static bool
 test_no_equals(void)
 {
         struct vsx_instance_state loaded_state;
@@ -196,13 +208,84 @@ test_empty_person_id(void)
 
         vsx_instance_state_load(&loaded_state, "person_id=");
 
-        if (loaded_state.has_person_id) {
+        if (loaded_state.id_type != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
                 fprintf(stderr,
                         "State has a person ID after an empty value was set\n");
                 return false;
         }
 
         return true;
+}
+
+static bool
+test_conversation_id(uint64_t test_id)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        state.id_type = VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION;
+        state.id = test_id;
+
+        char *str = vsx_instance_state_save(&state);
+
+        struct vsx_instance_state loaded_state;
+
+        memset(&loaded_state, 0, sizeof loaded_state);
+
+        vsx_instance_state_load(&loaded_state, str);
+
+        vsx_free(str);
+
+        if (loaded_state.id_type != VSX_INSTANCE_STATE_ID_TYPE_CONVERSATION) {
+                fprintf(stderr,
+                        "Loaded state doesn’t have a "
+                        "conversation ID\n");
+                return false;
+        }
+
+        if (loaded_state.id != test_id) {
+                fprintf(stderr,
+                        "Conversation ID in loaded state does not match.\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        test_id,
+                        loaded_state.id);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_invalid_char_in_conversation_id(void)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        vsx_instance_state_load(&state, "conversation_id=0?");
+
+        if (state.id_type != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
+                fprintf(stderr,
+                        "State has a conversation ID after invalid "
+                        "load of data");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_conversation_id_doesnt_override_person(void)
+{
+        struct vsx_instance_state state;
+
+        vsx_instance_state_init(&state);
+
+        vsx_instance_state_load(&state, "person_id=5,conversation_id=6");
+
+        return check_is_id(&state, 5);
 }
 
 static bool
@@ -214,7 +297,7 @@ test_empty_string(void)
 
         vsx_instance_state_load(&loaded_state, "");
 
-        if (loaded_state.has_person_id) {
+        if (loaded_state.id_type != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
                 fprintf(stderr,
                         "State has a person ID after an empty string was "
                         "loaded\n");
@@ -240,9 +323,9 @@ test_save_empty(void)
 
         vsx_free(str);
 
-        if (loaded_state.has_person_id) {
+        if (loaded_state.id != VSX_INSTANCE_STATE_ID_TYPE_NONE) {
                 fprintf(stderr,
-                        "State has a person ID after loading init state\n");
+                        "State has an ID after loading init state\n");
                 return false;
         }
 
@@ -418,6 +501,18 @@ main(int argc, char **argv)
                 ret = EXIT_FAILURE;
 
         if (!test_person_id_second_prop())
+                ret = EXIT_FAILURE;
+
+        if (!test_load_two_person_ids())
+                ret = EXIT_FAILURE;
+
+        if (!test_conversation_id(UINT64_C(0x1234567890abcdef)))
+                ret = EXIT_FAILURE;
+
+        if (!test_invalid_char_in_conversation_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_conversation_id_doesnt_override_person())
                 ret = EXIT_FAILURE;
 
         if (!test_no_equals())
