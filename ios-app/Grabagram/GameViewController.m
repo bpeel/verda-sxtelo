@@ -315,11 +315,12 @@ name_contains_non_whitespace(const char *name)
         if (nameEdit == nil)
                 return;
         
+        [nameEdit endEditing:YES];
+
         NSString *nameString = nameEdit.text;
         const char *name = [nameString UTF8String];
         
         if (name_contains_non_whitespace(name)) {
-                [nameEdit endEditing:YES];
                 vsx_game_state_set_player_name(self->game_state, name);
                 vsx_game_state_set_dialog(self->game_state,
                                           VSX_DIALOG_INVITE_LINK);
