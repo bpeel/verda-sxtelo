@@ -38,6 +38,10 @@ if get_option('client') or get_option('jni') or get_option('clientlib')
   subdir('client')
 endif
 
+if get_option('invite-cgi')
+  subdir('cgi')
+endif
+
 subdir('web')
 subdir('common')
 
