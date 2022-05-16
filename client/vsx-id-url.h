@@ -30,6 +30,10 @@ vsx_id_url_encode(uint64_t id,
                   char *url);
 
 bool
+vsx_id_url_decode_id_part(const char *str,
+                          uint64_t *id_out);
+
+bool
 vsx_id_url_decode(const char *url,
                   uint64_t *id_out);
 
