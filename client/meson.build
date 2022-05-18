@@ -37,7 +37,7 @@ client_common_src = [
         'vsx-guide.c',
         'vsx-guide-painter.c',
         '../common/vsx-hash-table.c',
-        'vsx-id-url.c',
+        '../common/vsx-id-url.c',
         'vsx-image.c',
         'vsx-image-loader.c',
         'vsx-instance-state.c',
@@ -52,7 +52,7 @@ client_common_src = [
         'vsx-name-painter.c',
         'vsx-note-painter.c',
         'vsx-paint-state.c',
-        'vsx-qr.c',
+        '../common/vsx-qr.c',
         'vsx-quad-tool.c',
         'vsx-shader-data.c',
         'vsx-shadow-painter.c',
@@ -167,7 +167,7 @@ test_game_state = executable('test-game-state',
 test('game-state', test_game_state)
 
 test_id_url_src = [
-        'vsx-id-url.c',
+        '../common/vsx-id-url.c',
         '../common/vsx-util.c',
         'test-id-url.c',
 ]
@@ -178,7 +178,7 @@ test_id_url = executable('test-id-url',
 test('id-url', test_id_url)
 
 generate_qr_src = [
-        'vsx-qr.c',
+        '../common/vsx-qr.c',
         '../common/vsx-util.c',
         'generate-qr.c',
 ]
