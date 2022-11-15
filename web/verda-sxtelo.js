@@ -1291,6 +1291,11 @@ ChatSession.prototype.handleBadConversationId = function (mr)
   this.setError ("@INVITE_LINK_NOT_VALID@");
 };
 
+ChatSession.prototype.handleConversationFull = function (mr)
+{
+  this.setError ("@CONVERSATION_FULL@");
+};
+
 ChatSession.prototype.handleConversationId = function (mr)
 {
   var id = mr.getUint64 ();
@@ -1330,6 +1335,8 @@ ChatSession.prototype.messageCb = function (e)
     this.handleConversationId (mr);
   else if (msgType == 0x0b)
     this.handleBadConversationId (mr);
+  else if (msgType == 0x0d)
+    this.handleConversationFull (mr);
 };
 
 ChatSession.prototype.unloadCb = function ()

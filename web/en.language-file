@@ -61,6 +61,9 @@ There was an error communicating with the server.
 @INVITE_LINK_NOT_VALID@
 The invite link is no longer valid.
 
+@CONVERSATION_FULL@
+Unfortunately the game is already full and it’s not possible to join.
+
 @BAD_DATA@
 Received bad data from the server.
 

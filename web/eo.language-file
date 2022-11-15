@@ -61,6 +61,9 @@ Estis problemo dum komunikado kun la servilo.
 @INVITE_LINK_NOT_VALID@
 La invitligilo ne plu estas valida.
 
+@CONVERSATION_FULL@
+Bedaŭrinde la partio jam estas plena kaj ne eblas aliĝi.
+
 @BAD_DATA@
 Fuŝaj datumoj riceviĝis
 
