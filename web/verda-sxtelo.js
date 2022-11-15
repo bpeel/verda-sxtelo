@@ -1440,7 +1440,12 @@ ChatSession.prototype.decodeId = function (encoded)
   if (encoded.match (/[^a-zA-Z0-9_-]/) != null)
     return null;
 
-  var bstr = atob (encoded + "A");
+  var unfriendly = encoded.replace (/[_-]/g,
+                                    function (ch) {
+                                      return ch == "_" ? "/" : "+";
+                                    });
+
+  var bstr = atob (unfriendly + "A");
   var id = new Uint8Array (8);
 
   for (var i = 0; i < 7; i++)
