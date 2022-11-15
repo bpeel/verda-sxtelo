@@ -58,6 +58,9 @@ Send!
 @ERROR_OCCURRED@
 There was an error communicating with the server.
 
+@INVITE_LINK_NOT_VALID@
+The invite link is no longer valid.
+
 @BAD_DATA@
 Received bad data from the server.
 

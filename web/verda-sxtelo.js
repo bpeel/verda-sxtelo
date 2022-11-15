@@ -1288,7 +1288,7 @@ ChatSession.prototype.handleBadPlayerId = function (mr)
 
 ChatSession.prototype.handleBadConversationId = function (mr)
 {
-  this.setError ();
+  this.setError ("@INVITE_LINK_NOT_VALID@");
 };
 
 ChatSession.prototype.handleConversationId = function (mr)
