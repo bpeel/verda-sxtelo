@@ -1413,7 +1413,7 @@ ChatSession.prototype.encodeId = function (id)
   /* Change the order of the bytes in the ID to big-endian and convert
    * it to a “binary string”.
    */
-  for (i = 7; i >= 1; i--)
+  for (i = 7; i >= 1; i--)
     str += String.fromCharCode (id[i]);
   /* Add 2 bits of zeroes before the last 4 bits so that the last 4
    * bits will be in the lower bits of the second-to-last character.
@@ -1448,7 +1448,7 @@ ChatSession.prototype.decodeId = function (encoded)
   var bstr = atob (unfriendly + "A");
   var id = new Uint8Array (8);
 
-  for (var i = 0; i < 7; i++)
+  for (var i = 0; i < 7; i++)
     id[7 - i] = bstr.charCodeAt (i);
 
   var a = bstr.charCodeAt (7);
