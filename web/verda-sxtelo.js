@@ -334,6 +334,22 @@ ChatSession.prototype.soundToggleClickCb = function ()
   }
 };
 
+ChatSession.prototype.inviteButtonCb = function ()
+{
+  if (this.syncReceived)
+    $("#invite-overlay").show ();
+};
+
+ChatSession.prototype.closeInviteOverlayCb = function (event)
+{
+  if (event.target.id == "invite-link" ||
+      event.target.id == "invite-qr-link" ||
+      event.target.id == "invite-qr-image")
+    return;
+
+  $("#invite-overlay").hide ();
+};
+
 ChatSession.prototype.addMessageDiv = function (div)
 {
   $("#messages").append (div);
@@ -878,6 +894,9 @@ ChatSession.prototype.start = function ()
 
   $("#sound-toggle").bind ("click", this.soundToggleClickCb.bind (this));
 
+  $("#invite-button").bind ("click", this.inviteButtonCb.bind (this));
+  $("#invite-overlay").mousedown (this.closeInviteOverlayCb.bind (this));
+
   $("#game-length").change (this.gameLengthChangeCb.bind (this));
 
   $(document).keydown (this.documentKeyDownCb.bind (this));
@@ -1298,12 +1317,21 @@ ChatSession.prototype.handleConversationFull = function (mr)
 
 ChatSession.prototype.handleConversationId = function (mr)
 {
-  var id = mr.getUint64 ();
-  console.log ("Invite URL: " +
-               window.location.protocol + "//" +
-               window.location.host +
-               window.location.pathname +
-               "?" + this.encodeId (id));
+  var id = this.encodeId (mr.getUint64 ());
+  var webLink = (window.location.protocol + "//" +
+                 window.location.host +
+                 window.location.pathname +
+                 "?" + id);
+  var appLink = (window.location.protocol + "//" +
+                 window.location.host +
+                 "/j/" +
+                 id);
+  var qrImg = "/cgi-bin/invite-cgi?" + id;
+
+  $("#invite-link").attr ("href", webLink);
+  $("#invite-link").text (webLink);
+  $("#invite-qr-link").attr ("href", appLink);
+  $("#invite-qr-image").attr ("src", qrImg);
 };
 
 ChatSession.prototype.messageCb = function (e)

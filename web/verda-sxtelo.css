@@ -27,7 +27,7 @@ body {
     overflow: hidden;
 }
 
-#sound-on, #sound-off {
+#sound-on, #sound-off, #invite-button {
     vertical-align: middle;
 }
 
@@ -228,19 +228,19 @@ span.player+span.player:before {
     pointer-events: none;
 }
 
-#welcome-overlay {
+#welcome-overlay, #invite-overlay {
     width: 98%;
     height: 98%;
     position: absolute;
     z-index: 3;
 }
 
-#welcome-box {
+#welcome-box, #invite-dialog {
     margin-top: 5em;
     width: 30em;
 }
 
-#welcome-box, #start-note {
+#welcome-box, #start-note, #invite-dialog {
     margin-left: auto;
     margin-right: auto;
     border: 1px solid rgb(227, 227, 227);
@@ -296,6 +296,15 @@ span.player+span.player:before {
     margin-bottom: auto;
     padding-left: 1em;
     padding-right: 1em;
+}
+
+#invite-dialog {
+    text-align: center;
+}
+
+#invite-qr-image {
+    height: 10em;
+    image-rendering: pixelated;
 }
 
 #side-box {

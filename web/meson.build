@@ -13,6 +13,7 @@ data_files = [
         'jquery-1.9.1.min.js',
         'favicon.ico',
         'favicon.png',
+        'invite.png',
         'message-alert-sound.ogg',
         'message-alert-sound.mp3',
         'shout-sound.ogg',

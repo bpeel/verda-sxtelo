@@ -34,6 +34,18 @@ Rapida ludo (50 tegoletoj)
 @NORMAL_GAME@
 Normala ludo (122 tegoletoj)
 
+@INVITE_LINK_DESCRIPTION@
+Sendu la jenan ligilon al homoj por inviti ilin al la ludo:
+
+@INVITE_QR_DESCRIPTION@
+Aŭ skanu la jenan kodon per saĝtelefono por aliĝi per la aplikaĵo:
+
+@INVITE_BUTTON@
+Inviti aliajn ludantojn
+
+@INVITE_QR_ALT@
+Kodo QR por inviti ludantojn
+
 @PLAYER_JOINED@
 %% aliĝis al la ludo
 

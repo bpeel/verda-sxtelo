@@ -47,6 +47,22 @@
         </p>
       </div>
     </div>
+    <div id="invite-overlay" style="display: none">
+      <div id="invite-dialog">
+        <p>
+          @INVITE_LINK_DESCRIPTION@
+        </p>
+        <p><a href="#stub" target="_blank" id="invite-link"></a></p>
+        <p>
+          @INVITE_QR_DESCRIPTION@
+        </p>
+        <p>
+          <a href="#stub" target="_blank" id="invite-qr-link">
+            <img src="stub.png" alt="@INVITE_QR_ALT@" id="invite-qr-image">
+          </a>
+        </p>
+      </div>
+    </div>
     <div class="content">
       <div id="error-note" style="display: none">
         <div id="error-note-background">&nbsp;</div>
@@ -114,7 +130,8 @@
             <img alt="@SOUND_ON@" src="../sound-on.png" id="sound-on">
             <img alt="@SOUND_OFF@" src="../sound-off.png"
                  id="sound-off" style="display: none">
-          </span>
+          </span> |
+          <img alt="@INVITE_BUTTON@" src="../invite.png" id="invite-button">
         </div>
         <button id="shout-button">@SHOUT_BUTTON@</button>
         <button id="turn-button">@TURN_BUTTON@</button>

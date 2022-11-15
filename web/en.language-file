@@ -34,6 +34,18 @@ Short game (50 tiles)
 @NORMAL_GAME@
 Normal game (122 tiles)
 
+@INVITE_LINK_DESCRIPTION@
+Send the link below to people to invite them to the game:
+
+@INVITE_QR_DESCRIPTION@
+Or scan the code below with a phone to join via the app:
+
+@INVITE_BUTTON@
+Invite more players
+
+@INVITE_QR_ALT@
+QR code to invite players
+
 @PLAYER_JOINED@
 %% joined the game
 
