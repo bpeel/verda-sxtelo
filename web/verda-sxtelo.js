@@ -356,7 +356,7 @@ ChatSession.prototype.raiseTile = function (tile)
   $(parent).append (tile.element);
 };
 
-ChatSession.prototype.animateTile = function (tile, x, y)
+ChatSession.prototype.moveTile = function (tile, x, y, animate)
 {
   var te = $(tile.element);
   var dx = tile.x - x;
@@ -367,8 +367,22 @@ ChatSession.prototype.animateTile = function (tile, x, y)
 
   te.stop ();
   this.raiseTile (tile);
-  te.animate ({ "left": new_x, "top": new_y },
-              distance * 2.0);
+
+  if (animate)
+  {
+    te.animate ({ "left": new_x, "top": new_y },
+                distance * 2.0);
+  }
+  else
+  {
+    te.css ("left", new_x);
+    te.css ("top", new_y);
+  }
+};
+
+ChatSession.prototype.animateTile = function (tile, x, y)
+{
+  this.moveTile (tile, x, y, true /* animate */);
 };
 
 ChatSession.prototype.stopShout = function ()
@@ -1186,12 +1200,13 @@ ChatSession.prototype.handleTile = function (mr)
 
     $("#start-note").remove ();
 
-    this.playSound ("turn-sound");
+    if (this.syncReceived)
+      this.playSound ("turn-sound");
   }
 
   if (playerNum != this.personNumber &&
       (tileX != tile.x || tileY != tile.y))
-    this.animateTile (tile, tileX, tileY);
+    this.moveTile (tile, tileX, tileY, this.syncReceived);
 
   tile.x = tileX;
   tile.y = tileY;
