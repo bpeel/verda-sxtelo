@@ -11,6 +11,10 @@ game with friends or strangers on the Internet. There’s some
 instructions on how to play the game <a href="help.html"
 target="_blank">here</a>.
 
+@INVITE_BLURB@
+
+You have been invited to join a game of Anagrams.
+
 @NAME_BOX@
 To start, please type your name or a nickname in the box
 below and then click “Play!”.
