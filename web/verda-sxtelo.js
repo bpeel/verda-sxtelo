@@ -254,6 +254,8 @@ ChatSession.prototype.setError = function (msg)
    * button so this is a workaround to remove it */
   $("#error-button").removeAttr ("disabled");
 
+  $("#error-note-text").text (msg);
+
   $("#error-note").show ();
 
   /* Throw an exception so that we won't continue processing messages
