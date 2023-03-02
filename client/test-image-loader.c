@@ -314,7 +314,7 @@ main(int argc, char **argv)
         res = chdir(VSX_SOURCE_ROOT);
         assert(res == 0);
 
-        res = SDL_Init(0);
+        res = SDL_Init(SDL_INIT_EVENTS);
         assert(res >= 0);
 
         struct data data = {
