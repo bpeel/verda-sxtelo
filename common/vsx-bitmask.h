@@ -23,6 +23,8 @@
 #include <limits.h>
 #include <string.h>
 
+#include "vsx-buffer.h"
+
 typedef unsigned long vsx_bitmask_element_t;
 
 #define VSX_BITMASK_ELEMENT_MAX ULONG_MAX
@@ -82,6 +84,24 @@ vsx_bitmask_get(const vsx_bitmask_element_t *elements,
 {
         return (elements[vsx_bitmask_get_element(flag_num)] &
                 (1UL << vsx_bitmask_get_bit(flag_num)));
+}
+
+void
+vsx_bitmask_set_buffer(struct vsx_buffer *buffer,
+                       int flag_num,
+                       bool value);
+
+static inline bool
+vsx_bitmask_get_buffer(struct vsx_buffer *buffer,
+                       int flag_num)
+{
+        int element = vsx_bitmask_get_element(flag_num);
+
+        if (element >= buffer->length / sizeof (vsx_bitmask_element_t))
+                return false;
+
+        return vsx_bitmask_get((const vsx_bitmask_element_t *) buffer->data,
+                               flag_num);
 }
 
 #endif /* VSX_BITMASK_H */

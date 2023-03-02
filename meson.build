@@ -23,16 +23,18 @@ endif
 
 cdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
+cdata.set('VSX_SOURCE_ROOT', '"' + meson.source_root() + '"')
+
 # Paths
 vs_bindir = join_paths(get_option('prefix'), get_option('bindir'))
 
-openssl_dep = dependency('openssl')
+thread_dep = dependency('threads')
 
 if get_option('server')
   subdir('server')
 endif
 
-if get_option('client')
+if get_option('client') or get_option('jni') or get_option('clientlib')
   subdir('client')
 endif
 

@@ -1,4 +1,4 @@
-thread_dep = dependency('threads')
+openssl_dep = dependency('openssl')
 
 server_deps = [ openssl_dep, thread_dep ]
 
@@ -25,7 +25,7 @@ server_common = [
         '../common/vsx-error.c',
         '../common/vsx-file-error.c',
         'vsx-generate-id.c',
-        'vsx-hash-table.c',
+        '../common/vsx-hash-table.c',
         '../common/vsx-list.c',
         'vsx-log.c',
         'vsx-main-context.c',
@@ -41,6 +41,7 @@ server_common = [
 
 server_src = [
         'vsx-base64.c',
+        '../common/vsx-bitmask.c',
         'vsx-config.c',
         'vsx-connection.c',
         'vsx-key-value.c',
@@ -74,6 +75,7 @@ test('ws-parser', test_ws_parser)
 
 test_connection_src = [
         'vsx-base64.c',
+        '../common/vsx-bitmask.c',
         'vsx-connection.c',
         'vsx-normalize-name.c',
         'vsx-person.c',
@@ -88,18 +90,6 @@ test_connection = executable('test-connection',
                              dependencies: server_deps,
                              include_directories: inc_dirs)
 test('connection', test_connection)
-
-test_hash_table_src = [
-        'vsx-hash-table.c',
-        '../common/vsx-list.c',
-        '../common/vsx-util.c',
-        'test-hash-table.c',
-]
-
-test_hash_table = executable('test-hash-table',
-                             test_hash_table_src,
-                             include_directories: inc_dirs)
-test('hash-table', test_hash_table)
 
 test_conversation_set_src = [
         'test-conversation-set.c',

@@ -1,6 +1,6 @@
 /*
  * Verda Ŝtelo - An anagram game in Esperanto for the web
- * Copyright (C) 2012, 2013, 2021  Neil Roberts
+ * Copyright (C) 2012, 2013, 2021, 2022  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,8 +29,6 @@
 #include <poll.h>
 #include <errno.h>
 
-#include "vsx-player-private.h"
-#include "vsx-tile-private.h"
 #include "vsx-proto.h"
 #include "vsx-list.h"
 #include "vsx-util.h"
@@ -56,6 +54,7 @@ enum vsx_connection_dirty_flag {
         VSX_CONNECTION_DIRTY_FLAG_SHOUT = (1 << 4),
         VSX_CONNECTION_DIRTY_FLAG_TURN = (1 << 5),
         VSX_CONNECTION_DIRTY_FLAG_N_TILES = (1 << 6),
+        VSX_CONNECTION_DIRTY_FLAG_LANGUAGE = (1 << 7),
 };
 
 typedef int
@@ -67,8 +66,7 @@ struct vsx_error_domain
 vsx_connection_error;
 
 static void
-update_poll(struct vsx_connection *connection,
-            bool always_send);
+update_poll(struct vsx_connection *connection);
 
 /* Initial timeout (in microseconds) before attempting to reconnect
  * after an error. The timeout will be doubled every time there is a
@@ -97,7 +95,13 @@ enum vsx_connection_running_state {
          */
         VSX_CONNECTION_RUNNING_STATE_RECONNECTING,
         VSX_CONNECTION_RUNNING_STATE_RUNNING,
-        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT
+        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT,
+        /* The connection is missing some configuration properties
+         * that are needed before connecting, such as the address or a
+         * player name. Once these are set by the higher layers it
+         * will automatically start trying to connect.
+         */
+        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION,
 };
 
 struct vsx_connection_tile_to_move {
@@ -114,14 +118,18 @@ struct vsx_connection_message_to_send {
 };
 
 struct vsx_connection {
+        bool has_address;
         struct vsx_netaddress address;
+
+        bool has_conversation_id;
+        uint64_t conversation_id;
+
         char *room;
         char *player_name;
-        struct vsx_player *self;
         bool has_person_id;
         uint64_t person_id;
         enum vsx_connection_running_state running_state;
-        enum vsx_connection_state state;
+        bool finished;
         bool typing;
         bool sent_typing_state;
         bool write_finished;
@@ -149,29 +157,15 @@ struct vsx_connection {
         struct vsx_list messages_to_send;
         /* The n_tiles value that is queued to send to the server */
         int n_tiles_to_send;
+        /* The language code that is queued to send to the server */
+        char language_to_send[8];
 
         int sock;
-        /* The condition that the source was last created with so we can
-         * know if we need to recreate it.
-         */
-        short sock_events;
 
-        /* Array of pointers to players, indexed by player num. This can
-         * have NULL gaps.
+        /* The last poll_changed event that we sent so we can detect
+         * changes.
          */
-        struct vsx_buffer players;
-
-        /* Slab allocator for vsx_tile */
-        struct vsx_slab_allocator tile_allocator;
-        /* Array of pointers to tiles, indexed by tile num. This can have
-         * NULL gaps.
-         */
-        struct vsx_buffer tiles;
-
-        /* The total number of tiles that the game will have according
-         * to what was sent to us by the server.
-         */
-        int n_tiles;
+        struct vsx_connection_event poll_changed_event;
 
         /* true if we have received a sync message since the last time
          * we reconnected.
@@ -199,26 +193,12 @@ struct vsx_connection {
 };
 
 static void
-send_poll_changed(struct vsx_connection *connection)
+emit_event(struct vsx_connection *connection,
+           struct vsx_connection_event *event)
 {
-        int64_t wakeup_time = INT64_MAX;
+        event->synced = connection->synced;
 
-        if (connection->reconnect_timestamp < wakeup_time)
-                wakeup_time = connection->reconnect_timestamp;
-
-        if (connection->keep_alive_timestamp < wakeup_time)
-                wakeup_time = connection->keep_alive_timestamp;
-
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
-                .poll_changed = {
-                        .wakeup_time = wakeup_time,
-                        .fd = connection->sock,
-                        .events = connection->sock_events,
-                },
-        };
-
-        vsx_signal_emit(&connection->event_signal, &event);
+        vsx_signal_emit(&connection->event_signal, event);
 }
 
 static void
@@ -230,7 +210,7 @@ vsx_connection_signal_error(struct vsx_connection *connection,
                 .error = { .error = error },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 }
 
 static void
@@ -239,6 +219,7 @@ close_socket(struct vsx_connection *connection)
         if (connection->sock != -1) {
                 vsx_close(connection->sock);
                 connection->sock = -1;
+                connection->keep_alive_timestamp = INT64_MAX;
         }
 }
 
@@ -248,7 +229,7 @@ vsx_connection_set_typing(struct vsx_connection *connection,
 {
         if (connection->typing != typing) {
                 connection->typing = typing;
-                update_poll(connection, false /* always_send */);
+                update_poll(connection);
         }
 }
 
@@ -257,7 +238,7 @@ vsx_connection_shout(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_SHOUT;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -265,7 +246,7 @@ vsx_connection_turn(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_TURN;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -288,7 +269,7 @@ found_tile:
         tile->x = x;
         tile->y = y;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -298,69 +279,28 @@ vsx_connection_set_n_tiles(struct vsx_connection *connection,
         connection->n_tiles_to_send = n_tiles;
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_N_TILES;
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
-static void
-vsx_connection_set_state(struct vsx_connection *connection,
-                         enum vsx_connection_state state)
+void
+vsx_connection_set_default_language(struct vsx_connection *connection,
+                                    const char *language_code)
 {
-        if (connection->state == state)
-                return;
+        size_t max_len = VSX_N_ELEMENTS(connection->language_to_send) - 1;
 
-        connection->state = state;
-
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                .state_changed = { .state = state },
-        };
-
-        vsx_signal_emit(&connection->event_signal, &event);
+        strncpy(connection->language_to_send, language_code, max_len);
+        connection->language_to_send[max_len] = '\0';
 }
 
-static void *
-get_pointer_from_buffer(struct vsx_buffer *buf, int num)
+void
+vsx_connection_set_language(struct vsx_connection *connection,
+                            const char *language_code)
 {
-        size_t n_entries = buf->length / sizeof (void *);
+        vsx_connection_set_default_language(connection, language_code);
 
-        if (num >= n_entries)
-                return NULL;
+        connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LANGUAGE;
 
-        return ((void **) buf->data)[num];
-}
-
-static void
-set_pointer_in_buffer(struct vsx_buffer *buf,
-                      int num,
-                      void *value)
-{
-        size_t n_entries = buf->length / sizeof (void *);
-
-        if (num >= n_entries) {
-                size_t old_length = buf->length;
-                vsx_buffer_set_length(buf, (num + 1) * sizeof (void *));
-                memset(buf->data + old_length,
-                       0,
-                       num * sizeof (void *) - old_length);
-        }
-
-        ((void **) buf->data)[num] = value;
-}
-
-static struct vsx_player *
-get_or_create_player(struct vsx_connection *connection,
-                     int player_num)
-{
-        struct vsx_player *player =
-                get_pointer_from_buffer(&connection->players, player_num);
-
-        if (player == NULL) {
-                player = vsx_calloc(sizeof *player);
-                player->num = player_num;
-                set_pointer_in_buffer(&connection->players, player_num, player);
-        }
-
-        return player;
+        update_poll(connection);
 }
 
 static bool
@@ -388,18 +328,53 @@ handle_player_id(struct vsx_connection *connection,
                 return false;
         }
 
-        connection->self = get_or_create_player(connection, self_num);
-
-        /* Assume that self is connected until told otherwise */
-        connection->self->flags |= VSX_PLAYER_CONNECTED;
-
         connection->has_person_id = true;
         connection->player_id_received_timestamp = vsx_monotonic_get();
 
-        if (connection->state == VSX_CONNECTION_STATE_AWAITING_HEADER) {
-                vsx_connection_set_state(connection,
-                                         VSX_CONNECTION_STATE_IN_PROGRESS);
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_HEADER,
+                .header = {
+                        .self_num = self_num,
+                        .person_id = connection->person_id,
+                },
+        };
+
+        emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
+handle_conversation_id(struct vsx_connection *connection,
+                       const uint8_t *payload,
+                       size_t payload_length,
+                       struct vsx_error **error)
+{
+        uint64_t id;
+
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_UINT64,
+                                    &id,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid conversation_id "
+                              "command");
+                return false;
         }
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID,
+                .conversation_id = {
+                        .id = id,
+                },
+        };
+
+        emit_event(connection, &event);
 
         return true;
 }
@@ -426,8 +401,6 @@ handle_n_tiles(struct vsx_connection *connection,
                 return false;
         }
 
-        connection->n_tiles = n_tiles;
-
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED,
                 .n_tiles_changed = {
@@ -435,7 +408,41 @@ handle_n_tiles(struct vsx_connection *connection,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
+handle_language(struct vsx_connection *connection,
+                const uint8_t *payload,
+                size_t payload_length,
+                struct vsx_error **error)
+{
+        const char *language_code;
+
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_STRING,
+                                    &language_code,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid language command");
+                return false;
+        }
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED,
+                .language_changed = {
+                        .code = language_code,
+                },
+        };
+
+        emit_event(connection, &event);
 
         return true;
 }
@@ -471,12 +478,12 @@ handle_message(struct vsx_connection *connection,
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_MESSAGE,
                 .message = {
-                        .player = get_or_create_player(connection, person),
+                        .player_num = person,
                         .message = text,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -519,54 +526,20 @@ handle_tile(struct vsx_connection *connection,
                 return false;
         }
 
-        bool is_new = false;
-
-        struct vsx_tile *tile =
-                get_pointer_from_buffer(&connection->tiles, num);
-
-        if (tile == NULL) {
-                tile = vsx_slab_allocate(&connection->tile_allocator,
-                                         sizeof *tile,
-                                         alignof *tile);
-
-                tile->num = num;
-
-                set_pointer_in_buffer(&connection->tiles, num, tile);
-
-                is_new = true;
-        }
-
-        tile->x = x;
-        tile->y = y;
-        tile->letter = vsx_utf8_get_char(letter);
-
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED,
                 .tile_changed = {
-                        .new_tile = is_new,
-                        .tile = tile,
+                        .num = num,
+                        .last_player_moved = player,
+                        .x = x,
+                        .y = y,
+                        .letter = vsx_utf8_get_char(letter),
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
-}
-
-static void
-emit_player_changed(struct vsx_connection *connection,
-                    struct vsx_player *player,
-                    enum vsx_connection_player_changed_flags flags)
-{
-        struct vsx_connection_event event = {
-                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                .player_changed = {
-                        .player = player,
-                        .flags = flags,
-                },
-        };
-
-        vsx_signal_emit(&connection->event_signal, &event);
 }
 
 static bool
@@ -595,14 +568,15 @@ handle_player_name(struct vsx_connection *connection,
                 return false;
         }
 
-        struct vsx_player *player = get_or_create_player(connection, num);
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                .player_name_changed = {
+                        .player_num = num,
+                        .name = name,
+                },
+        };
 
-        vsx_free(player->name);
-        player->name = vsx_strdup(name);
-
-        emit_player_changed(connection,
-                            player,
-                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -631,13 +605,15 @@ handle_player(struct vsx_connection *connection,
                 return false;
         }
 
-        struct vsx_player *player = get_or_create_player(connection, num);
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                .player_flags_changed = {
+                        .player_num = num,
+                        .flags = flags,
+                },
+        };
 
-        player->flags = flags;
-
-        emit_player_changed(connection,
-                            player,
-                            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -667,11 +643,11 @@ handle_player_shouted(struct vsx_connection *connection,
         struct vsx_connection_event event = {
                 .type = VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
                 .player_shouted = {
-                        .player = get_or_create_player(connection, player_num)
+                        .player_num = player_num,
                 },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 
         return true;
 }
@@ -713,7 +689,130 @@ handle_end(struct vsx_connection *connection,
                 return false;
         }
 
-        vsx_connection_set_state(connection, VSX_CONNECTION_STATE_DONE);
+        connection->finished = true;
+
+        struct vsx_connection_event event = {
+                .type = VSX_CONNECTION_EVENT_TYPE_END,
+        };
+
+        emit_event(connection, &event);
+
+        return true;
+}
+
+static bool
+handle_bad_player_id(struct vsx_connection *connection,
+                     const uint8_t *payload,
+                     size_t payload_length,
+                     struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid bad player ID "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_BAD_PLAYER_ID,
+                      "The player ID no longer exists");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
+
+        return true;
+}
+
+static bool
+handle_bad_conversation_id(struct vsx_connection *connection,
+                           const uint8_t *payload,
+                           size_t payload_length,
+                           struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid bad conversation ID "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID,
+                      "The conversation ID no longer exists");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
+
+        return true;
+}
+
+static bool
+handle_conversation_full(struct vsx_connection *connection,
+                         const uint8_t *payload,
+                         size_t payload_length,
+                         struct vsx_error **error)
+{
+        if (!vsx_proto_read_payload(payload + 1,
+                                    payload_length - 1,
+
+                                    VSX_PROTO_TYPE_NONE)) {
+                vsx_set_error(error,
+                              &vsx_connection_error,
+                              VSX_CONNECTION_ERROR_BAD_DATA,
+                              "The server sent an invalid conversation full "
+                              "command");
+                return false;
+        }
+
+        connection->finished = true;
+
+        /* This error is emitted like this because we don’t want to
+         * try to reconnect. Instead it should try to shutdown
+         * gracefully.
+         */
+
+        struct vsx_error *bad_error = NULL;
+
+        vsx_set_error(&bad_error,
+                      &vsx_connection_error,
+                      VSX_CONNECTION_ERROR_CONVERSATION_FULL,
+                      "The conversation is full");
+
+        vsx_connection_signal_error(connection, bad_error);
+
+        vsx_error_free(bad_error);
 
         return true;
 }
@@ -736,10 +835,18 @@ process_message(struct vsx_connection *connection,
                 return handle_player_id(connection,
                                         payload, payload_length,
                                         error);
+        case VSX_PROTO_CONVERSATION_ID:
+                return handle_conversation_id(connection,
+                                              payload, payload_length,
+                                              error);
         case VSX_PROTO_N_TILES:
                 return handle_n_tiles(connection,
                                       payload, payload_length,
                                       error);
+        case VSX_PROTO_LANGUAGE:
+                return handle_language(connection,
+                                       payload, payload_length,
+                                       error);
         case VSX_PROTO_MESSAGE:
                 return handle_message(connection,
                                       payload, payload_length,
@@ -768,6 +875,18 @@ process_message(struct vsx_connection *connection,
                 return handle_end(connection,
                                   payload, payload_length,
                                   error);
+        case VSX_PROTO_BAD_PLAYER_ID:
+                return handle_bad_player_id(connection,
+                                            payload, payload_length,
+                                            error);
+        case VSX_PROTO_BAD_CONVERSATION_ID:
+                return handle_bad_conversation_id(connection,
+                                                  payload, payload_length,
+                                                  error);
+        case VSX_PROTO_CONVERSATION_FULL:
+                return handle_conversation_full(connection,
+                                                payload, payload_length,
+                                                error);
         }
 
         return true;
@@ -810,7 +929,7 @@ report_error(struct vsx_connection *connection,
                 connection->reconnect_timeout = 0;
 
         set_reconnect_timestamp(connection);
-        send_poll_changed(connection);
+        update_poll(connection);
         vsx_connection_signal_error(connection, error);
 }
 
@@ -945,7 +1064,7 @@ handle_read(struct vsx_connection *connection)
                         vsx_error_free(error);
                 }
         } else if (got == 0) {
-                if (connection->state == VSX_CONNECTION_STATE_DONE) {
+                if (connection->finished) {
                         vsx_connection_set_running(connection, false);
                 } else {
                         struct vsx_error *error = NULL;
@@ -993,7 +1112,7 @@ handle_read(struct vsx_connection *connection)
                         p);
                 connection->input_length -= p - connection->input_buffer;
 
-                update_poll(connection, false /* always_send */ );
+                update_poll(connection);
         }
 }
 
@@ -1018,6 +1137,63 @@ write_ws_request(struct vsx_connection *connection,
 }
 
 static int
+write_join_conversation_header(struct vsx_connection *connection,
+                               uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_JOIN_GAME,
+
+                                       VSX_PROTO_TYPE_UINT64,
+                                       connection->conversation_id,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
+write_join_public_game_header(struct vsx_connection *connection,
+                              uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_NEW_PLAYER,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->room,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
+write_create_private_game_header(struct vsx_connection *connection,
+                                 uint8_t *buffer, size_t buffer_size)
+{
+
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_NEW_PRIVATE_GAME,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->language_to_send,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->player_name,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
 write_header(struct vsx_connection *connection,
              uint8_t *buffer, size_t buffer_size)
 {
@@ -1034,18 +1210,26 @@ write_header(struct vsx_connection *connection,
 
                                                VSX_PROTO_TYPE_NONE);
         } else {
-                return vsx_proto_write_command(buffer,
-                                               buffer_size,
+                /* If we don’t have a person ID then we need to create
+                 * a new person. For that we need a player name. The
+                 * connection shouldn’t have started if this isn’t set
+                 * yet.
+                 */
+                assert(connection->player_name != NULL);
 
-                                               VSX_PROTO_NEW_PLAYER,
-
-                                               VSX_PROTO_TYPE_STRING,
-                                               connection->room,
-
-                                               VSX_PROTO_TYPE_STRING,
-                                               connection->player_name,
-
-                                               VSX_PROTO_TYPE_NONE);
+                if (connection->has_conversation_id) {
+                        return write_join_conversation_header(connection,
+                                                              buffer,
+                                                              buffer_size);
+                } else if (connection->room != NULL) {
+                        return write_join_public_game_header(connection,
+                                                             buffer,
+                                                             buffer_size);
+                } else {
+                        return write_create_private_game_header(connection,
+                                                                buffer,
+                                                                buffer_size);
+                }
         }
 }
 
@@ -1072,6 +1256,21 @@ write_n_tiles(struct vsx_connection *connection,
 
                                        VSX_PROTO_TYPE_UINT8,
                                        connection->n_tiles_to_send,
+
+                                       VSX_PROTO_TYPE_NONE);
+}
+
+static int
+write_language(struct vsx_connection *connection,
+               uint8_t *buffer, size_t buffer_size)
+{
+        return vsx_proto_write_command(buffer,
+                                       buffer_size,
+
+                                       VSX_PROTO_SET_LANGUAGE,
+
+                                       VSX_PROTO_TYPE_STRING,
+                                       connection->language_to_send,
 
                                        VSX_PROTO_TYPE_NONE);
 }
@@ -1216,6 +1415,7 @@ write_one_item(struct vsx_connection *connection)
                 { VSX_CONNECTION_DIRTY_FLAG_HEADER, write_header },
                 { VSX_CONNECTION_DIRTY_FLAG_KEEP_ALIVE, write_keep_alive },
                 { VSX_CONNECTION_DIRTY_FLAG_N_TILES, write_n_tiles },
+                { VSX_CONNECTION_DIRTY_FLAG_LANGUAGE, write_language },
                 { VSX_CONNECTION_DIRTY_FLAG_LEAVE, write_leave },
                 { VSX_CONNECTION_DIRTY_FLAG_SHOUT, write_shout },
                 { VSX_CONNECTION_DIRTY_FLAG_TURN, write_turn },
@@ -1296,7 +1496,7 @@ handle_write(struct vsx_connection *connection)
                 connection->keep_alive_timestamp =
                         vsx_monotonic_get() + VSX_CONNECTION_KEEP_ALIVE_TIME;
 
-                update_poll(connection, true /* always_send */ );
+                update_poll(connection);
         }
 }
 
@@ -1330,28 +1530,25 @@ try_reconnect(struct vsx_connection *connection)
                                   &address.sockaddr,
                                   address.length);
 
-        short events;
-
         if (connect_ret == 0) {
                 connection->running_state =
                         VSX_CONNECTION_RUNNING_STATE_RUNNING;
-                events = POLLIN | POLLOUT;
         } else if (errno == EINPROGRESS) {
                 connection->running_state =
                         VSX_CONNECTION_RUNNING_STATE_RECONNECTING;
-                events = POLLOUT;
         } else {
                 goto file_error;
         }
 
         connection->dirty_flags |= (VSX_CONNECTION_DIRTY_FLAG_WS_HEADER |
                                     VSX_CONNECTION_DIRTY_FLAG_HEADER);
+        connection->output_length = 0;
+        connection->input_length = 0;
         connection->ws_terminator_pos = 0;
         connection->write_finished = false;
         connection->synced = false;
 
-        connection->sock_events = events;
-        send_poll_changed(connection);
+        update_poll(connection);
 
         return;
 
@@ -1395,7 +1592,7 @@ vsx_connection_wake_up(struct vsx_connection *connection,
         else if ((poll_events & POLLOUT))
                 handle_write(connection);
         else
-                update_poll(connection, false /* always_send */ );
+                update_poll(connection);
 }
 
 static bool
@@ -1419,8 +1616,8 @@ has_pending_data(struct vsx_connection *connection)
         return false;
 }
 
-static void
-update_poll(struct vsx_connection *connection, bool always_send)
+static short
+calculate_poll_events(struct vsx_connection *connection)
 {
         short events = 0;
 
@@ -1435,8 +1632,7 @@ update_poll(struct vsx_connection *connection, bool always_send)
                 if (!connection->write_finished) {
                         if (has_pending_data(connection)) {
                                 events |= POLLOUT;
-                        } else if (connection->state ==
-                                   VSX_CONNECTION_STATE_DONE) {
+                        } else if (connection->finished) {
                                 shutdown(connection->sock, SHUT_WR);
 
                                 connection->write_finished = true;
@@ -1445,14 +1641,66 @@ update_poll(struct vsx_connection *connection, bool always_send)
                 break;
 
         default:
-                return;
+                break;
         }
 
-        if (always_send || connection->sock_events != events) {
-                connection->sock_events = events;
+        return events;
+}
 
-                send_poll_changed(connection);
+static int64_t
+calculate_wakeup_timestamp(struct vsx_connection *connection)
+{
+        int64_t wakeup_timestamp = INT64_MAX;
+
+        if (connection->reconnect_timestamp < wakeup_timestamp)
+                wakeup_timestamp = connection->reconnect_timestamp;
+
+        if (connection->keep_alive_timestamp < wakeup_timestamp)
+                wakeup_timestamp = connection->keep_alive_timestamp;
+
+        return wakeup_timestamp;
+}
+
+static void
+update_poll(struct vsx_connection *connection)
+{
+        short events = calculate_poll_events(connection);
+        int64_t wakeup_timestamp = calculate_wakeup_timestamp(connection);
+
+        if (connection->poll_changed_event.poll_changed.fd !=
+            connection->sock ||
+            connection->poll_changed_event.poll_changed.events != events ||
+            connection->poll_changed_event.poll_changed.wakeup_time !=
+            wakeup_timestamp) {
+                connection->poll_changed_event.poll_changed.fd =
+                        connection->sock;
+                connection->poll_changed_event.poll_changed.events =
+                        events;
+                connection->poll_changed_event.poll_changed.wakeup_time =
+                        wakeup_timestamp;
+
+                emit_event(connection, &connection->poll_changed_event);
         }
+}
+
+static bool
+has_configuration(struct vsx_connection *connection)
+{
+        /* We always need a server address to connect to */
+        if (!connection->has_address)
+                return false;
+
+        /* If we have a person ID that we don’t need any of the other
+         * information.
+         */
+        if (connection->has_person_id)
+                return true;
+
+        /* In order to make a person we always need the name */
+        if (connection->player_name == NULL)
+                return false;
+
+        return true;
 }
 
 static void
@@ -1462,12 +1710,19 @@ start_connecting_running_state(struct vsx_connection *connection)
          * connecting
          */
         connection->reconnect_timeout = 0;
-        connection->reconnect_timestamp = vsx_monotonic_get();
 
-        connection->running_state =
-                VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+        if (has_configuration(connection)) {
+                connection->reconnect_timestamp = vsx_monotonic_get();
 
-        send_poll_changed(connection);
+                connection->running_state =
+                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT;
+
+                update_poll(connection);
+        } else {
+                connection->reconnect_timestamp = INT64_MAX;
+                connection->running_state =
+                        VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION;
+        }
 }
 
 static void
@@ -1490,7 +1745,7 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         close_socket(connection);
-                        send_poll_changed(connection);
+                        update_poll(connection);
                         break;
 
                 case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_RECONNECT:
@@ -1498,7 +1753,12 @@ vsx_connection_set_running_internal(struct vsx_connection *connection,
                         connection->reconnect_timestamp = INT64_MAX;
                         connection->running_state =
                                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
-                        send_poll_changed(connection);
+                        update_poll(connection);
+                        break;
+
+                case VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION:
+                        connection->running_state =
+                                VSX_CONNECTION_RUNNING_STATE_DISCONNECTED;
                         break;
                 }
         }
@@ -1508,6 +1768,9 @@ void
 vsx_connection_set_running(struct vsx_connection *connection,
                            bool running)
 {
+        if (running == vsx_connection_get_running(connection))
+                return;
+
         vsx_connection_set_running_internal(connection, running);
 
         struct vsx_connection_event event = {
@@ -1515,7 +1778,7 @@ vsx_connection_set_running(struct vsx_connection *connection,
                 .running_state_changed = { .running = running },
         };
 
-        vsx_signal_emit(&connection->event_signal, &event);
+        emit_event(connection, &event);
 }
 
 bool
@@ -1523,50 +1786,6 @@ vsx_connection_get_running(struct vsx_connection *connection)
 {
         return (connection->running_state !=
                 VSX_CONNECTION_RUNNING_STATE_DISCONNECTED);
-}
-
-bool
-vsx_connection_is_synced(struct vsx_connection *connection)
-{
-        return connection->synced;
-}
-
-struct vsx_connection *
-vsx_connection_new(const struct vsx_netaddress *address,
-                   const char *room,
-                   const char *player_name)
-{
-        struct vsx_connection *connection = vsx_calloc(sizeof *connection);
-
-        if (address == NULL) {
-                vsx_netaddress_from_string(&connection->address,
-                                           "127.0.0.1",
-                                           5144);
-        } else {
-                connection->address = *address;
-        }
-
-        vsx_signal_init(&connection->event_signal);
-
-        connection->keep_alive_timestamp = INT64_MAX;
-        connection->reconnect_timestamp = INT64_MAX;
-
-        connection->sock = -1;
-
-        connection->room = vsx_strdup(room);
-        connection->player_name = vsx_strdup(player_name);
-
-        connection->next_message_num = 0;
-
-        vsx_buffer_init(&connection->players);
-
-        vsx_slab_init(&connection->tile_allocator);
-        vsx_buffer_init(&connection->tiles);
-
-        vsx_list_init(&connection->tiles_to_move);
-        vsx_list_init(&connection->messages_to_send);
-
-        return connection;
 }
 
 static void
@@ -1577,6 +1796,8 @@ free_tiles_to_move(struct vsx_connection *connection)
         vsx_list_for_each_safe(tile, tmp, &connection->tiles_to_move, link) {
                 vsx_free(tile);
         }
+
+        vsx_list_init(&connection->tiles_to_move);
 }
 
 static void
@@ -1590,43 +1811,74 @@ free_messages_to_send(struct vsx_connection *connection)
                                link) {
                 vsx_free(message);
         }
+
+        vsx_list_init(&connection->messages_to_send);
 }
 
-static void
-free_players(struct vsx_connection *connection)
+void
+vsx_connection_reset(struct vsx_connection *connection)
 {
-        int n_players =
-                connection->players.length / sizeof (struct vsx_player *);
+        close_socket(connection);
 
-        for (int i = 0; i < n_players; i++) {
-                struct vsx_player *player =
-                        ((struct vsx_player **) connection->players.data)[i];
+        vsx_free(connection->room);
+        connection->room = NULL;
 
-                if (player == NULL)
-                        continue;
+        vsx_free(connection->player_name);
+        connection->player_name = NULL;
 
-                vsx_free(player->name);
-                vsx_free(player);
-        }
+        connection->has_person_id = false;
+        connection->has_conversation_id = false;
+        connection->finished = false;
+        connection->typing = false;
+        connection->sent_typing_state = false;
+        connection->next_message_num = 0;
+        connection->language_to_send[0] = '\0';
 
-        vsx_buffer_destroy(&connection->players);
+        connection->dirty_flags = 0;
+
+        connection->keep_alive_timestamp = INT64_MAX;
+        connection->reconnect_timestamp = INT64_MAX;
+        connection->player_id_received_timestamp = INT64_MAX;
+
+        connection->reconnect_timeout = 0;
+
+        free_tiles_to_move(connection);
+        free_messages_to_send(connection);
+
+        vsx_connection_set_running(connection, false);
+
+        update_poll(connection);
+}
+
+struct vsx_connection *
+vsx_connection_new(void)
+{
+        struct vsx_connection *connection = vsx_calloc(sizeof *connection);
+
+        vsx_signal_init(&connection->event_signal);
+
+        connection->poll_changed_event.type =
+                VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED;
+
+        connection->sock = -1;
+
+        vsx_list_init(&connection->tiles_to_move);
+        vsx_list_init(&connection->messages_to_send);
+
+        vsx_connection_reset(connection);
+
+        return connection;
 }
 
 void
 vsx_connection_free(struct vsx_connection *connection)
 {
-        close_socket(connection);
+        /* Reinitialise the signal so that reset the connection won’t
+         * emit the poll changed event.
+         */
+        vsx_signal_init(&connection->event_signal);
 
-        vsx_free(connection->room);
-        vsx_free(connection->player_name);
-
-        free_players(connection);
-
-        vsx_buffer_destroy(&connection->tiles);
-        vsx_slab_destroy(&connection->tile_allocator);
-
-        free_tiles_to_move(connection);
-        free_messages_to_send(connection);
+        vsx_connection_reset(connection);
 
         vsx_free(connection);
 }
@@ -1635,12 +1887,6 @@ bool
 vsx_connection_get_typing(struct vsx_connection *connection)
 {
         return connection->typing;
-}
-
-enum vsx_connection_state
-vsx_connection_get_state(struct vsx_connection *connection)
-{
-        return connection->state;
 }
 
 void
@@ -1671,7 +1917,7 @@ vsx_connection_send_message(struct vsx_connection *connection,
         vsx_list_insert(connection->messages_to_send.prev,
                         &message_to_send->link);
 
-        update_poll(connection, false /* always_send */);
+        update_poll(connection);
 }
 
 void
@@ -1679,63 +1925,7 @@ vsx_connection_leave(struct vsx_connection *connection)
 {
         connection->dirty_flags |= VSX_CONNECTION_DIRTY_FLAG_LEAVE;
 
-        update_poll(connection, false /* always_send */);
-}
-
-const struct vsx_player *
-vsx_connection_get_player(struct vsx_connection *connection, int player_num)
-{
-        return get_pointer_from_buffer(&connection->players, player_num);
-}
-
-void
-vsx_connection_foreach_player(struct vsx_connection *connection,
-                              vsx_connection_foreach_player_cb callback,
-                              void *user_data)
-{
-        int n_players =
-                connection->players.length / sizeof (struct vsx_player *);
-
-        for (int i = 0; i < n_players; i++) {
-                struct vsx_player *player =
-                        ((struct vsx_player **)connection->players.data)[i];
-
-                if (player == NULL)
-                        continue;
-
-                callback(player, user_data);
-        }
-}
-
-const struct vsx_player *
-vsx_connection_get_self(struct vsx_connection *connection)
-{
-        return connection->self;
-}
-
-const struct vsx_tile *
-vsx_connection_get_tile(struct vsx_connection *connection,
-                        int tile_num)
-{
-        return get_pointer_from_buffer(&connection->tiles, tile_num);
-}
-
-void
-vsx_connection_foreach_tile(struct vsx_connection *connection,
-                            vsx_connection_foreach_tile_cb callback,
-                            void *user_data)
-{
-        int n_tiles = connection->tiles.length / sizeof (struct vsx_tile *);
-
-        for (int i = 0; i < n_tiles; i++) {
-                struct vsx_tile *tile =
-                        ((struct vsx_tile **)connection->tiles.data)[i];
-
-                if (tile == NULL)
-                        continue;
-
-                callback(tile, user_data);
-        }
+        update_poll(connection);
 }
 
 struct vsx_signal *
@@ -1744,8 +1934,153 @@ vsx_connection_get_event_signal(struct vsx_connection *connection)
         return &connection->event_signal;
 }
 
-int
-vsx_connection_get_n_tiles(struct vsx_connection *connection)
+bool
+vsx_connection_get_person_id(struct vsx_connection *connection,
+                             uint64_t *person_id)
 {
-        return connection->n_tiles;
+        if (connection->has_person_id) {
+                *person_id = connection->person_id;
+                return true;
+        }
+
+        return false;
+}
+
+static void
+maybe_start_connecting_running_state(struct vsx_connection *connection)
+{
+        if (connection->running_state ==
+            VSX_CONNECTION_RUNNING_STATE_WAITING_FOR_CONFIGURATION)
+                start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_person_id(struct vsx_connection *connection,
+                             uint64_t person_id)
+{
+        if (connection->has_person_id)
+                return;
+
+        connection->person_id = person_id;
+        connection->has_person_id = true;
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_player_name(struct vsx_connection *connection,
+                               const char *player_name)
+{
+        if (connection->player_name)
+                return;
+
+        connection->player_name = vsx_strdup(player_name);
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_room(struct vsx_connection *connection,
+                        const char *room)
+{
+        if (connection->room)
+                return;
+
+        connection->room = vsx_strdup(room);
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_conversation_id(struct vsx_connection *connection,
+                                   uint64_t conversation_id)
+{
+        if (connection->has_conversation_id)
+                return;
+
+        connection->has_conversation_id = true;
+        connection->conversation_id = conversation_id;
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_set_address(struct vsx_connection *connection,
+                           const struct vsx_netaddress *address)
+{
+        if (connection->has_address)
+                return;
+
+        connection->has_address = true;
+        connection->address = *address;
+
+        maybe_start_connecting_running_state(connection);
+}
+
+void
+vsx_connection_copy_event(struct vsx_connection_event *dest,
+                          const struct vsx_connection_event *src)
+{
+        *dest = *src;
+
+        switch (src->type) {
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                dest->error.error = NULL;
+                vsx_set_error(&dest->error.error,
+                              src->error.error->domain,
+                              src->error.error->code,
+                              "%s",
+                              src->error.error->message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+                dest->message.message = vsx_strdup(src->message.message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
+                dest->player_name_changed.name =
+                        vsx_strdup(src->player_name_changed.name);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
+                dest->language_changed.code =
+                        vsx_strdup(src->language_changed.code);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_END:
+        case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
+                break;
+        }
+}
+
+void
+vsx_connection_destroy_event(struct vsx_connection_event *event)
+{
+        switch (event->type) {
+        case VSX_CONNECTION_EVENT_TYPE_ERROR:
+                vsx_error_free(event->error.error);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_MESSAGE:
+                vsx_free((char *) event->message.message);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED:
+                vsx_free((char *) event->player_name_changed.name);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED:
+                vsx_free((char *) event->language_changed.code);
+                break;
+        case VSX_CONNECTION_EVENT_TYPE_HEADER:
+        case VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED:
+        case VSX_CONNECTION_EVENT_TYPE_TILE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_N_TILES_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED:
+        case VSX_CONNECTION_EVENT_TYPE_END:
+        case VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED:
+                break;
+        }
 }

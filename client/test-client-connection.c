@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <poll.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "vsx-connection.h"
 #include "vsx-util.h"
@@ -37,9 +38,16 @@
 
 struct harness {
         int server_sock;
+        struct vsx_netaddress local_address;
         struct vsx_connection *connection;
         struct vsx_listener event_listener;
         struct vsx_signal *event_signal;
+
+        /* All of the events get copied into this list and then
+         * destroyed when the harness is destroyed in order to
+         * test the event copying mechanism
+         */
+        struct vsx_list copied_events;
 
         int poll_fd;
         short poll_events;
@@ -52,6 +60,11 @@ struct harness {
         const struct vsx_error_domain *expected_error_domain;
         int expected_error_code;
         const char *expected_error_message;
+};
+
+struct copied_event {
+        struct vsx_list link;
+        struct vsx_connection_event event;
 };
 
 struct frame_error_test
@@ -76,6 +89,7 @@ struct check_event_listener {
         struct vsx_listener listener;
         enum check_event_result result;
         enum vsx_connection_event_type expected_type;
+        int ignore_event_type;
         check_event_func cb;
         struct harness *harness;
         void *user_data;
@@ -84,6 +98,8 @@ struct check_event_listener {
 #define BIN_STR(x) ((const uint8_t *) (x)), (sizeof (x)) - 1
 
 static const uint8_t player_id_header[] = "\x82\x0a\x00ghijklmn\x00";
+static const uint8_t conversation_id_header[] =
+        "\x82\x09\x0a\x80\x81\x82\x83\x84\x85\x86\x87";
 
 static const struct frame_error_test
 frame_error_tests[] = {
@@ -92,8 +108,16 @@ frame_error_tests[] = {
                 "The server sent an invalid player_id command"
         },
         {
+                BIN_STR("\x82\x08\x0aghijklm"),
+                "The server sent an invalid conversation_id command"
+        },
+        {
                 BIN_STR("\x82\x04\x02six"),
                 "The server sent an invalid n_tiles command"
+        },
+        {
+                BIN_STR("\x82\x04\x0cĉĉ"),
+                "The server sent an invalid language command"
         },
         {
                 BIN_STR("\x82\x09\x01\x00ghijklm"),
@@ -118,6 +142,18 @@ frame_error_tests[] = {
         {
                 BIN_STR("\x82\x04\x08!!!"),
                 "The server sent an invalid end command"
+        },
+        {
+                BIN_STR("\x82\x04\x09!!!"),
+                "The server sent an invalid bad player ID command"
+        },
+        {
+                BIN_STR("\x82\x04\x0b!!!"),
+                "The server sent an invalid bad conversation ID command"
+        },
+        {
+                BIN_STR("\x82\x04\x0d!!!"),
+                "The server sent an invalid conversation full command"
         },
         {
                 BIN_STR("\x82\x04\x07!!!"),
@@ -206,6 +242,10 @@ event_cb(struct vsx_listener *listener,
                                                    event_listener);
         const struct vsx_connection_event *event = data;
 
+        struct copied_event *copied_event = vsx_calloc(sizeof *copied_event);
+        vsx_connection_copy_event(&copied_event->event, event);
+        vsx_list_insert(harness->copied_events.prev, &copied_event->link);
+
         harness->events_triggered |= 1 << event->type;
 
         switch (event->type) {
@@ -246,6 +286,20 @@ wake_up_connection(struct harness *harness)
 }
 
 static void
+free_copied_events(struct harness *harness)
+{
+        struct copied_event *copied_event, *tmp;
+
+        vsx_list_for_each_safe(copied_event,
+                               tmp,
+                               &harness->copied_events,
+                               link) {
+                vsx_connection_destroy_event(&copied_event->event);
+                vsx_free(copied_event);
+        }
+}
+
+static void
 free_harness(struct harness *harness)
 {
         if (harness->server_fd != -1)
@@ -256,6 +310,8 @@ free_harness(struct harness *harness)
 
         if (harness->connection)
                 vsx_connection_free(harness->connection);
+
+        free_copied_events(harness);
 
         vsx_free(harness);
 }
@@ -304,9 +360,14 @@ accept_connection(struct harness *harness)
 }
 
 static struct harness *
-create_harness(void)
+create_harness_no_start(void)
 {
         struct harness *harness = vsx_calloc(sizeof *harness);
+
+        harness->poll_fd = -1;
+        harness->wakeup_time = INT64_MAX;
+
+        vsx_list_init(&harness->copied_events);
 
         harness->server_fd = -1;
 
@@ -325,9 +386,7 @@ create_harness(void)
                    SOL_SOCKET, SO_REUSEADDR,
                    &true_value, sizeof true_value);
 
-        struct vsx_netaddress local_address;
-
-        if (!vsx_netaddress_from_string(&local_address,
+        if (!vsx_netaddress_from_string(&harness->local_address,
                                         "127.0.0.1",
                                         TEST_PORT)) {
                 fprintf(stderr, "error getting localhost address\n");
@@ -336,7 +395,8 @@ create_harness(void)
 
         struct vsx_netaddress_native native_local_address;
 
-        vsx_netaddress_to_native(&local_address, &native_local_address);
+        vsx_netaddress_to_native(&harness->local_address,
+                                 &native_local_address);
 
         if (bind(harness->server_sock,
                  &native_local_address.sockaddr,
@@ -354,9 +414,7 @@ create_harness(void)
                 goto error;
         }
 
-        harness->connection = vsx_connection_new(&local_address,
-                                                 "test_room",
-                                                 "test_player");
+        harness->connection = vsx_connection_new();
 
         harness->event_signal =
                 vsx_connection_get_event_signal(harness->connection);
@@ -364,28 +422,61 @@ create_harness(void)
         harness->event_listener.notify = event_cb;
         vsx_signal_add(harness->event_signal, &harness->event_listener);
 
-        vsx_connection_set_running(harness->connection, true);
-
-        if (!wake_up_connection(harness))
-                goto error;
-
-        if (harness->poll_fd == -1) {
-                fprintf(stderr,
-                        "After starting the connection, there is no poll fd\n");
-                goto error;
-        }
-
-        if (!wake_up_connection(harness))
-                goto error;
-
-        if (!accept_connection(harness))
-                goto error;
-
         return harness;
 
 error:
         free_harness(harness);
         return NULL;
+}
+
+static bool
+wake_up_and_accept_connection(struct harness *harness)
+{
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->poll_fd == -1) {
+                fprintf(stderr,
+                        "After starting the connection, there is no poll fd\n");
+                return false;
+        }
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (!accept_connection(harness))
+                return false;
+
+        return true;
+}
+
+static bool
+start_connection(struct harness *harness)
+{
+        vsx_connection_set_room(harness->connection, "test_room");
+        vsx_connection_set_player_name(harness->connection, "test_player");
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        return wake_up_and_accept_connection(harness);
+}
+
+static struct harness *
+create_harness(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        if (!start_connection(harness)) {
+                free_harness(harness);
+                return NULL;
+        }
+
+        return harness;
 }
 
 static void
@@ -585,10 +676,10 @@ test_slow_ws_response(void)
         }
 
         if ((harness->events_triggered &
-             (1 << VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED)) == 0) {
+             (1 << VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED)) == 0) {
                 fprintf(stderr,
-                        "Connection didn’t send player_changed event after "
-                        "receiving command\n");
+                        "Connection didn’t send player_name_changed event "
+                        "after receiving command\n");
                 ret = false;
                 goto out;
         }
@@ -607,6 +698,9 @@ check_event_cb(struct vsx_listener *listener, void *data)
                                  struct check_event_listener,
                                  listener);
         const struct vsx_connection_event *event = data;
+
+        if (event->type == ce_listener->ignore_event_type)
+                return;
 
         if (ce_listener->result != CHECK_EVENT_RESULT_NO_MESSAGE) {
                 fprintf(stderr,
@@ -629,17 +723,19 @@ check_event_cb(struct vsx_listener *listener, void *data)
 }
 
 static bool
-check_event(struct harness *harness,
-            enum vsx_connection_event_type expected_type,
-            check_event_func cb,
-            const uint8_t *data,
-            size_t data_len,
-            void *user_data)
+check_event_with_ignore(struct harness *harness,
+                        enum vsx_connection_event_type expected_type,
+                        int ignore_event_type,
+                        check_event_func cb,
+                        const uint8_t *data,
+                        size_t data_len,
+                        void *user_data)
 {
         struct check_event_listener listener = {
                 .listener = { .notify = check_event_cb },
                 .result = CHECK_EVENT_RESULT_NO_MESSAGE,
                 .expected_type = expected_type,
+                .ignore_event_type = ignore_event_type,
                 .cb = cb,
                 .harness = harness,
                 .user_data = user_data,
@@ -670,14 +766,43 @@ check_event(struct harness *harness,
 }
 
 static bool
-check_state_in_progress_cb(struct harness *harness,
-                           const struct vsx_connection_event *event,
-                           void *user_data)
+check_event(struct harness *harness,
+            enum vsx_connection_event_type expected_type,
+            check_event_func cb,
+            const uint8_t *data,
+            size_t data_len,
+            void *user_data)
 {
-        if (event->state_changed.state != VSX_CONNECTION_STATE_IN_PROGRESS) {
+        return check_event_with_ignore(harness,
+                                       expected_type,
+                                       -1, /* ignore_event_type */
+                                       cb,
+                                       data,
+                                       data_len,
+                                       user_data);
+}
+
+static bool
+check_header_cb(struct harness *harness,
+                const struct vsx_connection_event *event,
+                void *user_data)
+{
+        if (event->header.self_num != 0) {
                 fprintf(stderr,
-                        "Expected state to be in-progress, but got %i\n",
-                        event->state_changed.state);
+                        "Expected self to be 0 in header but got %i\n",
+                        event->header.self_num);
+                return false;
+        }
+
+        const uint64_t expected_id = UINT64_C(0x6e6d6c6b6a696867);
+
+        if (event->header.person_id != expected_id) {
+                fprintf(stderr,
+                        "person_id does not match in header\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        event->header.person_id);
                 return false;
         }
 
@@ -688,10 +813,41 @@ static bool
 send_player_id(struct harness *harness)
 {
         return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                           check_state_in_progress_cb,
+                           VSX_CONNECTION_EVENT_TYPE_HEADER,
+                           check_header_cb,
                            player_id_header,
                            sizeof player_id_header - 1,
+                           NULL /* user_data */);
+}
+
+static bool
+check_conversation_id_cb(struct harness *harness,
+                         const struct vsx_connection_event *event,
+                         void *user_data)
+{
+        const uint64_t expected_id = UINT64_C(0x8786858483828180);
+
+        if (event->conversation_id.id != expected_id) {
+                fprintf(stderr,
+                        "conversation_id does not match in event\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        event->conversation_id.id);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+send_conversation_id(struct harness *harness)
+{
+        return check_event(harness,
+                           VSX_CONNECTION_EVENT_TYPE_CONVERSATION_ID,
+                           check_conversation_id_cb,
+                           conversation_id_header,
+                           sizeof conversation_id_header - 1,
                            NULL /* user_data */);
 }
 
@@ -703,31 +859,44 @@ send_player_id_no_event(struct harness *harness)
                           sizeof player_id_header - 1);
 }
 
-struct check_player_changed_closure {
-        enum vsx_connection_player_changed_flags flags;
-};
-
 static bool
-check_player_changed_cb(struct harness *harness,
-                        const struct vsx_connection_event *event,
-                        void *user_data)
+check_player_name_changed_cb(struct harness *harness,
+                             const struct vsx_connection_event *event,
+                             void *user_data)
 {
-        struct check_player_changed_closure *closure = user_data;
-
-        if (event->player_changed.player == NULL ||
-            event->player_changed.player !=
-            vsx_connection_get_self(harness->connection)) {
+        if (event->player_name_changed.player_num != 0) {
                 fprintf(stderr,
                         "Changed player is not self\n");
                 return false;
         }
 
-        if (event->player_changed.flags != closure->flags) {
+        if (strcmp(event->player_name_changed.name, "test_player")) {
                 fprintf(stderr,
-                        "Expected flags 0x%x in player changed event but "
-                        "received 0x%x\n",
-                        closure->flags,
-                        event->player_changed.flags);
+                        "self name does not match\n"
+                        " Expected: test_player\n"
+                        " Received: %s\n",
+                        event->player_name_changed.name);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+check_player_flags_changed_cb(struct harness *harness,
+                              const struct vsx_connection_event *event,
+                              void *user_data)
+{
+        if (event->player_flags_changed.player_num != 0) {
+                fprintf(stderr,
+                        "Changed player is not self\n");
+                return false;
+        }
+
+        if (event->player_flags_changed.flags != 1) {
+                fprintf(stderr,
+                        "Expected changed flags to be 1, got %i\n",
+                        event->player_flags_changed.flags);
                 return false;
         }
 
@@ -745,26 +914,20 @@ send_player_data(struct harness *harness)
                 /* player */
                 "\x82\x03\x05\x00\x01";
 
-        struct check_player_changed_closure closure = {
-                .flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME,
-        };
-
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                         check_player_changed_cb,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                         check_player_name_changed_cb,
                          name_header,
                          sizeof name_header - 1,
-                         &closure))
+                         NULL))
                 return false;
 
-        closure.flags = VSX_CONNECTION_PLAYER_CHANGED_FLAGS_FLAGS;
-
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
-                         check_player_changed_cb,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_FLAGS_CHANGED,
+                         check_player_flags_changed_cb,
                          data_header,
                          sizeof data_header - 1,
-                         &closure))
+                         NULL))
                 return false;
 
         return true;
@@ -790,43 +953,11 @@ create_negotiated_harness(void)
         if (!send_player_id(harness))
                 goto error;
 
+        if (!send_conversation_id(harness))
+                goto error;
+
         if (!send_player_data(harness))
                 goto error;
-
-        const struct vsx_player *self =
-                vsx_connection_get_self(harness->connection);
-        const char *name = vsx_player_get_name(self);
-
-        if (strcmp(name, "test_player")) {
-                fprintf(stderr,
-                        "self name does not match\n"
-                        " Expected: test_player\n"
-                        " Received: %s\n",
-                        name);
-                goto error;
-        }
-
-        if (!vsx_player_is_connected(self)) {
-                fprintf(stderr, "self is not connected\n");
-                goto error;
-        }
-
-        if (vsx_player_is_typing(self)) {
-                fprintf(stderr, "self is typing after connecting\n");
-                goto error;
-        }
-
-        if (vsx_player_has_next_turn(self)) {
-                fprintf(stderr, "self has next turn after connecting\n");
-                goto error;
-        }
-
-        if (vsx_player_get_number(self) != 0) {
-                fprintf(stderr,
-                        "self number is not 0 (%i)\n",
-                        vsx_player_get_number(self));
-                goto error;
-        }
 
         return harness;
 
@@ -1061,6 +1192,54 @@ out:
 }
 
 static bool
+test_reconnect_pending_data(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Send an incomplete message so that the data will be pending
+         * in the input buffer of the connection. The message
+         * deliberately contains the websocket terminator so that if
+         * the pending data isn’t cleared then it will confuse the
+         * part that skips the websocket header.
+         */
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x08\x01\r\n\r\n",
+                        7)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!do_unexpected_close(harness) ||
+            !wake_up_connection(harness) ||
+            !accept_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n") ||
+            !read_reconnect_message(harness, 0)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Send any message that would trigger an event to check that
+         * the connection is correctly processing messages.
+         */
+
+        if (!send_player_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 test_keep_alive(void)
 {
         struct harness *harness = create_negotiated_harness();
@@ -1137,16 +1316,6 @@ check_n_tiles_changed_cb(struct harness *harness,
                 return false;
         }
 
-        if (event->n_tiles_changed.n_tiles !=
-            vsx_connection_get_n_tiles(harness->connection)) {
-                fprintf(stderr,
-                        "n_tiles in event does not match connection value "
-                        "(%i != %i)\n",
-                        event->n_tiles_changed.n_tiles,
-                        vsx_connection_get_n_tiles(harness->connection));
-                return false;
-        }
-
         return true;
 }
 
@@ -1176,33 +1345,63 @@ out:
 }
 
 static bool
+check_language_changed_cb(struct harness *harness,
+                          const struct vsx_connection_event *event,
+                          void *user_data)
+{
+        if (strcmp(event->language_changed.code, "fr")) {
+                fprintf(stderr,
+                        "language in event has unexpected value\n"
+                        " Expected: fr\n"
+                        " Received: %s\n",
+                        event->language_changed.code);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_send_language(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_LANGUAGE_CHANGED,
+                         check_language_changed_cb,
+                         (const uint8_t *) "\x82\x04\x0C" "fr\x00", 6,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+
+        return ret;
+}
+
+static bool
 check_player_added_cb(struct harness *harness,
                       const struct vsx_connection_event *event,
                       void *user_data)
 {
-        const struct vsx_player *other = event->player_changed.player;
-        int number = vsx_player_get_number(other);
-
-        if (number != 1) {
+        if (event->player_name_changed.player_num != 1) {
                 fprintf(stderr,
                         "Expected other player to have number 1 but got %i\n",
-                        number);
+                        event->player_name_changed.player_num);
                 return false;
         }
 
-        const char *name = vsx_player_get_name(other);
-
-        if (strcmp(name, "George")) {
+        if (strcmp(event->player_name_changed.name, "George")) {
                 fprintf(stderr,
                         "Other player is not called George: %s\n",
-                        name);
-                return false;
-        }
-
-        if (event->player_changed.flags !=
-            VSX_CONNECTION_PLAYER_CHANGED_FLAGS_NAME) {
-                fprintf(stderr,
-                        "Player changed flags are not just the name\n");
+                        event->player_name_changed.name);
                 return false;
         }
 
@@ -1216,7 +1415,7 @@ add_player(struct harness *harness)
                 "\x82\x09\x04\x01George\x00";
 
         return check_event(harness,
-                           VSX_CONNECTION_EVENT_TYPE_PLAYER_CHANGED,
+                           VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
                            check_player_added_cb,
                            add_player_message,
                            sizeof add_player_message - 1,
@@ -1224,18 +1423,14 @@ add_player(struct harness *harness)
 }
 
 static bool
-check_self_shouted_cb(struct harness *harness,
-                      const struct vsx_connection_event *event,
-                      void *user_data)
+check_shouter_num(int expected_shouter,
+                  const struct vsx_connection_event *event)
 {
-        const struct vsx_player *self =
-                vsx_connection_get_self (harness->connection);
-        const struct vsx_player *shouter = event->player_shouted.player;
-
-        if (self != shouter) {
+        if (expected_shouter != event->player_shouted.player_num) {
                 fprintf(stderr,
-                        "Expected self to shout but got %i\n",
-                        vsx_player_get_number(shouter));
+                        "Expected shouter to be %i but got %i\n",
+                        expected_shouter,
+                        event->player_shouted.player_num);
                 return false;
         }
 
@@ -1243,21 +1438,19 @@ check_self_shouted_cb(struct harness *harness,
 }
 
 static bool
+check_self_shouted_cb(struct harness *harness,
+                      const struct vsx_connection_event *event,
+                      void *user_data)
+{
+        return check_shouter_num(0, event);
+}
+
+static bool
 check_other_shouted_cb(struct harness *harness,
                        const struct vsx_connection_event *event,
                        void *user_data)
 {
-        const struct vsx_player *shouter = event->player_shouted.player;
-        int number = vsx_player_get_number(shouter);
-
-        if (number != 1) {
-                fprintf(stderr,
-                        "Expected other to shout but got %i\n",
-                        number);
-                return false;
-        }
-
-        return true;
+        return check_shouter_num(1, event);
 }
 
 static bool
@@ -1273,12 +1466,16 @@ test_receive_shout(void)
         static const uint8_t self_shout_message[] =
                 "\x82\x02\x06\x00";
 
-        if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
-                         check_self_shouted_cb,
-                         self_shout_message,
-                         sizeof self_shout_message - 1,
-                         NULL /* user_data */)) {
+        replacement_monotonic_time = vsx_monotonic_get();
+        replace_monotonic_time = true;
+
+        if (!check_event_with_ignore(harness,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
+                                     VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+                                     check_self_shouted_cb,
+                                     self_shout_message,
+                                     sizeof self_shout_message - 1,
+                                     NULL /* user_data */)) {
                 ret = false;
                 goto out;
         }
@@ -1291,17 +1488,19 @@ test_receive_shout(void)
         static const uint8_t other_shout_message[] =
                 "\x82\x02\x06\x01";
 
-        if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
-                         check_other_shouted_cb,
-                         other_shout_message,
-                         sizeof other_shout_message - 1,
-                         NULL /* user_data */)) {
+        if (!check_event_with_ignore(harness,
+                                     VSX_CONNECTION_EVENT_TYPE_PLAYER_SHOUTED,
+                                     VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED,
+                                     check_other_shouted_cb,
+                                     other_shout_message,
+                                     sizeof other_shout_message - 1,
+                                     NULL /* user_data */)) {
                 ret = false;
                 goto out;
         }
 
 out:
+        replace_monotonic_time = false;
         free_harness(harness);
 
         return ret;
@@ -1410,7 +1609,7 @@ test_send_message(void)
         buf[0] = 0x82;
         buf[1] = 0x7e; /* 16-bit payload length */
         buf[2] = payload_length >> 8;
-        buf[3] = payload_length & 0xff;
+        buf[3] = (char) (payload_length & 0xff);
         buf[4] = 0x85;
         memset(buf + 5, 'a', VSX_PROTO_MAX_MESSAGE_LENGTH - 3);
         strcpy(buf + 5 + VSX_PROTO_MAX_MESSAGE_LENGTH - 3, "ĉ");
@@ -1526,7 +1725,6 @@ struct send_tile_closure {
         int x;
         int y;
         char letter;
-        bool is_new;
 };
 
 static bool
@@ -1536,27 +1734,22 @@ check_tile_changed_cb(struct harness *harness,
 {
         struct send_tile_closure *closure = user_data;
 
-        const struct vsx_tile *tile = event->tile_changed.tile;
-
-        if (vsx_tile_get_number(tile) != closure->num ||
-            vsx_tile_get_x(tile) != closure->x ||
-            vsx_tile_get_y(tile) != closure->y ||
-            vsx_tile_get_letter(tile) != closure->letter ||
-            event->tile_changed.new_tile != closure->is_new) {
+        if (event->tile_changed.num != closure->num ||
+            event->tile_changed.x != closure->x ||
+            event->tile_changed.y != closure->y ||
+            event->tile_changed.letter != closure->letter) {
                 fprintf(stderr,
                         "Tile from event does not match sent tile:\n"
-                        " Expected: %i %i,%i %c %s\n"
-                        " Received: %i %i,%i %c %s\n",
+                        " Expected: %i %i,%i %c\n"
+                        " Received: %i %i,%i %c\n",
                         closure->num,
                         closure->x,
                         closure->y,
                         closure->letter,
-                        closure->is_new ? "new" : "old",
-                        vsx_tile_get_number(tile),
-                        vsx_tile_get_x(tile),
-                        vsx_tile_get_y(tile),
-                        vsx_tile_get_letter(tile),
-                        event->tile_changed.new_tile ? "new" : "old");
+                        event->tile_changed.num,
+                        event->tile_changed.x,
+                        event->tile_changed.y,
+                        event->tile_changed.letter);
                 return false;
         }
 
@@ -1569,8 +1762,7 @@ send_tile(struct harness *harness,
           int x,
           int y,
           char letter,
-          uint8_t player,
-          bool is_new)
+          uint8_t player)
 {
         uint8_t add_tile_message[] =
                 "\x82\x09\x03\x00\x01\x00\x02\x00g\x00\x00";
@@ -1588,7 +1780,6 @@ send_tile(struct harness *harness,
                 .x = x,
                 .y = y,
                 .letter = letter,
-                .is_new = is_new,
         };
 
         return check_event(harness,
@@ -1616,8 +1807,7 @@ test_move_tile(void)
                                i * 2,
                                i * 2 + 1,
                                'a' + i,
-                               i /* player */,
-                               true /* is_new */)) {
+                               i /* player */)) {
                         ret = false;
                         goto out;
                 }
@@ -1696,63 +1886,41 @@ out:
         return ret;
 }
 
-struct check_tiles_closure {
-        struct harness *harness;
-        int next_tile_num;
-        bool succeeded;
-};
-
-static void
-check_tiles_cb(const struct vsx_tile *tile,
-               void *user_data)
+static bool
+test_set_language(void)
 {
-        struct check_tiles_closure *closure = user_data;
-        int tile_num = closure->next_tile_num++;
+        struct harness *harness = create_negotiated_harness();
 
-        if (tile_num != vsx_tile_get_number(tile)) {
-                fprintf(stderr,
-                        "Tiles reported out of order. Expected %i got %i\n",
-                        tile_num,
-                        vsx_tile_get_number(tile));
-                closure->succeeded = false;
-                return;
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        vsx_connection_set_language(harness->connection, "en");
+        vsx_connection_set_language(harness->connection,
+                                    "really_excessively_long_language_code");
+        vsx_connection_set_language(harness->connection, "fr");
+
+        const uint8_t expected_data[] =
+                "\x82\x04\x8e" "fr\x0";
+
+        if (!expect_data(harness, expected_data, sizeof expected_data - 1)) {
+                ret = false;
+                goto out;
         }
 
-        int16_t x = tile_num * 257;
-        int y = (tile_num & 1) ? -tile_num : tile_num;
-
-        if (x != vsx_tile_get_x(tile) ||
-            y != vsx_tile_get_y(tile)) {
+        if (fd_ready_for_read(harness->server_fd)) {
                 fprintf(stderr,
-                        "Wrong tile position reported.\n"
-                        " Expected: %i,%i\n"
-                        " Received: %i,%i\n",
-                        x, y,
-                        vsx_tile_get_x(tile),
-                        vsx_tile_get_y(tile));
-                closure->succeeded = false;
-                return;
+                        "Connection sent more data after set_language "
+                        "command\n");
+                ret = false;
+                goto out;
         }
 
-        char letter = tile_num % 26 + 'A';
+out:
+        free_harness(harness);
 
-        if (letter != vsx_tile_get_letter(tile)) {
-                fprintf(stderr,
-                        "Reported tile letter does not match. (%c != %c)\n",
-                        letter,
-                        vsx_tile_get_letter(tile));
-                closure->succeeded = false;
-                return;
-        }
-
-        if (vsx_connection_get_tile(closure->harness->connection,
-                                    tile_num) != tile) {
-                fprintf(stderr,
-                        "Tile reported by get_tile not same as iterating "
-                        "tiles\n");
-                closure->succeeded = false;
-                return;
-        }
+        return ret;
 }
 
 static bool
@@ -1781,8 +1949,7 @@ test_send_all_tiles(void)
                                x,
                                (tile_num & 1) ? -tile_num : tile_num,
                                tile_num % 26 + 'A',
-                               tile_num / 2,
-                               true /* is_new */)) {
+                               tile_num / 2)) {
                         ret = false;
                         goto out;
                 }
@@ -1794,31 +1961,7 @@ test_send_all_tiles(void)
                        257,
                        -1,
                        'B',
-                       0,
-                       false /* is_new */)) {
-                ret = false;
-                goto out;
-        }
-
-        struct check_tiles_closure closure = {
-                .harness = harness,
-                .next_tile_num = 0,
-                .succeeded = true,
-        };
-
-        vsx_connection_foreach_tile(harness->connection,
-                                    check_tiles_cb,
-                                    &closure);
-
-        if (!closure.succeeded) {
-                ret = false;
-                goto out;
-        }
-
-        if (closure.next_tile_num != 256) {
-                fprintf(stderr,
-                        "vsx_connection_foreach_tile didn’t report "
-                        "all the tiles\n");
+                       0)) {
                 ret = false;
                 goto out;
         }
@@ -1829,55 +1972,44 @@ out:
         return ret;
 }
 
-struct check_players_closure {
-        struct harness *harness;
-        int next_player_num;
-        bool succeeded;
+struct check_add_all_player_name_closure {
+        int player_num;
 };
 
-static void
-check_players_cb(const struct vsx_player *player,
-                 void *user_data)
+static bool
+check_add_all_player_name_cb(struct harness *harness,
+                             const struct vsx_connection_event *event,
+                             void *user_data)
 {
-        struct check_players_closure *closure = user_data;
-        int player_num = closure->next_player_num++;
+        struct check_add_all_player_name_closure *closure = user_data;
 
-        if (player_num != vsx_player_get_number(player)) {
+        if (event->player_name_changed.player_num != closure->player_num) {
                 fprintf(stderr,
-                        "Players reported out of order. Expected %i got %i\n",
-                        player_num,
-                        vsx_player_get_number(player));
-                closure->succeeded = false;
-                return;
+                        "Changed player num does not match (%i != %i)\n",
+                        event->player_name_changed.player_num,
+                        closure->player_num);
+                return false;
         }
 
         struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+        vsx_buffer_append_printf(&buf, "Player %i", closure->player_num);
 
-        if (player_num == 1)
-                vsx_buffer_append_string(&buf, "George");
-        else
-                vsx_buffer_append_printf(&buf, "Player %i", player_num);
-
-        if (strcmp(vsx_player_get_name(player), (const char *) buf.data)) {
-                fprintf(stderr,
-                        "Wrong player name reported.\n"
-                        " Expected: %s\n"
-                        " Received: %s\n",
-                        (const char *) buf.data,
-                        vsx_player_get_name(player));
-                closure->succeeded = false;
-        }
+        int comp = strcmp((const char *) buf.data,
+                          event->player_name_changed.name);
 
         vsx_buffer_destroy(&buf);
 
-        if (vsx_connection_get_player(closure->harness->connection,
-                                      player_num) != player) {
+        if (comp) {
                 fprintf(stderr,
-                        "Player reported by get_player not same as iterating "
-                        "players\n");
-                closure->succeeded = false;
-                return;
+                        "Changed player name does not match expected\n"
+                        " Expected: Player %i\n"
+                        " Received: %s\n",
+                        closure->player_num,
+                        event->player_name_changed.name);
+                return false;
         }
+
+        return true;
 }
 
 static bool
@@ -1905,7 +2037,15 @@ test_send_all_players(void)
                 buf.data[1] = buf.length - 2;
                 buf.data[3] = player_num;
 
-                if (!write_data(harness, buf.data, buf.length)) {
+                struct check_add_all_player_name_closure closure = {
+                        .player_num = player_num,
+                };
+
+                if (!check_event(harness,
+                                 VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                                 check_add_all_player_name_cb,
+                                 buf.data, buf.length,
+                                 &closure)) {
                         ret = false;
                         goto out;
                 }
@@ -1917,29 +2057,6 @@ test_send_all_players(void)
                 goto out;
         }
 
-        struct check_players_closure closure = {
-                .harness = harness,
-                .next_player_num = 0,
-                .succeeded = true,
-        };
-
-        vsx_connection_foreach_player(harness->connection,
-                                      check_players_cb,
-                                      &closure);
-
-        if (!closure.succeeded) {
-                ret = false;
-                goto out;
-        }
-
-        if (closure.next_player_num != 256) {
-                fprintf(stderr,
-                        "vsx_connection_foreach_player didn’t report "
-                        "all the players\n");
-                ret = false;
-                goto out;
-        }
-
 out:
         vsx_buffer_destroy(&buf);
         free_harness(harness);
@@ -1947,23 +2064,38 @@ out:
         return ret;
 }
 
-static bool
-check_end_state_cb(struct harness *harness,
-                   const struct vsx_connection_event *event,
-                   void *user_data)
-{
-        if (event->state_changed.state != VSX_CONNECTION_STATE_DONE) {
-                fprintf(stderr,
-                        "State is not DONE after sending END\n");
-                return false;
-        }
+struct check_synced_closure {
+        bool synced;
+};
 
-        if (event->state_changed.state !=
-            vsx_connection_get_state(harness->connection)) {
-                fprintf(stderr,
-                        "State in event does not match connection state\n");
+static bool
+check_synced_cb(struct harness *harness,
+                const struct vsx_connection_event *event,
+                void *user_data)
+{
+        struct check_synced_closure *closure = user_data;
+
+        closure->synced = event->synced;
+
+        return true;
+}
+
+static bool
+check_synced(struct harness *harness, bool *synced)
+{
+        struct check_synced_closure closure;
+
+        /* Change a player name so that we can check the synced value
+         * in the corresponding event.
+         */
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_PLAYER_NAME_CHANGED,
+                         check_synced_cb,
+                         (const uint8_t *) "\x82\x05\x04\x00!!\x00", 7,
+                         &closure))
                 return false;
-        }
+
+        *synced = closure.synced;
 
         return true;
 }
@@ -1979,8 +2111,15 @@ test_sync(void)
         bool ret = true;
 
         for (int i = 0; i < 2; i++) {
+                bool synced;
+
+                if (!check_synced(harness, &synced)) {
+                        ret = false;
+                        goto out;
+                }
+
                 /* A new connection shouldn’t be synced */
-                if (vsx_connection_is_synced(harness->connection)) {
+                if (synced) {
                         fprintf(stderr,
                                 "Newly %s connection is already synced\n",
                                 i == 0 ? "created" : "reconnected");
@@ -1993,7 +2132,12 @@ test_sync(void)
                         goto out;
                 }
 
-                if (!vsx_connection_is_synced(harness->connection)) {
+                if (!check_synced(harness, &synced)) {
+                        ret = false;
+                        goto out;
+                }
+
+                if (!synced) {
                         fprintf(stderr,
                                 "Connection is not synced after sending sync "
                                 "command\n");
@@ -2022,6 +2166,14 @@ out:
 }
 
 static bool
+check_end_cb(struct harness *harness,
+             const struct vsx_connection_event *event,
+             void *user_data)
+{
+        return true;
+}
+
+static bool
 test_end(bool do_shutdown)
 {
         struct harness *harness = create_negotiated_harness();
@@ -2032,8 +2184,8 @@ test_end(bool do_shutdown)
         bool ret = true;
 
         if (!check_event(harness,
-                         VSX_CONNECTION_EVENT_TYPE_STATE_CHANGED,
-                         check_end_state_cb,
+                         VSX_CONNECTION_EVENT_TYPE_END,
+                         check_end_cb,
                          (const uint8_t *) "\x82\x01\x08", 3,
                          NULL /* user_data */)) {
                 ret = false;
@@ -2221,6 +2373,710 @@ test_leak_pendings(void)
         return true;
 }
 
+static bool
+test_get_person_id(void)
+{
+        struct harness *harness = create_harness();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n") ||
+            !read_new_player_request(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        uint64_t person_id = UINT64_MAX;
+
+        if (vsx_connection_get_person_id(harness->connection,
+                                         &person_id)) {
+                fprintf(stderr,
+                        "Person ID is already available before header was "
+                        "sent.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!send_player_id(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &person_id)) {
+                fprintf(stderr,
+                        "Person ID is not available even after sending the "
+                        "header.\n");
+                ret = false;
+                goto out;
+        }
+
+        const uint64_t expected_id = UINT64_C(0x6e6d6c6b6a696867);
+
+        if (person_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID is not as expected.\n"
+                        " Expected: 0x%" PRIx64 "\n"
+                        " Received: 0x%" PRIx64 "\n",
+                        expected_id,
+                        person_id);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_set_person_id(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        uint64_t expected_id = 0xfedcba9876543210;
+
+        vsx_connection_set_person_id(harness->connection, expected_id);
+
+        uint64_t received_id;
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &received_id)) {
+                fprintf(stderr, "Failed to get person ID after setting it.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (received_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID not as set:\n"
+                        " Expected 0x%" PRIx64 "\n"
+                        " Received 0x%" PRIx64 "\n",
+                        expected_id,
+                        received_id);
+                ret = false;
+                goto out;
+        }
+
+        if (!start_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        /* Make sure that the connection sends a reconnect command
+         * with the chosen person ID instead of trying to create a new
+         * person.
+         */
+        const uint8_t expected_data[] =
+                "\x82\x0b\x81\x10\x32\x54\x76\x98\xba\xdc\xfe\x00\x00";
+
+        if (!expect_data(harness, expected_data, (sizeof expected_data) - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Make sure that we can can’t change the person ID after it
+         * is set once.
+         */
+        vsx_connection_set_person_id(harness->connection, 5);
+
+        received_id = 0;
+
+        if (!vsx_connection_get_person_id(harness->connection,
+                                          &received_id)) {
+                fprintf(stderr, "Failed to get person ID after setting it.\n");
+                ret = false;
+                goto out;
+        }
+
+        if (received_id != expected_id) {
+                fprintf(stderr,
+                        "Person ID changed after setting it a second time:\n"
+                        " Expected 0x%" PRIx64 "\n"
+                        " Received 0x%" PRIx64 "\n",
+                        expected_id,
+                        received_id);
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+check_after_bad_thing_error(struct harness *harness)
+{
+        /* The connection should close the write end of the socket */
+        uint8_t byte;
+        int got = read(harness->server_fd, &byte, 1);
+
+        if (got != 0) {
+                fprintf(stderr,
+                        "Expected connection to close, got %i bytes\n",
+                        got);
+                return false;
+        }
+
+        shutdown(harness->server_fd, SHUT_WR);
+
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->wakeup_time != INT64_MAX) {
+                fprintf(stderr,
+                        "Expected connection to block forever after "
+                        "bad player ID, but got timeout of %f seconds\n",
+                        (harness->wakeup_time -
+                         vsx_monotonic_get()) /
+                        1000000.0f);
+                return false;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Expected connection to close fd, but it still has "
+                        "a poll fd\n");
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_bad_player_id(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        vsx_connection_set_person_id(harness->connection,
+                                     UINT64_C(0xfedcba9876543210));
+
+        if (!start_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        const uint8_t expected_data[] =
+                "\x82\x0b\x81\x10\x32\x54\x76\x98\xba\xdc\xfe\x00\x00";
+
+        if (!expect_data(harness, expected_data, (sizeof expected_data) - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        harness->expected_error_domain = &vsx_connection_error;
+        harness->expected_error_code = VSX_CONNECTION_ERROR_BAD_PLAYER_ID;
+        harness->expected_error_message =
+                "The player ID no longer exists";
+
+        if (!write_data(harness,
+                        (const uint8_t *) "\x82\x01\x09", 3)) {
+                ret = false;
+                goto out;
+        }
+
+        if (harness->expected_error_message != NULL) {
+                fprintf(stderr,
+                        "No error received after sending bad player ID "
+                        "message\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!check_after_bad_thing_error(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_join_error(enum vsx_connection_error error_code,
+                const char *error_message,
+                uint8_t protocol_code)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return NULL;
+
+        bool ret = true;
+
+        vsx_connection_set_conversation_id(harness->connection,
+                                           UINT64_C(0xfedcba9876543210));
+
+        if (!start_connection(harness) ||
+            !read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        const uint8_t expected_data[] =
+                "\x82\x15\x8d\x10\x32\x54\x76\x98\xba\xdc\xfe" "test_player\0";
+
+        if (!expect_data(harness, expected_data, (sizeof expected_data) - 1)) {
+                ret = false;
+                goto out;
+        }
+
+        harness->expected_error_domain = &vsx_connection_error;
+        harness->expected_error_code = error_code;
+        harness->expected_error_message = error_message;
+
+        uint8_t command[] = {
+                0x82, 0x01, protocol_code,
+        };
+
+        if (!write_data(harness, command, sizeof command)) {
+                ret = false;
+                goto out;
+        }
+
+        if (harness->expected_error_message != NULL) {
+                fprintf(stderr,
+                        "No error received after sending conversation ID error "
+                        "message\n");
+                ret = false;
+                goto out;
+        }
+
+        if (!check_after_bad_thing_error(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_bad_conversation_id(void)
+{
+        return test_join_error(VSX_CONNECTION_ERROR_BAD_CONVERSATION_ID,
+                               "The conversation ID no longer exists",
+                               0x0b);
+}
+
+static bool
+test_conversation_full(void)
+{
+        return test_join_error(VSX_CONNECTION_ERROR_CONVERSATION_FULL,
+                               "The conversation is full",
+                               0x0d);
+}
+
+static bool
+test_connection_is_blocking_for_config(struct harness *harness)
+{
+        if (!wake_up_connection(harness))
+                return false;
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Expected harness to be waiting for config but it "
+                        "has a poll FD.\n");
+                return false;
+        }
+
+        if (harness->wakeup_time != INT64_MAX) {
+                fprintf(stderr,
+                        "Expected harness to be waiting for config it it "
+                        "has a timeout in %f seconds.\n",
+                        (harness->wakeup_time -
+                         vsx_monotonic_get()) /
+                        1000000.0f);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_address_block_connect(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_room(harness->connection, "test_room");
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_player_name_block_connect(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_new_private_game(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *) "\x82\x0e\x8c\0test_player\0",
+                         16)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_join_private_game(void)
+{
+        struct harness *harness = create_harness_no_start();
+
+        if (harness == NULL)
+                return false;
+
+        vsx_connection_set_address(harness->connection,
+                                   &harness->local_address);
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        vsx_connection_set_conversation_id(harness->connection,
+                                           0x8081828384858687);
+
+        vsx_connection_set_running(harness->connection, true);
+
+        bool ret = true;
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x15\x8d"
+                         "\x87\x86\x85\x84\x83\x82\x81\x80"
+                         "test_player\0",
+                         23)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+test_stop_running(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        harness->events_triggered = 0;
+
+        vsx_connection_set_running(harness->connection, true);
+
+        if (harness->events_triggered != 0) {
+                fprintf(stderr,
+                        "Events received after setting running state to same "
+                        "value.\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_running(harness->connection, false);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Connection has a poll fd after stopping running.\n");
+                ret = false;
+                goto out;
+        }
+
+        harness->events_triggered = 0;
+
+        vsx_connection_set_running(harness->connection, false);
+
+        if (harness->events_triggered != 0) {
+                fprintf(stderr,
+                        "Events received after setting running state to same "
+                        "value.\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_running(harness->connection, true);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
+static bool
+check_message_cb(struct harness *harness,
+                 const struct vsx_connection_event *event,
+                 void *user_data)
+{
+        if (strcmp(event->message.message, "gh")) {
+                fprintf(stderr,
+                        "Message mismatch:\n"
+                        " Expected: gh\n"
+                        " Received: %s\n",
+                        event->message.message);
+                return false;
+        }
+
+        return true;
+}
+
+static bool
+test_reset(void)
+{
+        struct harness *harness = create_negotiated_harness();
+
+        if (harness == NULL)
+                return false;
+
+        bool ret = true;
+
+        /* Send a message to increase the next_message_num so we can
+         * check that it gets reset.
+         */
+        if (!check_event(harness,
+                         VSX_CONNECTION_EVENT_TYPE_MESSAGE,
+                         check_message_cb,
+                         (const uint8_t *)
+                         "\x82\x05\x01\x0gh\0",
+                         7,
+                         NULL /* user_data */)) {
+                ret = false;
+                goto out;
+        }
+
+        /* Queue up a bunch of state so that we can test that it won’t
+         * be sent after we reset the connection.
+         */
+        vsx_connection_set_typing(harness->connection, true);
+        vsx_connection_shout(harness->connection);
+        vsx_connection_turn(harness->connection);
+        vsx_connection_move_tile(harness->connection, 0, 1, 2);
+        vsx_connection_set_n_tiles(harness->connection, 8);
+        vsx_connection_set_language(harness->connection, "fr");
+        vsx_connection_send_message(harness->connection,
+                                    "Manĝu terpomojn");
+
+        harness->events_triggered = 0;
+
+        vsx_connection_reset(harness->connection);
+
+        if (harness->events_triggered !=
+            ((1 << VSX_CONNECTION_EVENT_TYPE_RUNNING_STATE_CHANGED) |
+             (1 << VSX_CONNECTION_EVENT_TYPE_POLL_CHANGED))) {
+                fprintf(stderr,
+                        "Expected running state changed and poll changed "
+                        "events but got event mask 0x%x\n",
+                        harness->events_triggered);
+                ret = false;
+                goto out;
+        }
+
+        if (vsx_connection_get_running(harness->connection)) {
+                fprintf(stderr,
+                        "Connection is running after reset");
+                ret = false;
+                goto out;
+        }
+
+        if (harness->poll_fd != -1) {
+                fprintf(stderr,
+                        "Connection has a poll fd after reset.\n");
+                ret = false;
+                goto out;
+        }
+
+        uint64_t person_id;
+
+        if (vsx_connection_get_person_id(harness->connection,
+                                         &person_id)) {
+                fprintf(stderr,
+                        "Connection has a person ID after reset\n");
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_running(harness->connection, true);
+
+        if (!test_connection_is_blocking_for_config(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        vsx_connection_set_player_name(harness->connection, "test_player");
+
+        if (!wake_up_and_accept_connection(harness)) {
+                ret = false;
+                goto out;
+        }
+
+        if (!read_ws_request(harness) ||
+            !write_string(harness, "\r\n\r\n")) {
+                ret = false;
+                goto out;
+        }
+
+        if (!expect_data(harness,
+                         (const uint8_t *)
+                         "\x82\x0e\x8c"
+                         "\x0" /* empty language code */
+                         "test_player\0",
+                         16)) {
+                ret = false;
+                goto out;
+        }
+
+        /* The connection shouldn’t have any other data to send */
+        if ((harness->poll_events & POLLOUT) ||
+            fd_ready_for_read(harness->server_fd)) {
+                fprintf(stderr,
+                        "Connection wants to send more data after header.\n");
+                ret = false;
+                goto out;
+        }
+
+out:
+        free_harness(harness);
+        return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2238,10 +3094,16 @@ main(int argc, char **argv)
         if (!test_reconnect_delay())
                 ret = EXIT_FAILURE;
 
+        if (!test_reconnect_pending_data())
+                ret = EXIT_FAILURE;
+
         if (!test_keep_alive())
                 ret = EXIT_FAILURE;
 
         if (!test_send_n_tiles())
+                ret = EXIT_FAILURE;
+
+        if (!test_send_language())
                 ret = EXIT_FAILURE;
 
         if (!test_receive_shout())
@@ -2268,6 +3130,9 @@ main(int argc, char **argv)
         if (!test_set_n_tiles())
                 ret = EXIT_FAILURE;
 
+        if (!test_set_language())
+                ret = EXIT_FAILURE;
+
         if (!test_send_all_tiles())
                 ret = EXIT_FAILURE;
 
@@ -2289,7 +3154,40 @@ main(int argc, char **argv)
         if (!test_write_buffer_full())
                 ret = EXIT_FAILURE;
 
+        if (!test_get_person_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_set_person_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_bad_player_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_bad_conversation_id())
+                ret = EXIT_FAILURE;
+
+        if (!test_conversation_full())
+                ret = EXIT_FAILURE;
+
         if (!test_leak_pendings())
+                ret = EXIT_FAILURE;
+
+        if (!test_address_block_connect())
+                ret = EXIT_FAILURE;
+
+        if (!test_player_name_block_connect())
+                ret = EXIT_FAILURE;
+
+        if (!test_new_private_game())
+                ret = EXIT_FAILURE;
+
+        if (!test_join_private_game())
+                ret = EXIT_FAILURE;
+
+        if (!test_stop_running())
+                ret = EXIT_FAILURE;
+
+        if (!test_reset())
                 ret = EXIT_FAILURE;
 
         return ret;

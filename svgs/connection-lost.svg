@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="128"
+   height="128"
+   viewBox="0 0 33.866666 33.866666"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   sodipodi:docname="connection-lost.svg"
+   inkscape:export-filename="/home/neil/c/verda-sxtelo/app/src/main/assets/connection-lost.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="1"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     units="px"
+     width="128px"
+     inkscape:zoom="3.8248961"
+     inkscape:cx="26.275223"
+     inkscape:cy="46.798656"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <circle
+       style="fill:#000000;fill-opacity:1;stroke-width:8.18268;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
+       id="path869"
+       cx="16.933332"
+       cy="29.797026"
+       r="1.907586" />
+    <path
+       id="circle1427"
+       style="color:#000000;fill:#000000;stroke-width:3.77953;stroke-linecap:round;stroke-linejoin:round;-inkscape-stroke:none;paint-order:stroke markers fill"
+       d="M 63.816406 13.980469 C 41.023812 13.980469 20.027493 21.74228 3.3203125 34.757812 L 7.8359375 41.548828 C 23.224188 29.404568 42.66353 22.160156 63.816406 22.160156 C 85.049251 22.160156 104.55549 29.460163 119.97266 41.6875 L 124.52539 34.917969 C 107.7832 21.804693 86.703537 13.980469 63.816406 13.980469 z M 63.816406 32.878906 C 44.894072 32.878906 27.501793 39.503041 13.824219 50.548828 L 18.345703 57.347656 C 30.696162 47.167128 46.531765 41.058594 63.816406 41.058594 C 81.146969 41.058594 97.022392 47.200436 109.38867 57.429688 L 113.94336 50.654297 C 100.24436 39.544808 82.799248 32.878906 63.816406 32.878906 z M 63.816406 51.777344 C 48.762228 51.777344 34.982247 57.286981 24.355469 66.380859 L 28.892578 73.205078 C 38.17436 64.96297 50.395633 59.955078 63.816406 59.955078 C 77.248634 59.955078 89.481218 64.971881 98.767578 73.226562 L 103.33789 66.429688 C 92.701837 57.30677 78.89741 51.777344 63.816406 51.777344 z M 63.816406 70.673828 C 52.626757 70.673828 42.452803 75.100131 34.929688 82.28125 L 39.519531 89.179688 C 45.643349 82.812761 54.249814 78.853516 63.816406 78.853516 C 73.360057 78.853516 81.951297 82.792712 88.074219 89.132812 L 92.691406 82.265625 C 85.168069 75.093503 74.998131 70.673828 63.816406 70.673828 z M 63.816406 89.572266 C 56.471194 89.572266 49.910356 93.063674 45.695312 98.464844 L 50.611328 105.85547 C 53.041773 101.03612 58.012262 97.751953 63.816406 97.751953 C 69.552333 97.751953 74.48222 100.95694 76.945312 105.68359 L 81.865234 98.365234 C 77.645356 93.020549 71.116596 89.572266 63.816406 89.572266 z "
+       transform="scale(0.26458333)" />
+    <path
+       style="color:#000000;fill:#000000;fill-rule:evenodd;stroke:#ffffff;paint-order:stroke markers fill;stroke-width:1.44991667;stroke-miterlimit:4;stroke-dasharray:none"
+       d="M 28.929687,2.0292969 5.34375,25.634766 7.5898437,27.878906 31.175781,4.2734375 Z"
+       id="path2223" />
+  </g>
+</svg>
