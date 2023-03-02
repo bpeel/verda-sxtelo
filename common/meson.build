@@ -15,5 +15,5 @@ test_hash_table_src = [
 
 test_hash_table = executable('test-hash-table',
                              test_hash_table_src,
-                             include_directories: inc_dirs)
+                             include_directories: configinc)
 test('hash-table', test_hash_table)

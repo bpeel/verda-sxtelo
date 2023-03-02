@@ -73,9 +73,9 @@ get_char_value(char ch)
                 return -1;
 }
 
-static bool
-parse_id_part(const char *str,
-              uint64_t *id_out)
+bool
+vsx_id_url_decode_id_part(const char *str,
+                          uint64_t *id_out)
 {
         uint64_t id = 0;
 
@@ -139,7 +139,7 @@ vsx_id_url_decode(const char *url,
 
         url += (sizeof REST_URL) - 1;
 
-        return parse_id_part(url, id_out);
+        return vsx_id_url_decode_id_part(url, id_out);
 }
 
 static char
