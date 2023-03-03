@@ -9,6 +9,7 @@ import re
 TEMPLATE = """\
 [binaries]
 c = '${c}'
+ar = '${ar}'
 pkgconfig = '/usr/bin/pkg-config'
 
 [built-in options]
@@ -44,7 +45,9 @@ with open('cross.txt', 'wt', encoding='utf-8') as f:
     target_args = ['-target', sys.argv[2]]
     args_array = target_args + sys.argv[3].split()
     args = "[" + ",".join("'{}'".format(x) for x in args_array) + "]"
+    ar = re.sub(r'clang$', "llvm-ar", sys.argv[1])
     print(Template(TEMPLATE).render(c=sys.argv[1],
+                                    ar=ar,
                                     c_args=args,
                                     c_link_args=target_args,
                                     cpu_family=cpu_family,
