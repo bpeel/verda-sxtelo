@@ -50,7 +50,7 @@ struct vertex {
 
 static const char
 copyright_text[] =
-        "Copyright © 2022 Neil Roberts. All rights reserved.\n"
+        "Copyright © 2022 Neil Roberts.\n"
         "\n"
         "Portions of this software are copyright © 2022 The FreeType "
         "Project (www.freetype.org).  All rights reserved.\n"
