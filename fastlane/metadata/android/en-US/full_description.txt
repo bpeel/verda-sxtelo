@@ -1,0 +1,1 @@
+Each player adds a letter from the bag to the centre of the table on their turn. When any player sees a word in the jumble of letters they can take it. You can also steal a word from another player if you add another letter and rearrange their word to make an anagram. Can you spot anagrams faster than your friends?
