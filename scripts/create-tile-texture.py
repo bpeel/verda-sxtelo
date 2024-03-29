@@ -51,6 +51,9 @@ struct vsx_tile_texture_letter {
 extern const struct vsx_tile_texture_letter
 vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS];
 
+const struct vsx_tile_texture_letter *
+vsx_tile_texture_find_letter(uint32_t letter);
+
 #endif /* VSX_TILE_TEXTURE_H */""")
 
 SOURCE_TEMPLATE = mako.template.Template("""\
