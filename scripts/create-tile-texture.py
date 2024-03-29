@@ -68,11 +68,15 @@ vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS] = {
   y1 = letter_num // x_tiles
   x2 = x1 + 1
   y2 = y1 + 1
+  s1 = (x1 * 65535 + x_tiles // 2) // x_tiles
+  t1 = (y1 * 65535 + y_tiles // 2) // y_tiles
+  s2 = (x2 * 65535 + x_tiles // 2) // x_tiles
+  t2 = (y2 * 65535 + y_tiles // 2) // y_tiles
 %>\
         {
                 .letter = ${ord(letter)}, /* ${letter} */
-                .s1 = ${x1 * 65535 // x_tiles}, .t1 = ${y1 * 65535 // y_tiles},
-                .s2 = ${x2 * 65535 // x_tiles}, .t2 = ${y2 * 65535 // y_tiles},
+                .s1 = ${s1}, .t1 = ${t1},
+                .s2 = ${s2}, .t2 = ${t2},
         },
 % endfor
 };""")
