@@ -28,7 +28,8 @@ import re
 import os.path
 import mako.template
 
-LETTERS = list(sorted("ABCDEFGHIJKLMNOPQRSTUVWXYZĤŜĜĈĴŬ"))
+LETTERS = list(sorted("ABCDEFGHIJKLMNOPQRSTUVWXYZĤŜĜĈĴŬ" +
+                      "𐑐𐑑𐑒𐑓𐑔𐑕𐑖𐑗𐑘𐑙𐑚𐑛𐑜𐑝𐑞𐑟𐑠𐑡𐑢𐑣𐑤𐑥𐑦𐑧𐑨𐑩𐑪𐑫𐑬𐑭𐑮𐑯𐑰𐑱𐑲𐑳𐑴𐑵𐑶𐑷𐑸𐑹𐑺𐑻𐑼𐑽𐑾𐑿"))
 N_LETTERS = len(LETTERS)
 
 TILE_SIZE = 128

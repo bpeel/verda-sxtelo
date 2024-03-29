@@ -21,7 +21,7 @@
 
 #include <stdint.h>
 
-#define VSX_TILE_TEXTURE_N_LETTERS 32
+#define VSX_TILE_TEXTURE_N_LETTERS 80
 
 struct vsx_tile_texture_letter {
         uint32_t letter;
