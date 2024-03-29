@@ -41,6 +41,11 @@ vsx_tile_data[VSX_TILE_DATA_N_ROOMS] =
       "OOOOOOPPQRRRRRRSSSSSSTTTTTTUUUUUUVVWXYZ"
       "IRTEOAUTUTAFNSUFLURCIT"
     },
+    {
+      "en-sv",
+      "𐑠𐑶𐑾𐑽𐑭𐑘𐑺𐑔𐑷𐑸𐑫𐑬𐑡𐑗𐑿𐑵𐑹𐑻𐑜𐑙𐑖𐑴𐑳𐑳𐑣𐑣𐑱𐑱𐑲𐑲𐑓𐑓𐑪𐑪𐑼𐑼𐑚𐑚𐑰𐑰𐑢𐑢𐑢𐑨𐑨𐑨𐑝𐑝𐑝𐑐𐑐𐑐𐑧𐑧𐑧𐑮𐑮𐑮𐑥𐑥𐑥"
+      "𐑟𐑟𐑟𐑟𐑒𐑒𐑒𐑒𐑞𐑞𐑞𐑞𐑛𐑛𐑛𐑛𐑤𐑤𐑤𐑤𐑤𐑕𐑕𐑕𐑕𐑕𐑕𐑩𐑩𐑩𐑩𐑩𐑩𐑩𐑑𐑑𐑑𐑑𐑑𐑑𐑑𐑑𐑑𐑯𐑯𐑯𐑯𐑯𐑯𐑯𐑯𐑦𐑦𐑦𐑦𐑦𐑦𐑦𐑦𐑦𐑦"
+    },
   };
 
 const VsxTileData *
