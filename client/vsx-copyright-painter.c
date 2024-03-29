@@ -55,8 +55,7 @@ copyright_text[] =
         "Portions of this software are copyright © 2022 The FreeType "
         "Project (www.freetype.org).  All rights reserved.\n"
         "\n"
-        "The Luna Sans font is copyright 2013 The Alegreya Sans Project "
-        "Authors.";
+        "The Noto Sans font is copyright 2022 The Noto Project Authors.";
 
 #define N_QUADS 1
 #define N_VERTICES (N_QUADS * 4)

@@ -63,7 +63,7 @@ struct vsx_font_data {
 static const struct vsx_font_data
 font_types[] = {
         [VSX_FONT_TYPE_LABEL] = {
-                .filename = "LunaSans-Regular.ttf",
+                .filename = "NotoSans-Regular.ttf",
                 .face_index = 0,
                 .size = 8 * 64,
         },
