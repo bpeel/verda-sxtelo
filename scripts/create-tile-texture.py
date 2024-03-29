@@ -17,6 +17,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import gi
+gi.require_version('Pango', '1.0')
+from gi.repository import Pango
+gi.require_version('PangoCairo', '1.0')
+from gi.repository import PangoCairo
 import cairo
 import math
 import re
@@ -158,11 +163,20 @@ def generate_tile(cr, letter):
     cr.fill()
 
     cr.set_source_rgb(0, 0, 0)
-    cr.set_font_size((TILE_SIZE - BORDER_SIZE * 2.0) * 0.8)
-    extents = cr.text_extents(letter)
-    cr.move_to(int(TILE_SIZE / 2.0 - extents.x_bearing - extents.width / 2.0),
-               BORDER_SIZE + (TILE_SIZE - BORDER_SIZE * 2.0) * 0.82)
-    cr.show_text(letter)
+
+    layout = PangoCairo.create_layout(cr)
+    layout.set_text(letter, -1)
+    size = (TILE_SIZE - BORDER_SIZE * 2.0) * 0.8 * 72 / 96
+    fd = Pango.FontDescription.from_string(f"Sans Serif {size}")
+    layout.set_font_description(fd)
+    (ink_rect, logical_rect) = layout.get_pixel_extents()
+
+    cr.move_to(int(TILE_SIZE / 2.0 - logical_rect.x - logical_rect.width / 2.0),
+               BORDER_SIZE + (TILE_SIZE - BORDER_SIZE * 2.0)
+               - logical_rect.height
+               + logical_rect.y)
+
+    PangoCairo.show_layout(cr, layout)
 
 
 def generate_tiles(cr, tiles_per_row):
