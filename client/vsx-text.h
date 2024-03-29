@@ -23,6 +23,7 @@ enum vsx_text_language {
         VSX_TEXT_LANGUAGE_ENGLISH,
         VSX_TEXT_LANGUAGE_FRENCH,
         VSX_TEXT_LANGUAGE_ESPERANTO,
+        VSX_TEXT_LANGUAGE_ENGLISH_SHAVIAN,
 };
 
 enum vsx_text {
@@ -61,7 +62,7 @@ enum vsx_text {
         VSX_TEXT_PRIVACY_POLICY,
 };
 
-#define VSX_TEXT_N_LANGUAGES 3
+#define VSX_TEXT_N_LANGUAGES 4
 
 const char *
 vsx_text_get(enum vsx_text_language language,

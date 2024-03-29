@@ -40,6 +40,7 @@ languages[] = {
         { .code = "en", .name = "English" },
         { .code = "fr", .name = "Français" },
         { .code = "eo", .name = "Esperanto" },
+        { .code = "en-sv", .name = "𐑖𐑱𐑝𐑾𐑯" },
 };
 
 #define N_LANGUAGES VSX_N_ELEMENTS(languages)

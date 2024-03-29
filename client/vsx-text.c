@@ -24,87 +24,110 @@
 
 #include "vsx-util.h"
 
+#define ENGLISH_COMMON_TRANSLATIONS \
+        [VSX_TEXT_SHARE_BUTTON] = "Invite friends", \
+        [VSX_TEXT_LONG_GAME] = "Long game", \
+        [VSX_TEXT_HELP_BUTTON] = "Help", \
+        [VSX_TEXT_LEAVE_BUTTON] = "Leave game", \
+        [VSX_TEXT_SHORT_GAME] = "Short game", \
+        [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] = \
+        "The language can’t be changed after the game has started", \
+        [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] = \
+        "The game length can’t be changed after the game has started", \
+        [VSX_TEXT_INVITE_EXPLANATION] = \
+        "Send the link below or scan the code to invite friends.", \
+        [VSX_TEXT_LINK_COPIED] = \
+        "Link copied to the clipboard", \
+        [VSX_TEXT_ENTER_NAME_NEW_GAME] = \
+        "Please enter your name to start a new game.", \
+        [VSX_TEXT_ENTER_NAME_JOIN_GAME] = \
+        "Please enter your name to join the game.", \
+        [VSX_TEXT_NAME_BUTTON_NEW_GAME] = \
+        "Start game", \
+        [VSX_TEXT_NAME_BUTTON_JOIN_GAME] = \
+        "Join game", \
+        [VSX_TEXT_BAD_GAME] = \
+        "This game is no longer available. Please start a new one instead.", \
+        [VSX_TEXT_GAME_FULL] = \
+        "This game is full. Please start a new one instead.", \
+        [VSX_TEXT_PLAYER_JOINED] = \
+        "%s joined the game", \
+        [VSX_TEXT_PLAYER_LEFT] = \
+        "%s left the game", \
+        [VSX_TEXT_GUIDE_MOVE_WORD] = \
+        "To move a word:\n" \
+        "\n" \
+        "• Drag the first letter where you want.\n" \
+        "• Click on the other letters and they will jump into place.\n", \
+        [VSX_TEXT_GUIDE_STEAL_WORD] = \
+        "The new word has to be a different root and can’t just be a " \
+        "different form of the original, like making it plural.", \
+        [VSX_TEXT_GUIDE_BOXES] = \
+        "Grabagram is a fast-paced word game you can play with your " \
+        "friends.\n" \
+        "\n" \
+        "Every player has a box on the screen. When your box is green, " \
+        "it is your turn.", \
+        [VSX_TEXT_GUIDE_ADD_LETTER] = \
+        "During your turn, click on the tile bag to add a letter to the " \
+        "table.", \
+        [VSX_TEXT_GUIDE_SHOUT] = \
+        "When you see a word in the jumble of letters you can take it! You " \
+        "don’t have to wait for your turn.\n" \
+        "\n" \
+        "Click on the megaphone to let the other players " \
+        "know you found a word. If you were the first one to click, your box " \
+        "will turn red.", \
+        [VSX_TEXT_GUIDE_VALID_WORDS] = \
+        "The word has to be at least three letters long. You can use plurals " \
+        "and conjugated verbs.\n", \
+        [VSX_TEXT_GUIDE_HOW_STEAL] = \
+        "You can also steal a word from another player!\n" \
+        "\n" \
+        "You have to steal one whole word from another player or yourself " \
+        "and add at least one letter from the letters in the middle to make " \
+        "an anagram.\n", \
+        [VSX_TEXT_GUIDE_END] = \
+        "When there are no more tiles left in the bag you can keep stealing " \
+        "words until everyone gives up. The player with the most words " \
+        "wins!\n" \
+        "\n" \
+        "If there is a draw, the player with the most letters wins.\n", \
+        [VSX_TEXT_PRIVACY_POLICY] = \
+        "Privacy policy",
+
 static const char *const
 english[] = {
+        [VSX_TEXT_LANGUAGE_BUTTON] = "Game in English", \
         [VSX_TEXT_LANGUAGE_CODE] = "en",
-        [VSX_TEXT_LANGUAGE_BUTTON] = "Game in English",
-        [VSX_TEXT_SHARE_BUTTON] = "Invite friends",
-        [VSX_TEXT_LONG_GAME] = "Long game",
-        [VSX_TEXT_HELP_BUTTON] = "Help",
-        [VSX_TEXT_LEAVE_BUTTON] = "Leave game",
-        [VSX_TEXT_SHORT_GAME] = "Short game",
-        [VSX_TEXT_CANT_CHANGE_LANGUAGE_STARTED] =
-        "The language can’t be changed after the game has started",
-        [VSX_TEXT_CANT_CHANGE_LENGTH_STARTED] =
-        "The game length can’t be changed after the game has started",
-        [VSX_TEXT_INVITE_EXPLANATION] =
-        "Send the link below or scan the code to invite friends.",
-        [VSX_TEXT_LINK_COPIED] =
-        "Link copied to the clipboard",
-        [VSX_TEXT_ENTER_NAME_NEW_GAME] =
-        "Please enter your name to start a new game.",
-        [VSX_TEXT_ENTER_NAME_JOIN_GAME] =
-        "Please enter your name to join the game.",
-        [VSX_TEXT_NAME_BUTTON_NEW_GAME] =
-        "Start game",
-        [VSX_TEXT_NAME_BUTTON_JOIN_GAME] =
-        "Join game",
-        [VSX_TEXT_BAD_GAME] =
-        "This game is no longer available. Please start a new one instead.",
-        [VSX_TEXT_GAME_FULL] =
-        "This game is full. Please start a new one instead.",
-        [VSX_TEXT_PLAYER_JOINED] =
-        "%s joined the game",
-        [VSX_TEXT_PLAYER_LEFT] =
-        "%s left the game",
         [VSX_TEXT_GUIDE_EXAMPLE_WORD] =
         "HELLO",
-        [VSX_TEXT_GUIDE_MOVE_WORD] =
-        "To move a word:\n"
-        "\n"
-        "• Drag the first letter where you want.\n"
-        "• Click on the other letters and they will jump into place.\n",
         [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
         "TEARTEARSRATES",
-        [VSX_TEXT_GUIDE_STEAL_WORD] =
-        "The new word has to be a different root and can’t just be a different "
-        "form of the original, like making it plural.",
-        [VSX_TEXT_GUIDE_BOXES] =
-        "Grabagram is a fast-paced word game you can play with your friends.\n"
-        "\n"
-        "Every player has a box on the screen. When your box is green, "
-        "it is your turn.",
-        [VSX_TEXT_GUIDE_ADD_LETTER] =
-        "During your turn, click on the tile bag to add a letter to the table.",
         [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
         "QOZE",
-        [VSX_TEXT_GUIDE_SHOUT] =
-        "When you see a word in the jumble of letters you can take it! You "
-        "don’t have to wait for your turn.\n"
-        "\n"
-        "Click on the megaphone to let the other players "
-        "know you found a word. If you were the first one to click, your box "
-        "will turn red.",
-        [VSX_TEXT_GUIDE_VALID_WORDS] =
-        "The word has to be at least three letters long. You can use plurals "
-        "and conjugated verbs.\n",
         [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
         "MILKSATTRAINS",
-        [VSX_TEXT_GUIDE_HOW_STEAL] =
-        "You can also steal a word from another player!\n"
-        "\n"
-        "You have to steal one whole word from another player or yourself and "
-        "add at least one letter from the letters in the middle to make an "
-        "anagram.\n",
         [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
         "FORG",
-        [VSX_TEXT_GUIDE_END] =
-        "When there are no more tiles left in the bag you can keep stealing "
-        "words until everyone gives up. The player with the most words wins!\n"
-        "\n"
-        "If there is a draw, the player with the most letters wins.\n",
-        [VSX_TEXT_PRIVACY_POLICY] =
-        "Privacy policy",
+        ENGLISH_COMMON_TRANSLATIONS
+};
+
+static const char *const
+english_shavian[] = {
+        [VSX_TEXT_LANGUAGE_BUTTON] = "Game in 𐑖𐑱𐑝𐑾𐑯", \
+        [VSX_TEXT_LANGUAGE_CODE] = "en-sv",
+        [VSX_TEXT_GUIDE_EXAMPLE_WORD] =
+        "𐑚𐑦𐑒𐑪𐑟",
+        [VSX_TEXT_GUIDE_EXAMPLE_STEAL_WORD] =
+        "𐑕𐑑𐑪𐑒𐑕𐑑𐑪𐑒𐑕𐑒𐑪𐑕𐑑𐑕",
+        [VSX_TEXT_GUIDE_ADD_LETTER_WORD] =
+        "𐑒𐑴𐑟𐑩",
+        [VSX_TEXT_GUIDE_VALID_WORDS_WORD] =
+        "𐑥𐑦𐑤𐑒𐑕𐑨𐑑𐑑𐑱𐑚𐑩𐑤𐑟",
+        [VSX_TEXT_GUIDE_HOW_STEAL_WORD] =
+        "𐑓𐑵𐑤𐑑",
+        ENGLISH_COMMON_TRANSLATIONS
 };
 
 static const char *const
@@ -286,6 +309,7 @@ languages[] = {
         [VSX_TEXT_LANGUAGE_ENGLISH] = english,
         [VSX_TEXT_LANGUAGE_FRENCH] = french,
         [VSX_TEXT_LANGUAGE_ESPERANTO] = esperanto,
+        [VSX_TEXT_LANGUAGE_ENGLISH_SHAVIAN] = english_shavian,
 };
 
 _Static_assert(VSX_N_ELEMENTS(languages) == VSX_TEXT_N_LANGUAGES,

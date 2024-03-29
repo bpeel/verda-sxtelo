@@ -2017,6 +2017,7 @@ test_language(void)
                 /* Unknown language should resort to English */
                 { "\x82\x04\x0c" "??", VSX_TEXT_LANGUAGE_ENGLISH },
                 { "\x82\x04\x0c" "fr", VSX_TEXT_LANGUAGE_FRENCH },
+                { "\x82\x07\x0c" "en-sv", VSX_TEXT_LANGUAGE_ENGLISH_SHAVIAN },
                 { "\x82\x04\x0c" "en", VSX_TEXT_LANGUAGE_ENGLISH },
         };
 
