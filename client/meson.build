@@ -249,3 +249,12 @@ test_tile_texture_src = [
 test_tile_texture = executable('test-tile-texture', test_tile_texture_src,
                                include_directories: inc_dirs)
 test('tile-texture', test_tile_texture)
+
+test_font_shavian_src = [
+        'test-font-shavian.c'
+]
+test_font_shavian = executable('test-font-shavian', test_font_shavian_src,
+                               dependencies: [freetype],
+                               include_directories: inc_dirs)
+test('test-font-shavian', test_font_shavian,
+     args : ['../app/src/main/assets/NotoSans-Regular.ttf'])
