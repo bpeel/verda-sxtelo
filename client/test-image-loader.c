@@ -87,7 +87,7 @@ test_load_tiles(struct data *data)
 
         struct vsx_image_loader_token *token =
                 vsx_image_loader_load(data->loader,
-                                      "tiles.mpng",
+                                      "tiles-0.mpng",
                                       test_load_tiles_cb,
                                       &tiles_data);
 
@@ -135,7 +135,7 @@ test_load_multiple(struct data *data)
         for (int i = 0; i < 3; i++) {
                 struct vsx_image_loader_token *token =
                         vsx_image_loader_load(data->loader,
-                                              "tiles.mpng",
+                                              "tiles-0.mpng",
                                               test_load_multiple_cb,
                                               &multiple_data);
 
@@ -202,7 +202,7 @@ test_cancel(struct data *data,
 {
         struct vsx_image_loader_token *token =
                 vsx_image_loader_load(data->loader,
-                                      "tiles.mpng",
+                                      "tiles-0.mpng",
                                       test_cancel_cb,
                                       NULL);
 
@@ -261,7 +261,7 @@ test_free_while_loading(struct data *data)
 
         struct vsx_image_loader_token *token =
                 vsx_image_loader_load(loader,
-                                      "tiles.mpng",
+                                      "tiles-0.mpng",
                                       test_free_while_loading_cb,
                                       NULL);
 

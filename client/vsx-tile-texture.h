@@ -22,9 +22,11 @@
 #include <stdint.h>
 
 #define VSX_TILE_TEXTURE_N_LETTERS 80
+#define VSX_TILE_TEXTURE_N_TEXTURES 2
 
 struct vsx_tile_texture_letter {
         uint32_t letter;
+        uint16_t texture;
         uint16_t s1, t1;
         uint16_t s2, t2;
 };

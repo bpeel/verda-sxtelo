@@ -28,9 +28,25 @@ import re
 import os.path
 import mako.template
 
-LETTERS = list(sorted("ABCDEFGHIJKLMNOPQRSTUVWXYZĤŜĜĈĴŬ" +
-                      "𐑐𐑑𐑒𐑓𐑔𐑕𐑖𐑗𐑘𐑙𐑚𐑛𐑜𐑝𐑞𐑟𐑠𐑡𐑢𐑣𐑤𐑥𐑦𐑧𐑨𐑩𐑪𐑫𐑬𐑭𐑮𐑯𐑰𐑱𐑲𐑳𐑴𐑵𐑶𐑷𐑸𐑹𐑺𐑻𐑼𐑽𐑾𐑿"))
-N_LETTERS = len(LETTERS)
+ALPHABETS = [
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZĤŜĜĈĴŬ",
+    "𐑐𐑑𐑒𐑓𐑔𐑕𐑖𐑗𐑘𐑙𐑚𐑛𐑜𐑝𐑞𐑟𐑠𐑡𐑢𐑣𐑤𐑥𐑦𐑧𐑨𐑩𐑪𐑫𐑬𐑭𐑮𐑯𐑰𐑱𐑲𐑳𐑴𐑵𐑶𐑷𐑸𐑹𐑺𐑻𐑼𐑽𐑾𐑿",
+]
+
+def make_letters():
+    lookup = {}
+
+    for alphabet_num, letters in enumerate(ALPHABETS):
+        for letter_num, letter in enumerate(sorted(letters)):
+            lookup[letter] = {
+                "texture": alphabet_num,
+                "letter_num": letter_num,
+            }
+
+    return lookup
+
+
+LETTERS = make_letters()
 
 TILE_SIZE = 128
 BORDER_SIZE = TILE_SIZE // 16
@@ -42,9 +58,11 @@ HEADER_TEMPLATE = mako.template.Template("""\
 #include <stdint.h>
 
 #define VSX_TILE_TEXTURE_N_LETTERS ${n_letters}
+#define VSX_TILE_TEXTURE_N_TEXTURES ${n_textures}
 
 struct vsx_tile_texture_letter {
         uint32_t letter;
+        uint16_t texture;
         uint16_t s1, t1;
         uint16_t s2, t2;
 };
@@ -62,10 +80,11 @@ SOURCE_TEMPLATE = mako.template.Template("""\
 
 const struct vsx_tile_texture_letter
 vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS] = {
-% for letter_num, letter in enumerate(letters):
+% for letter, data in sorted(letters.items()):
 <%
-  x1 = letter_num % x_tiles
-  y1 = letter_num // x_tiles
+  x_tiles, y_tiles = texture_sizes[data["texture"]]
+  x1 = data["letter_num"] % x_tiles
+  y1 = data["letter_num"] // x_tiles
   x2 = x1 + 1
   y2 = y1 + 1
   s1 = (x1 * 65535 + x_tiles // 2) // x_tiles
@@ -75,6 +94,7 @@ vsx_tile_texture_letters[VSX_TILE_TEXTURE_N_LETTERS] = {
 %>\
         {
                 .letter = ${ord(letter)}, /* ${letter} */
+                .texture = ${data["texture"]},
                 .s1 = ${s1}, .t1 = ${t1},
                 .s2 = ${s2}, .t2 = ${t2},
         },
@@ -98,11 +118,11 @@ def output_copyright(outfile):
         print(" */\n", file=outfile)
 
 
-def get_texture_size():
+def get_texture_size(n_letters):
     w = 1
     h = 1
 
-    while w * h < N_LETTERS:
+    while w * h < n_letters:
         if w <= h:
             w *= 2
         else:
@@ -119,7 +139,8 @@ def generate_header_file():
     with open(header_file_name, "wt", encoding="utf-8") as f:
         output_copyright(f)
 
-        print(HEADER_TEMPLATE.render(n_letters=N_LETTERS),
+        print(HEADER_TEMPLATE.render(n_letters=len(LETTERS),
+                                     n_textures=len(ALPHABETS)),
               file=f)
 
 
@@ -128,14 +149,15 @@ def generate_source_file():
                                     "..",
                                     "client",
                                     "vsx-tile-texture-letters.c")
-    x_tiles, y_tiles = get_texture_size()
+
+    texture_sizes = list(map(lambda letters: get_texture_size(len(letters)),
+                             ALPHABETS))
 
     with open(source_file_name, "wt", encoding="utf-8") as f:
         output_copyright(f)
 
         print(SOURCE_TEMPLATE.render(letters=LETTERS,
-                                     x_tiles=x_tiles,
-                                     y_tiles=y_tiles),
+                                     texture_sizes=texture_sizes),
               file=f)
 
 
@@ -187,8 +209,8 @@ def generate_tile(cr, letter):
     PangoCairo.show_layout(cr, layout)
 
 
-def generate_tiles(cr, tiles_per_row):
-    for tile_num, letter in enumerate(LETTERS):
+def generate_tiles(cr, tiles_per_row, letters):
+    for tile_num, letter in enumerate(letters):
         x = tile_num % tiles_per_row
         y = tile_num // tiles_per_row
 
@@ -201,9 +223,7 @@ def generate_tiles(cr, tiles_per_row):
         cr.restore()
 
 
-def generate_texture():
-    x_tiles, y_tiles = get_texture_size()
-
+def generate_texture(x_tiles, y_tiles, letters):
     full_width = x_tiles * TILE_SIZE
     full_height = y_tiles * TILE_SIZE
 
@@ -226,7 +246,7 @@ def generate_texture():
         cr.translate(x_pos, y_pos)
         cr.scale(1.0 / scale_x, 1.0 / scale_y)
 
-        generate_tiles(cr, x_tiles)
+        generate_tiles(cr, x_tiles, letters)
 
         cr.restore()
 
@@ -247,7 +267,11 @@ def generate_texture():
 
     return surface
 
-generate_texture().write_to_png("tiles.mpng")
+
+for i, letters in enumerate(ALPHABETS):
+    tiles_x, tiles_y = get_texture_size(len(letters))
+    texture = generate_texture(tiles_x, tiles_y, list(sorted(letters)))
+    texture.write_to_png(f"tiles-{i}.mpng")
 
 generate_header_file()
 generate_source_file()

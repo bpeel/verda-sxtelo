@@ -26,6 +26,12 @@
 #include "vsx-mipmap.h"
 #include "vsx-board.h"
 #include "vsx-array-object.h"
+#include "vsx-buffer.h"
+
+struct draw_call {
+        int n_tiles;
+        int texture;
+};
 
 struct vsx_tile_tool_buffer {
         struct vsx_tile_tool *tool;
@@ -36,7 +42,8 @@ struct vsx_tile_tool_buffer {
 
         struct vertex *vertices, *v;
 
-        int n_tiles;
+        struct vsx_buffer draw_calls;
+
         int max_tiles;
         int tile_size;
 };
@@ -48,7 +55,7 @@ struct vsx_tile_tool {
         struct vsx_map_buffer *map_buffer;
         struct vsx_quad_tool *quad_tool;
 
-        GLuint tex;
+        GLuint textures[VSX_TILE_TEXTURE_N_TEXTURES];
         struct vsx_image_loader_token *image_token;
 
         struct vsx_signal ready_signal;
@@ -58,6 +65,29 @@ struct vertex {
         float x, y;
         uint16_t s, t;
 };
+
+static void
+texture_load_cb(const struct vsx_image *image,
+                struct vsx_error *error,
+                void *data);
+
+static void
+start_texture_load(struct vsx_tile_tool *tool,
+                   int texture_num)
+{
+        assert(tool->image_token == NULL);
+
+        struct vsx_buffer buf = VSX_BUFFER_STATIC_INIT;
+
+        vsx_buffer_append_printf(&buf, "tiles-%i.mpng", texture_num);
+
+        tool->image_token = vsx_image_loader_load(tool->image_loader,
+                                                  (const char *) buf.data,
+                                                  texture_load_cb,
+                                                  tool);
+
+        vsx_buffer_destroy(&buf);
+}
 
 static void
 texture_load_cb(const struct vsx_image *image,
@@ -80,9 +110,11 @@ texture_load_cb(const struct vsx_image *image,
 
         struct vsx_gl *gl = tool->gl;
 
-        gl->glGenTextures(1, &tool->tex);
+        GLuint tex;
 
-        gl->glBindTexture(GL_TEXTURE_2D, tool->tex);
+        gl->glGenTextures(1, &tex);
+
+        gl->glBindTexture(GL_TEXTURE_2D, tex);
         gl->glTexParameteri(GL_TEXTURE_2D,
                             GL_TEXTURE_WRAP_S,
                             GL_CLAMP_TO_EDGE);
@@ -96,9 +128,25 @@ texture_load_cb(const struct vsx_image *image,
                             GL_TEXTURE_MAG_FILTER,
                             GL_LINEAR);
 
-        vsx_mipmap_load_image(image, gl, tool->tex);
+        vsx_mipmap_load_image(image, gl, tex);
 
-        vsx_signal_emit(&tool->ready_signal, NULL);
+        for (int i = 0; i < VSX_TILE_TEXTURE_N_TEXTURES; i++) {
+                if (tool->textures[i] == 0) {
+                        tool->textures[i] = tex;
+
+                        if (i >= VSX_TILE_TEXTURE_N_TEXTURES - 1) {
+                                vsx_signal_emit(&tool->ready_signal, NULL);
+                        } else {
+                                start_texture_load(tool, i + 1);
+                        }
+
+                        goto found_empty_texture;
+                }
+        }
+
+        assert(!"extra tile texture loaded!");
+
+found_empty_texture: (void) 0;
 }
 
 struct vsx_tile_tool *
@@ -118,10 +166,7 @@ vsx_tile_tool_new(struct vsx_gl *gl,
         tool->map_buffer = map_buffer;
         tool->quad_tool = quad_tool;
 
-        tool->image_token = vsx_image_loader_load(image_loader,
-                                                  "tiles.mpng",
-                                                  texture_load_cb,
-                                                  tool);
+        start_texture_load(tool, 0);
 
         return tool;
 }
@@ -134,6 +179,8 @@ vsx_tile_tool_create_buffer(struct vsx_tile_tool *tool,
 
         buf->tool = tool;
         buf->tile_size = tile_size;
+
+        vsx_buffer_init(&buf->draw_calls);
 
         return buf;
 }
@@ -227,6 +274,32 @@ vsx_tile_tool_begin_update(struct vsx_tile_tool_buffer *buf,
                                    GL_DYNAMIC_DRAW);
 
         buf->v = buf->vertices;
+        buf->draw_calls.length = 0;
+}
+
+static void
+add_to_draw_call_for_texture(struct vsx_tile_tool_buffer *buf,
+                             int texture)
+{
+        if (buf->draw_calls.length > 0) {
+                struct draw_call *last_draw_call =
+                        (struct draw_call *)
+                        (buf->draw_calls.data +
+                         buf->draw_calls.length -
+                         sizeof (struct draw_call));
+
+                if (last_draw_call->texture == texture) {
+                        last_draw_call->n_tiles++;
+                        return;
+                }
+        }
+
+        struct draw_call draw_call = {
+                .n_tiles = 1,
+                .texture = texture,
+        };
+
+        vsx_buffer_append(&buf->draw_calls, &draw_call, sizeof draw_call);
 }
 
 void
@@ -237,6 +310,8 @@ vsx_tile_tool_add_tile(struct vsx_tile_tool_buffer *buf,
         struct vertex *v = buf->v;
 
         assert(buf->vertices);
+
+        add_to_draw_call_for_texture(buf, letter_data->texture);
 
         v->x = tile_x;
         v->y = tile_y;
@@ -277,8 +352,6 @@ vsx_tile_tool_end_update(struct vsx_tile_tool_buffer *buf)
 
         vsx_map_buffer_unmap(buf->tool->map_buffer);
 
-        buf->n_tiles = n_vertices / 4;
-
         buf->vertices = NULL;
 }
 
@@ -288,7 +361,7 @@ vsx_tile_tool_paint(struct vsx_tile_tool_buffer *buf,
                     const GLfloat *matrix,
                     const GLfloat *translation)
 {
-        assert(buf->tool->tex != 0);
+        assert(vsx_tile_tool_is_ready(buf->tool));
 
         struct vsx_gl *gl = buf->tool->gl;
 
@@ -306,20 +379,37 @@ vsx_tile_tool_paint(struct vsx_tile_tool_buffer *buf,
                         translation[0],
                         translation[1]);
 
-        gl->glBindTexture(GL_TEXTURE_2D, buf->tool->tex);
+        const struct draw_call *draw_calls =
+                (const struct draw_call *) buf->draw_calls.data;
+        size_t n_draw_calls = buf->draw_calls.length / sizeof *draw_calls;
+        int tile_num = 0;
+        int index_size = buf->quad_buffer->type == GL_UNSIGNED_BYTE ? 1 : 2;
 
-        vsx_gl_draw_range_elements(gl,
-                                   GL_TRIANGLES,
-                                   0, buf->n_tiles * 4 - 1,
-                                   buf->n_tiles * 6,
-                                   buf->quad_buffer->type,
-                                   NULL /* indices */);
+        for (unsigned i = 0; i < n_draw_calls; i++) {
+                int texture = draw_calls[i].texture;
+
+                gl->glBindTexture(GL_TEXTURE_2D, buf->tool->textures[texture]);
+
+                vsx_gl_draw_range_elements(gl,
+                                           GL_TRIANGLES,
+                                           tile_num * 4,
+                                           (tile_num + draw_calls[i].n_tiles)
+                                           * 4
+                                           - 1,
+                                           draw_calls[i].n_tiles * 6,
+                                           buf->quad_buffer->type,
+                                           (GLvoid *) (intptr_t)
+                                           (tile_num * 6 * index_size));
+
+                tile_num += draw_calls[i].n_tiles;
+        }
 }
 
 void
 vsx_tile_tool_free_buffer(struct vsx_tile_tool_buffer *buf)
 {
         assert(buf->vertices == NULL);
+        vsx_buffer_destroy(&buf->draw_calls);
         free_buffer(buf);
         vsx_free(buf);
 }
@@ -333,7 +423,12 @@ vsx_tile_tool_get_ready_signal(struct vsx_tile_tool *tool)
 bool
 vsx_tile_tool_is_ready(struct vsx_tile_tool *tool)
 {
-        return tool->tex != 0;
+        for (int i = 0; i < VSX_TILE_TEXTURE_N_TEXTURES; i++) {
+                if (tool->textures[i] == 0)
+                        return false;
+        }
+
+        return true;
 }
 
 void
@@ -343,8 +438,11 @@ vsx_tile_tool_free(struct vsx_tile_tool *tool)
 
         if (tool->image_token)
                 vsx_image_loader_cancel(tool->image_token);
-        if (tool->tex)
-                gl->glDeleteTextures(1, &tool->tex);
+
+        for (int i = 0; i < VSX_TILE_TEXTURE_N_TEXTURES; i++) {
+                if (tool->textures[i])
+                        gl->glDeleteTextures(1, &tool->textures[i]);
+        }
 
         vsx_free(tool);
 }
