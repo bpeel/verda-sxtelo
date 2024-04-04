@@ -19,6 +19,7 @@
 -->
 
 <resources>
+  <string name="app_name">Grabagram</string>
   <string name="game_language_code">eo</string>
   <string name="name_hint">Entajpu vian nomon</string>
 </resources>
