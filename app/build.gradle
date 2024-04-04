@@ -3,7 +3,7 @@ plugins {
 }
 
 ext {
-    appVersion = 13
+    appVersion = 14
 }
 
 android {
