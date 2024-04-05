@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId "uk.co.busydoingnothing.anagrams"
         minSdk 21
-        targetSdk 30
+        targetSdk 33
         versionCode "$appVersion".toInteger()
         versionName "$appVersion"
         externalNativeBuild {
