@@ -1,1 +1,1 @@
-- Add a game mode using the Shavian alphabet.
+- Added a game mode using the Shavian alphabet.
