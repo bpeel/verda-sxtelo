@@ -30,6 +30,8 @@ vs_bindir = join_paths(get_option('prefix'), get_option('bindir'))
 
 thread_dep = dependency('threads')
 
+python = find_program('python3')
+
 if get_option('server')
   subdir('server')
 endif

@@ -29,6 +29,8 @@
 #include "vsx-qr.h"
 #include "vsx-id-url.h"
 
+#include "crc-table.h"
+
 #define INITIAL_CRC UINT32_MAX
 #define INITIAL_FISCHER UINT32_C(1)
 
@@ -46,36 +48,11 @@ png_header[] =
 };
 
 struct chunk_writer {
-        uint32_t *crc_table;
         uint32_t crc;
 };
 
-static uint32_t *
-make_crc_table(void)
-{
-        uint32_t *table = vsx_alloc(sizeof table[0] * 256);
-
-        for (int n = 0; n < 256; n++) {
-                uint32_t c = n;
-
-                for (int bit = 0; bit < 8; bit++) {
-                        bool value = c & 1;
-
-                        c >>= 1;
-
-                        if (value)
-                                c ^= UINT32_C(0xedb88320L);
-                }
-
-                table[n] = c;
-        }
-
-        return table;
-}
-
 static uint32_t
-update_crc(const uint32_t *crc_table,
-           uint32_t crc,
+update_crc(uint32_t crc,
            const uint8_t *buf,
            size_t len)
 {
@@ -106,10 +83,7 @@ write_data(struct chunk_writer *writer,
            const uint8_t *data,
            size_t len)
 {
-        writer->crc = update_crc(writer->crc_table,
-                                 writer->crc,
-                                 data,
-                                 len);
+        writer->crc = update_crc(writer->crc, data, len);
 
         fwrite(data, 1, len, stdout);
 }
@@ -217,15 +191,13 @@ static void
 write_png(const uint8_t *image)
 {
         struct chunk_writer writer = {
-                .crc_table = make_crc_table(),
+                .crc = 0,
         };
 
         fwrite(png_header, 1, sizeof png_header, stdout);
         write_ihdr(&writer);
         write_idat(&writer, image);
         write_iend(&writer);
-
-        vsx_free(writer.crc_table);
 }
 
 static void
