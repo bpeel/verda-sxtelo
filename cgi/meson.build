@@ -6,6 +6,7 @@ crc_table_h = custom_target(
 )
 
 invite_cgi_src = [
+        'vsx-generate-qr.c',
         'invite-cgi.c',
         '../common/vsx-id-url.c',
         '../common/vsx-qr.c',
