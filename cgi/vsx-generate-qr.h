@@ -21,7 +21,10 @@
 
 #include <stdint.h>
 
+#define VSX_GENERATE_QR_PNG_SIZE 1474
+
 void
-vsx_generate_qr(uint64_t id);
+vsx_generate_qr(uint64_t id,
+                uint8_t png[VSX_GENERATE_QR_PNG_SIZE]);
 
 #endif /* VSX_GENERATE_QR_H */

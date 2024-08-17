@@ -21,8 +21,8 @@
 #include "vsx-generate-qr.h"
 
 #include <string.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include "vsx-util.h"
 #include "vsx-qr.h"
@@ -40,14 +40,54 @@
  */
 #define N_IMAGE_BYTES ((VSX_QR_IMAGE_SIZE + 1) * VSX_QR_IMAGE_SIZE)
 
+#define CHUNK_HEADER_SIZE (sizeof (uint32_t) * 2 + 4)
+
 static const uint8_t
 png_header[] =
 {
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 };
 
+static const uint8_t ihdr_data[] = {
+        0x00, 0x00, 0x00, VSX_QR_IMAGE_SIZE, /* width */
+        0x00, 0x00, 0x00, VSX_QR_IMAGE_SIZE, /* height */
+        8, /* bits per sample */
+        0, /* color type (grayscale) */
+        0, /* compression method (the only available one) */
+        0, /* filter method */
+        0, /* interlace method */
+};
+
+static const uint8_t zlib_header[] = {
+        /* compression method / flags */
+        ZLIB_CMF,
+        /* check bits for CMF */
+        31 - (ZLIB_CMF * 256 % 31),
+        /* deflate block header (final block, no compression) */
+        1,
+        /* block len */
+        N_IMAGE_BYTES & 0xff,
+        N_IMAGE_BYTES >> 8,
+        /* block nlen */
+        (~N_IMAGE_BYTES) & 0xff,
+        (~N_IMAGE_BYTES) >> 8,
+};
+
+#define IDAT_SIZE (sizeof zlib_header + N_IMAGE_BYTES + sizeof (uint32_t))
+
+#define PNG_SIZE                                \
+        (sizeof png_header +                    \
+         CHUNK_HEADER_SIZE + sizeof ihdr_data + \
+         CHUNK_HEADER_SIZE + IDAT_SIZE +        \
+         CHUNK_HEADER_SIZE)
+
+_Static_assert(PNG_SIZE == VSX_GENERATE_QR_PNG_SIZE,
+               "PNG size declared in the header needs to match the "
+               "calculated size");
+
 struct chunk_writer {
         uint32_t crc;
+        uint8_t *pos;
 };
 
 static uint32_t
@@ -78,13 +118,22 @@ update_fischer(uint32_t sums,
 }
 
 static void
+write_data_no_crc(struct chunk_writer *writer,
+                  const uint8_t *data,
+                  size_t len)
+{
+        memcpy(writer->pos, data, len);
+        writer->pos += len;
+}
+
+static void
 write_data(struct chunk_writer *writer,
            const uint8_t *data,
            size_t len)
 {
         writer->crc = update_crc(writer->crc, data, len);
 
-        fwrite(data, 1, len, stdout);
+        write_data_no_crc(writer, data, len);
 }
 
 static void
@@ -94,7 +143,9 @@ start_chunk(struct chunk_writer *writer,
 {
         uint32_t length_be = VSX_UINT32_TO_BE(length);
 
-        fwrite(&length_be, 1, sizeof length_be, stdout);
+        write_data_no_crc(writer,
+                          (const uint8_t *) &length_be,
+                          sizeof length_be);
 
         writer->crc = INITIAL_CRC;
 
@@ -107,7 +158,9 @@ end_chunk(struct chunk_writer *writer)
         uint32_t final_crc = writer->crc ^ UINT32_MAX;
         uint32_t final_crc_be = VSX_UINT32_TO_BE(final_crc);
 
-        fwrite(&final_crc_be, 1, sizeof final_crc_be, stdout);
+        write_data_no_crc(writer,
+                          (const uint8_t *) &final_crc_be,
+                          sizeof final_crc_be);
 }
 
 static void
@@ -116,18 +169,8 @@ write_ihdr(struct chunk_writer *writer)
         _Static_assert(VSX_QR_IMAGE_SIZE < 256,
                        "Image size needs to fit in a byte");
 
-        static const uint8_t data[] = {
-                0x00, 0x00, 0x00, VSX_QR_IMAGE_SIZE, /* width */
-                0x00, 0x00, 0x00, VSX_QR_IMAGE_SIZE, /* height */
-                8, /* bits per sample */
-                0, /* color type (grayscale) */
-                0, /* compression method (the only available one) */
-                0, /* filter method */
-                0, /* interlace method */
-        };
-
-        start_chunk(writer, "IHDR", sizeof data);
-        write_data(writer, data, sizeof data);
+        start_chunk(writer, "IHDR", sizeof ihdr_data);
+        write_data(writer, ihdr_data, sizeof ihdr_data);
         end_chunk(writer);
 }
 
@@ -135,26 +178,7 @@ static void
 write_idat(struct chunk_writer *writer,
            const uint8_t *image)
 {
-        static const uint8_t zlib_header[] = {
-                /* compression method / flags */
-                ZLIB_CMF,
-                /* check bits for CMF */
-                31 - (ZLIB_CMF * 256 % 31),
-                /* deflate block header (final block, no compression) */
-                1,
-                /* block len */
-                N_IMAGE_BYTES & 0xff,
-                N_IMAGE_BYTES >> 8,
-                /* block nlen */
-                (~N_IMAGE_BYTES) & 0xff,
-                (~N_IMAGE_BYTES) >> 8,
-        };
-
-        start_chunk(writer,
-                    "IDAT",
-                    sizeof zlib_header +
-                    N_IMAGE_BYTES +
-                    sizeof (uint32_t));
+        start_chunk(writer, "IDAT", IDAT_SIZE);
 
         write_data(writer, zlib_header, sizeof zlib_header);
 
@@ -187,20 +211,24 @@ write_iend(struct chunk_writer *writer)
 }
 
 static void
-write_png(const uint8_t *image)
+write_png(const uint8_t *image, uint8_t *png)
 {
         struct chunk_writer writer = {
                 .crc = 0,
+                .pos = png,
         };
 
-        fwrite(png_header, 1, sizeof png_header, stdout);
+        write_data_no_crc(&writer, png_header, sizeof png_header);
         write_ihdr(&writer);
         write_idat(&writer, image);
         write_iend(&writer);
+
+        assert(writer.pos - png == PNG_SIZE);
 }
 
 void
-vsx_generate_qr(uint64_t id)
+vsx_generate_qr(uint64_t id,
+                uint8_t png[VSX_GENERATE_QR_PNG_SIZE])
 {
         char url_buf[VSX_ID_URL_ENCODED_SIZE + 1];
 
@@ -213,5 +241,5 @@ vsx_generate_qr(uint64_t id)
 
         vsx_qr_create((const uint8_t *) url_buf, image);
 
-        write_png(image);
+        write_png(image, png);
 }

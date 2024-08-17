@@ -24,6 +24,7 @@
 
 #include "vsx-generate-qr.h"
 #include "vsx-id-url.h"
+#include "vsx-util.h"
 
 static void
 report_error(void)
@@ -51,7 +52,13 @@ handle_query_string(void)
               "\r\n",
               stdout);
 
-        vsx_generate_qr(id);
+        uint8_t *png = vsx_alloc(VSX_GENERATE_QR_PNG_SIZE);
+
+        vsx_generate_qr(id, png);
+
+        fwrite(png, 1, VSX_GENERATE_QR_PNG_SIZE, stdout);
+
+        vsx_free(png);
 
         return true;
 }
