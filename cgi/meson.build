@@ -14,7 +14,18 @@ invite_cgi_src = [
         crc_table_h,
 ]
 
+deps = []
+
+if get_option('fastcgi')
+  if not cc.check_header('fcgi_stdio.h')
+    error('fcgi_stdio.h is needed with the fastcgi option')
+  endif
+  deps += cc.find_library('fcgi')
+  cdata.set('HAVE_FASTCGI', true)
+endif
+
 executable('invite-cgi', invite_cgi_src,
            install: true,
            install_dir: get_option('datadir') / 'web/cgi-bin',
+           dependencies: deps,
            include_directories: [ configinc, '../common' ])

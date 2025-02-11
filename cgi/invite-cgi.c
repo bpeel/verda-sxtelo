@@ -26,6 +26,10 @@
 #include "vsx-id-url.h"
 #include "vsx-util.h"
 
+#ifdef HAVE_FASTCGI
+#include <fcgi_stdio.h>
+#endif
+
 static void
 report_error(void)
 {
@@ -63,11 +67,23 @@ handle_query_string(void)
         return true;
 }
 
-int
-main(int argc, char **argv)
+static void
+run_once(void)
 {
         if (!handle_query_string())
                 report_error();
+}
+
+int
+main(int argc, char **argv)
+{
+#ifdef HAVE_FASTCGI
+        while (FCGI_Accept() >= 0) {
+                run_once();
+        }
+#else
+        run_once();
+#endif
 
         return EXIT_SUCCESS;
 }
