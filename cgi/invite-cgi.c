@@ -33,6 +33,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 
 static bool
 open_fastcgi_socket(const char *filename)
@@ -68,6 +69,20 @@ open_fastcgi_socket(const char *filename)
         if (res == -1) {
                 fprintf(stderr,
                         "error binding to %s: %s\n",
+                        filename,
+                        strerror(errno));
+                vsx_close(sock);
+                return false;
+        }
+
+        res = chmod(filename,
+                    S_IRUSR | S_IWUSR | S_IXUSR |
+                    S_IRGRP | S_IWGRP | S_IXGRP |
+                    S_IROTH | S_IWOTH | S_IXOTH);
+
+        if (res == -1) {
+                fprintf(stderr,
+                        "error setting permissions on %s: %s\n",
                         filename,
                         strerror(errno));
                 vsx_close(sock);
