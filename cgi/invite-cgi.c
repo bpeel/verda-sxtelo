@@ -27,7 +27,80 @@
 #include "vsx-util.h"
 
 #ifdef HAVE_FASTCGI
+
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+static bool
+open_fastcgi_socket(const char *filename)
+{
+        int res;
+
+        res = unlink(filename);
+
+        if (res == -1 && errno != ENOENT) {
+                fprintf(stderr,
+                        "error deleting %s: %s\n",
+                        filename,
+                        strerror(errno));
+                return false;
+        }
+
+        int sock = socket(PF_LOCAL, SOCK_STREAM, 0);
+
+        struct sockaddr_un *sockaddr_un =
+                vsx_alloc(offsetof(struct sockaddr_un, sun_path) +
+                          strlen(filename) + 1);
+
+        sockaddr_un->sun_family = AF_LOCAL;
+        strcpy(sockaddr_un->sun_path, filename);
+
+        res = bind(sock,
+                   (struct sockaddr *) sockaddr_un,
+                   offsetof(struct sockaddr_un, sun_path) +
+                   strlen(filename));
+
+        vsx_free(sockaddr_un);
+
+        if (res == -1) {
+                fprintf(stderr,
+                        "error binding to %s: %s\n",
+                        filename,
+                        strerror(errno));
+                vsx_close(sock);
+                return false;
+        }
+
+        res = listen(sock, 10);
+
+        if (res == -1) {
+                fprintf(stderr,
+                        "error listening on %s: %s\n",
+                        filename,
+                        strerror(errno));
+                vsx_close(sock);
+                return false;
+        };
+
+        res = dup2(sock, STDIN_FILENO);
+
+        vsx_close(sock);
+
+        if (res == -1) {
+                fprintf(stderr,
+                        "dup2: %s\n",
+                        strerror(errno));
+                return false;
+        }
+
+        return true;
+}
+
 #include <fcgi_stdio.h>
+
 #endif
 
 static void
@@ -78,6 +151,25 @@ int
 main(int argc, char **argv)
 {
 #ifdef HAVE_FASTCGI
+        char *fastcgi_socket_name = NULL;
+        int opt;
+
+        while ((opt = getopt(argc, argv, "u:")) != -1) {
+                switch (opt) {
+                case 'u':
+                        fastcgi_socket_name = optarg;
+                        break;
+
+                default:
+                        fprintf(stderr,
+                                "usage: invite-cgi [-u <unix_socket>]");
+                        return EXIT_FAILURE;
+                }
+        }
+
+        if (fastcgi_socket_name && !open_fastcgi_socket(fastcgi_socket_name))
+                return EXIT_FAILURE;
+
         while (FCGI_Accept() >= 0) {
                 run_once();
         }
